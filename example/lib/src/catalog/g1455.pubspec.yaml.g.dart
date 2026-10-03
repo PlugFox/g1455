@@ -305,10 +305,12 @@ sealed class Pubspec {
     r'{description: GlassGroup: three clear glass blobs orbit and fuse into one silhouette where they meet., path: doc/screenshots/group.webp}',
     r'{description: GlassFinish: regular, clear and frosted glass side by side over the same backdrop., path: doc/screenshots/finishes.webp}',
     r'{description: GlassRipple: taps and a drag send viscous waves across a clear glass panel., path: doc/screenshots/ripple.webp}',
-    r'{description: GlassTabBar: the selection lifts into a drop that magnifies the bar and is dragged between tabs., path: doc/screenshots/tab_bar.webp}',
+    r'{description: GlassSurface.materialize: a bar and two buttons arrive, blur first and tint last, and leave., path: doc/screenshots/materialize.webp}',
     r'{description: GlassSwitch: switches on a glass card, the knob turning into a clear drop while held., path: doc/screenshots/switch.webp}',
     r'{description: GlassSlider: two sliders dragged, the knob a clear drop while held., path: doc/screenshots/slider.webp}',
+    r'{description: GlassTabBar: the selection lifts into a drop that magnifies the bar and is dragged between tabs., path: doc/screenshots/tab_bar.webp}',
     r'{description: GlassSegmentedControl: the selected segment lifts into a drop and slides to another., path: doc/screenshots/segmented.webp}',
+    r'{description: GlassMenuAnchor and GlassButtonGroup: a button grows into a glass menu, and toolbar cells are pressed., path: doc/screenshots/menu.webp}',
     r'{description: GlassAlert: an alert materializes over the screen, blur first and tint last, and is dismissed., path: doc/screenshots/alert.webp}',
   ];
 

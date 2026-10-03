@@ -70,7 +70,7 @@ class ShowcaseScene {
   /// The anaglyph word in the backdrop.
   final String word;
 
-  /// The component, written into the tile's corner so the strip reads
+  /// The component, written into the tile's corner so the grid reads
   /// without the text around it.
   final String caption;
 

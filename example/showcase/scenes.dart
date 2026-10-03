@@ -8,8 +8,12 @@ import 'package:g1455/g1455.dart';
 import 'backdrop.dart';
 import 'harness.dart';
 
-/// The README's strip, top to bottom. The order is the strip's: each scene is
-/// cut from the backdrop at its own index, so reordering moves the seams.
+/// The README's grid, left to right and top to bottom, [kGridColumns] to a
+/// row: each scene is cut from the backdrop at its own index, so reordering
+/// moves the seams, and the count stays a multiple of the columns.
+///
+/// Ten at most: that is as many screenshots as pub.dev shows, and the
+/// pubspec lists every one.
 final List<ShowcaseScene> kShowcaseScenes = <ShowcaseScene>[
   const ShowcaseScene(name: 'group', word: 'GLASS', caption: 'GlassGroup', builder: _blobs),
   const ShowcaseScene(name: 'finishes', word: 'FINISH', caption: 'GlassFinish', builder: _finishes),
@@ -24,6 +28,7 @@ final List<ShowcaseScene> kShowcaseScenes = <ShowcaseScene>[
       Stroke.drag(1.6, 2.5, _rippleTarget, const Alignment(-0.7, 0.4), const Alignment(0.5, -0.4), hold: 0.1),
     ],
   ),
+  const ShowcaseScene(name: 'materialize', word: 'APPEAR', caption: 'GlassSurface.materialize', builder: _materialize),
   ShowcaseScene(
     name: 'switch',
     word: 'SWITCH',
@@ -71,6 +76,20 @@ final List<ShowcaseScene> kShowcaseScenes = <ShowcaseScene>[
       Stroke.tap(0.2, 0.45, _segments, _tab(1, 3)),
       Stroke.drag(0.9, 2.0, _segments, _tab(1, 3), _tab(2, 3), hold: 0.25),
       Stroke.drag(2.4, 3.5, _segments, _tab(2, 3), _tab(0, 3), hold: 0.25),
+    ],
+  ),
+  ShowcaseScene(
+    name: 'menu',
+    word: 'MENU',
+    caption: 'GlassMenuAnchor · GlassButtonGroup',
+    builder: (BuildContext context, ValueListenable<double> _) => const _MenuDemo(),
+    strokes: <Stroke>[
+      Stroke.tap(0.2, 0.4, find.byKey(_menuButton)),
+      Stroke.tap(1.2, 1.4, find.text('Date')),
+      Stroke.tap(1.7, 1.95, find.byKey(_toolbar), const Alignment(-2 / 3, 0)),
+      Stroke.tap(2.2, 2.4, find.byKey(_menuButton)),
+      Stroke.tap(3.1, 3.3, find.text('Name')),
+      Stroke.tap(3.5, 3.75, find.byKey(_toolbar), const Alignment(2 / 3, 0)),
     ],
   ),
   ShowcaseScene(
@@ -177,6 +196,64 @@ Widget _ripple(BuildContext context, ValueListenable<double> phase) => const Cen
       ripple: GlassRipple(viscosity: 0.3, amplitude: 14, width: 16, speed: 300, light: 0.2),
     ),
   ),
+);
+
+// ---------------------------------------------------------------------------
+// Materialize.
+
+/// How far a panel has materialized at phase [t], if it starts [delay] into
+/// the loop: in, held, out, and gone at the seam.
+double _arrival(double t, double delay) {
+  double ramp(double from, double to) => Curves.easeInOut.transform(((t - from) / (to - from)).clamp(0.0, 1.0));
+  return ramp(delay, delay + 0.22) - ramp(delay + 0.5, delay + 0.72);
+}
+
+/// A bar and two buttons arriving one after another: the bend first, then
+/// the blur, the tint last, and leaving in the reverse order.
+Widget _materialize(BuildContext context, ValueListenable<double> phase) => ValueListenableBuilder<double>(
+  valueListenable: phase,
+  builder: (BuildContext context, double t, Widget? _) {
+    Widget panel(double delay, double width, Widget child) => SizedBox(
+      width: width,
+      height: 48,
+      child: GlassSurface(
+        borderRadius: kGlassCapsule,
+        materialize: _arrival(t, delay),
+        child: Center(
+          child: Opacity(opacity: _arrival(t, delay + 0.06).clamp(0.0, 1.0), child: child),
+        ),
+      ),
+    );
+    const TextStyle label = TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          panel(
+            0.04,
+            300,
+            const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(Icons.photo_library_outlined, size: 20),
+                SizedBox(width: 8),
+                Text('Library', style: label),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              panel(0.12, 143, const Text('Edit', style: label)),
+              const SizedBox(width: 14),
+              panel(0.2, 143, const Text('Share', style: label)),
+            ],
+          ),
+        ],
+      ),
+    );
+  },
 );
 
 // ---------------------------------------------------------------------------
@@ -355,6 +432,52 @@ class _SegmentsState extends State<_Segments> {
           onSelected: (int i) => setState(() => _selected = i),
         ),
       ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Menu and toolbar.
+
+const Key _menuButton = ValueKey<String>('menu button');
+const Key _toolbar = ValueKey<String>('toolbar');
+
+class _MenuDemo extends StatelessWidget {
+  const _MenuDemo();
+
+  @override
+  Widget build(BuildContext context) => Align(
+    // High enough that the menu opens downward, over the button, as it does
+    // from a toolbar at the top of a screen.
+    alignment: const Alignment(0, -0.62),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        GlassMenuAnchor(
+          items: <GlassMenuItem>[
+            GlassMenuItem(label: 'Name', icon: const Icon(Icons.sort_by_alpha, size: 20), onPressed: () {}),
+            GlassMenuItem(label: 'Date', icon: const Icon(Icons.schedule, size: 20), onPressed: () {}),
+            GlassMenuItem(label: 'Size', icon: const Icon(Icons.straighten, size: 20), onPressed: () {}),
+          ],
+          builder: (BuildContext context, GlassMenuController menu) => GlassButton(
+            key: _menuButton,
+            onPressed: menu.open,
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[Icon(Icons.swap_vert, size: 20), SizedBox(width: 6), Text('Sort')],
+            ),
+          ),
+        ),
+        const SizedBox(width: 40),
+        GlassButtonGroup(
+          key: _toolbar,
+          items: <GlassToolbarItem>[
+            GlassToolbarItem(icon: const Icon(Icons.ios_share), label: 'Share', onPressed: () {}),
+            GlassToolbarItem(icon: const Icon(Icons.favorite_border), label: 'Like', onPressed: () {}),
+            GlassToolbarItem(icon: const Icon(Icons.delete_outline), label: 'Delete', onPressed: () {}),
+          ],
+        ),
+      ],
     ),
   );
 }
