@@ -60,15 +60,19 @@ class SiteShell extends StatelessWidget {
                 ),
               ),
             ),
+            // The edge across the whole window, as the package asks, and the
+            // bar inset from the side panel inside it: an edge that stopped
+            // where the page column starts drew its blur and tint up to a hard
+            // vertical line beside the panel.
             Positioned(
-              left: left,
+              left: 0,
               top: 0,
               right: 0,
               child: GlassScrollEdge(
                 side: GlassScrollEdgeSide.top,
                 extent: barTop + barHeight + 4,
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(wide ? 0 : 12, barTop, 12, 0),
+                  padding: EdgeInsets.fromLTRB(wide ? left : 12, barTop, 12, 0),
                   child: _TopBar(title: title, current: current, wide: wide, height: barHeight),
                 ),
               ),

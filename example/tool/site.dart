@@ -1,7 +1,7 @@
 // The HTML around the app: one page per address of the site, the sitemap,
 // robots.txt and the web manifest — all from the catalog the app draws.
 //
-//   dart run tool/site.dart [build/web]
+//   dart run tool/site.dart [build/web [version]]
 //
 // Run after `flutter build web` and before `sw:generate`. Each page is the
 // app's shell — the same bootstrap, the same base — with the page's own
@@ -31,7 +31,9 @@ void main(List<String> args) {
     stderr.writeln('${out.path} is not a web build: run `flutter build web` first');
     exit(64);
   }
-  final String version = _version();
+  // The build's own name when the build script gives it: the app compares
+  // itself with this file, and was compiled with the same one.
+  final String version = args.length > 1 ? args[1] : _version();
 
   _write(out, 'index.html', _home());
   for (final Entry entry in kEntries) {

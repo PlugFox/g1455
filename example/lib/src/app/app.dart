@@ -3,6 +3,7 @@ import 'package:g1455/g1455.dart';
 import 'package:squid/squid.dart';
 
 import '../style.dart';
+import '../widgets/update_banner.dart';
 import 'router.dart';
 import 'routes.dart';
 import 'theme.dart';
@@ -69,7 +70,8 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
         // never deforms the glass. On in the Ultra preset only, which is where
         // the example opens.
         ripple: _settings.glassRipple,
-        child: child!,
+        // Over every route: a deploy since this tab loaded is offered here.
+        child: SiteUpdateBanner(child: child!),
       ),
     ),
   );

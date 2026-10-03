@@ -26,7 +26,7 @@ flutter build web --release --wasm --base-href / --no-source-maps \
 
 flutter test tool/brand_test.dart --dart-define=BRAND_OUT=build/web --dart-define=BRAND_ONLY=og --reporter=compact
 
-dart run tool/site.dart build/web
+dart run tool/site.dart build/web "$version"
 
 if ! dart pub global list | grep -q '^sw 0.2.0'; then
   dart pub global activate sw 0.2.0

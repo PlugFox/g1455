@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
 
@@ -177,7 +179,8 @@ class KnobSlider extends StatelessWidget {
   );
 }
 
-/// One of a few values, as a row of chips.
+/// One of a few values: the package's own [GlassSegmentedControl], its
+/// segments as wide as the longest label.
 class KnobChoice<T> extends StatelessWidget {
   const KnobChoice({
     required this.label,
@@ -186,42 +189,64 @@ class KnobChoice<T> extends StatelessWidget {
     required this.onChanged,
     this.labelOf,
     super.key,
-  });
+  }) : assert(values.length >= 2);
 
   final String label;
   final List<T> values;
+
+  /// One of [values].
   final T selected;
   final ValueChanged<T> onChanged;
 
   /// The text of a value; its `toString` when null.
   final String Function(T value)? labelOf;
 
+  static const TextStyle _kSegment = TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kSiteText);
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(label, style: const TextStyle(color: kSiteTextMuted, fontSize: 13)),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: <Widget>[
-              for (final T value in values)
-                ChoiceChip(
-                  label: Text(labelOf?.call(value) ?? '$value'),
-                  selected: value == selected,
-                  showCheckmark: false,
-                  visualDensity: VisualDensity.compact,
-                  labelStyle: const TextStyle(fontSize: 12),
-                  onSelected: (_) => onChanged(value),
+  Widget build(BuildContext context) {
+    final List<String> labels = <String>[for (final T value in values) labelOf?.call(value) ?? '$value'];
+    final int index = values.indexOf(selected);
+    assert(index >= 0, '$selected is not one of $values');
+    // The control divides its width evenly, so it is given the longest label
+    // times the count — and no more than a phone has, where the knob row
+    // wraps under its label instead.
+    var widest = 0.0;
+    for (final String text in labels) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: _kSegment),
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      widest = math.max(widest, painter.width);
+      painter.dispose();
+    }
+    final double width = (widest + 24) * values.length + 4;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(label, style: const TextStyle(color: kSiteTextMuted, fontSize: 13)),
+          const SizedBox(width: 10),
+          Flexible(
+            child: SizedBox(
+              width: width,
+              child: DefaultTextStyle.merge(
+                style: _kSegment,
+                child: GlassSegmentedControl(
+                  segments: <Widget>[
+                    for (final String text in labels)
+                      Text(text, maxLines: 1, overflow: TextOverflow.fade, softWrap: false),
+                  ],
+                  selectedIndex: math.max(index, 0),
+                  onSelected: (int i) => onChanged(values[i]),
                 ),
-            ],
+              ),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

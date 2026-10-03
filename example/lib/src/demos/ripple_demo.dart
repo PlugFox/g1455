@@ -38,6 +38,12 @@ class _RippleDemoState extends State<RippleDemo> {
     return null;
   }
 
+  /// The named point nearest the viscosity: the one the knob shows while the
+  /// slider is between two.
+  _Liquid get _nearest => _Liquid.values.reduce(
+    (_Liquid a, _Liquid b) => (a.viscosity - _viscosity).abs() <= (b.viscosity - _viscosity).abs() ? a : b,
+  );
+
   @override
   Widget build(BuildContext context) {
     final bool reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
@@ -45,12 +51,12 @@ class _RippleDemoState extends State<RippleDemo> {
     return DemoStage(
       height: 360,
       knobs: <Widget>[
-        KnobChoice<_Liquid?>(
+        KnobChoice<_Liquid>(
           label: 'Liquid',
           values: _Liquid.values,
-          selected: preset,
-          labelOf: (_Liquid? l) => l?.label ?? '',
-          onChanged: (_Liquid? l) => setState(() => _viscosity = l!.viscosity),
+          selected: _nearest,
+          labelOf: (_Liquid l) => l.label,
+          onChanged: (_Liquid l) => setState(() => _viscosity = l.viscosity),
         ),
         KnobSlider(
           label: 'Viscosity',
