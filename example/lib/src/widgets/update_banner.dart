@@ -176,10 +176,11 @@ class _Close extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
+    enabled: onTap != null,
     label: 'Later',
     excludeSemantics: true,
     child: MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,

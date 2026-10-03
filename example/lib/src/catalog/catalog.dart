@@ -34,7 +34,8 @@ abstract final class Site {
   static String source(String path) => '$repository/blob/master/$path';
 
   /// The dartdoc page of an exported name: `GlassSlider`, `showGlassDialog()`,
-  /// `kGlassCapsule`, or a named constructor such as `GlassTextField.search`.
+  /// `kGlassCapsule`, `debugPaintGlassSurfaces`, or a named constructor such as
+  /// `GlassTextField.search`.
   static String api(String symbol) {
     if (symbol.endsWith('()')) {
       return '$pubApi${symbol.substring(0, symbol.length - 2)}.html';
@@ -44,6 +45,10 @@ abstract final class Site {
     }
     if (symbol.startsWith('k') && symbol.length > 1 && symbol[1].toUpperCase() == symbol[1]) {
       return '$pubApi$symbol-constant.html';
+    }
+    // A top-level variable, such as `debugPaintGlassSurfaces`: no suffix.
+    if (symbol[0].toLowerCase() == symbol[0]) {
+      return '$pubApi$symbol.html';
     }
     // dartdoc names an enum's page without the `-class` suffix.
     return _enums.contains(symbol) ? '$pubApi$symbol.html' : '$pubApi$symbol-class.html';

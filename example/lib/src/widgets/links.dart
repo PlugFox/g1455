@@ -30,8 +30,8 @@ Future<void> copyLink(BuildContext context, String path) async {
   }
 }
 
-/// A link that reads as one: the pointer, an underline on hover, and the
-/// semantics of a link for a screen reader.
+/// A link that reads as one: the pointer, an underline on hover or focus, a
+/// stop in keyboard traversal, and the semantics of a link for a screen reader.
 class LinkText extends StatefulWidget {
   const LinkText({required this.text, required this.url, this.style, this.icon, this.maxLines, super.key});
 
@@ -52,21 +52,29 @@ class LinkText extends StatefulWidget {
 
 class _LinkTextState extends State<LinkText> {
   bool _hover = false;
+  bool _focus = false;
+
+  late final Map<Type, Action<Intent>> _actions = <Type, Action<Intent>>{
+    ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) => openLink(context, widget.url)),
+  };
 
   @override
   Widget build(BuildContext context) {
     final TextStyle style = (widget.style ?? DefaultTextStyle.of(context).style).copyWith(
       color: widget.style?.color ?? kSiteAccent,
-      decoration: _hover ? TextDecoration.underline : TextDecoration.none,
+      // Focus shows as hover does, so a keyboard user sees where they are.
+      decoration: _hover || _focus ? TextDecoration.underline : TextDecoration.none,
       decorationColor: widget.style?.color ?? kSiteAccent,
     );
     return Semantics(
       link: true,
       linkUrl: Uri.tryParse(widget.url.startsWith('/') ? '${Site.origin}${widget.url}' : widget.url),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
+      // Tab reaches it and Enter or Space follows it, like a link of the page.
+      child: FocusableActionDetector(
+        actions: _actions,
+        mouseCursor: SystemMouseCursors.click,
+        onShowHoverHighlight: (bool value) => setState(() => _hover = value),
+        onShowFocusHighlight: (bool value) => setState(() => _focus = value),
         child: GestureDetector(
           onTap: () => openLink(context, widget.url),
           child: Row(
