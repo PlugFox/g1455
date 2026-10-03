@@ -18,7 +18,7 @@
       },
       {
         "regex": "^/(?:assets|canvaskit)/.*$|^/main\\.dart\\.(?:js|mjs|wasm)$",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {
         "regex": "^/(?:og|icons)/.*$|^/favicon\\.(?:ico|png|svg)$",

@@ -166,6 +166,43 @@ $body
       if (s) { s.setAttribute('aria-hidden', 'true'); s.setAttribute('inert', ''); s.style.display = 'none'; }
     }, { once: true });
   </script>
+  <script>
+    // A deploy takes over on the visit that finds it. The bootstrap installs
+    // the new worker and gives it four seconds to activate, but a worker
+    // waits while the old one controls the tab, so the visit after a deploy
+    // ran the old build and only the next reload ran the new one. Here the
+    // new worker takes over as soon as it is installed: in time, the
+    // bootstrap goes on with it; too late, the old build already started,
+    // and the tab reloads into the new one — unless it has been touched, in
+    // which case the app's own banner offers the reload.
+    (function () {
+      var sw = navigator.serviceWorker;
+      if (!sw || !sw.controller) return;
+      var touched = false, start = Date.now();
+      ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (t) {
+        addEventListener(t, function () { touched = true; }, { capture: true, passive: true, once: true });
+      });
+      function adopt(w) {
+        if (!w) return;
+        var go = function () { if (w.state === 'installed') w.postMessage({ type: 'skipWaiting' }); };
+        go();
+        w.addEventListener('statechange', go);
+      }
+      sw.getRegistration().then(function (r) {
+        if (!r) return;
+        adopt(r.waiting);
+        adopt(r.installing);
+        r.addEventListener('updatefound', function () { adopt(r.installing); });
+      });
+      sw.addEventListener('controllerchange', function () {
+        // Before the bootstrap is past its worker step, it loads through the
+        // new worker anyway.
+        var b = window.Bootstrap;
+        if (!b || b.progress.phase === 'init' || b.progress.phase === 'sw') return;
+        if (!touched && Date.now() - start < 30000) location.reload();
+      }, { once: true });
+    })();
+  </script>
   <script defer data-sw-bootstrap src="bootstrap.js" data-config='{"logo":"icons/Icon-192.png","title":"g1455","theme":"dark","color":"#8ab4ff"}'></script>
 </body>
 </html>

@@ -45,6 +45,7 @@ extension type _Registration._(JSObject _) implements JSObject {
 
 extension type _Worker._(JSObject _) implements JSObject {
   external String get state;
+  external String get scriptURL;
   external void postMessage(JSAny message);
   external void addEventListener(String type, JSFunction listener);
 }
@@ -92,6 +93,9 @@ final class _WebSiteUpdates extends ChangeNotifier implements SiteUpdates {
   bool available = false;
 
   _Registration? _registration;
+
+  /// The build `version.json` last named, once it differs from this one.
+  String? _live;
   Timer? _timer;
   DateTime _checked = DateTime.now();
   bool _disposed = false;
@@ -194,6 +198,7 @@ final class _WebSiteUpdates extends ChangeNotifier implements SiteUpdates {
       final Object? body = (await response.json().toDart).dartify();
       final Object? live = body is Map ? body['version'] : null;
       if (live is String && live.isNotEmpty && live != kSiteVersion) {
+        _live = live;
         _found();
       }
     } on Object {
@@ -224,6 +229,9 @@ final class _WebSiteUpdates extends ChangeNotifier implements SiteUpdates {
       waiting.postMessage(<String, Object?>{'type': 'skipWaiting'}.jsify()!);
       await taken.future.timeout(_kHandover, onTimeout: () {});
       workers.removeEventListener('controllerchange', done);
+    } else if (_live != null && (workers?.controller?.scriptURL.endsWith('v=$_live') ?? false)) {
+      // The new build's worker already took over (the page's loader hands
+      // over as soon as it is installed): a reload is all it takes.
     } else {
       // Nothing waiting — the deploy is newer than any worker this tab has
       // seen, or the worker is stuck — so the cache goes: the reload then
