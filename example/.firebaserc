@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "plug-fox"
+  },
+  "targets": {
+    "plug-fox": {
+      "hosting": {
+        "g1455": ["g1455d"]
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@
 [![Checks](https://github.com/PlugFox/g1455/actions/workflows/checks.yml/badge.svg)](https://github.com/PlugFox/g1455/actions/workflows/checks.yml)
 [![codecov](https://codecov.io/gh/PlugFox/g1455/graph/badge.svg)](https://codecov.io/gh/PlugFox/g1455)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Site](https://img.shields.io/badge/demo-g1455.plugfox.dev-8ab4ff.svg)](https://g1455.plugfox.dev)
 
 Liquid Glass for Flutter: refraction, blur, tint and a rim over the live
 backdrop, in the shape the engine already draws (`RSuperellipse`). Built for
@@ -114,8 +115,11 @@ What is in the box:
   and a surface with no wave runs the same shader as before. It is off under
   reduced motion.
 
-The [`example/`](example/) directory has a full app: four pages under one host,
-and a settings menu that switches the finish, the tint, the rung and the ripple.
+Every component is live at **[g1455.plugfox.dev](https://g1455.plugfox.dev)**,
+with its guide, its code and its API. The site is the [`example/`](example/)
+app built for the web: one host, every component on its own page, the original
+full-screen demos, and a settings menu that switches the finish, the tint, the
+rung and the ripple.
 
 ### Things the application has to declare
 

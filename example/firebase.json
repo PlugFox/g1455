@@ -1,0 +1,41 @@
+{
+  "hosting": {
+    "target": "g1455",
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/*.map", "**/*.symbols"],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "redirects": [
+      { "source": "/start", "destination": "/start/installation", "type": 301 },
+      { "source": "/foundations", "destination": "/foundations/host", "type": 301 },
+      { "source": "/components", "destination": "/components/bar", "type": 301 },
+      { "source": "/demos", "destination": "/demos/scroll", "type": 301 }
+    ],
+    "headers": [
+      {
+        "regex": "^/(?:[^.]*|.*\\.html|bootstrap\\.js|sw\\.js|version\\.json|manifest\\.json|robots\\.txt|sitemap\\.xml)$",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "regex": "^/(?:assets|canvaskit)/.*$|^/main\\.dart\\.(?:js|mjs|wasm)$",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
+        "regex": "^/(?:og|icons)/.*$|^/favicon\\.(?:ico|png|svg)$",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+      },
+      {
+        "source": "**/*.@(ttf|otf|woff|woff2)",
+        "headers": [{ "key": "Access-Control-Allow-Origin", "value": "*" }]
+      },
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+        ]
+      }
+    ]
+  }
+}

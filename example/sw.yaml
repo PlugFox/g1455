@@ -1,0 +1,14 @@
+# `dart pub global run sw:generate` (package `sw`): the service worker and the
+# bootstrap that replace Flutter's own. See tool/build_web.sh.
+input: build/web
+output: sw.js
+bootstrap-output: bootstrap.js
+prefix: g1455
+# What the worker precaches and serves: the app. Not the pages around it —
+# each is fetched fresh for its own meta — and not the link previews.
+glob: "*.{html,js,mjs,wasm,json}; assets/**; canvaskit/**; icons/**; favicon.*"
+no-glob: "sw.js; bootstrap.js; 404.html; version.json; **/*.map; **/*.symbols; assets/NOTICES"
+title: g1455
+logo: icons/Icon-192.png
+theme: dark
+color: "#8ab4ff"
