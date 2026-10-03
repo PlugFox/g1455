@@ -424,6 +424,113 @@ void main() {
     after.dispose();
     expect(diff.differing, 0, reason: 'the live frame changed under the passes: $diff');
   });
+
+  // A render object that keeps its own layer writes its position into it from
+  // `paint` — `RenderLeaderLayer` sets `layer.offset` — and the pass calls
+  // `paint` with the root's offset, not the one the layer's parent composites
+  // it at. The snapshot above has no field for an offset, so this is its own
+  // arm: a leader inside a repaint boundary that is not at the origin, which is
+  // a `SelectionArea` in a bar and was the bar's title moved on screen.
+  testWidgets('a pass leaves a leader where its parent composites it', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _mount(
+        _page(
+          Stack(
+            children: <Widget>[
+              Positioned(
+                left: 60,
+                top: 12,
+                width: 100,
+                height: 40,
+                child: RepaintBoundary(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 14),
+                    child: CompositedTransformTarget(
+                      link: LayerLink(),
+                      child: const ColoredBox(color: kBox),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final RenderRepaintBoundary root = _boundaryOf();
+    final leader = tester.renderObject(find.byType(CompositedTransformTarget)).debugLayer! as LeaderLayer;
+    // In its boundary's layer, so not where it is on the screen: the pass
+    // reaches it at (74, 12).
+    expect(leader.offset, const Offset(14, 0));
+
+    final ui.Image before = root.toImageSync();
+    final _Pass pass = _passOver(root);
+    expect(pass.log.errors, isEmpty);
+    expect(leader.offset, const Offset(14, 0), reason: 'the pass moved the live leader');
+    pass.dispose();
+
+    final ui.Image after = root.toImageSync();
+    final _Diff diff = await _compare(tester, before, after);
+    before.dispose();
+    after.dispose();
+    expect(diff.differing, 0, reason: 'the live frame changed under the pass: $diff');
+  });
+
+  // The stock capture leaves a hole where a platform view is, so the base
+  // level is recorded with one; a pass that stubbed it showed the levels above
+  // something the base did not. On the web a `SelectionArea` lays a
+  // transparent platform view under everything it holds.
+  testWidgets('a platform view is a hole in the pass, as it is in the stock capture', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _mount(
+        _page(
+          Stack(
+            children: <Widget>[
+              const Positioned.fill(child: _PlatformViewStandIn()),
+              Positioned.fromRect(
+                rect: _first,
+                child: const ColoredBox(color: kBox),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final RenderRepaintBoundary root = _boundaryOf();
+    final ui.Image stock = root.toImageSync();
+    final _Pass pass = _passOver(root);
+    expect(pass.log.addedLayers, contains('PlatformViewLayer'));
+    expect(pass.log.unhandledLayers, isEmpty);
+    final _Diff diff = await _compare(tester, stock, pass.image);
+    stock.dispose();
+    pass.dispose();
+    expect(diff.differing, 0, reason: 'the pass drew where the platform view is: $diff');
+  });
+}
+
+/// What `HtmlElementView` paints, without a platform to make the view: a
+/// `PlatformViewLayer` over its box and nothing else.
+class _PlatformViewStandIn extends LeafRenderObjectWidget {
+  const _PlatformViewStandIn();
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderPlatformViewStandIn();
+}
+
+class _RenderPlatformViewStandIn extends RenderBox {
+  @override
+  bool get sizedByParent => true;
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;
+
+  @override
+  bool get alwaysNeedsCompositing => true;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    context.addLayer(PlatformViewLayer(rect: offset & size, viewId: 1));
+  }
 }
 
 /// A policy that composes differently from `paintEverything` on every branch

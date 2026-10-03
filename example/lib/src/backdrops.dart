@@ -84,15 +84,7 @@ class _GridPainter extends CustomPainter {
           ).createShader(Rect.fromCircle(center: c, radius: r)),
       );
     }
-    final line = Paint()
-      ..color = const Color(0x55FFFFFF)
-      ..strokeWidth = 1;
-    for (double x = 0; x < size.width; x += 24) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
-    }
-    for (double y = 0; y < size.height; y += 24) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), line);
-    }
+    paintDraftingGrid(canvas, size, cell: 24, minor: const Color(0x26FFFFFF), major: const Color(0x66FFFFFF));
   }
 
   Color _hsv(double h, double s, double v) => HSVColor.fromAHSV(1, (h + hue) % 360, s, v).toColor();
@@ -151,4 +143,53 @@ class _PhotoPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PhotoPainter oldDelegate) => oldDelegate.seed != seed;
+}
+
+/// A drafting sheet's grid over [size]: fine lines every [cell], a heavier
+/// line every [every] cells, and a cross at each crossing of the heavy lines
+/// — straight edges for refraction to bend, in three weights so the eye can
+/// tell how far the glass moved them.
+///
+/// One path per weight: a few draw calls however large the canvas.
+void paintDraftingGrid(
+  Canvas canvas,
+  Size size, {
+  required double cell,
+  required Color minor,
+  required Color major,
+  int every = 5,
+}) {
+  final fine = Path();
+  final heavy = Path();
+  final crosses = Path();
+  final double step = cell * every;
+  for (var i = 0; cell * i <= size.width; i++) {
+    final double x = cell * i + 0.5;
+    (i % every == 0 ? heavy : fine)
+      ..moveTo(x, 0)
+      ..lineTo(x, size.height);
+  }
+  for (var i = 0; cell * i <= size.height; i++) {
+    final double y = cell * i + 0.5;
+    (i % every == 0 ? heavy : fine)
+      ..moveTo(0, y)
+      ..lineTo(size.width, y);
+  }
+  final double arm = cell * 0.4;
+  for (double x = step + 0.5; x < size.width; x += step) {
+    for (double y = step + 0.5; y < size.height; y += step) {
+      crosses
+        ..moveTo(x - arm, y)
+        ..lineTo(x + arm, y)
+        ..moveTo(x, y - arm)
+        ..lineTo(x, y + arm);
+    }
+  }
+  final paint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1;
+  canvas
+    ..drawPath(fine, paint..color = minor)
+    ..drawPath(heavy, paint..color = major)
+    ..drawPath(crosses, paint..strokeWidth = 2);
 }

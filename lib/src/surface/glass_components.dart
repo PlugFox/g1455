@@ -309,7 +309,11 @@ class _GlassButtonState extends State<GlassButton> {
             child: Center(
               widthFactor: 1,
               heightFactor: 1,
-              child: ExcludeSemantics(excluding: widget.semanticLabel != null, child: widget.child),
+              // A label is not text to select: a drag across a page that
+              // selects would otherwise take it along.
+              child: SelectionContainer.disabled(
+                child: ExcludeSemantics(excluding: widget.semanticLabel != null, child: widget.child),
+              ),
             ),
           ),
         ),

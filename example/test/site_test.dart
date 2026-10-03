@@ -1,0 +1,160 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:g1455/g1455.dart';
+import 'package:g1455_example/main.dart';
+import 'package:g1455_example/src/app/routes.dart';
+import 'package:g1455_example/src/catalog/catalog.dart';
+import 'package:g1455_example/src/demos/demos.dart';
+import 'package:g1455_example/src/pages/entry_page.dart';
+import 'package:g1455_example/src/pages/home_page.dart';
+import 'package:g1455_example/src/pages/not_found_page.dart';
+import 'package:g1455_example/src/widgets/icons.dart';
+import 'package:squid/squid.dart';
+
+Future<void> _frames(WidgetTester tester, [int n = 30, String? reason]) async {
+  for (var i = 0; i < n; i++) {
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.takeException(), isNull, reason: reason);
+  }
+}
+
+void _size(WidgetTester tester, Size logical) {
+  tester.view
+    ..physicalSize = logical * 2
+    ..devicePixelRatio = 2;
+  addTearDown(tester.view.reset);
+}
+
+void main() {
+  group('catalog', () {
+    test('every page has a unique address, an icon, a summary and a guide', () {
+      final Set<String> paths = <String>{};
+      for (final Entry e in kEntries) {
+        expect(paths.add(e.path), isTrue, reason: 'two pages at ${e.path}');
+        expect(knownIconNames, contains(e.icon), reason: '${e.path}: unknown icon ${e.icon}');
+        expect(e.summary, isNotEmpty, reason: e.path);
+        expect(e.summary.length, lessThanOrEqualTo(220), reason: '${e.path}: too long for a meta description');
+        expect(RegExp(r'^[a-z0-9-]+$').hasMatch(e.id), isTrue, reason: e.path);
+        if (e.section != Section.demos) {
+          expect(e.guide, isNotEmpty, reason: e.path);
+        }
+      }
+      for (final Section s in Section.values) {
+        expect(entriesOf(s), isNotEmpty, reason: '${s.id} has no pages');
+      }
+    });
+
+    test('every component has a demo, code and an API table', () {
+      for (final Entry e in entriesOf(Section.components)) {
+        expect(hasDemo(e), isTrue, reason: e.path);
+        expect(e.code, isNotNull, reason: e.path);
+        expect(e.properties, isNotNull, reason: e.path);
+        expect(e.api, isNotEmpty, reason: e.path);
+      }
+    });
+
+    test('links inside the guides go to pages that exist', () {
+      final Set<String> paths = <String>{for (final Entry e in kEntries) e.path};
+      final link = RegExp(r'\]\((/[^)#?\s]*)');
+      for (final Entry e in kEntries) {
+        for (final RegExpMatch m in link.allMatches('${e.guide}\n${e.properties ?? ''}')) {
+          expect(paths, contains(m.group(1)), reason: '${e.path} links to ${m.group(1)}');
+        }
+      }
+    });
+
+    test('API links follow dartdoc names', () {
+      expect(Site.api('GlassSlider'), endsWith('/GlassSlider-class.html'));
+      expect(Site.api('GlassTier'), endsWith('/GlassTier.html'));
+      expect(Site.api('kGlassCapsule'), endsWith('/kGlassCapsule-constant.html'));
+      expect(Site.api('showGlassDialog()'), endsWith('/showGlassDialog.html'));
+      expect(Site.api('GlassTextField.search'), endsWith('/GlassTextField/GlassTextField.search.html'));
+    });
+  });
+
+  group('addresses', () {
+    test('every page opens from its own address, the tab included', () {
+      for (final Entry e in kEntries) {
+        final NavigationStack stack = stackFromUri(Uri.parse(e.path));
+        expect(stack.first, isA<HomeRoute>());
+        expect((stack.last as AppRoute).uri.path, e.path);
+      }
+      final NavigationStack code = stackFromUri(Uri.parse('${entriesOf(Section.components).first.path}?tab=code'));
+      expect((code.last as EntryRoute).tab, EntryTab.code);
+      expect((code.last as EntryRoute).uri.queryParameters['tab'], 'code');
+    });
+
+    test('a section opens its first page, and nonsense is not found', () {
+      final NavigationStack section = stackFromUri(Uri.parse('/components/'));
+      expect((section.last as EntryRoute).entry, entriesOf(Section.components).first);
+      expect(stackFromUri(Uri.parse('/nope')).last, isA<NotFoundRoute>());
+      expect(stackFromUri(Uri.parse('/components/nope')).last, isA<NotFoundRoute>());
+      expect(stackFromUri(Uri.parse('/a/b/c')).last, isA<NotFoundRoute>());
+      expect(stackFromUri(Uri.parse('/')).single, isA<HomeRoute>());
+    });
+  });
+
+  group('pages', () {
+    testWidgets('the home page, wide: a side panel and every section', (WidgetTester tester) async {
+      _size(tester, const Size(1440, 900));
+      await tester.pumpWidget(const GlassExampleApp(initialLocation: '/'));
+      await _frames(tester, 6);
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.byType(GlassHost), findsOneWidget);
+      for (final Section s in Section.values) {
+        expect(find.text(s.title), findsWidgets, reason: s.title);
+      }
+    });
+
+    testWidgets('a deep link opens its page and its tab, and a tab is an address', (WidgetTester tester) async {
+      _size(tester, const Size(1280, 900));
+      final Entry entry = entriesOf(Section.components).firstWhere((Entry e) => e.code != null);
+      await tester.pumpWidget(GlassExampleApp(initialLocation: '${entry.path}?tab=code'));
+      await _frames(tester, 10);
+      final EntryPage page = tester.widget(find.byType(EntryPage));
+      expect(page.entry, entry);
+      expect(page.tab, EntryTab.code);
+      final Finder guide = find.descendant(of: find.byType(GlassSegmentedControl), matching: find.text('Guide'));
+      await tester.ensureVisible(guide);
+      await _frames(tester, 4);
+      await tester.tap(guide);
+      await _frames(tester, 20);
+      expect(tester.widget<EntryPage>(find.byType(EntryPage)).tab, EntryTab.guide);
+    });
+
+    testWidgets('narrow: the navigation is a sheet behind the menu button', (WidgetTester tester) async {
+      _size(tester, const Size(390, 844));
+      await tester.pumpWidget(const GlassExampleApp(initialLocation: '/'));
+      await _frames(tester, 6);
+      await tester.tap(find.byIcon(Icons.menu));
+      await _frames(tester, 30);
+      // Near the top of the sheet, so it is on screen without a scroll.
+      final Entry target = entriesOf(Section.start).elementAt(1);
+      await tester.tap(find.text(target.title).last);
+      await _frames(tester, 40);
+      expect(tester.widget<EntryPage>(find.byType(EntryPage)).entry, target);
+    });
+
+    testWidgets('an unknown address is not found, and the way back is home', (WidgetTester tester) async {
+      _size(tester, const Size(1024, 768));
+      await tester.pumpWidget(const GlassExampleApp(initialLocation: '/nowhere'));
+      await _frames(tester, 6);
+      expect(find.byType(NotFoundPage), findsOneWidget);
+      await tester.tap(find.text('Back to the overview'));
+      await _frames(tester, 30);
+      expect(find.byType(HomePage), findsOneWidget);
+    });
+
+    // Every page builds, its demo included, at a phone's width and a desktop's.
+    for (final Size size in const <Size>[Size(375, 812), Size(1366, 900)]) {
+      testWidgets('every page builds at ${size.width.toInt()} wide', (WidgetTester tester) async {
+        _size(tester, size);
+        for (final Entry e in kEntries) {
+          await tester.pumpWidget(GlassExampleApp(key: ValueKey<String>(e.path), initialLocation: e.path));
+          await _frames(tester, 4, e.path);
+          expect(find.byType(GlassHost), findsOneWidget, reason: e.path);
+        }
+      });
+    }
+  });
+}

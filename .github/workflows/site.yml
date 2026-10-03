@@ -1,0 +1,119 @@
+name: Site
+
+# The design-system site — the example app built for the web — on Firebase
+# Hosting: https://g1455.plugfox.dev (site `g1455d` of project `plug-fox`).
+# Master goes live; a pull request from this repository gets a preview
+# channel, linked from the pull request, that expires in a week.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'example/**'
+      - '.github/workflows/site.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'example/**'
+      - '.github/workflows/site.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Versions
+        run: flutter --version
+
+      - name: Get dependencies
+        run: |
+          flutter pub get
+          (cd example && flutter pub get)
+
+      # The app, the link previews, the pages around it, the service worker.
+      - name: Build
+        working-directory: example
+        env:
+          SW_VERSION: ${{ github.sha }}
+        run: tool/build_web.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: |
+            example/build/web
+            example/firebase.json
+            example/.firebaserc
+          include-hidden-files: true
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Firebase Hosting
+    needs: build
+    # A fork's pull request has no access to the deploy secret.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'site-preview' || 'site' }}
+      url: ${{ steps.deploy.outputs.details_url || 'https://g1455.plugfox.dev' }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write # the preview's link, as a comment
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: site
+          path: site
+
+      - id: deploy
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PLUG_FOX }}
+          projectId: plug-fox
+          target: g1455
+          entryPoint: site
+          # Live from master; a preview channel per pull request otherwise.
+          channelId: ${{ github.event_name != 'pull_request' && 'live' || '' }}
+          expires: 7d
+
+      # The release is only done when the address serves it: version.json
+      # names the build that tabs compare themselves with.
+      - name: Verify the live version
+        if: github.event_name != 'pull_request'
+        timeout-minutes: 5
+        env:
+          EXPECTED: ${{ github.sha }}
+        run: |
+          for i in $(seq 1 30); do
+            live=$(curl -sf "https://g1455.plugfox.dev/version.json?t=$(date +%s)" \
+              | python3 -c 'import json, sys; print(json.load(sys.stdin).get("version", ""))' || true)
+            if [ "$live" = "$EXPECTED" ]; then
+              echo "Live: $live"
+              exit 0
+            fi
+            echo "Attempt $i: live is '$live', expected '$EXPECTED'"
+            sleep 10
+          done
+          exit 1

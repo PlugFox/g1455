@@ -2,21 +2,30 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// One tile of the README's strip, logical px. Every scene renders at this
-/// size, and the backdrop is one canvas cut into tiles of it, so the tiles
-/// stacked in order meet without a seam: the grid runs on, and a colour field
-/// that straddles a boundary continues into the next tile.
+/// One tile of the README's grid, logical px. Every scene renders at this
+/// size, and the backdrop is one canvas cut into tiles of it, [kGridColumns]
+/// to a row, so the tiles laid out in order meet without a seam: the grid
+/// runs on, and a colour field that straddles a boundary continues into the
+/// next tile, across as well as down.
 const Size kTile = Size(400, 200);
+
+/// Tiles to a row of the README's grid: two, at half pub.dev's 776-px README
+/// column each. A narrower screen wraps them into one column, and only there
+/// do the seams show.
+const int kGridColumns = 2;
+
+/// Where tile [index] sits on the backdrop canvas.
+Offset tileOrigin(int index) => Offset(index % kGridColumns * kTile.width, index ~/ kGridColumns * kTile.height);
 
 /// The colour under everything, which is also what the host is told is
 /// behind its labels.
 const Color kShowcaseBase = Color(0xFF0B0F24);
 
-/// The grid's pitch. The tile's height is a multiple of it, so every tile
-/// starts on a grid line and the strip has one lattice.
+/// The grid's pitch. The tile's sides are multiples of it, so every tile
+/// starts on a grid line and the canvas has one lattice.
 const double kGridPitch = 20;
 
-/// The strip a scene belongs to, painted for tile [index].
+/// The part of the canvas a scene belongs to, painted for tile [index].
 ///
 /// Three layers, each there for what the glass does to it: colour fields
 /// that the blur and the tint act on, a grid whose straight lines show the
@@ -25,7 +34,7 @@ const double kGridPitch = 20;
 class ShowcaseBackdrop extends StatelessWidget {
   const ShowcaseBackdrop({required this.index, required this.word, super.key});
 
-  /// Which tile of the strip this is.
+  /// Which tile of the grid this is.
   final int index;
 
   /// The anaglyph word, centred in the tile.
@@ -33,11 +42,11 @@ class ShowcaseBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
-    child: CustomPaint(size: kTile, painter: _StripPainter(index, word)),
+    child: CustomPaint(size: kTile, painter: _CanvasPainter(index, word)),
   );
 }
 
-/// A colour field: a soft disc, in strip coordinates.
+/// A colour field: a soft disc, in canvas coordinates.
 class _Field {
   const _Field(this.centre, this.radius, this.colour);
 
@@ -46,7 +55,8 @@ class _Field {
   final Color colour;
 }
 
-/// The fields of the whole strip, laid out once.
+/// The fields of the whole canvas, laid out once: a jittered lattice, four
+/// to a tile, so every tile gets about the same colour.
 ///
 /// Fixed rather than drawn from a seed per tile: a field near a boundary has
 /// to be the same disc in both tiles it shows in.
@@ -60,21 +70,22 @@ final List<_Field> _fields = () {
     Color(0xFFFF5A36), // orange
   ];
   final random = math.Random(26);
+  const int across = 2 * kGridColumns;
   return <_Field>[
     for (var i = 0; i < 64; i++)
       _Field(
         Offset(
-          (i.isEven ? 0.18 : 0.82) * kTile.width + (random.nextDouble() - 0.5) * 180,
-          i * kTile.height / 4 + random.nextDouble() * kTile.height / 4 - kTile.height / 2,
+          (i % across + 0.5) * kTile.width / 2 + (random.nextDouble() - 0.5) * 140,
+          (i ~/ across + 0.5) * kTile.height / 2 + (random.nextDouble() - 0.5) * 120,
         ),
         70 + random.nextDouble() * 70,
-        palette[(i * 5) % palette.length],
+        palette[(i * 5 + i ~/ across) % palette.length],
       ),
   ];
 }();
 
-class _StripPainter extends CustomPainter {
-  _StripPainter(this.index, this.word);
+class _CanvasPainter extends CustomPainter {
+  _CanvasPainter(this.index, this.word);
 
   final int index;
   final String word;
@@ -82,14 +93,15 @@ class _StripPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Rect tile = Offset.zero & size;
-    final double top = index * kTile.height;
+    final Offset origin = tileOrigin(index);
+    final Rect onCanvas = origin & size;
 
     canvas.drawRect(tile, Paint()..color = kShowcaseBase);
 
     canvas.save();
-    canvas.translate(0, -top);
+    canvas.translate(-origin.dx, -origin.dy);
     for (final _Field f in _fields) {
-      if (f.centre.dy + f.radius < top || f.centre.dy - f.radius > top + size.height) {
+      if (!onCanvas.overlaps(Rect.fromCircle(center: f.centre, radius: f.radius))) {
         continue;
       }
       final Rect r = Rect.fromCircle(center: f.centre, radius: f.radius);
@@ -111,16 +123,15 @@ class _StripPainter extends CustomPainter {
     final major = Paint()
       ..color = const Color(0x4DFFFFFF)
       ..strokeWidth = 1;
-    // In strip coordinates, so the major lines run on across tiles whatever
-    // the tile's height. Half a pixel in, so a one-pixel line lands on whole
+    // In canvas coordinates, so the major lines run on across tiles whatever
+    // the tile's size. Half a pixel in, so a one-pixel line lands on whole
     // device pixels; a tile's last line is the next tile's first.
-    for (var i = 0; i * kGridPitch < size.width; i++) {
-      final double x = i * kGridPitch + 0.5;
+    for (var i = (origin.dx / kGridPitch).ceil(); i * kGridPitch < origin.dx + size.width; i++) {
+      final double x = i * kGridPitch - origin.dx + 0.5;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), i % 5 == 0 ? major : minor);
     }
-    final int first = (top / kGridPitch).ceil();
-    for (var i = first; i * kGridPitch < top + size.height; i++) {
-      final double y = i * kGridPitch - top + 0.5;
+    for (var i = (origin.dy / kGridPitch).ceil(); i * kGridPitch < origin.dy + size.height; i++) {
+      final double y = i * kGridPitch - origin.dy + 0.5;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), i % 5 == 0 ? major : minor);
     }
   }
@@ -163,5 +174,5 @@ class _StripPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_StripPainter oldDelegate) => oldDelegate.index != index || oldDelegate.word != word;
+  bool shouldRepaint(_CanvasPainter oldDelegate) => oldDelegate.index != index || oldDelegate.word != word;
 }

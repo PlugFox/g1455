@@ -21,7 +21,7 @@ void main() {
   });
 
   testWidgets('every page mounts its glass under one host, quietly', (WidgetTester tester) async {
-    await tester.pumpWidget(const GlassExampleApp());
+    await tester.pumpWidget(const GlassExampleApp(initialLocation: '/demos/kit'));
     await _frames(tester, 4);
     expect(find.byType(GlassHost), findsOneWidget);
     for (final String tab in <String>['Controls', 'Blobs', 'Cards', 'Scroll']) {
@@ -36,7 +36,7 @@ void main() {
   // geometry and repaints a host boundary that draws nothing of its own.
   // Without the guard in `_debugRepaintMintedPicture` this arm throws.
   testWidgets('every preset applies, and the host wears what it names', (WidgetTester tester) async {
-    await tester.pumpWidget(const GlassExampleApp());
+    await tester.pumpWidget(const GlassExampleApp(initialLocation: '/demos/scroll'));
     await _frames(tester, 4);
     expect(_barLabel(GlassPreset.ultra.label), findsOneWidget, reason: 'the app opens on Ultra');
     await _openMenu(tester);
@@ -60,7 +60,7 @@ void main() {
   testWidgets('a change makes the settings custom, and changing it back is the preset again', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const GlassExampleApp());
+    await tester.pumpWidget(const GlassExampleApp(initialLocation: '/demos/scroll'));
     await _frames(tester, 4);
     await _openMenu(tester);
     await tester.tap(_inMenu('Clear'));
@@ -94,7 +94,7 @@ void main() {
   });
 
   testWidgets('a ripple from the menu, and a touch on the glass makes a wave', (WidgetTester tester) async {
-    await tester.pumpWidget(const GlassExampleApp());
+    await tester.pumpWidget(const GlassExampleApp(initialLocation: '/demos/scroll'));
     await _frames(tester, 4);
     // Ultra, which is the one preset with a ripple.
     expect(tester.widget<GlassHost>(find.byType(GlassHost)).ripple?.viscosity, 0.5);

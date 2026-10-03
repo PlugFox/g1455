@@ -269,6 +269,7 @@ class ProxyWalkContext extends PaintingContext {
       _opacityDepth++;
     }
     final bool verbatim = marker != null && marker.role == GlassProxyRole.verbatim;
+    final _LiveOffsets? live = _LiveOffsets.of(child);
     composited?.begin(canvas);
     // After `begin` and before `end`, so the effect's own save/restore pair is
     // issued through the same canvas at both ends.
@@ -285,6 +286,7 @@ class ProxyWalkContext extends PaintingContext {
     } catch (error) {
       log.errors.add('${child.runtimeType}: $error');
     } finally {
+      live?.restore();
       if (verbatim) {
         _verbatimDepth--;
       }
@@ -506,20 +508,17 @@ class ProxyWalkContext extends PaintingContext {
   @override
   void addLayer(Layer layer) {
     // Content that never reaches a canvas: `TextureLayer`, `PlatformViewLayer`.
-    // There is nothing to read, so the choice is a placeholder or a hole, and
-    // the stock capture already gives a hole.
+    // There is nothing to read, so the choice is a placeholder or a hole — and
+    // it is a hole, because the stock capture gives a hole and the base level
+    // is recorded that way: a level above it that drew a stub showed something
+    // the level below did not. On the web every `SelectionArea` stands on one
+    // — the browser's context menu, a transparent `HtmlElementView` under the
+    // whole selectable region — and a stub there painted a selectable page
+    // grey into the backdrop of every bar over it.
     log.addedLayers.add(layer.runtimeType.toString());
-    final Rect? rect = switch (layer) {
-      TextureLayer() => layer.rect,
-      PlatformViewLayer() => layer.rect,
-      _ => null,
-    };
-    if (rect == null) {
+    if (layer is! TextureLayer && layer is! PlatformViewLayer) {
       log.unhandledLayers.add(layer.runtimeType.toString());
-      return;
     }
-    log.substituted.add(layer.runtimeType.toString());
-    canvas.drawRect(rect, ui.Paint()..color = placeholderColor);
   }
 
   @override
@@ -620,6 +619,49 @@ class ProxyWalkContext extends PaintingContext {
 // Canvas effects. Each is a matched save/restore pair so the walk can wrap a
 // child in it without knowing what it is.
 // ---------------------------------------------------------------------------
+
+/// Where a live layer was before the walk painted the render object that owns
+/// it, put back afterwards.
+///
+/// A render object that keeps its own layer writes its position into it from
+/// `paint` and then pushes it: `RenderLeaderLayer` sets `layer.offset`,
+/// `RenderFollowerLayer` the follower's offsets. That layer is the one on
+/// screen, and the walk calls `paint` with the root's offset rather than the
+/// one the layer's parent composites it at — so the write moved the live
+/// layer. A `SelectionArea` in a bar (its `CompositedTransformTarget`) put the
+/// bar's title one sidebar right and one inset down whenever a level above the
+/// bar was captured, a popover's, and left it there until the bar repainted.
+final class _LiveOffsets {
+  _LiveOffsets._(this._layer, this._offset, this._linked);
+
+  static _LiveOffsets? of(RenderObject owner) {
+    // ignore: invalid_use_of_protected_member
+    final ContainerLayer? layer = owner.layer;
+    return switch (layer) {
+      OffsetLayer() => _LiveOffsets._(layer, layer.offset, null),
+      LeaderLayer() => _LiveOffsets._(layer, layer.offset, null),
+      FollowerLayer() => _LiveOffsets._(layer, layer.unlinkedOffset, layer.linkedOffset),
+      _ => null,
+    };
+  }
+
+  final ContainerLayer _layer;
+  final Offset? _offset;
+  final Offset? _linked;
+
+  void restore() {
+    switch (_layer) {
+      case final OffsetLayer layer:
+        layer.offset = _offset!;
+      case final LeaderLayer layer:
+        layer.offset = _offset!;
+      case final FollowerLayer layer:
+        layer
+          ..unlinkedOffset = _offset
+          ..linkedOffset = _linked;
+    }
+  }
+}
 
 abstract class _CanvasEffect {
   const _CanvasEffect();

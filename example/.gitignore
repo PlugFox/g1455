@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Firebase CLI's deploy cache and logs
+.firebase/
+firebase-debug.log

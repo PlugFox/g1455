@@ -291,90 +291,93 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   // rebuild a new selection brings.
   @override
   Widget build(BuildContext context) => RepaintBoundary(
-    child: LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        final double width = constraints.maxWidth;
-        final _TabGeometry g = _geometry = _TabGeometry(width, widget.items.length);
-        final Size margin = g.margin(widget.items.length);
-        return SizedBox(
-          width: width,
-          height: math.max(g.height, kGlassMinTapTarget.height),
-          child: RepaintBoundary(
-            child: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints _) => Listener(
-                behavior: HitTestBehavior.opaque,
-                onPointerDown: _onDown,
-                onPointerMove: _onMove,
-                onPointerUp: _onUp,
-                onPointerCancel: _onCancel,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: <Widget>[
-                    // The bar's whole growth is declared, so growing does not retake
-                    // the bar's own capture.
-                    Positioned(
-                      left: -_kBarGrow.width,
-                      right: -_kBarGrow.width,
-                      top: -_kBarGrow.height,
-                      bottom: -_kBarGrow.height,
-                      child: GlassTravel(
-                        // A boundary of its own, so the bar resizing repaints this
-                        // and not the screen it sits on.
-                        child: RepaintBoundary(
-                          child: Center(
-                            child: AnimatedBuilder(
-                              animation: _lift,
-                              builder: (BuildContext context, Widget? child) {
-                                // In whole device pixels: the drop on the bar shows
-                                // the bar, so a growth under a pixel is a capture that
-                                // changes nothing anybody can see.
-                                final double dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
-                                double px(double v) => (v * dpr).round() / dpr;
-                                final double t = _lift.value.clamp(0.0, 1.2);
-                                final double gx = px(_kBarGrow.width * t);
-                                final double gy = px(_kBarGrow.height * t);
-                                return SizedBox(
-                                  width: width + 2 * gx,
-                                  height: g.height + 2 * gy,
-                                  child: GlassBar(
-                                    padding: EdgeInsets.zero,
-                                    // Content stays where it was laid out at rest: the
-                                    // bar grows around it.
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      children: <Widget>[
-                                        Positioned(
-                                          left: gx,
-                                          top: gy,
-                                          width: width,
-                                          height: g.height,
-                                          child: child!,
-                                        ),
-                                        Positioned(
-                                          left: gx - margin.width,
-                                          top: gy - margin.height,
-                                          width: width + 2 * margin.width,
-                                          height: g.height + 2 * margin.height,
-                                          child: _dropStage(g, margin),
-                                        ),
-                                      ],
+    // Tab labels are not text to select, as a button's are not.
+    child: SelectionContainer.disabled(
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double width = constraints.maxWidth;
+          final _TabGeometry g = _geometry = _TabGeometry(width, widget.items.length);
+          final Size margin = g.margin(widget.items.length);
+          return SizedBox(
+            width: width,
+            height: math.max(g.height, kGlassMinTapTarget.height),
+            child: RepaintBoundary(
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints _) => Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: _onDown,
+                  onPointerMove: _onMove,
+                  onPointerUp: _onUp,
+                  onPointerCancel: _onCancel,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: <Widget>[
+                      // The bar's whole growth is declared, so growing does not retake
+                      // the bar's own capture.
+                      Positioned(
+                        left: -_kBarGrow.width,
+                        right: -_kBarGrow.width,
+                        top: -_kBarGrow.height,
+                        bottom: -_kBarGrow.height,
+                        child: GlassTravel(
+                          // A boundary of its own, so the bar resizing repaints this
+                          // and not the screen it sits on.
+                          child: RepaintBoundary(
+                            child: Center(
+                              child: AnimatedBuilder(
+                                animation: _lift,
+                                builder: (BuildContext context, Widget? child) {
+                                  // In whole device pixels: the drop on the bar shows
+                                  // the bar, so a growth under a pixel is a capture that
+                                  // changes nothing anybody can see.
+                                  final double dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+                                  double px(double v) => (v * dpr).round() / dpr;
+                                  final double t = _lift.value.clamp(0.0, 1.2);
+                                  final double gx = px(_kBarGrow.width * t);
+                                  final double gy = px(_kBarGrow.height * t);
+                                  return SizedBox(
+                                    width: width + 2 * gx,
+                                    height: g.height + 2 * gy,
+                                    child: GlassBar(
+                                      padding: EdgeInsets.zero,
+                                      // Content stays where it was laid out at rest: the
+                                      // bar grows around it.
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: <Widget>[
+                                          Positioned(
+                                            left: gx,
+                                            top: gy,
+                                            width: width,
+                                            height: g.height,
+                                            child: child!,
+                                          ),
+                                          Positioned(
+                                            left: gx - margin.width,
+                                            top: gy - margin.height,
+                                            width: width + 2 * margin.width,
+                                            height: g.height + 2 * margin.height,
+                                            child: _dropStage(g, margin),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              child: _content(g),
+                                  );
+                                },
+                                child: _content(g),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     ),
   );
 

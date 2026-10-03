@@ -302,7 +302,8 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     return Semantics(
       container: true,
       enabled: _enabled,
-      child: _enabled ? body : Opacity(opacity: 0.5, child: body),
+      // Segment labels are not text to select, as a button's are not.
+      child: SelectionContainer.disabled(child: _enabled ? body : Opacity(opacity: 0.5, child: body)),
     );
   }
 

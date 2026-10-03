@@ -92,6 +92,32 @@ void main() {
     expect(find.text('sheet body'), findsNothing);
   });
 
+  testWidgets('a sheet with a max width is that wide, centred over the bottom', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _App(
+        home: Builder(
+          builder: (BuildContext context) => Center(
+            child: GestureDetector(
+              onTap: () => showGlassSheet<void>(
+                context: context,
+                constraints: const BoxConstraints(maxWidth: 300),
+                builder: (_) => const SizedBox(height: 200, child: Center(child: Text('narrow body'))),
+              ),
+              child: const Text('open narrow sheet'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open narrow sheet'));
+    await tester.pumpAndSettle();
+    final Rect sheet = _surfaceAbove(tester, find.text('narrow body')).globalRect;
+    final Size screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+    expect(sheet.width, closeTo(300, 0.01));
+    expect(sheet.center.dx, closeTo(screen.width / 2, 0.01));
+    expect(sheet.bottom, closeTo(screen.height - kGlassSheetInset, 0.01));
+  });
+
   testWidgets('a menu stands over its anchor, as Apple places one, and closes on a choice', (
     WidgetTester tester,
   ) async {

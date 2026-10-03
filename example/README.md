@@ -1,35 +1,70 @@
 # g1455_example
 
-One `GlassHost` over the whole screen, four pages under it, and the glass on
-top: an app bar with a settings menu, and a tab bar between the pages.
-
-- **Scroll** — a list scrolling under the bars, a slider, buttons, and a lens
-  to drag over the list.
-- **Controls** — switches, sliders and buttons on glass cards. The hue slider
-  and "Drift backdrop" change what is under the glass on every frame.
-- **Blobs** — metaballs: blobs in a `GlassGroup` fuse when they come within
-  `spacing`, or are all joined in a `GlassUnion`. They orbit inside a
-  `GlassTravel`, so the motion costs no capture. One blob follows the finger,
-  and the − / + buttons bud blobs in and out through `presence`.
-- **Cards** — a photo grid with a glass caption on every photo.
-
-The settings menu (the tune icon in the app bar) works like a game's graphics
-settings. It sets:
-
-- the material: Regular, Clear or Frosted;
-- the tint: Neutral, Indigo or Rose;
-- the rendering: Glass, Translucent (the cheap rung, no capture) or Opaque;
-- the ripple: Off, Water, Jelly or Honey. This one is not Apple's;
-- the contrast: System, or Increased.
-
-Above them are the presets: Ultra (glass with a ripple), High (glass as iOS
-draws it), Medium (translucent) and Low (opaque). Change any setting and the
-preset becomes Custom. Set it back and the preset returns. The app bar shows
-the preset in force.
+The g1455 design system: every component live, with its guide, its code and
+its API. It is the package's example app, and the site at
+**https://g1455.plugfox.dev**.
 
 ```bash
-flutter run --profile -d <device>
+flutter run -d chrome            # the site
+flutter run --profile -d <device> # on a device: profile, not debug, to judge cost
 ```
 
-Profile rather than debug if you are looking at cost: debug builds are not
-representative of what the GPU does.
+## What is in it
+
+- **Getting started** — installation, how the host captures, what an app
+  declares, platforms.
+- **Foundations** — the host, the surface, finishes, legibility, tiers, ripple,
+  groups, travel, glass on glass, the scroll edge, performance.
+- **Components** — bar, button, card, switch, slider, segmented control, tab
+  bar, text field, toolbar, alert, sheet, menu, popover.
+- **Demos** — the example's original full-screen pages (`/demos/scroll`,
+  `/demos/controls`, `/demos/blobs`, `/demos/cards`, `/demos/kit`), with the
+  tab bar between them.
+
+Every page is a live demo with knobs, then three tabs — Guide, Code, API —
+whose state is in the address (`/components/slider?tab=code`). The API names
+link to the package's documentation on pub.dev, and every page links to its
+source and its demo's source on GitHub.
+
+The settings menu (the tune icon in the top bar) works like a game's graphics
+settings: the material, the tint, the rendering rung, the ripple and the
+contrast, under the presets Ultra, High, Medium and Low. Change any setting and
+the preset becomes Custom; set it back and the preset returns.
+
+## How it is built
+
+- `lib/src/catalog/` — the pages as plain Dart data: titles, summaries, the
+  guides in markdown, the code, the API tables. No Flutter imports, so
+  `tool/site.dart` reads the same list.
+- `lib/src/app/` — navigation with [squid](https://pub.dev/packages/squid)
+  behind Flutter's `Router`: an address becomes a stack, a stack change becomes
+  a history entry, and the browser's back and forward work.
+- `lib/src/shell/` — the adaptive frame: a glass side panel on a wide window,
+  a glass sheet behind the menu button on a narrow one.
+- `lib/src/demos/` — one live demo per page.
+- `lib/src/widgets/` — the guide renderer ([flutter_md](https://pub.dev/packages/flutter_md),
+  code highlighted and copyable), the demo stage, links.
+- `lib/src/playground/` — the full-screen demos.
+
+## Building the site
+
+```bash
+tool/build_web.sh   # → build/web
+firebase deploy --only hosting:g1455
+```
+
+The script builds the app (`--wasm`: Skwasm with a CanvasKit fallback), draws
+a link preview per page with the package itself (`tool/brand_test.dart`),
+writes a page per address with its own title, description, preview and
+structured data plus the sitemap and robots.txt (`tool/site.dart`), and
+generates the service worker and bootstrap with the
+[sw](https://pub.dev/packages/sw) package (`sw.yaml`).
+
+The icons under `web/` are drawn the same way and committed:
+
+```bash
+flutter test tool/brand_test.dart --dart-define=BRAND_OUT=web --dart-define=BRAND_ONLY=icons
+```
+
+`.github/workflows/site.yml` deploys master to the live channel and every pull
+request from this repository to a preview channel.

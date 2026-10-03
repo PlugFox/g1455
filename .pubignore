@@ -29,3 +29,5 @@ local.properties
 # The runs the constants in lib/ came from, and the tests that check them, live
 # in the repository: 6.9 MB nobody's build reads.
 /provenance/
+# The README's banner, served from GitHub like the full-size loops.
+/doc/readme/
