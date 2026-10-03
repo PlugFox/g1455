@@ -97,3 +97,23 @@ jobs:
           # Live from master; a preview channel per pull request otherwise.
           channelId: ${{ github.event_name == 'pull_request' && '' || 'live' }}
           expires: 7d
+
+      # The release is only done when the address serves it: version.json
+      # names the build that tabs compare themselves with.
+      - name: Verify the live version
+        if: github.event_name != 'pull_request'
+        timeout-minutes: 5
+        env:
+          EXPECTED: ${{ github.sha }}
+        run: |
+          for i in $(seq 1 30); do
+            live=$(curl -sf "https://g1455.plugfox.dev/version.json?t=$(date +%s)" \
+              | python3 -c 'import json, sys; print(json.load(sys.stdin).get("version", ""))' || true)
+            if [ "$live" = "$EXPECTED" ]; then
+              echo "Live: $live"
+              exit 0
+            fi
+            echo "Attempt $i: live is '$live', expected '$EXPECTED'"
+            sleep 10
+          done
+          exit 1

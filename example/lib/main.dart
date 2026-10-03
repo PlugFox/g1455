@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
@@ -15,5 +19,11 @@ void main() {
   // `/components/slider`, not `/#/components/slider`: the hosting rewrites
   // every path to the app, and a link to a page is a link a crawler reads.
   usePathUrlStrategy();
+  WidgetsFlutterBinding.ensureInitialized();
+  // A right click opens the app's own menu (copy for a selection, paste in a
+  // field), not the browser's over it.
+  if (kIsWeb) {
+    unawaited(BrowserContextMenu.disableContextMenu());
+  }
   runApp(const GlassExampleApp());
 }

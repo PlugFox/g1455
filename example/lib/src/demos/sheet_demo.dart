@@ -33,6 +33,8 @@ class _SheetDemoState extends State<SheetDemo> {
       finish: finish,
       showGrabber: _grabber,
       barrierDismissible: _tapDim,
+      // The content's width, centred, rather than the window's.
+      constraints: const BoxConstraints(maxWidth: 520),
       builder: (BuildContext context) => _ShareSheet(finish: finish),
     );
     if (mounted) {
@@ -54,7 +56,7 @@ class _SheetDemoState extends State<SheetDemo> {
       KnobSwitch(label: 'Grabber', value: _grabber, onChanged: (bool v) => setState(() => _grabber = v)),
       KnobSwitch(label: 'Tap outside', value: _tapDim, onChanged: (bool v) => setState(() => _tapDim = v)),
     ],
-    hint: 'The sheet rises from the bottom of the window. Drag it down past a third of its height, or flick it, to close.',
+    hint: 'The sheet rises from the bottom of the window, as wide as what it holds. Drag it down past a third of its height, or flick it, to close.',
     child: Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -102,135 +104,130 @@ class _ShareSheet extends StatelessWidget {
         data: IconThemeData(color: label),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
                 children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      const ClipRRect(
-                        borderRadius: BorderRadius.all(Radius.circular(10)),
-                        child: SizedBox(width: 48, height: 48, child: PhotoBackdrop(seed: 23)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            const Text('Lisbon.jpg', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                            Text('Photo · 2.4 MB', style: TextStyle(color: secondary, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      Semantics(
-                        button: true,
-                        label: 'Close',
-                        child: GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: CircleAvatar(
-                            radius: 15,
-                            backgroundColor: label.withValues(alpha: 0.12),
-                            child: Icon(Icons.close, size: 18, color: secondary),
-                          ),
-                        ),
-                      ),
-                    ],
+                  const ClipRRect(
+                    borderRadius: BorderRadius.all(Radius.circular(10)),
+                    child: SizedBox(width: 48, height: 48, child: PhotoBackdrop(seed: 23)),
                   ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: <Widget>[
-                      for (final (String name, Color colour) in const <(String, Color)>[
-                        ('Anna', Color(0xFFFF7A59)),
-                        ('Ben', Color(0xFF5AC8FA)),
-                        ('Chiara', Color(0xFFAF52DE)),
-                        ('Dmitri', Color(0xFF34C759)),
-                      ])
-                        Expanded(
-                          child: _Target(
-                            onTap: () => done('sent to $name'),
-                            label: name,
-                            child: CircleAvatar(
-                              radius: 26,
-                              backgroundColor: colour,
-                              child: Text(
-                                name[0],
-                                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: <Widget>[
-                      for (final (String name, IconData icon, Color colour) in const <(String, IconData, Color)>[
-                        ('Messages', Icons.chat_bubble, Color(0xFF34C759)),
-                        ('Mail', Icons.mail, Color(0xFF0A84FF)),
-                        ('Notes', Icons.sticky_note_2, Color(0xFFFFCC00)),
-                        ('More', Icons.more_horiz, Color(0xFF8E8E93)),
-                      ])
-                        Expanded(
-                          child: _Target(
-                            onTap: () => done('shared via $name'),
-                            label: name,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: colour,
-                                borderRadius: const BorderRadius.all(Radius.circular(14)),
-                              ),
-                              child: SizedBox(
-                                width: 52,
-                                height: 52,
-                                child: Icon(icon, color: Colors.white, size: 26),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: label.withValues(alpha: 0.08),
-                      borderRadius: const BorderRadius.all(Radius.circular(18)),
-                    ),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        for (final (String name, IconData icon) in const <(String, IconData)>[
-                          ('Copy', Icons.copy),
-                          ('Add to Album', Icons.photo_library_outlined),
-                          ('Save to Files', Icons.folder_outlined),
-                        ])
-                          // No Material in a sheet's route: a plain detector.
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => done(name.toLowerCase()),
-                            child: SizedBox(
-                              height: 48,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Semantics(
-                                  button: true,
-                                  child: Row(
-                                    children: <Widget>[
-                                      Expanded(child: Text(name, style: const TextStyle(fontSize: 17))),
-                                      Icon(icon, size: 22),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                        const Text('Lisbon.jpg', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                        Text('Photo · 2.4 MB', style: TextStyle(color: secondary, fontSize: 13)),
                       ],
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: 'Close',
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: CircleAvatar(
+                        radius: 15,
+                        backgroundColor: label.withValues(alpha: 0.12),
+                        child: Icon(Icons.close, size: 18, color: secondary),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 18),
+              Row(
+                children: <Widget>[
+                  for (final (String name, Color colour) in const <(String, Color)>[
+                    ('Anna', Color(0xFFFF7A59)),
+                    ('Ben', Color(0xFF5AC8FA)),
+                    ('Chiara', Color(0xFFAF52DE)),
+                    ('Dmitri', Color(0xFF34C759)),
+                  ])
+                    Expanded(
+                      child: _Target(
+                        onTap: () => done('sent to $name'),
+                        label: name,
+                        child: CircleAvatar(
+                          radius: 26,
+                          backgroundColor: colour,
+                          child: Text(
+                            name[0],
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: <Widget>[
+                  for (final (String name, IconData icon, Color colour) in const <(String, IconData, Color)>[
+                    ('Messages', Icons.chat_bubble, Color(0xFF34C759)),
+                    ('Mail', Icons.mail, Color(0xFF0A84FF)),
+                    ('Notes', Icons.sticky_note_2, Color(0xFFFFCC00)),
+                    ('More', Icons.more_horiz, Color(0xFF8E8E93)),
+                  ])
+                    Expanded(
+                      child: _Target(
+                        onTap: () => done('shared via $name'),
+                        label: name,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: colour,
+                            borderRadius: const BorderRadius.all(Radius.circular(14)),
+                          ),
+                          child: SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: Icon(icon, color: Colors.white, size: 26),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: label.withValues(alpha: 0.08),
+                  borderRadius: const BorderRadius.all(Radius.circular(18)),
+                ),
+                child: Column(
+                  children: <Widget>[
+                    for (final (String name, IconData icon) in const <(String, IconData)>[
+                      ('Copy', Icons.copy),
+                      ('Add to Album', Icons.photo_library_outlined),
+                      ('Save to Files', Icons.folder_outlined),
+                    ])
+                      // No Material in a sheet's route: a plain detector.
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => done(name.toLowerCase()),
+                        child: SizedBox(
+                          height: 48,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Semantics(
+                              button: true,
+                              child: Row(
+                                children: <Widget>[
+                                  Expanded(child: Text(name, style: const TextStyle(fontSize: 17))),
+                                  Icon(icon, size: 22),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

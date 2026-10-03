@@ -397,41 +397,43 @@ class _EntryCardState extends State<_EntryCard> {
       link: true,
       label: '${entry.title}. ${entry.summary}',
       excludeSemantics: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: () => openEntry(context, entry),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.all(20),
-            transform: Matrix4.translationValues(0, _hover ? -2 : 0, 0),
-            decoration: BoxDecoration(
-              color: _hover ? const Color(0x1A8AB4FF) : const Color(0x0DFFFFFF),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _hover ? const Color(0x668AB4FF) : kSiteLine),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0x268AB4FF),
-                    borderRadius: BorderRadius.circular(12),
+      child: SelectionContainer.disabled(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: GestureDetector(
+            onTap: () => openEntry(context, entry),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.all(20),
+              transform: Matrix4.translationValues(0, _hover ? -2 : 0, 0),
+              decoration: BoxDecoration(
+                color: _hover ? const Color(0x1A8AB4FF) : const Color(0x0DFFFFFF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _hover ? const Color(0x668AB4FF) : kSiteLine),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0x268AB4FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(iconFor(entry.icon), color: kSiteAccent, size: 22),
                   ),
-                  child: Icon(iconFor(entry.icon), color: kSiteAccent, size: 22),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  entry.title,
-                  style: const TextStyle(color: kSiteText, fontSize: 17, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                Text(entry.summary, style: const TextStyle(color: kSiteTextMuted, fontSize: 14, height: 1.5)),
-              ],
+                  const SizedBox(height: 14),
+                  Text(
+                    entry.title,
+                    style: const TextStyle(color: kSiteText, fontSize: 17, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(entry.summary, style: const TextStyle(color: kSiteTextMuted, fontSize: 14, height: 1.5)),
+                ],
+              ),
             ),
           ),
         ),

@@ -189,41 +189,43 @@ class _PillState extends State<Pill> {
       button: true,
       label: widget.label,
       excludeSemantics: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: _hover ? const Color(0x1F8AB4FF) : kSiteFill,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: _hover ? const Color(0x668AB4FF) : kSiteLine),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (widget.icon != null) ...<Widget>[
-                  Icon(widget.icon, size: 16, color: kSiteAccent),
-                  const SizedBox(width: 8),
-                ],
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: kSiteText,
-                      fontSize: 13,
-                      fontFamily: widget.monospace ? 'monospace' : null,
-                      fontWeight: FontWeight.w500,
+      child: SelectionContainer.disabled(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: _hover ? const Color(0x1F8AB4FF) : kSiteFill,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: _hover ? const Color(0x668AB4FF) : kSiteLine),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (widget.icon != null) ...<Widget>[
+                    Icon(widget.icon, size: 16, color: kSiteAccent),
+                    const SizedBox(width: 8),
+                  ],
+                  Flexible(
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: kSiteText,
+                        fontSize: 13,
+                        fontFamily: widget.monospace ? 'monospace' : null,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -340,45 +342,47 @@ class _NeighbourCardState extends State<_NeighbourCard> {
       link: true,
       label: '${forward ? 'Next' : 'Previous'}: ${widget.entry.title}',
       excludeSemantics: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: () => openEntry(context, widget.entry),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: _hover ? const Color(0x148AB4FF) : kSiteFill,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _hover ? const Color(0x668AB4FF) : kSiteLine),
-            ),
-            child: Column(
-              crossAxisAlignment: forward ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  forward ? 'Next' : 'Previous',
-                  style: const TextStyle(color: kSiteTextMuted, fontSize: 12),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    if (!forward) const Icon(Icons.arrow_back, size: 18, color: kSiteAccent),
-                    if (!forward) const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        widget.entry.title,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: kSiteText, fontSize: 16, fontWeight: FontWeight.w600),
+      child: SelectionContainer.disabled(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: GestureDetector(
+            onTap: () => openEntry(context, widget.entry),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: _hover ? const Color(0x148AB4FF) : kSiteFill,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: _hover ? const Color(0x668AB4FF) : kSiteLine),
+              ),
+              child: Column(
+                crossAxisAlignment: forward ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    forward ? 'Next' : 'Previous',
+                    style: const TextStyle(color: kSiteTextMuted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (!forward) const Icon(Icons.arrow_back, size: 18, color: kSiteAccent),
+                      if (!forward) const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          widget.entry.title,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: kSiteText, fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
                       ),
-                    ),
-                    if (forward) const SizedBox(width: 8),
-                    if (forward) const Icon(Icons.arrow_forward, size: 18, color: kSiteAccent),
-                  ],
-                ),
-              ],
+                      if (forward) const SizedBox(width: 8),
+                      if (forward) const Icon(Icons.arrow_forward, size: 18, color: kSiteAccent),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

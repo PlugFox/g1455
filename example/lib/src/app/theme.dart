@@ -52,5 +52,8 @@ ThemeData buildSiteTheme() {
       waitDuration: Duration(milliseconds: 400),
     ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+    // The thumb stops short of the track's ends, so it never touches the
+    // window's top and bottom edges.
+    scrollbarTheme: const ScrollbarThemeData(mainAxisMargin: 6),
   );
 }
