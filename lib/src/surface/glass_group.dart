@@ -58,6 +58,9 @@ const String kGlassGroupShaderAsset = 'packages/g1455/shaders/glass_group.frag';
 /// truncated group would draw a picture with shapes missing and no sign of it.
 const int kMaxFusedShapes = 12;
 
+/// Where `glass_group.frag`'s uniforms resume after `uBox` and `uRadius`.
+const int _kTail = 11 + kMaxFusedShapes * 5;
+
 /// The membership of one blend group.
 ///
 /// Owned by [GlassGroup]'s state rather than by its render object, because the
@@ -1431,13 +1434,15 @@ class RenderGlassGroup extends RenderProxyBox {
     final GlassOptics optics = finish.optics;
     final Offset srcOrigin = globalRect.topLeft - offset;
     final double scale = slot.pixelRatio;
-    final Offset mapOrigin = (srcOrigin - slot.source.topLeft) * scale + slot.rect.topLeft;
+    final Rect texels = slot.rect;
+    final Offset mapOrigin = (srcOrigin - slot.source.topLeft) * scale + texels.topLeft;
     final Color tint = finish.tint;
     final Color? contrastRim = effectiveHighContrastRim;
     final Color rim = contrastRim ?? finish.rim;
     final double rimWidth = contrastRim != null ? kHighContrastRimWidthLogical : (rim.a <= 0 ? 0 : kRimWidthLogical);
 
-    final ui.FragmentShader shader = program.fragmentShader()
+    // Everything but the members, which are the tile's.
+    ui.FragmentShader shaded() => program.fragmentShader()
       ..setFloat(0, frame.image.width.toDouble())
       ..setFloat(1, frame.image.height.toDouble())
       ..setFloat(2, mapOrigin.dx)
@@ -1445,38 +1450,49 @@ class RenderGlassGroup extends RenderProxyBox {
       ..setFloat(4, scale)
       // Texel centres, not the slot's edges: a bilinear tap reaches half a texel
       // each way. See [RenderGlassSurface] for the column this cost.
-      ..setFloat(5, slot.rect.left + 0.5)
-      ..setFloat(6, slot.rect.top + 0.5)
-      ..setFloat(7, slot.rect.right - 0.5)
-      ..setFloat(8, slot.rect.bottom - 0.5)
-      ..setFloat(10, blend);
-    const int tail = 11 + kMaxFusedShapes * 5;
-    shader
-      ..setFloat(tail, optics.thickness)
-      ..setFloat(tail + 1, optics.strength)
-      ..setFloat(tail + 2, optics.edgePower)
-      ..setFloat(tail + 3, optics.shoulder)
-      ..setFloat(tail + 4, tint.r)
-      ..setFloat(tail + 5, tint.g)
-      ..setFloat(tail + 6, tint.b)
-      ..setFloat(tail + 7, tint.a)
-      ..setFloat(tail + 8, rimWidth)
-      ..setFloat(tail + 9, rim.r)
-      ..setFloat(tail + 10, rim.g)
-      ..setFloat(tail + 11, rim.b)
-      ..setFloat(tail + 12, rim.a)
-      ..setFloat(tail + 13, 1 / _devicePixelRatio)
+      ..setFloat(5, texels.left + 0.5)
+      ..setFloat(6, texels.top + 0.5)
+      ..setFloat(7, texels.right - 0.5)
+      ..setFloat(8, texels.bottom - 0.5)
+      ..setFloat(10, blend)
+      ..setFloat(_kTail, optics.thickness)
+      ..setFloat(_kTail + 1, optics.strength)
+      ..setFloat(_kTail + 2, optics.edgePower)
+      ..setFloat(_kTail + 3, optics.shoulder)
+      ..setFloat(_kTail + 4, tint.r)
+      ..setFloat(_kTail + 5, tint.g)
+      ..setFloat(_kTail + 6, tint.b)
+      ..setFloat(_kTail + 7, tint.a)
+      ..setFloat(_kTail + 8, rimWidth)
+      ..setFloat(_kTail + 9, rim.r)
+      ..setFloat(_kTail + 10, rim.g)
+      ..setFloat(_kTail + 11, rim.b)
+      ..setFloat(_kTail + 12, rim.a)
+      ..setFloat(_kTail + 13, 1 / _devicePixelRatio)
       // The fold's cull distance, which is `k` in every draw that ships. It is
       // a uniform so that the skip's bit-identity is checkable from outside the
       // shader — render the same fragment twice with the branch compiled into
       // both and the threshold out of reach in one — and
       // [debugGlassFoldCull] is the same lever reachable from a benchmark.
-      ..setFloat(tail + 14, lastCullDistance)
-      ..setFloat(tail + 15, contrastRim == null ? 0 : 1)
+      ..setFloat(_kTail + 14, lastCullDistance)
+      ..setFloat(_kTail + 15, contrastRim == null ? 0 : 1)
       ..setImageSampler(0, frame.image, filterQuality: FilterQuality.low);
 
+    // One shader object for every tile — natively. `ReusableFragmentShader::
+    // shader()` copies the uniform buffer on each draw the paint is converted
+    // for (`fragment_shader.cc:110-120`), so setting the next tile's members
+    // and drawing again is a memcpy in C++ rather than an allocation in Dart.
+    //
+    // **Not on the web.** Skwasm's runtime-effect shader holds the uniform
+    // buffer by reference (`UniformData` is a `shared_ptr`, handed to the
+    // `DlColorSource` uncopied), so a draw recorded with it renders whatever
+    // the buffer says when the picture is rasterized — the last tile's
+    // members, for every tile. Blobs vanished, or showed through the wrong
+    // tile as the bare tint. There each tile gets a shader of its own.
+    final bool shared = !kIsWeb;
+    final ui.FragmentShader? shader = shared ? shaded() : null;
+
     final Paint paint = Paint()
-      ..shader = shader
       // Off for a split draw, and that is the seam rather than a detail. The
       // shader's output is premultiplied and translucent, so a device pixel
       // handed to two tiles composites twice: coverages of 0.37 and 0.63 make
@@ -1487,12 +1503,10 @@ class RenderGlassGroup extends RenderProxyBox {
       // picture — see [debugGlassShaderAntiAlias].
       ..isAntiAlias = tiles == null && debugGlassShaderAntiAlias;
 
-    // One shader object for every tile: `ReusableFragmentShader::shader()`
-    // copies the uniform buffer on each draw the paint is converted for
-    // (`fragment_shader.cc:110-120`), so setting the next tile's members and
-    // drawing again is a memcpy in C++ rather than an allocation in Dart.
     void draw(Rect rect, List<int> members) {
-      shader.setFloat(9, members.length.toDouble());
+      final ui.FragmentShader tile = shader ?? shaded();
+      paint.shader = tile;
+      tile.setFloat(9, members.length.toDouble());
       for (var i = 0; i < members.length; i++) {
         final int m = members[i];
         final Rect box = boxes[m];
@@ -1501,18 +1515,18 @@ class RenderGlassGroup extends RenderProxyBox {
         // an eroded member is inside its box, so every bound drawn from the
         // box still holds.
         final double inset = shapes[m].presenceInset(blend: blend);
-        shader
+        tile
           ..setFloat(11 + i * 4, box.center.dx)
           ..setFloat(12 + i * 4, box.center.dy)
           ..setFloat(13 + i * 4, box.width / 2 - inset)
           ..setFloat(14 + i * 4, box.height / 2 - inset);
-        shader.setFloat(11 + kMaxFusedShapes * 4 + i, shapes[m].effectiveRadius - inset);
+        tile.setFloat(11 + kMaxFusedShapes * 4 + i, shapes[m].effectiveRadius - inset);
       }
       // Unused slots are zeroed rather than left at whatever the last frame —
       // or the last tile — put there: `uCount` stops the loop, but a uniform
       // buffer nobody wrote is not a promise this code should be making.
       for (var i = members.length; i < kMaxFusedShapes; i++) {
-        shader
+        tile
           ..setFloat(11 + i * 4, 0)
           ..setFloat(12 + i * 4, 0)
           ..setFloat(13 + i * 4, 0)
@@ -1520,6 +1534,9 @@ class RenderGlassGroup extends RenderProxyBox {
           ..setFloat(11 + kMaxFusedShapes * 4 + i, 0);
       }
       canvas.drawRect(rect, paint);
+      if (!shared) {
+        tile.dispose();
+      }
       if (!paint.isAntiAlias) {
         fusedDrawsAliased++;
       }
@@ -1535,7 +1552,7 @@ class RenderGlassGroup extends RenderProxyBox {
         draw(tile.rect, tile.shapes);
       }
     }
-    shader.dispose();
+    shader?.dispose();
   }
 
   /// Every group currently attached, so [debugGlassFoldCull] can repaint them.

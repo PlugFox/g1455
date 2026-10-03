@@ -13,6 +13,23 @@ What a screen reader is told and can do:
   to be a tap target with no label, so a screen reader had no way to close a
   popover.
 
+Fixed:
+
+- Glass standing on glass no longer moves what is under the glass it stands
+  on. When a level was captured, the walk painted the levels below it, and a
+  `CompositedTransformTarget` among them wrote the walk's offset into its own
+  live `LeaderLayer`. A `SelectionArea` creates one. So with a popover open
+  over a bar, the bar's text jumped right and down, and it stayed there until
+  the bar repainted. The walk now puts back every live offset it touches.
+- A `GlassGroup` drawn in tiles no longer loses members on the web. Skwasm's
+  fragment shader keeps its uniforms by reference rather than copying them on
+  each draw, so every tile drew the last tile's members, and blobs flickered
+  in and out. On the web each tile now gets its own shader.
+- A platform view or a `Texture` is a hole in the capture of an upper level,
+  as it already was in the base level. It used to be a grey stub. On the web
+  every `SelectionArea` lays a transparent platform view under what it holds,
+  so a bar over a selectable page showed grey.
+
 ## 0.1.0
 
 First release on pub.dev, as `g1455`. The package was `glass` while it lived
