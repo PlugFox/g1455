@@ -13,6 +13,15 @@ What a screen reader is told and can do:
   to be a tap target with no label, so a screen reader had no way to close a
   popover.
 
+On a page:
+
+- `showGlassSheet` takes `constraints`, as `showModalBottomSheet` does. A
+  `maxWidth` keeps the sheet at its content's width, centred, on a window
+  wider than that. Null, it spans the window as before.
+- The labels of `GlassButton`, `GlassSegmentedControl` and `GlassTabBar` are
+  not text to select. Under a `SelectionArea`, a drag across the page used to
+  take them along with the prose around them.
+
 Fixed:
 
 - Glass standing on glass no longer moves what is under the glass it stands

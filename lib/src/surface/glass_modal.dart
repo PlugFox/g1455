@@ -306,6 +306,11 @@ class _AlertButtonState extends State<_AlertButton> {
 /// Shows [builder]'s widget in a glass sheet rising from the bottom, over a
 /// dim. Dragged down, it follows the finger and goes past a third of its
 /// height or on a flick. See the file comment for where the host has to be.
+///
+/// [constraints] bound the sheet inside the window's margins, as
+/// `showModalBottomSheet`'s do: a `maxWidth` keeps it at its content's width
+/// and centred on a wide window, where a sheet across the whole width leaves
+/// its content in a corner of the glass. Null, it spans the window.
 Future<T?> showGlassSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -313,6 +318,7 @@ Future<T?> showGlassSheet<T>({
   bool showGrabber = true,
   bool barrierDismissible = true,
   String barrierLabel = 'Dismiss',
+  BoxConstraints? constraints,
 }) {
   final NavigatorState navigator = Navigator.of(context);
   return navigator.push<T>(
@@ -323,6 +329,7 @@ Future<T?> showGlassSheet<T>({
       showGrabber: showGrabber,
       dismissible: barrierDismissible,
       dismissLabel: barrierLabel,
+      constraints: constraints,
     ),
   );
 }
@@ -335,6 +342,7 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
     required this.showGrabber,
     required this.dismissible,
     required this.dismissLabel,
+    required this.constraints,
   });
 
   final WidgetBuilder builder;
@@ -343,6 +351,7 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   final bool showGrabber;
   final bool dismissible;
   final String dismissLabel;
+  final BoxConstraints? constraints;
 
   @override
   Color get barrierColor => kGlassModalDim;
@@ -394,41 +403,44 @@ class _GlassSheet extends StatelessWidget {
       alignment: Alignment.bottomCenter,
       child: Padding(
         padding: EdgeInsets.fromLTRB(kGlassSheetInset, safe.top + kGlassSheetInset, kGlassSheetInset, kGlassSheetInset),
-        child: GlassAbove(
-          lift: kGlassModalLift,
-          child: AnimatedBuilder(
-            animation: progress,
-            builder: (BuildContext context, Widget? child) {
-              final double t = Curves.easeOutCubic.transform(progress.value.clamp(0.0, 1.0));
-              return FractionalTranslation(translation: Offset(0, 1.05 * (1 - t)), child: child);
-            },
-            child: GestureDetector(
-              onVerticalDragUpdate: (DragUpdateDetails d) {
-                final double h = context.size?.height ?? 1;
-                route._drag(d.primaryDelta! / h);
+        child: ConstrainedBox(
+          constraints: route.constraints ?? const BoxConstraints(),
+          child: GlassAbove(
+            lift: kGlassModalLift,
+            child: AnimatedBuilder(
+              animation: progress,
+              builder: (BuildContext context, Widget? child) {
+                final double t = Curves.easeOutCubic.transform(progress.value.clamp(0.0, 1.0));
+                return FractionalTranslation(translation: Offset(0, 1.05 * (1 - t)), child: child);
               },
-              onVerticalDragEnd: (DragEndDetails d) {
-                final double h = context.size?.height ?? 1;
-                route._release(d.primaryVelocity! / h);
-              },
-              child: GlassSurface(
-                borderRadius: const BorderRadius.all(Radius.circular(kGlassSheetRadius)),
-                finish: route.finish,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    if (route.showGrabber)
-                      Center(
-                        child: Container(
-                          margin: const EdgeInsets.only(top: 5, bottom: 4),
-                          width: 36,
-                          height: 5,
-                          decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0x4D3C3C43)),
+              child: GestureDetector(
+                onVerticalDragUpdate: (DragUpdateDetails d) {
+                  final double h = context.size?.height ?? 1;
+                  route._drag(d.primaryDelta! / h);
+                },
+                onVerticalDragEnd: (DragEndDetails d) {
+                  final double h = context.size?.height ?? 1;
+                  route._release(d.primaryVelocity! / h);
+                },
+                child: GlassSurface(
+                  borderRadius: const BorderRadius.all(Radius.circular(kGlassSheetRadius)),
+                  finish: route.finish,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      if (route.showGrabber)
+                        Center(
+                          child: Container(
+                            margin: const EdgeInsets.only(top: 5, bottom: 4),
+                            width: 36,
+                            height: 5,
+                            decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0x4D3C3C43)),
+                          ),
                         ),
-                      ),
-                    Flexible(child: Builder(builder: route.builder)),
-                  ],
+                      Flexible(child: Builder(builder: route.builder)),
+                    ],
+                  ),
                 ),
               ),
             ),
