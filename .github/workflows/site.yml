@@ -95,7 +95,7 @@ jobs:
           target: g1455
           entryPoint: site
           # Live from master; a preview channel per pull request otherwise.
-          channelId: ${{ github.event_name == 'pull_request' && '' || 'live' }}
+          channelId: ${{ github.event_name != 'pull_request' && 'live' || '' }}
           expires: 7d
 
       # The release is only done when the address serves it: version.json

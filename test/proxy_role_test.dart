@@ -445,7 +445,10 @@ void main() {
                 child: RepaintBoundary(
                   child: Padding(
                     padding: const EdgeInsets.only(left: 14),
-                    child: CompositedTransformTarget(link: LayerLink(), child: const ColoredBox(color: kBox)),
+                    child: CompositedTransformTarget(
+                      link: LayerLink(),
+                      child: const ColoredBox(color: kBox),
+                    ),
                   ),
                 ),
               ),
@@ -484,7 +487,10 @@ void main() {
           Stack(
             children: <Widget>[
               const Positioned.fill(child: _PlatformViewStandIn()),
-              Positioned.fromRect(rect: _first, child: const ColoredBox(color: kBox)),
+              Positioned.fromRect(
+                rect: _first,
+                child: const ColoredBox(color: kBox),
+              ),
             ],
           ),
         ),
