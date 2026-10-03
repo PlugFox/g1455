@@ -1,0 +1,31 @@
+# A .pubignore replaces .gitignore for pub, so everything ignored there is
+# repeated here.
+.dart_tool/
+.packages
+.pub/
+build/
+coverage/
+doc/api/
+.flutter-plugins
+.flutter-plugins-dependencies
+/pubspec.lock
+/example/pubspec.lock
+.idea/
+*.iml
+.DS_Store
+.env
+.env.*
+local.properties
+
+# Repository-only. The README's full-size loops are served from GitHub (pub.dev
+# resolves the README's relative links against `repository`); the half-size
+# ones in doc/screenshots/ are what pub ships.
+/doc/showcase/
+/tool/
+/.github/
+/.vscode/
+/codecov.yml
+/example/build/
+# The runs the constants in lib/ came from, and the tests that check them, live
+# in the repository: 6.9 MB nobody's build reads.
+/provenance/

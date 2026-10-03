@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "pub get",
+      "type": "shell",
+      "command": "flutter pub get && (cd example && flutter pub get)",
+      "problemMatcher": []
+    },
+    {
+      "label": "format",
+      "type": "shell",
+      "command": "dart format .",
+      "problemMatcher": []
+    },
+    {
+      "label": "analyze",
+      "type": "shell",
+      "command": "flutter analyze --fatal-infos --fatal-warnings",
+      "problemMatcher": "$dart-analyze",
+      "group": "build"
+    },
+    {
+      "label": "test with coverage",
+      "type": "shell",
+      "command": "flutter test --coverage",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "publish dry-run",
+      "type": "shell",
+      "command": "flutter pub publish --dry-run",
+      "problemMatcher": []
+    },
+    {
+      "label": "pana",
+      "type": "shell",
+      "command": "dart pub global activate pana && dart pub global run pana --no-warning .",
+      "problemMatcher": []
+    },
+    {
+      "label": "showcase: README loops",
+      "type": "shell",
+      "command": "tool/showcase.sh",
+      "problemMatcher": []
+    },
+    {
+      "label": "showcase: pub.dev screenshots",
+      "type": "shell",
+      "command": "SHOWCASE_DPR=1 SHOWCASE_DIR=doc/screenshots tool/showcase.sh",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,348 @@
+{
+  "source": "s22u-m7glass-bank-2026-09-08T14-22-06.json",
+  "digest_of": "benchmark report, cells only",
+  "metric": "micros_per_frame",
+  "started_at": "2026-09-08T14:22:04.704611Z",
+  "environment": {
+    "label": "s22u-m7glass-bank",
+    "build_mode": "profile",
+    "os": "android",
+    "os_version": "BP2A.250605.031.A3.S908BXXSOGZH3",
+    "device_pixel_ratio": 2.0,
+    "physical_size": [
+      720.0,
+      1544.0
+    ],
+    "impeller_shader_filter_supported": true,
+    "graphics_backend": {
+      "observed": "vulkan",
+      "requested": null
+    },
+    "display_refresh_rate_hz": 120.00000762939453
+  },
+  "config": {
+    "measure_ms": 30000,
+    "repeats": 3,
+    "shuffle_seed": 20260908,
+    "warmup_ms": 3000,
+    "cooldown_ms": 5000
+  },
+  "caveats": [
+    "THROTTLED: surface.bank_home.pubGlassOwnLayer ran with the GPU held at the thermal ceiling (worst power level 0, 1084 of 1499 samples pinned there). Its numbers are not comparable to an unthrottled scenario.",
+    "THROTTLED: surface.bank_home.pubGlass ran with the GPU held at the thermal ceiling (worst power level 0, 1499 of 1499 samples pinned there). Its numbers are not comparable to an unthrottled scenario.",
+    "THROTTLED: surface.bank_home.backdrop ran with the GPU held at the thermal ceiling (worst power level 0, 6 of 1499 samples pinned there). Its numbers are not comparable to an unthrottled scenario.",
+    "THROTTLED: surface.bank_home.pubGlassOwnLayer ran with the GPU held at the thermal ceiling (worst power level 0, 1498 of 1498 samples pinned there). Its numbers are not comparable to an unthrottled scenario.",
+    "THROTTLED: surface.bank_home.pubGlassOwnLayer ran with the GPU held at the thermal ceiling (worst power level 0, 1498 of 1498 samples pinned there). Its numbers are not comparable to an unthrottled scenario.",
+    "THROTTLED: surface.bank_home.pubGlass ran with the GPU held at the thermal ceiling (worst power level 0, 1499 of 1499 samples pinned there). Its numbers are not comparable to an unthrottled scenario.",
+    "GPU counters came from the Exynos nodes, not kgsl: `gpu_busy` is a snapshot of the governor's ~32 ms window rather than a counter reset on read, and it is a whole percent. These numbers are comparable to another Exynos run and not to any of the SM-S938B ones.",
+    "OFF VSYNC: surface.bank_home.pubGlassOwnLayer fell to 40.5 fps on its worst repeat, against a 120 Hz display. Per-frame numbers there are not a frame price, and the cost fits exclude it.",
+    "OFF VSYNC: surface.bank_home.glass_d2 fell to 68.8 fps on its worst repeat, against a 120 Hz display. Per-frame numbers there are not a frame price, and the cost fits exclude it.",
+    "OFF VSYNC: surface.bank_home.glass_d1 fell to 45.5 fps on its worst repeat, against a 120 Hz display. Per-frame numbers there are not a frame price, and the cost fits exclude it.",
+    "OFF VSYNC: surface.bank_home.glass_d4 fell to 112.2 fps on its worst repeat, against a 120 Hz display. Per-frame numbers there are not a frame price, and the cost fits exclude it."
+  ],
+  "cells": [
+    {
+      "scene": "bank_home",
+      "variant": "backdrop",
+      "repeats": 3,
+      "micros_per_frame": 8342.77808676307,
+      "frames_per_second": 119.86414951952676,
+      "values": [
+        8340.515985543509,
+        8342.77808676307,
+        8345.065924895689
+      ],
+      "spread": 0.0005453746108145356,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9392,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 18784.0,
+        "steps_taken": 9392,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "fake",
+      "repeats": 3,
+      "micros_per_frame": 8359.053775424909,
+      "frames_per_second": 119.63076525957243,
+      "values": [
+        8359.053775424909,
+        8362.572185061315,
+        8349.833843584747
+      ],
+      "spread": 0.0015238975389796016,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9347,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 18694.0,
+        "steps_taken": 9347,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "glass_d1",
+      "repeats": 3,
+      "micros_per_frame": 19456.143968871595,
+      "frames_per_second": 51.39764598781376,
+      "values": [
+        21995.059384164222,
+        17678.807307012376,
+        19456.143968871595
+      ],
+      "spread": 0.2218451962556164,
+      "counters": {
+        "cells_built": 76,
+        "frames_driven": 3926,
+        "glass_paints_with_optics": 58875,
+        "glass_paints_with_proxy": 58875,
+        "glass_paints_without_proxy": 30,
+        "glass_proxy_divisor": 1,
+        "glass_proxy_generations": 1874,
+        "scroll_travelled": 7852.0,
+        "steps_taken": 3926,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 117810
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "1"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "glass_d2",
+      "repeats": 3,
+      "micros_per_frame": 9807.493625367768,
+      "frames_per_second": 101.96284985732034,
+      "values": [
+        9807.493625367768,
+        14542.680077556955,
+        8481.964093864857
+      ],
+      "spread": 0.617967873873059,
+      "counters": {
+        "cells_built": 116,
+        "frames_driven": 6576,
+        "glass_paints_with_optics": 98625,
+        "glass_paints_with_proxy": 98625,
+        "glass_paints_without_proxy": 30,
+        "glass_proxy_divisor": 2,
+        "glass_proxy_generations": 3953,
+        "scroll_travelled": 13152.0,
+        "steps_taken": 6576,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 197310
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "2"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "glass_d4",
+      "repeats": 3,
+      "micros_per_frame": 8865.473995271868,
+      "frames_per_second": 112.7971274331547,
+      "values": [
+        8915.639821693909,
+        8865.473995271868,
+        8336.118921922756
+      ],
+      "spread": 0.06536829278166316,
+      "counters": {
+        "cells_built": 146,
+        "frames_driven": 8556,
+        "glass_paints_with_optics": 128325,
+        "glass_paints_with_proxy": 128325,
+        "glass_paints_without_proxy": 30,
+        "glass_proxy_divisor": 4,
+        "glass_proxy_generations": 4366,
+        "scroll_travelled": 17112.0,
+        "steps_taken": 8556,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 256710
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "4"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "material",
+      "repeats": 3,
+      "micros_per_frame": 8365.134374128798,
+      "frames_per_second": 119.54380590618388,
+      "values": [
+        8365.134374128798,
+        8387.359798714006,
+        8359.169963778211
+      ],
+      "spread": 0.003369920156091961,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9351,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 18702.0,
+        "steps_taken": 9351,
+        "surface_area_logical": 453136.0,
+        "surface_bounds_area_logical": 268920.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "plain",
+      "repeats": 3,
+      "micros_per_frame": 8359.349679576484,
+      "frames_per_second": 119.62653057129485,
+      "values": [
+        8368.54811715481,
+        8359.349679576484,
+        8340.516819571865
+      ],
+      "spread": 0.003353286877259308,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9357,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 18714.0,
+        "steps_taken": 9357,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "pubGlass",
+      "repeats": 3,
+      "micros_per_frame": 8338.12896053363,
+      "frames_per_second": 119.93098268607268,
+      "values": [
+        8338.12896053363,
+        8335.867741039177,
+        8518.274559909143
+      ],
+      "spread": 0.021876229035715455,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9402,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 18804.0,
+        "steps_taken": 9402,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "pubGlassOwnLayer",
+      "repeats": 3,
+      "micros_per_frame": 18809.479623824453,
+      "frames_per_second": 53.16468185187753,
+      "values": [
+        18271.034104750306,
+        18809.479623824453,
+        24692.410699588476
+      ],
+      "spread": 0.34139044371566396,
+      "counters": {
+        "cells_built": 79,
+        "frames_driven": 4136,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 8272.0,
+        "steps_taken": 4136,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    }
+  ]
+}

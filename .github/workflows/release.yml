@@ -1,0 +1,71 @@
+name: Release
+
+# pub.dev accepts an automated publish only from a workflow started by a tag
+# push matching the pattern on the package's admin page: `v{{version}}`.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  publish:
+    name: Publish to pub.dev
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pub.dev
+    permissions:
+      id-token: write # the OIDC token pub.dev trusts
+    steps:
+      - uses: actions/checkout@v7
+
+      # Configures pub's credentials from the OIDC token. Flutter's pub reads
+      # the same token store, so the publish below is authenticated.
+      - uses: dart-lang/setup-dart@v1
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Check the tag names the pubspec's version
+        run: |
+          version="$(sed -n 's/^version: *//p' pubspec.yaml)"
+          if [[ "v$version" != "$GITHUB_REF_NAME" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME, pubspec version $version"
+            exit 1
+          fi
+          grep -q "^## $version\$" CHANGELOG.md || { echo "::error::no '## $version' in CHANGELOG.md"; exit 1; }
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Publish
+        run: flutter pub publish --force
+
+  release:
+    name: GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="## $version" '$0 == v {on = 1; next} /^## / && on {exit} on' CHANGELOG.md > notes.md
+          printf '\n---\n\nhttps://pub.dev/packages/g1455/versions/%s\n' "$version" >> notes.md
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ github.ref_name }}
+          body_path: notes.md
+          prerelease: ${{ contains(github.ref_name, '-') }}

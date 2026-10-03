@@ -1,0 +1,36 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+doc/api/
+.flutter-plugins
+.flutter-plugins-dependencies
+# A library resolves fresh in CI; the example's lock is the example's.
+/pubspec.lock
+/example/pubspec.lock
+
+# IDE: .vscode/ is shared, its local state is not
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*.log
+.history/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets and machine-local files
+.env
+.env.*
+*.jks
+*.keystore
+*.p12
+*.pem
+key.properties
+local.properties
+**/android/app/upload-keystore*

@@ -1,0 +1,16 @@
+name: Feature request
+description: A component, an optic or a declaration the package does not have.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you need
+      description: What it should look like or do. A reference from iOS 26 helps.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What you are building, and what you do without it today.

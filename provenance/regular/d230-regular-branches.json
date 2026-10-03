@@ -1,0 +1,236 @@
+{
+ "taken_at": "2026-10-03",
+ "instrument": "iOS 26.5 simulators; S4 rig (integration_test/spike_18_apple_reference_test.dart, S4_STYLE) on iPad Pro 11-inch (M5); MaterialReference (ios/Runner/GlassReference.swift) on iPhone 17 Pro, read off simctl io screenshot",
+ "s4": {
+  "dark": {
+   "regular": {
+    "backdrop_luma": [
+     48.7,
+     108.1,
+     188.8,
+     146.9
+    ],
+    "material_luma": [
+     34.4,
+     54.9,
+     77.2,
+     66.2
+    ]
+   },
+   "clear": {
+    "backdrop_luma": [
+     48.7,
+     108.1,
+     188.8,
+     146.9
+    ],
+    "material_luma": [
+     69.4,
+     129.2,
+     212.3,
+     169.0
+    ]
+   }
+  },
+  "light": {
+   "regular": {
+    "backdrop_luma": [
+     48.7,
+     108.1,
+     188.8,
+     146.9
+    ],
+    "material_luma": [
+     194.7,
+     211.7,
+     234.6,
+     221.2
+    ]
+   },
+   "clear": {
+    "backdrop_luma": [
+     48.7,
+     108.1,
+     188.8,
+     146.9
+    ],
+    "material_luma": [
+     69.4,
+     129.2,
+     212.3,
+     169.0
+    ]
+   }
+  }
+ },
+ "flat": {
+  "dark": [
+   {
+    "level": 16,
+    "backdrop": 16.0,
+    "glass": 23.0
+   },
+   {
+    "level": 48,
+    "backdrop": 48.0,
+    "glass": 34.0
+   },
+   {
+    "level": 80,
+    "backdrop": 80.0,
+    "glass": 57.0
+   },
+   {
+    "level": 112,
+    "backdrop": 112.0,
+    "glass": 82.0
+   },
+   {
+    "level": 144,
+    "backdrop": 144.0,
+    "glass": 93.0
+   },
+   {
+    "level": 176,
+    "backdrop": 176.0,
+    "glass": 98.0
+   },
+   {
+    "level": 208,
+    "backdrop": 208.0,
+    "glass": 106.3
+   },
+   {
+    "level": 240,
+    "backdrop": 240.0,
+    "glass": 250.0
+   }
+  ],
+  "light": [
+   {
+    "level": 16,
+    "backdrop": 16.0,
+    "glass": 23.0
+   },
+   {
+    "level": 48,
+    "backdrop": 48.0,
+    "glass": 34.0
+   },
+   {
+    "level": 80,
+    "backdrop": 80.0,
+    "glass": 182.0
+   },
+   {
+    "level": 112,
+    "backdrop": 112.0,
+    "glass": 196.0
+   },
+   {
+    "level": 144,
+    "backdrop": 144.0,
+    "glass": 216.7
+   },
+   {
+    "level": 176,
+    "backdrop": 176.0,
+    "glass": 230.0
+   },
+   {
+    "level": 208,
+    "backdrop": 208.0,
+    "glass": 242.0
+   },
+   {
+    "level": 240,
+    "backdrop": 240.0,
+    "glass": 250.0
+   }
+  ],
+  "light_threshold": [
+   {
+    "level": 52,
+    "backdrop": 52.0,
+    "glass": 36.0
+   },
+   {
+    "level": 56,
+    "backdrop": 56.0,
+    "glass": 171.0
+   },
+   {
+    "level": 60,
+    "backdrop": 60.0,
+    "glass": 172.0
+   },
+   {
+    "level": 64,
+    "backdrop": 64.0,
+    "glass": 174.0
+   },
+   {
+    "level": 68,
+    "backdrop": 68.0,
+    "glass": 175.0
+   },
+   {
+    "level": 72,
+    "backdrop": 72.0,
+    "glass": 179.0
+   },
+   {
+    "level": 76,
+    "backdrop": 76.0,
+    "glass": 180.0
+   },
+   {
+    "level": 80,
+    "backdrop": 80.0,
+    "glass": 182.0
+   }
+  ],
+  "dark_threshold": [
+   {
+    "level": 212,
+    "backdrop": 212.0,
+    "glass": 107.0
+   },
+   {
+    "level": 216,
+    "backdrop": 216.0,
+    "glass": 108.0
+   },
+   {
+    "level": 220,
+    "backdrop": 220.0,
+    "glass": 108.0
+   },
+   {
+    "level": 224,
+    "backdrop": 224.0,
+    "glass": 247.0
+   },
+   {
+    "level": 228,
+    "backdrop": 228.0,
+    "glass": 247.0
+   },
+   {
+    "level": 232,
+    "backdrop": 232.0,
+    "glass": 249.0
+   },
+   {
+    "level": 236,
+    "backdrop": 236.0,
+    "glass": 249.3
+   },
+   {
+    "level": 240,
+    "backdrop": 240.0,
+    "glass": 250.0
+   }
+  ]
+ }
+}

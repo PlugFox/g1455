@@ -1,0 +1,432 @@
+{
+  "source": "s25u-area-b-2026-08-24T01-09-28.json",
+  "digest_of": "benchmark report, cells only",
+  "metric": "gpu_cycles_per_frame",
+  "started_at": "2026-08-24T01:09:27.811874Z",
+  "environment": {
+    "label": "s25u-area-b",
+    "build_mode": "profile",
+    "os": "android",
+    "os_version": "BP4A.251205.006.S938BXXSBCZG3",
+    "device_pixel_ratio": 3.0,
+    "physical_size": [
+      1080.0,
+      2340.0
+    ],
+    "impeller_shader_filter_supported": true
+  },
+  "config": {
+    "measure_ms": 30000,
+    "repeats": 3,
+    "warmup_ms": 3000,
+    "cooldown_ms": 5000
+  },
+  "caveats": [],
+  "cells": [
+    {
+      "scene": "area_n12_c20",
+      "variant": "fake",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 329463.10950820154,
+      "values": [
+        331906.1135788179,
+        329463.10950820154,
+        328342.84646362346
+      ],
+      "spread": 0.01081537511290248,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9419,
+        "scroll_travelled": 16012.30000000273,
+        "steps_taken": 9419,
+        "surface_area_logical": 56159.99999999999,
+        "surface_bounds_area_logical": 147440.28366550317,
+        "surfaces_painted": 24
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 12,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n12_c20",
+      "variant": "material",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 275105.95125107357,
+      "values": [
+        275105.95125107357,
+        270889.79405526514,
+        276778.7637341703
+      ],
+      "spread": 0.02140618787824995,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9421,
+        "scroll_travelled": 16015.700000002731,
+        "steps_taken": 9421,
+        "surface_area_logical": 56159.99999999999,
+        "surface_bounds_area_logical": 147440.28366550317,
+        "surfaces_painted": 24
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 12,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n12_c20",
+      "variant": "plain",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 240511.58930730462,
+      "values": [
+        240505.3605892817,
+        240511.58930730462,
+        243174.74823566072
+      ],
+      "spread": 0.011098790100165602,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9422,
+        "scroll_travelled": 16017.400000002732,
+        "steps_taken": 9422,
+        "surface_area_logical": 56159.99999999999,
+        "surface_bounds_area_logical": 147440.28366550317,
+        "surfaces_painted": 24
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 12,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c10",
+      "variant": "fake",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 255211.08352854403,
+      "values": [
+        255211.08352854403,
+        252983.76565880718,
+        255662.3144985365
+      ],
+      "spread": 0.010495425209186601,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9418,
+        "scroll_travelled": 16010.600000002729,
+        "steps_taken": 9418,
+        "surface_area_logical": 28079.999999999996,
+        "surface_bounds_area_logical": 50772.056844124585,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.1,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c10",
+      "variant": "material",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 239167.01192401364,
+      "values": [
+        239167.01192401364,
+        238722.61316683269,
+        239173.3415722959
+      ],
+      "spread": 0.0018845759782558152,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9419,
+        "scroll_travelled": 16012.30000000273,
+        "steps_taken": 9419,
+        "surface_area_logical": 28079.999999999996,
+        "surface_bounds_area_logical": 50772.056844124585,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.1,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c10",
+      "variant": "plain",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 219625.35114979307,
+      "values": [
+        219534.8443445243,
+        219625.35114979307,
+        222793.74758988584
+      ],
+      "spread": 0.014838465724928319,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9421,
+        "scroll_travelled": 16015.700000002731,
+        "steps_taken": 9421,
+        "surface_area_logical": 28079.999999999996,
+        "surface_bounds_area_logical": 50772.056844124585,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.1,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c20",
+      "variant": "fake",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 295085.1789388551,
+      "values": [
+        292866.86012201884,
+        301444.23623948934,
+        295085.1789388551
+      ],
+      "spread": 0.029067458244820304,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9419,
+        "scroll_travelled": 16012.30000000273,
+        "steps_taken": 9419,
+        "surface_area_logical": 56159.99999999998,
+        "surface_bounds_area_logical": 80026.97296282044,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c20",
+      "variant": "material",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 254705.2104819726,
+      "values": [
+        254265.43190557545,
+        258265.77934434803,
+        254705.2104819726
+      ],
+      "spread": 0.01570579349830663,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9421,
+        "scroll_travelled": 16015.700000002731,
+        "steps_taken": 9421,
+        "surface_area_logical": 56159.99999999998,
+        "surface_bounds_area_logical": 80026.97296282044,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c20",
+      "variant": "plain",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 231459.81907968328,
+      "values": [
+        229743.7998142676,
+        233423.53358894595,
+        231459.81907968328
+      ],
+      "spread": 0.0158979376606682,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9420,
+        "scroll_travelled": 16014.00000000273,
+        "steps_taken": 9420,
+        "surface_area_logical": 56159.99999999998,
+        "surface_bounds_area_logical": 80026.97296282044,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c30",
+      "variant": "fake",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 332879.3897364771,
+      "values": [
+        332803.2501386578,
+        332879.3897364771,
+        332892.3938973648
+      ],
+      "spread": 0.0002677959689170053,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9421,
+        "scroll_travelled": 16015.700000002731,
+        "steps_taken": 9421,
+        "surface_area_logical": 84239.99999999999,
+        "surface_bounds_area_logical": 105741.78872053188,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.3,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c30",
+      "variant": "material",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 279544.6948419301,
+      "values": [
+        279174.2943347914,
+        279544.6948419301,
+        279567.44891846925
+      ],
+      "spread": 0.0014064104629141155,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9421,
+        "scroll_travelled": 16015.700000002731,
+        "steps_taken": 9421,
+        "surface_area_logical": 84239.99999999999,
+        "surface_bounds_area_logical": 105741.78872053188,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.3,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n2_c30",
+      "variant": "plain",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 240120.8533179948,
+      "values": [
+        240253.71027525372,
+        240120.8533179948,
+        240063.85789570338
+      ],
+      "spread": 0.0007906534435762594,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9418,
+        "scroll_travelled": 16010.600000002729,
+        "steps_taken": 9418,
+        "surface_area_logical": 84239.99999999999,
+        "surface_bounds_area_logical": 105741.78872053188,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.3,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n6_c20",
+      "variant": "fake",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 307504.14936977945,
+      "values": [
+        307504.14936977945,
+        312819.2687905887,
+        306615.48394147994
+      ],
+      "spread": 0.020174637844150235,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9420,
+        "scroll_travelled": 16014.00000000273,
+        "steps_taken": 9420,
+        "surface_area_logical": 56159.99999999996,
+        "surface_bounds_area_logical": 128921.34493637567,
+        "surfaces_painted": 12
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 6,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n6_c20",
+      "variant": "material",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 266688.3107418517,
+      "values": [
+        266688.3107418517,
+        266760.88324001874,
+        266302.1891816921
+      ],
+      "spread": 0.001719963117433597,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9420,
+        "scroll_travelled": 16014.00000000273,
+        "steps_taken": 9420,
+        "surface_area_logical": 56159.99999999996,
+        "surface_bounds_area_logical": 128921.34493637567,
+        "surfaces_painted": 12
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 6,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "area_n6_c20",
+      "variant": "plain",
+      "repeats": 3,
+      "gpu_cycles_per_frame": 239609.83427620633,
+      "values": [
+        239680.36660194176,
+        239608.53244592345,
+        239609.83427620633
+      ],
+      "spread": 0.0002997963595079233,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 9420,
+        "scroll_travelled": 16014.00000000273,
+        "steps_taken": 9420,
+        "surface_area_logical": 56159.99999999996,
+        "surface_bounds_area_logical": 128921.34493637567,
+        "surfaces_painted": 12
+      },
+      "axes": {
+        "coverage": 0.2,
+        "content_complexity": 1,
+        "shape_count": 6,
+        "motion": "contentScrolls"
+      }
+    }
+  ]
+}

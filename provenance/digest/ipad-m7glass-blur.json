@@ -1,0 +1,241 @@
+{
+  "source": "ipad-m7glass-blur-2026-09-08T22-19-10.json",
+  "digest_of": "benchmark report, cells only",
+  "metric": "frame_ms_per_frame",
+  "started_at": "2026-09-08T22:19:09.988944Z",
+  "environment": {
+    "label": "ipad-m7glass-blur",
+    "build_mode": "profile",
+    "os": "ios",
+    "os_version": "Version 26.6.1 (Build 23G83)",
+    "device_pixel_ratio": 2.0,
+    "physical_size": [
+      1668.0,
+      2388.0
+    ],
+    "impeller_shader_filter_supported": true,
+    "graphics_backend": {
+      "observed": null,
+      "requested": null
+    },
+    "display_refresh_rate_hz": 120.0
+  },
+  "config": {
+    "measure_ms": 5000,
+    "repeats": 3,
+    "shuffle_seed": 20260909,
+    "warmup_ms": 3000,
+    "cooldown_ms": 1500
+  },
+  "caveats": [
+    "Thermal state unavailable: no platform channel and no readable GPU temperature. A long run cannot be told apart from a throttled one.",
+    "GPU counters unavailable: neither a kgsl node nor an Exynos one was readable. Throughput and raster timings are the only metrics, and both have known blind spots here.",
+    "Measurement window is 5s, below the 30s floor that #126353-style late degradation needs to show up."
+  ],
+  "cells": [
+    {
+      "scene": "over_photo",
+      "variant": "glass_d1",
+      "repeats": 3,
+      "frame_ms_per_frame": 3.8975233729096996,
+      "values": [
+        3.4957195728643233,
+        3.8975233729096996,
+        3.9185695075376916
+      ],
+      "spread": 0.10849195610023739,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3386,
+        "glass_paints_with_optics": 6770,
+        "glass_paints_with_proxy": 6770,
+        "glass_paints_without_proxy": 4,
+        "glass_proxy_divisor": 1,
+        "glass_proxy_generations": 1693,
+        "scroll_travelled": 4401.8000000002785,
+        "steps_taken": 3386,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 13548
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "1",
+        "glass_max_captures": "unlimited"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "glass_d1_noblur",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.8291888944723602,
+      "values": [
+        1.7998365943238706,
+        1.8291888944723602,
+        1.834065673913041
+      ],
+      "spread": 0.01871270905514873,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3387,
+        "glass_paints_with_optics": 6772,
+        "glass_paints_with_proxy": 6772,
+        "glass_paints_without_proxy": 4,
+        "glass_proxy_divisor": 1,
+        "glass_proxy_generations": 1694,
+        "scroll_travelled": 4403.100000000279,
+        "steps_taken": 3387,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 13552
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "1",
+        "glass_max_captures": "unlimited"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "glass_d8",
+      "repeats": 3,
+      "frame_ms_per_frame": 2.2040642931323275,
+      "values": [
+        2.0293037382550336,
+        2.2170227872696944,
+        2.2040642931323275
+      ],
+      "spread": 0.08516949782253493,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3377,
+        "glass_paints_with_optics": 6752,
+        "glass_paints_with_proxy": 6752,
+        "glass_paints_without_proxy": 4,
+        "glass_proxy_divisor": 8,
+        "glass_proxy_generations": 1689,
+        "scroll_travelled": 4390.100000000277,
+        "steps_taken": 3377,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 13512
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "8",
+        "glass_max_captures": "unlimited"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "glass_d8_noblur",
+      "repeats": 3,
+      "frame_ms_per_frame": 2.0777854117647077,
+      "values": [
+        2.052620224455613,
+        2.0963326331658316,
+        2.0777854117647077
+      ],
+      "spread": 0.021037980372137114,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3378,
+        "glass_paints_with_optics": 6754,
+        "glass_paints_with_proxy": 6754,
+        "glass_paints_without_proxy": 4,
+        "glass_proxy_divisor": 8,
+        "glass_proxy_generations": 1690,
+        "scroll_travelled": 4391.400000000277,
+        "steps_taken": 3378,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 13516
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "8",
+        "glass_max_captures": "unlimited"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "material",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.0888671599999995,
+      "values": [
+        1.0933075687919462,
+        1.0888671599999995,
+        1.078937403361342
+      ],
+      "spread": 0.013197354056122261,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3379,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 4392.700000000277,
+        "steps_taken": 3379,
+        "surface_area_logical": 266143.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "plain",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.0565617521079236,
+      "values": [
+        1.0565617521079236,
+        1.0537734574290456,
+        1.0614474857142822
+      ],
+      "spread": 0.007263208487271348,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3377,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 4390.100000000277,
+        "steps_taken": 3377,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    }
+  ]
+}

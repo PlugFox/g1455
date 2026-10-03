@@ -1,0 +1,210 @@
+{
+  "source": "s22u-d136-bank-2026-09-08T15-54-28.json",
+  "digest_of": "benchmark report, cells only",
+  "metric": "micros_per_frame",
+  "started_at": "2026-09-08T15:54:26.667888Z",
+  "environment": {
+    "label": "s22u-d136-bank",
+    "build_mode": "profile",
+    "os": "android",
+    "os_version": "BP2A.250605.031.A3.S908BXXSOGZH3",
+    "device_pixel_ratio": 2.0,
+    "physical_size": [
+      720.0,
+      1544.0
+    ],
+    "impeller_shader_filter_supported": true,
+    "graphics_backend": {
+      "observed": "vulkan",
+      "requested": null
+    },
+    "display_refresh_rate_hz": 120.00000762939453
+  },
+  "config": {
+    "measure_ms": 30000,
+    "repeats": 3,
+    "shuffle_seed": 20260910,
+    "warmup_ms": 3000,
+    "cooldown_ms": 5000
+  },
+  "caveats": [
+    "GPU counters came from the Exynos nodes, not kgsl: `gpu_busy` is a snapshot of the governor's ~32 ms window rather than a counter reset on read, and it is a whole percent. These numbers are comparable to another Exynos run and not to any of the SM-S938B ones.",
+    "OFF VSYNC: surface.bank_home.glass_d1 fell to 37.2 fps on its worst repeat, against a 120 Hz display. Per-frame numbers there are not a frame price, and the cost fits exclude it."
+  ],
+  "cells": [
+    {
+      "scene": "bank_home",
+      "variant": "glass",
+      "repeats": 3,
+      "micros_per_frame": 8339.093107281824,
+      "frames_per_second": 119.91711654193965,
+      "values": [
+        8339.093107281824,
+        8335.898027229787,
+        8375.390843104411
+      ],
+      "spread": 0.004735864603806684,
+      "counters": {
+        "cells_built": 161,
+        "frames_driven": 9390,
+        "glass_paints_with_optics": 140850,
+        "glass_paints_with_proxy": 140850,
+        "glass_paints_without_proxy": 15,
+        "glass_proxy_divisor": 4,
+        "glass_proxy_generations": 4698,
+        "scroll_travelled": 18780.0,
+        "steps_taken": 9390,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 281730
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "policy",
+        "glass_max_captures": "unlimited"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "glass_d1",
+      "repeats": 3,
+      "micros_per_frame": 25493.043330501274,
+      "frames_per_second": 39.22638764762719,
+      "values": [
+        25493.043330501274,
+        24753.574257425742,
+        26912.173094170405
+      ],
+      "spread": 0.08467403474586326,
+      "counters": {
+        "cells_built": 64,
+        "frames_driven": 3158,
+        "glass_paints_with_optics": 47355,
+        "glass_paints_with_proxy": 47355,
+        "glass_paints_without_proxy": 30,
+        "glass_proxy_divisor": 1,
+        "glass_proxy_generations": 1562,
+        "scroll_travelled": 6316.0,
+        "steps_taken": 3158,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 94770
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "1",
+        "glass_max_captures": "unlimited"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "glass_d4",
+      "repeats": 3,
+      "micros_per_frame": 8341.391159299415,
+      "frames_per_second": 119.88407939425645,
+      "values": [
+        8338.066981656475,
+        8341.391159299415,
+        8358.996935079409
+      ],
+      "spread": 0.0025091681978731063,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9377,
+        "glass_paints_with_optics": 140640,
+        "glass_paints_with_proxy": 140640,
+        "glass_paints_without_proxy": 30,
+        "glass_proxy_divisor": 4,
+        "glass_proxy_generations": 4683,
+        "scroll_travelled": 18754.0,
+        "steps_taken": 9377,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 281340
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls",
+        "glass_hardware": "detect",
+        "glass_pinned_divisor": "4",
+        "glass_max_captures": "unlimited"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "material",
+      "repeats": 3,
+      "micros_per_frame": 8363.84750487873,
+      "frames_per_second": 119.56219902582974,
+      "values": [
+        8366.182933630786,
+        8352.257795100222,
+        8363.84750487873
+      ],
+      "spread": 0.0016649201844534647,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9369,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 18738.0,
+        "steps_taken": 9369,
+        "surface_area_logical": 453136.0,
+        "surface_bounds_area_logical": 268920.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "bank_home",
+      "variant": "plain",
+      "repeats": 3,
+      "micros_per_frame": 8354.36313004734,
+      "frames_per_second": 119.69793321568648,
+      "values": [
+        8354.36313004734,
+        8352.433184855234,
+        8354.397660818713
+      ],
+      "spread": 0.0002351437126803719,
+      "counters": {
+        "cells_built": 158,
+        "frames_driven": 9370,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 18740.0,
+        "steps_taken": 9370,
+        "surface_area_logical": 183312.00000000003,
+        "surface_bounds_area_logical": 245880.0,
+        "surfaces_painted": 30
+      },
+      "axes": {
+        "coverage": 0.6,
+        "content_complexity": 12,
+        "shape_count": 15,
+        "motion": "contentScrolls"
+      }
+    }
+  ]
+}

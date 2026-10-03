@@ -1,0 +1,40 @@
+name: Bug report
+description: The glass draws wrong, costs too much, or throws.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. A screenshot or a recording helps.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest widget tree that shows it.
+      render: dart
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and GPU
+      placeholder: Pixel 9 (Mali-G715), iPhone 16 Pro, macOS 26 on M3...
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Renderer
+      options: [Impeller (Metal), Impeller (Vulkan), Impeller (GLES), Skia, Web (CanvasKit), Web (Skwasm), Not sure]
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: flutter doctor -v
+      render: text
+    validations:
+      required: true

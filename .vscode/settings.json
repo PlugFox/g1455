@@ -1,0 +1,30 @@
+{
+  "dart.lineLength": 120,
+    "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  // Width and trailing commas come from analysis_options.yaml.
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnType": false,
+    "editor.rulers": [120],
+    "editor.selectionHighlight": false,
+    "editor.tabCompletion": "onlySnippets",
+    "editor.wordBasedSuggestions": "off"
+  },
+  "files.associations": {
+    "*.frag": "glsl"
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/.dart_tool": true,
+    "coverage": true,
+    "provenance": true
+  },
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/.dart_tool/**": true
+  },
+  "dart.flutterTestAdditionalArgs": [],
+  "coverage-gutters.coverageFileNames": ["lcov.info"],
+  "coverage-gutters.coverageBaseDir": "coverage"
+}

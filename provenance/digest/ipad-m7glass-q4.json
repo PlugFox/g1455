@@ -1,0 +1,227 @@
+{
+  "source": "ipad-m7glass-q4-2026-09-08T11-06-02.json",
+  "digest_of": "benchmark report, cells only",
+  "metric": "frame_ms_per_frame",
+  "started_at": "2026-09-08T11:06:02.736465Z",
+  "environment": {
+    "label": "ipad-m7glass-q4",
+    "build_mode": "profile",
+    "os": "ios",
+    "os_version": "Version 26.6.1 (Build 23G83)",
+    "device_pixel_ratio": 2.0,
+    "physical_size": [
+      1668.0,
+      2388.0
+    ],
+    "impeller_shader_filter_supported": true,
+    "graphics_backend": {
+      "observed": null,
+      "requested": null
+    }
+  },
+  "config": {
+    "measure_ms": 5000,
+    "repeats": 3,
+    "warmup_ms": 3000,
+    "cooldown_ms": 1500
+  },
+  "caveats": [
+    "Thermal state unavailable: no platform channel and no readable GPU temperature. A long run cannot be told apart from a throttled one.",
+    "GPU counters unavailable: neither a kgsl node nor an Exynos one was readable. Throughput and raster timings are the only metrics, and both have known blind spots here.",
+    "Measurement window is 5s, below the 30s floor that #126353-style late degradation needs to show up."
+  ],
+  "cells": [
+    {
+      "scene": "over_photo",
+      "variant": "backdrop",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.9108876369747914,
+      "values": [
+        1.9325537969798656,
+        1.9108876369747914,
+        1.9056589412751737
+      ],
+      "spread": 0.014074535406629337,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3375,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 4387.5000000002765,
+        "steps_taken": 3375,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 6
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "fake",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.1020762567114095,
+      "values": [
+        1.1020762567114095,
+        1.0971453579831936,
+        1.1038043875838899
+      ],
+      "spread": 0.006042258473625793,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3378,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 4391.400000000277,
+        "steps_taken": 3378,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "fakeOpaqueBacked",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.0874821588628754,
+      "values": [
+        1.0874821588628754,
+        1.0867591529411753,
+        1.4247830836120392
+      ],
+      "spread": 0.3108317023097816,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3382,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 4396.600000000278,
+        "steps_taken": 3382,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "glass",
+      "repeats": 3,
+      "frame_ms_per_frame": 2.3176773578595404,
+      "values": [
+        2.3176773578595404,
+        2.2908341404682364,
+        2.5863520000000038
+      ],
+      "spread": 0.1275060389789064,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3384,
+        "glass_paints_with_optics": 6766,
+        "glass_paints_with_proxy": 6766,
+        "glass_paints_without_proxy": 4,
+        "glass_proxy_divisor": 4,
+        "glass_proxy_generations": 1693,
+        "scroll_travelled": 4399.200000000278,
+        "steps_taken": 3384,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 13540
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "material",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.0808436549413736,
+      "values": [
+        1.0845042710437716,
+        1.0808436549413736,
+        1.0544207966386518
+      ],
+      "spread": 0.027833326557069424,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3374,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 4386.200000000276,
+        "steps_taken": 3374,
+        "surface_area_logical": 266143.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    },
+    {
+      "scene": "over_photo",
+      "variant": "plain",
+      "repeats": 3,
+      "frame_ms_per_frame": 1.0534954020100458,
+      "values": [
+        1.0764113731092428,
+        1.0534954020100458,
+        1.0498454765886256
+      ],
+      "spread": 0.025216907895307478,
+      "counters": {
+        "cells_built": 0,
+        "frames_driven": 3380,
+        "glass_paints_with_optics": 0,
+        "glass_paints_with_proxy": 0,
+        "glass_paints_without_proxy": 0,
+        "glass_proxy_divisor": 0,
+        "glass_proxy_generations": 0,
+        "scroll_travelled": 4394.000000000277,
+        "steps_taken": 3380,
+        "surface_area_logical": 224439.99999999994,
+        "surface_bounds_area_logical": 592637.9,
+        "surfaces_painted": 4
+      },
+      "axes": {
+        "coverage": 0.4,
+        "content_complexity": 1,
+        "shape_count": 2,
+        "motion": "contentScrolls"
+      }
+    }
+  ]
+}
