@@ -17,21 +17,26 @@ permissions:
 
 jobs:
   test:
-    name: Analyze and test (Flutter ${{ matrix.flutter }})
+    name: Analyze and test (Flutter ${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        # The floor the pubspec declares, and whatever stable is today.
-        flutter: ['3.47.x', 'stable']
+        # The floor the pubspec declares, and whatever stable is today (an
+        # empty version is the channel's latest).
+        include:
+          - name: '3.47'
+            version: '3.47.x'
+          - name: stable
+            version: ''
     steps:
       - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: ${{ matrix.flutter == 'stable' && '' || matrix.flutter }}
+          flutter-version: ${{ matrix.version }}
           cache: true
 
       - name: Versions
@@ -63,7 +68,7 @@ jobs:
         run: flutter test test/ showcase/ --reporter=github
 
       - name: Upload coverage
-        if: matrix.flutter == 'stable'
+        if: matrix.name == 'stable'
         uses: codecov/codecov-action@v7
         with:
           files: coverage/lcov.info
@@ -85,8 +90,12 @@ jobs:
           channel: stable
           cache: true
 
+      # pana reads the screenshots with libwebp's tools; without them every
+      # screenshot is "No such file or directory" and the example's 10 points go.
       - name: Install pana
-        run: dart pub global activate pana
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq webp
+          dart pub global activate pana
 
       # Fails on any point lost. pana scores what `pub publish` would upload.
       # Run after the repository exists on GitHub: pana checks `repository`.

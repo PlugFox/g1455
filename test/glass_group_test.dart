@@ -74,6 +74,12 @@ const double kTop = 60;
 /// plausible picture out of the wrong numbers.
 const int kGroupUniformFloats = 87;
 
+/// The lone surface's block, probed against the program in
+/// `glass_ripple_test.dart`. Here it bounds the hand-written probes below: a
+/// probe that stops short leaves the tail to the allocator, which is zero on
+/// macOS and not on Linux.
+const int kSurfaceUniformFloats = 34;
+
 void main() {
   // -------------------------------------------------------------------------
   // 0. The uniform block is where the writer thinks it is.
@@ -1698,6 +1704,13 @@ ui.Image _renderSingle(ui.FragmentProgram program, ui.Image backdrop) {
   w(kProbe.height / 2);
   w(kRadius);
   _writeTail(w, GlassFinish.regularDark);
+  // uRimMix, uWiden, uFade: zero, as the surface writes them for this finish.
+  // Unwritten, they are whatever the allocator had there — zero on macOS,
+  // anything on Linux, where this arm failed with half its pixels off by 255.
+  for (var k = 0; k < 6; k++) {
+    w(0);
+  }
+  expect(i, kSurfaceUniformFloats, reason: 'the probe does not write the whole block');
   return _drawProbe(shader, backdrop);
 }
 
@@ -1730,6 +1743,8 @@ ui.Image _renderFused(ui.FragmentProgram program, ui.Image backdrop) {
   // float longer than the single program's and a short write leaves whatever
   // the allocator had there.
   w(1e9);
+  w(0); // uRimMix
+  expect(i, kGroupUniformFloats, reason: 'the probe does not write the whole block');
   return _drawProbe(shader, backdrop);
 }
 
@@ -1782,6 +1797,8 @@ ui.Image _renderFusedShapes(
   }
   _writeTail(w, GlassFinish.regularDark);
   w(cullK);
+  w(0); // uRimMix
+  expect(i, kGroupUniformFloats, reason: 'the probe does not write the whole block');
   return _drawProbe(shader, backdrop);
 }
 
@@ -1907,6 +1924,8 @@ ui.Image _renderFusedTiled(
     }
     _writeTail(w, GlassFinish.regularDark);
     w(cullK);
+    w(0); // uRimMix
+    expect(i, kGroupUniformFloats, reason: 'the probe does not write the whole block');
     canvas.drawRect(tile.rect, paint);
   }
   final ui.Picture picture = recorder.endRecording();
