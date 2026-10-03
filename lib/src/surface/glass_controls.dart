@@ -194,6 +194,7 @@ class GlassSwitch extends StatefulWidget {
     this.trackColor = const Color(0x29787880),
     this.dropScale = kGlassDropScale,
     this.dropWiden = kGlassSwitchDropWiden,
+    this.semanticLabel,
     super.key,
   }) : assert(dropScale >= 1);
 
@@ -216,6 +217,10 @@ class GlassSwitch extends StatefulWidget {
 
   /// The track when off.
   final Color trackColor;
+
+  /// What a screen reader says the switch is for. Null leaves it to a
+  /// `MergeSemantics` around the switch and its row's label.
+  final String? semanticLabel;
 
   @override
   State<GlassSwitch> createState() => _GlassSwitchState();
@@ -284,6 +289,7 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     final double margin = (widget.dropScale - 1) * _kSwitchKnob.width / 2 + _inset + 4;
     return Semantics(
+      label: widget.semanticLabel,
       toggled: widget.value,
       enabled: _enabled,
       onTap: _enabled ? () => _commit(!widget.value) : null,
@@ -401,8 +407,11 @@ class GlassSlider extends StatefulWidget {
     this.trackColor = const Color(0x29787880),
     this.dropScale = kGlassDropScale,
     this.dropWiden = 0,
+    this.semanticLabel,
+    this.semanticStep = 0.1,
     super.key,
-  }) : assert(dropScale >= 1);
+  }) : assert(dropScale >= 1),
+       assert(semanticStep > 0 && semanticStep <= 1);
 
   /// How much larger the held drop is than the resting knob. See
   /// [kGlassDropScale]; macOS's own slider is 1.4.
@@ -421,6 +430,14 @@ class GlassSlider extends StatefulWidget {
   final ValueChanged<double>? onChangeEnd;
   final Color activeColor;
   final Color trackColor;
+
+  /// What a screen reader says the slider is for. Null leaves it to a
+  /// `MergeSemantics` around the slider and its row's label.
+  final String? semanticLabel;
+
+  /// How far a screen reader's increase or decrease moves the value: a tenth,
+  /// as Flutter's own continuous slider does.
+  final double semanticStep;
 
   @override
   State<GlassSlider> createState() => _GlassSliderState();
@@ -470,14 +487,31 @@ class _GlassSliderState extends State<GlassSlider> with SingleTickerProviderStat
     widget.onChangeEnd?.call(widget.value);
   }
 
+  /// A screen reader's increase or decrease: a whole change, start to end, with
+  /// no drop, since nothing is held.
+  void _step(double to) {
+    widget.onChangeStart?.call(widget.value);
+    widget.onChanged?.call(to);
+    widget.onChangeEnd?.call(to);
+  }
+
+  static String _percent(double v) => '${(v * 100).round()}%';
+
   @override
   Widget build(BuildContext context) {
     final double margin = (widget.dropScale - 1) * _kSliderKnob.width / 2 + 4;
     final double value = widget.value.clamp(0.0, 1.0);
+    final double up = (value + widget.semanticStep).clamp(0.0, 1.0);
+    final double down = (value - widget.semanticStep).clamp(0.0, 1.0);
     return Semantics(
       slider: true,
+      label: widget.semanticLabel,
       enabled: _enabled,
-      value: '${(value * 100).round()}%',
+      value: _percent(value),
+      increasedValue: _enabled && up != value ? _percent(up) : null,
+      decreasedValue: _enabled && down != value ? _percent(down) : null,
+      onIncrease: _enabled && up != value ? () => _step(up) : null,
+      onDecrease: _enabled && down != value ? () => _step(down) : null,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onHorizontalDragStart: _enabled ? (DragStartDetails d) => _start(d.localPosition) : null,

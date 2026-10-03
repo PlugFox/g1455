@@ -1,3 +1,18 @@
+## Unreleased
+
+What a screen reader is told and can do:
+
+- `GlassSwitch` and `GlassSlider` take a `semanticLabel`. A screen reader steps
+  `GlassSlider` with increase and decrease, by `semanticStep` (a tenth by
+  default), through `onChangeStart`, `onChanged` and `onChangeEnd`, and never
+  past either end.
+- `GlassButton` takes a `semanticLabel` that is read in place of its child,
+  for a button that is only an icon.
+- `showGlassSheet` takes a `barrierLabel`, as `showGlassDialog` already did.
+  `GlassMenuAnchor` and `GlassPopoverAnchor` take one too. Their barrier used
+  to be a tap target with no label, so a screen reader had no way to close a
+  popover.
+
 ## 0.1.0
 
 First release on pub.dev, as `g1455`. The package was `glass` while it lived

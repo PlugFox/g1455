@@ -215,6 +215,7 @@ class GlassButton extends StatefulWidget {
     this.minSize = kGlassMinTapTarget,
     this.pressedOverlay,
     this.finish,
+    this.semanticLabel,
     super.key,
   });
 
@@ -242,6 +243,10 @@ class GlassButton extends StatefulWidget {
 
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
+
+  /// What a screen reader says in place of [child] — for a button that is
+  /// only an icon, which says nothing. Null lets [child]'s own semantics speak.
+  final String? semanticLabel;
 
   final Widget child;
 
@@ -278,6 +283,7 @@ class _GlassButtonState extends State<GlassButton> {
     return Semantics(
       button: true,
       enabled: widget.onPressed != null,
+      label: widget.semanticLabel,
       child: GestureDetector(
         // Opaque, so the whole capsule takes the tap and not only the part the
         // label covers. Outside the surface for the same reason.
@@ -300,7 +306,11 @@ class _GlassButtonState extends State<GlassButton> {
             // Factors of one: centred inside the minimum size, and no larger
             // than the label otherwise. A bare `Center` takes every pixel it is
             // offered, so a button in a `Wrap` or a `Column` was a bar.
-            child: Center(widthFactor: 1, heightFactor: 1, child: widget.child),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: ExcludeSemantics(excluding: widget.semanticLabel != null, child: widget.child),
+            ),
           ),
         ),
       ),

@@ -312,6 +312,7 @@ Future<T?> showGlassSheet<T>({
   GlassFinish? finish,
   bool showGrabber = true,
   bool barrierDismissible = true,
+  String barrierLabel = 'Dismiss',
 }) {
   final NavigatorState navigator = Navigator.of(context);
   return navigator.push<T>(
@@ -321,6 +322,7 @@ Future<T?> showGlassSheet<T>({
       finish: finish,
       showGrabber: showGrabber,
       dismissible: barrierDismissible,
+      dismissLabel: barrierLabel,
     ),
   );
 }
@@ -332,6 +334,7 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
     required this.finish,
     required this.showGrabber,
     required this.dismissible,
+    required this.dismissLabel,
   });
 
   final WidgetBuilder builder;
@@ -339,6 +342,7 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   final GlassFinish? finish;
   final bool showGrabber;
   final bool dismissible;
+  final String dismissLabel;
 
   @override
   Color get barrierColor => kGlassModalDim;
@@ -347,7 +351,7 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   bool get barrierDismissible => dismissible;
 
   @override
-  String get barrierLabel => 'Dismiss';
+  String get barrierLabel => dismissLabel;
 
   @override
   Duration get transitionDuration => const Duration(milliseconds: 350);
@@ -493,6 +497,7 @@ class GlassMenuAnchor extends StatefulWidget {
     this.controller,
     this.finish,
     this.width = kGlassMenuWidth,
+    this.barrierLabel = 'Dismiss',
     super.key,
   });
 
@@ -501,6 +506,10 @@ class GlassMenuAnchor extends StatefulWidget {
   final GlassMenuController? controller;
   final GlassFinish? finish;
   final double width;
+
+  /// What a screen reader says of the space around the open menu, whose tap
+  /// closes it.
+  final String barrierLabel;
 
   @override
   State<GlassMenuAnchor> createState() => _GlassMenuAnchorState();
@@ -522,6 +531,7 @@ class GlassPopoverAnchor extends StatefulWidget {
     this.finish,
     this.width = 320,
     this.radius = kGlassMenuRadius,
+    this.barrierLabel = 'Dismiss',
     super.key,
   });
 
@@ -533,6 +543,9 @@ class GlassPopoverAnchor extends StatefulWidget {
   final GlassFinish? finish;
   final double width;
   final double radius;
+
+  /// See [GlassMenuAnchor.barrierLabel].
+  final String barrierLabel;
 
   @override
   State<GlassPopoverAnchor> createState() => _GlassPopoverAnchorState();
@@ -559,6 +572,7 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
   GlassFinish? get _finish;
   double get _width;
   double get _radius;
+  String get _barrierLabel;
 
   /// Where the panel goes for an anchor at [at] on [screen].
   _Placement _place(Rect at, Size screen, EdgeInsets safe);
@@ -658,7 +672,12 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
     return Stack(
       children: <Widget>[
         Positioned.fill(
-          child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: _hide),
+          // Labelled, or a screen reader finds a tap target that says nothing
+          // and no other way to close a popover.
+          child: Semantics(
+            label: _barrierLabel,
+            child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: _hide),
+          ),
         ),
         Positioned(
           left: place.left,
@@ -707,6 +726,8 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
   double get _width => widget.width;
   @override
   double get _radius => kGlassMenuRadius;
+  @override
+  String get _barrierLabel => widget.barrierLabel;
 
   double get _height => widget.items.length * kGlassMenuRowHeight + 2 * _kMenuPad;
 
@@ -796,6 +817,8 @@ class _GlassPopoverAnchorState extends _AnchoredState<GlassPopoverAnchor> {
   double get _width => widget.width;
   @override
   double get _radius => widget.radius;
+  @override
+  String get _barrierLabel => widget.barrierLabel;
 
   @override
   _Placement _place(Rect at, Size screen, EdgeInsets safe) {
