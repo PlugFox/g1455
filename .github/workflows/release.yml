@@ -12,6 +12,9 @@ permissions:
 jobs:
   checks:
     uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+      id-token: write
 
   publish:
     name: Publish to pub.dev

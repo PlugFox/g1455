@@ -20,6 +20,9 @@ jobs:
     name: Analyze and test (Flutter ${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # Codecov's upload authenticates by OIDC, not a secret
     strategy:
       fail-fast: false
       matrix:
@@ -72,7 +75,9 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           files: coverage/lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
+          # A fork's pull request gets no OIDC token; its upload is skipped
+          # rather than failing the checks.
           fail_ci_if_error: false
 
       - name: Publish dry run
