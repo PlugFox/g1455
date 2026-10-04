@@ -1037,9 +1037,10 @@ class _GlassHostState extends State<GlassHost> {
       _handle.publish(null);
       _publishUpper(const <GlassProxyFrame?>[]);
       // Nothing to read, but the surfaces that left still leave: a screen
-      // whose last glass went would otherwise keep its verdict, and the
-      // render object it is keyed by, for the host's lifetime.
-      reader?.prune(keys.toSet());
+      // whose last glass went, or whose glass all fell to a rung that reads
+      // nothing, would otherwise keep its verdicts, and the render objects
+      // they are keyed by, for the host's lifetime.
+      reader?.prune(const <GlassSurfaceGeometry>{});
       return;
     }
     // What each slot is blurred by is an input to the capture the oracle
@@ -1091,7 +1092,7 @@ class _GlassHostState extends State<GlassHost> {
       // A reader that has never read — turned on over a still screen — reads
       // the capture already held, once; every other held frame reads nothing.
       if (reader != null && reader.hungry) {
-        _feed(reader, keys, boxes!);
+        _feed(reader, boxes!);
       }
       return;
     }
@@ -1102,18 +1103,19 @@ class _GlassHostState extends State<GlassHost> {
     // On a frame that published: a held frame has nothing new under the glass,
     // which is what makes the read-back per capture and not per frame.
     if (reader != null) {
-      _feed(reader, keys, boxes!);
+      _feed(reader, boxes!);
     }
   }
 
   /// Hands the capture just published, or held, to the reader.
-  void _feed(
-    GlassBackdropReader reader,
-    List<GlassSurfaceGeometry> registered,
-    List<({GlassSurfaceGeometry surface, Rect box})> boxes,
-  ) {
+  ///
+  /// Pruned to the surfaces in the capture, not to every one registered: a
+  /// glass that fell to a rung that reads nothing, or to presence zero, is
+  /// registered and has nothing under it to read, and a verdict kept for it
+  /// would go on standing in for the declarations it should be back on.
+  void _feed(GlassBackdropReader reader, List<({GlassSurfaceGeometry surface, Rect box})> boxes) {
     reader
-      ..prune(registered.toSet())
+      ..prune(<GlassSurfaceGeometry>{for (final (:GlassSurfaceGeometry surface, box: _) in boxes) surface})
       ..captured(boxes, SchedulerBinding.instance.currentSystemFrameTimeStamp);
   }
 

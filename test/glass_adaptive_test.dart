@@ -466,6 +466,25 @@ void main() {
     expect(scene.handle.readings!.length, 0, reason: 'a read that landed late gave a gone bar a verdict');
   });
 
+  testWidgets('a bar that falls to a rung that reads nothing drops its verdict', (WidgetTester tester) async {
+    final _Scene scene = await _mount(tester, adaptive: const GlassAdaptive());
+    await _land(tester);
+    expect(scene.handle.readings!.length, 2);
+    // Still registered, no longer in the capture: back on the declarations.
+    await _mount(
+      tester,
+      adaptive: const GlassAdaptive(),
+      tier: const GlassTierChoice(GlassTier.cheap, GlassTierReason.pinnedByHost),
+    );
+    await _run(tester, frames: 3);
+    expect(
+      scene.handle.readings!.length,
+      0,
+      reason: 'a bar on the cheap rung kept a reading of what it no longer reads',
+    );
+    expect(scene.seen['dark']!.reading, isNull);
+  });
+
   testWidgets('a host that goes with a read in flight leaves nothing behind', (WidgetTester tester) async {
     await _mount(tester, adaptive: const GlassAdaptive());
     await tester.pump();
@@ -501,6 +520,7 @@ Future<_Scene> _mount(
   ValueListenable<Color>? left,
   bool onlyDark = false,
   bool bars = true,
+  GlassTierChoice tier = GlassTierChoice.byDefault,
 }) async {
   tester.view
     ..physicalSize = kScreen
@@ -536,6 +556,7 @@ Future<_Scene> _mount(
         child: GlassHost(
           hardware: GlassHardware.appleMetal,
           adaptive: adaptive,
+          tier: tier,
           finish: hostFinish,
           richBackdrop: richBackdrop,
           content: content,
