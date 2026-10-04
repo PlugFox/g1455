@@ -62,7 +62,20 @@ class ShowcaseScene {
     required this.builder,
     this.strokes = const <Stroke>[],
     this.seconds = 4,
-  });
+  }) : size = kTile,
+       onStage = true;
+
+  /// A whole app screen of [size], not a tile of the grid: no backdrop, no
+  /// word, no caption — [builder] draws every pixel, as an app would.
+  const ShowcaseScene.screen({
+    required this.name,
+    required this.size,
+    required this.builder,
+    this.strokes = const <Stroke>[],
+    this.seconds = 4,
+  }) : word = '',
+       caption = '',
+       onStage = false;
 
   /// The file the loop is written to, `<name>.webp`.
   final String name;
@@ -80,12 +93,22 @@ class ShowcaseScene {
   final List<Stroke> strokes;
   final double seconds;
 
+  /// Logical px of the frame: [kTile], or a screen's own.
+  final Size size;
+
+  /// Whether this is a tile of the grid, drawn over its cut of the backdrop
+  /// with [word] and [caption]; false for a [ShowcaseScene.screen].
+  final bool onStage;
+
   int get frames => (seconds * kFps).round();
 }
 
 /// The tile around the navigator: backdrop, caption, and one host over both
 /// and over every route — the app's `builder:`, as the example's is, so a
 /// dialog or a menu built in the navigator's overlay is glass the host sees.
+///
+/// A [ShowcaseScene.screen] gets the host and nothing else: the screen is
+/// its own backdrop.
 class ShowcaseTile extends StatelessWidget {
   const ShowcaseTile({required this.scene, required this.index, required this.child, super.key});
 
@@ -96,47 +119,50 @@ class ShowcaseTile extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => GlassHost(
-    // The frames are drawn by flutter_tester on the CPU; naming the
-    // hardware only attaches prices, and these frames are not priced.
-    hardware: GlassHardware.appleMetal,
-    // The base colour, not `richBackdrop`: the fields are bright, but the
-    // labels here are short and large, and a floor for the worst case would
-    // dim every panel to grey — which is what the glass is not.
-    backdrop: kShowcaseBase,
-    child: Stack(
-      children: <Widget>[
-        Positioned.fill(
-          child: ShowcaseBackdrop(index: index, word: scene.word),
-        ),
-        Positioned(
-          left: 10,
-          bottom: 7,
-          // Replaces, not merges: the app's ambient style is the debug
-          // "no Material here" one, underlined in yellow.
-          child: DefaultTextStyle(
-            style: const TextStyle(),
-            child: Text(
-              scene.caption,
-              textDirection: TextDirection.ltr,
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.4,
-                color: Color(0xB3FFFFFF),
-              ),
+  Widget build(BuildContext context) {
+    // A route that brings no `Material` — a dialog's — would otherwise
+    // write in the debug "no Material here" style, underlined in yellow.
+    final Widget navigator = DefaultTextStyle(style: Theme.of(context).textTheme.bodyMedium!, child: child);
+    return GlassHost(
+      // The frames are drawn by flutter_tester on the CPU; naming the
+      // hardware only attaches prices, and these frames are not priced.
+      hardware: GlassHardware.appleMetal,
+      // The base colour, not `richBackdrop`: the fields are bright, but the
+      // labels here are short and large, and a floor for the worst case would
+      // dim every panel to grey — which is what the glass is not.
+      backdrop: kShowcaseBase,
+      child: !scene.onStage
+          ? navigator
+          : Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: ShowcaseBackdrop(index: index, word: scene.word),
+                ),
+                Positioned(
+                  left: 10,
+                  bottom: 7,
+                  // Replaces, not merges: the app's ambient style is the
+                  // underlined debug one.
+                  child: DefaultTextStyle(
+                    style: const TextStyle(),
+                    child: Text(
+                      scene.caption,
+                      textDirection: TextDirection.ltr,
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.4,
+                        color: Color(0xB3FFFFFF),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(child: navigator),
+              ],
             ),
-          ),
-        ),
-        // A route that brings no `Material` — a dialog's — would otherwise
-        // write in that underlined debug style too.
-        Positioned.fill(
-          child: DefaultTextStyle(style: Theme.of(context).textTheme.bodyMedium!, child: child),
-        ),
-      ],
-    ),
-  );
+    );
+  }
 }
 
 /// Loads Roboto and the Material icons out of the SDK's own cache.
@@ -244,6 +270,7 @@ Future<LoopRecord> recordScene(WidgetTester tester, ShowcaseScene scene, int ind
   );
 
   final int n = scene.frames;
+  final int width = (scene.size.width * kDpr).round();
   final gestures = <int, TestGesture>{};
   Rect rectOf(Finder target) => tester.getRect(target);
   Duration at(int frame) => Duration(microseconds: (frame * 1e6 / kFps).round());
@@ -286,7 +313,7 @@ Future<LoopRecord> recordScene(WidgetTester tester, ShowcaseScene scene, int ind
       continue;
     }
     final bool last = frame == 2 * n;
-    final (Uint8List rgba, Uint8List? png) = await _grab(tester, shot, png: outDir != null && !last);
+    final (Uint8List rgba, Uint8List? png) = await _grab(tester, shot, scene.size, png: outDir != null && !last);
     if (frame == n) {
       first = rgba;
     }
@@ -315,8 +342,8 @@ Future<LoopRecord> recordScene(WidgetTester tester, ShowcaseScene scene, int ind
         // slow fade — a dialog's barrier — is never written, and the error
         // piles up frame after frame and stays after the fade has ended.
         final (int, int, int, int)? r = previous == null
-            ? (0, 0, _width, rgba.length ~/ 4 ~/ _width)
-            : _changedRect(previous, rgba);
+            ? (0, 0, width, rgba.length ~/ 4 ~/ width)
+            : _changedRect(previous, rgba, width);
         final String name = (frame - n).toString().padLeft(4, '0');
         rects.writeln(r == null ? '$name -' : '$name ${r.$1} ${r.$2} ${r.$3} ${r.$4}');
         // Every frame, still ones too: a video wants them all.
@@ -332,13 +359,11 @@ Future<LoopRecord> recordScene(WidgetTester tester, ShowcaseScene scene, int ind
   return LoopRecord(frames: n, repeatMax: repeatMax, seamStep: seamStep, maxStep: maxStep, stillFrames: still);
 }
 
-int get _width => (kTile.width * kDpr).round();
-
 /// The smallest rect holding every pixel that differs between [a] and [b],
-/// as x, y, width, height in physical pixels, or null if none does. The
-/// origin is rounded down to even: a webp frame's offset is stored halved.
-(int, int, int, int)? _changedRect(Uint8List a, Uint8List b) {
-  final int w = _width;
+/// frames [w] physical pixels wide, as x, y, width, height in physical
+/// pixels, or null if none does. The origin is rounded down to even: a webp
+/// frame's offset is stored halved.
+(int, int, int, int)? _changedRect(Uint8List a, Uint8List b, int w) {
   var x0 = w, y0 = -1, x1 = -1, y1 = -1;
   for (var i = 0; i < a.length; i += 4) {
     if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2] || a[i + 3] != b[i + 3]) {
@@ -364,13 +389,13 @@ int get _width => (kTile.width * kDpr).round();
 }
 
 /// The painted frame as raw RGBA, and as a PNG when asked.
-Future<(Uint8List, Uint8List?)> _grab(WidgetTester tester, GlobalKey shot, {required bool png}) async {
+Future<(Uint8List, Uint8List?)> _grab(WidgetTester tester, GlobalKey shot, Size size, {required bool png}) async {
   final boundary = shot.currentContext!.findRenderObject()! as RenderRepaintBoundary;
   // `layer.toImageSync` rather than `toImage`: the host publishes a proxy
   // after every frame that captured, which leaves the tree dirty, and
   // `toImage` asserts it is not. The layer holds the frame that was painted.
   // ignore: invalid_use_of_protected_member
-  final ui.Image image = (boundary.layer! as OffsetLayer).toImageSync(Offset.zero & kTile, pixelRatio: kDpr);
+  final ui.Image image = (boundary.layer! as OffsetLayer).toImageSync(Offset.zero & size, pixelRatio: kDpr);
   late Uint8List rgba;
   Uint8List? encoded;
   await tester.runAsync(() async {

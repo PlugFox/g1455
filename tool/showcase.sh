@@ -3,6 +3,10 @@
 #
 #   tool/showcase.sh                 every scene
 #   tool/showcase.sh switch,slider   just these (names from example/showcase/scenes.dart)
+#   tool/showcase.sh screen          the whole app screen of example/showcase/screen.dart
+#
+# A whole screen is not a tile of the grid and not one of pub's screenshots,
+# so it is shot only when it is named: with no names, the grid alone.
 #
 # Plays each scene in `example/showcase/scenes.dart` headless under
 # flutter_tester — deterministic, no device, no screen recorder — one loop to
