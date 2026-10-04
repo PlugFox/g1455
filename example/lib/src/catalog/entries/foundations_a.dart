@@ -1,7 +1,7 @@
 import '../catalog.dart';
 
-/// Foundations, first half: the host, the surface, the finishes, legibility
-/// and the tiers.
+/// Foundations, first half: the host, the surface, the finishes, legibility,
+/// adaptive glass and the tiers.
 const List<Entry> kFoundationEntriesA = <Entry>[
   Entry(
     section: Section.foundations,
@@ -50,6 +50,9 @@ MaterialApp(
   that repaints under glass, such as a list scrolling under a bar, costs one capture per changed frame.
 - **The first frame has no glass.** The host captures after a frame is painted, and surfaces draw the capture on the
   next frame.
+- **Shaders compile when the host mounts.** Until they land, glass draws the blurred backdrop with no tint, rim or bend.
+  `await GlassHost.precache()` in `main()`, before `runApp`, compiles them first. See
+  [Installation](/start/installation).
 - **The resolution is chosen for you** against a quality budget (`budgetDeltaE`), from the finishes in use. Pin it
   with `resolution:` only for tests and benchmarks.
 
@@ -65,7 +68,11 @@ The host builds a `GlassTheme` from its parameters and puts it below itself. Tha
   for a list of cards. See [Legibility & theme](/foundations/legibility) and [Tiers & fallbacks](/foundations/tiers).
 
 When `finish` is null the host uses Apple's `.regular`, which is two materials: it picks `regularDark` or
-`regularLight` from `backdrop` and the platform's appearance, and follows appearance changes.
+`regularLight` from `backdrop` and the platform's appearance, and follows appearance changes. With `adaptive:` set it
+picks per glass instead, from what each one reads under it: see [Adaptive glass](/foundations/adaptive).
+
+The host also sets the screen's motion: `ripple:` for a touch wave ([Ripple](/foundations/ripple)) and `dropMotion:`
+for how the held drops of the controls stretch and squash ([Drop motion](/foundations/drop-motion)).
 
 ## Gotchas
 
@@ -148,6 +155,8 @@ class HomePage extends StatelessWidget {
 | `minLabelContrast` | `double?` | `null` | Minimum label contrast, e.g. `kTextContrastAA` (4.5). The glass is dimmed just enough to meet it. |
 | `highContrast` | `bool?` | `null` | Draws an opaque outline instead of the subtle rim. Null reads `MediaQuery.highContrastOf`; on macOS pass it yourself. |
 | `ripple` | `GlassRipple?` | `null` | A touch wave for every surface below. None by default. |
+| `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How the held drop of the switch, slider, segmented control and tab bar stretches and squashes. `GlassDropMotion.none` keeps it round. |
+| `adaptive` | `GlassAdaptive?` | `null` | Each bar, card and button reads the backdrop under it and picks its branch and label. Null reads nothing. |
 | `thermal` | `GlassThermalState?` | `null` | The device's thermal state, read by your app. Null is nominal. |
 | `thermalPolicy` | `GlassThermalPolicy` | `GlassThermalPolicy()` | How much staleness each thermal state may spend. `GlassThermalPolicy.never` keeps every frame fresh. |
 | `hardware` | `GlassHardware?` | `null` | Which device family's measurements apply. Null detects: `appleMetal` on Apple, otherwise `unmeasured`. |
@@ -157,6 +166,13 @@ class HomePage extends StatelessWidget {
 | `resolution` | `ProxyResolution?` | `null` | Pins the capture's downscale (`full()`, `half()`, `quarter()`, `divisor(n)`). For tests and benchmarks. |
 | `blurPass` | `ProxyBlurPass?` | `null` | How the residual blur is applied. Diagnostic. |
 | `maxCaptures` | `int?` | `null` | Stops capturing after N captures. Diagnostic; never ship it. |
+
+## GlassHost.precache
+
+`static Future<void> precache({bool group = true, bool ripple = true})`: compiles the package's shaders now, so the
+first glass on screen is drawn through its optics. Call it in `main()` after `WidgetsFlutterBinding.ensureInitialized()`.
+Idempotent, and it shares the loads a host starts, so nothing compiles twice. `group: false` and `ripple: false` leave
+out those programs. Completes with a load's error if one fails.
 ''',
   ),
   Entry(
@@ -536,6 +552,12 @@ Text('Now playing', style: TextStyle(color: look.label));
 `look.finish` is the finish actually drawn (dimmed, if a floor asked for it), and `look.rim` the opaque outline under
 increased contrast, or null.
 
+## Glass that reads its backdrop
+
+Everything above goes by what you declared: one `backdrop` for the whole screen. Over photographs, where one bar sits
+on a bright sky and a button on a dark shadow, let each glass read what is under it instead with
+`GlassHost(adaptive: GlassAdaptive())`. See [Adaptive glass](/foundations/adaptive).
+
 > [!NOTE]
 > `GlassThemeData.copyWith` cannot set a nullable field back to null. To drop `minLabelContrast` or `backdrop` for a
 > subtree, build a new `GlassThemeData`.
@@ -604,6 +626,10 @@ class LightPanel extends StatelessWidget {
 | `richBackdrop` | `bool` | `false` | The backdrop is an image or feed: labels are chosen for the worst case. |
 | `minLabelContrast` | `double?` | `null` | The least label contrast. The glass is dimmed just enough to meet it. |
 | `ripple` | `GlassRipple?` | `null` | The default touch wave. |
+| `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How held drops stretch and squash. See [Drop motion](/foundations/drop-motion). |
+| `adaptive` | `GlassAdaptive?` | `null` | Whether glass reads its backdrop. Installed by `GlassHost.adaptive`. See [Adaptive glass](/foundations/adaptive). |
+| `regularAppearance` | `Brightness?` | `null` | The appearance `finish` was picked in when it is `.regular` and nobody named it. Set by an adaptive host. |
+| `reading` | `GlassBackdropReading?` | `null` | What the glass this theme was installed for read of its backdrop. |
 
 ## GlassTheme
 
@@ -628,6 +654,217 @@ class LightPanel extends StatelessWidget {
 |---|---|---|
 | `kTextContrastAA` | `4.5` | WCAG AA for body text. |
 | `kNonTextContrast` | `3` | WCAG's floor for non-text elements. |
+''',
+  ),
+  // --------------------------------------------------------------- adaptive
+  Entry(
+    section: Section.foundations,
+    id: 'adaptive',
+    title: 'Adaptive glass',
+    icon: 'brightness_6',
+    summary:
+        'Glass that reads its own backdrop: a bar over a bright sky turns light, a button over a shadow stays '
+        'dark, each with a label to match. Off by default and free when off.',
+    api: <String>['GlassAdaptive', 'GlassBackdropReading', 'GlassHost', 'GlassThemeData'],
+    source: 'lib/src/surface/glass_adaptive.dart',
+    guide: r'''
+Apple's `.regular` is two materials, dark over dark content and light over light. Without help the package picks one
+branch for the whole screen, from what you declared: the host's `backdrop` and the platform's appearance. A screen is
+not one level, though. A bar over a photograph's sky and a button over its shadow sit on different branches of Apple's
+own material.
+
+`GlassHost(adaptive: GlassAdaptive())` lets each glass look. The host already holds the pixels under every surface, so
+it reads back the mean level inside each one's box, and a [GlassBar](/components/bar), a [GlassCard](/components/card)
+or a [GlassButton](/components/button) picks the branch of `.regular` and its label colour from it.
+
+## When to use
+
+- Glass over photographs, maps or video, where one declared level is wrong for half the screen.
+- Bars and buttons that stay put while the content under them changes from light to dark, such as a full-bleed hero
+  image scrolling under a bar.
+- **Not** over a flat page: declare its colour as the host's `backdrop` instead, which is exact and reads nothing.
+
+## Usage
+
+```dart
+MaterialApp(
+  builder: (BuildContext context, Widget? child) => GlassHost(
+    adaptive: const GlassAdaptive(),
+    child: child!,
+  ),
+  home: const PhotoPage(),
+)
+```
+
+That's all. The components under the host follow what is under them.
+
+## What a reading changes
+
+- **The branch of `.regular`.** Only when nobody named a finish. A finish named by the component, by an inner
+  `GlassTheme` or by the host (`GlassHost(finish: GlassFinish.regularDark)`) is kept. Only its label follows the
+  reading.
+- **The label.** The reading stands in for the declared `backdrop` for that one glass: the label colour, the
+  high-contrast outline and the `minLabelContrast` dim are all chosen against it.
+- **Not under `richBackdrop: true`.** A mean says nothing about the brightest corner of a photograph, so there the label
+  stays chosen against every backdrop, and the reading moves only the branch.
+
+Until a glass has its first reading (its first couple of frames, or a [tier](/foundations/tiers) that captures nothing),
+it wears what the declarations give, exactly as with adaptive off.
+
+## Behaviour
+
+- **No flicker.** A reading moves a glass only when it is more than `band` (12) code values from the one it last
+  moved on, and not within `hold` (600 ms) of its last move. A list of light and dark rows scrolling under a bar keeps
+  the bar on the branch it has.
+- **Moves animate.** A glass crossing between branches tweens its tint and its label over `duration` (300 ms). Under
+  reduced motion it is a cut.
+- **What adapts.** `GlassBar`, `GlassCard` and `GlassButton`. A raw `GlassSurface`, the
+  [scroll edge](/foundations/scroll-edge), the [tab bar](/components/tab-bar) and the
+  [segmented control](/components/segmented-control) do not adapt yet.
+
+The demo above turns adaptive on in the site's own host while the page is open, so the site's top bar and side panel
+follow it too. The site declares a rich backdrop, so the stage nests a `GlassTheme` with `richBackdrop: false` to let
+the labels follow as well. It needs the full tier (the High or Ultra setting) and the Regular material: a lower tier
+captures nothing to read, and a named material is kept.
+
+## Content on the glass
+
+Inside a component that reads its backdrop, `GlassTheme.of(context).reading` is what it read, so an icon that is not a
+label, or a custom painter, can follow it:
+
+```dart
+final GlassBackdropReading? reading = GlassTheme.of(context).reading;
+final bool overLight = reading?.brightness == Brightness.light;
+```
+
+It is null with adaptive off and before the first reading. `level` is the mean's luma in code values (0 to 255),
+`luminance` its WCAG relative luminance, and `brightness` whether black or white stands out more against it. The
+branch the glass is on is `GlassTheme.of(context).finish`.
+
+A custom component does what the built-in ones do with `GlassThemeData.adaptedTo(reading)`. To turn adaptive off for a
+subtree, nest `GlassTheme(data: GlassTheme.of(context).withAdaptive(null), ...)`.
+
+## Cost
+
+- **Off: nothing.** No reader exists, nothing is recorded, read back or scheduled.
+- **On, a still screen: nothing** after the first reading. A frame that keeps its capture has nothing new under the
+  glass and reads nothing.
+- **On, a frame that captures:** at most one read-back of a 4 × 4-pixel cell per surface, asynchronously, and at most
+  once per `interval`. The frame that asked doesn't wait for it.
+- **On the web it is dearer.** CanvasKit reads back synchronously, a GPU flush on the frame it lands in, so `interval`
+  is a second there rather than 250 ms. Raise it further for a screen that scrolls a lot.
+
+> [!TIP]
+> The finish table of [Finishes](/foundations/finishes) and the label rules of
+> [Legibility & theme](/foundations/legibility) still apply: adaptive only gives each glass its own `backdrop`.
+''',
+    code: r'''
+import 'package:flutter/material.dart';
+import 'package:g1455/g1455.dart';
+
+void main() => runApp(const PhotoApp());
+
+class PhotoApp extends StatelessWidget {
+  const PhotoApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    // One host, reading the backdrop under each glass. No finish named, so
+    // each bar and button may take the branch of `.regular` it reads.
+    builder: (BuildContext context, Widget? child) => GlassHost(adaptive: const GlassAdaptive(), child: child!),
+    home: const PhotoPage(),
+  );
+}
+
+class PhotoPage extends StatelessWidget {
+  const PhotoPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final EdgeInsets safe = MediaQuery.paddingOf(context);
+    return Scaffold(
+      body: Stack(
+        children: <Widget>[
+          // Bright at the top, dark at the bottom: a sky and its shadow.
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: <Color>[Color(0xFFEAF2FA), Color(0xFFB9D3EA), Color(0xFF1B2A1F), Color(0xFF0A110C)],
+                  stops: <double>[0, 0.5, 0.52, 1],
+                ),
+              ),
+            ),
+          ),
+          // Over the sky: turns light, with a dark label.
+          Positioned(
+            top: safe.top + 8,
+            left: 16,
+            right: 16,
+            child: const GlassBar(child: Text('Lake Tekapo')),
+          ),
+          // Over the shadow: stays dark, with a white label.
+          Positioned(
+            bottom: safe.bottom + 16,
+            left: 16,
+            child: GlassButton(onPressed: () {}, child: const Text('Directions')),
+          ),
+          // Content that follows the reading itself.
+          Positioned(
+            bottom: safe.bottom + 16,
+            right: 16,
+            child: GlassButton(
+              onPressed: () {},
+              semanticLabel: 'Weather',
+              child: Builder(
+                builder: (BuildContext context) {
+                  final GlassBackdropReading? reading = GlassTheme.of(context).reading;
+                  return Icon(reading?.brightness == Brightness.light ? Icons.wb_sunny : Icons.nightlight_round);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+''',
+    properties: r'''
+`GlassHost`:
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `adaptive` | `GlassAdaptive?` | `null` | Turns reading on, and says how. Null: glass goes by what is declared, and nothing is read. |
+
+`GlassAdaptive`:
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `band` | `double` | `GlassAdaptive.kDefaultBand` (12) | How far, in code values of luma, a reading must be from the last one to move the glass. Must be ≥ 0. |
+| `hold` | `Duration` | `GlassAdaptive.kDefaultHold` (600 ms) | The least time between two moves of one glass. |
+| `interval` | `Duration` | `GlassAdaptive.kDefaultInterval` (250 ms; 1 s on the web) | The least time between two read-backs. |
+| `duration` | `Duration` | `GlassAdaptive.kDefaultDuration` (300 ms) | How long a glass takes to cross between branches. None under reduced motion. |
+
+## GlassBackdropReading
+
+| Member | Type | Description |
+|---|---|---|
+| `mean` | `Color` | The mean colour of the captured backdrop under the glass, opaque. |
+| `level` | `double` | The mean's luma in code values, 0 to 255: the scale `.regular` switches on. |
+| `luminance` | `double` | The mean's WCAG relative luminance. |
+| `brightness` | `Brightness` | Light when black stands out more against the mean, dark when white does. Not the branch of the glass. |
+
+## GlassThemeData
+
+| Member | Description |
+|---|---|
+| `adaptive` | The host's `GlassAdaptive`, or null. Installed by `GlassHost.adaptive`. |
+| `reading` | What the glass this theme was installed for read, or null. Read it as `GlassTheme.of(context).reading`. |
+| `adaptedTo(GlassBackdropReading reading)` | This theme as it applies over one glass that read `reading`: what a custom component installs around its content. |
+| `withAdaptive(GlassAdaptive? adaptive)` | This theme with `adaptive` replaced, null included: turns reading off for a subtree. |
 ''',
   ),
   Entry(

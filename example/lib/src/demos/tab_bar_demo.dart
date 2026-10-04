@@ -5,7 +5,7 @@ import '../backdrops.dart';
 import '../widgets/stage.dart';
 
 /// A floating tab bar at the bottom of a small "app" whose page changes with
-/// the tab.
+/// the tab, one of its tabs drawn with a badge by `iconBuilder`.
 class TabBarDemo extends StatefulWidget {
   const TabBarDemo({super.key});
 
@@ -22,6 +22,16 @@ const List<(GlassTabItem, String)> _kTabs = <(GlassTabItem, String)>[
   (GlassTabItem(icon: Icons.person_rounded, label: 'Profile'), 'Signed in'),
 ];
 
+/// The "Saved" tab with a badge: drawn by `iconBuilder`, in the colour and
+/// size the bar resolved for the item.
+Widget _savedWithBadge(BuildContext context, GlassTabItemLook look) => Badge(
+  label: const Text('3'),
+  backgroundColor: const Color(0xFFFF453A),
+  child: Icon(Icons.favorite_rounded, color: look.color, size: look.iconSize),
+);
+
+const GlassTabItem _kSavedWithBadge = GlassTabItem(label: 'Saved', iconBuilder: _savedWithBadge);
+
 const Map<String, Color> _kAccents = <String, Color>{
   'Blue': Color(0xFF0A84FF),
   'Pink': Color(0xFFFF375F),
@@ -33,6 +43,7 @@ class _TabBarDemoState extends State<TabBarDemo> {
   int _tab = 0;
   double _zoom = kGlassTabDropZoom;
   String _accent = 'Blue';
+  bool _badge = true;
 
   void _setCount(int count) => setState(() {
     _count = count;
@@ -45,7 +56,9 @@ class _TabBarDemoState extends State<TabBarDemo> {
     return DemoStage(
       height: 400,
       background: GridBackdrop(hue: _tab * 70.0),
-      hint: 'Tap a tab, or press and hold the selected one and drag the drop along the bar.',
+      hint:
+          'Tap a tab, or press and hold the selected one and drag the drop along the bar. '
+          'The badge on Saved is an iconBuilder, drawn in the colour the bar gives the tab.',
       knobs: <Widget>[
         KnobChoice<int>(label: 'Tabs', values: const <int>[3, 4, 5], selected: _count, onChanged: _setCount),
         KnobChoice<String>(
@@ -54,6 +67,7 @@ class _TabBarDemoState extends State<TabBarDemo> {
           selected: _accent,
           onChanged: (String a) => setState(() => _accent = a),
         ),
+        KnobSwitch(label: 'Badge', value: _badge, onChanged: (bool v) => setState(() => _badge = v)),
         KnobSlider(
           label: 'Zoom',
           value: _zoom,
@@ -93,7 +107,10 @@ class _TabBarDemoState extends State<TabBarDemo> {
                 child: SizedBox(
                   width: double.infinity,
                   child: GlassTabBar(
-                    items: <GlassTabItem>[for (final (GlassTabItem tab, _) in _kTabs.take(_count)) tab],
+                    items: <GlassTabItem>[
+                      for (final (GlassTabItem tab, _) in _kTabs.take(_count))
+                        _badge && tab.label == 'Saved' ? _kSavedWithBadge : tab,
+                    ],
                     selectedIndex: _tab,
                     activeColor: _kAccents[_accent]!,
                     dropZoom: _zoom,

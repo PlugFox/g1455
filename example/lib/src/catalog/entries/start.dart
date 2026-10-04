@@ -79,22 +79,49 @@ The host captures the backdrop after a frame has been painted, and the glass dra
 the very first frame of a screen shows the glass's children without the glass itself. That is by design and is not
 visible in practice, but it matters in widget tests: pump one more frame before you look for glass.
 
+## Compile the shaders before the first frame
+
+The host loads the package's shaders when it mounts, and a shader is compiled asynchronously. Until it lands, glass
+that has a capture draws a stand-in: the captured, blurred backdrop clipped to its shape, with no tint, rim or bend.
+Compile them before `runApp` and the first frame that has a capture is drawn through the optics:
+
+```dart
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await GlassHost.precache();
+  runApp(const GlassApp());
+}
+```
+
+`GlassHost.precache()` shares the loads a host starts on its own, so nothing is compiled twice, and once the programs
+are in it costs nothing. `group: false` and `ripple: false` leave out the programs of [groups](/foundations/groups) and
+the [ripple](/foundations/ripple) for an app that uses neither. It completes with the error of a load that fails, so
+catch it if the app should start regardless.
+
 ## Next steps
 
 - [How it works](/start/how-it-works): one capture for the whole screen, and only when something changed.
 - [What the app declares](/start/declarations): the backdrop, reduce transparency, contrast, thermal state.
 - [GlassHost](/foundations/host) and [GlassSurface](/foundations/surface): the two building blocks.
 - [Finishes](/foundations/finishes): regular, clear and frosted glass.
+- [Scaffold](/components/scaffold): a whole screen, a bar, a tab bar and a list scrolling under them, wired for you.
 - The components: [Bar](/components/bar), [Button](/components/button), [Card](/components/card),
   [Switch](/components/switch), [Slider](/components/slider), [Tab bar](/components/tab-bar),
   [Alert](/components/alert), [Sheet](/components/sheet) and more.
+- [Adaptive glass](/foundations/adaptive): glass that reads its backdrop, for screens over photographs.
 - [Performance](/foundations/performance): what glass costs and how to keep it cheap.
 ''',
     code: r'''
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
 
-void main() => runApp(const GlassApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Compiles the shaders before the first frame, so the first glass on screen
+  // is drawn through its optics.
+  await GlassHost.precache();
+  runApp(const GlassApp());
+}
 
 class GlassApp extends StatelessWidget {
   const GlassApp({super.key});

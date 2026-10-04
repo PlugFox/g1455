@@ -50,10 +50,12 @@ abstract final class Site {
     if (symbol[0].toLowerCase() == symbol[0]) {
       return '$pubApi$symbol.html';
     }
-    // dartdoc names an enum's page without the `-class` suffix.
+    // dartdoc names an enum's page, and a typedef's, without the `-class`
+    // suffix.
     return _enums.contains(symbol) ? '$pubApi$symbol.html' : '$pubApi$symbol-class.html';
   }
 
+  /// The enums and typedefs among the names the pages link.
   static const Set<String> _enums = <String>{
     'GlassContentDeclaration',
     'GlassHardware',
@@ -63,6 +65,7 @@ abstract final class Site {
     'GlassScrollEdgeSide',
     'GlassScrollEdgeStyle',
     'GlassSurfaceCostModel',
+    'GlassTabItemBuilder',
     'GlassThermalState',
     'GlassTier',
     'GlassTierReason',

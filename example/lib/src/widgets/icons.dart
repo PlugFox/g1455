@@ -41,6 +41,9 @@ const Map<String, IconData> _kIcons = <String, IconData>{
   'arrow_upward': Icons.arrow_upward,
   'speed': Icons.speed_outlined,
   'visibility': Icons.visibility_outlined,
+  'brightness_6': Icons.brightness_6_outlined,
+  'water_drop': Icons.water_drop_outlined,
+  'space_dashboard': Icons.space_dashboard_outlined,
 };
 
 /// The icon named [name], or a neutral one for a name the map lacks.

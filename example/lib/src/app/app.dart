@@ -9,6 +9,14 @@ import 'router.dart';
 import 'routes.dart';
 import 'theme.dart';
 
+/// Whether the site's host reads the backdrop under its glass, and how: null,
+/// the default, for glass that goes by what is declared.
+///
+/// Set only by the page that shows it (`/foundations/adaptive`), while that
+/// page is open. Not a second host inside that page's demo: one mounted inside
+/// this one, at an offset, drew its glass black and read nothing.
+final ValueNotifier<GlassAdaptive?> siteAdaptive = ValueNotifier<GlassAdaptive?>(null);
+
 /// The app, and the one place the host goes: above the navigator
 /// (`builder:`), so that a dialog, a sheet or a menu — all built in the
 /// navigator's overlay — is captured by it like any other glass.
@@ -82,25 +90,29 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
     builder: (BuildContext context, Widget? child) => SettingsScope(
       settings: _settings,
       onChanged: (GlassSettings s) => setState(() => _settings = s),
-      child: GlassHost(
-        finish: _settings.finishIn(MediaQuery.platformBrightnessOf(context)),
-        tier: _settings.tierChoice,
-        highContrast: _settings.highContrast,
-        // The opaque rung fills with the level over this, and reads nothing
-        // that could tell it otherwise.
-        backdrop: kExampleBackdrop,
-        // What scrolls under the glass is an image as far as legibility goes:
-        // there is no one colour behind a label, so the finish is dimmed until
-        // the worst case still reads. Without these, `clear` over this list
-        // reaches a contrast of 1.76 and the package says so in debug.
-        richBackdrop: true,
-        minLabelContrast: kTextContrastAA,
-        // Not Apple's: iOS answers a touch with light and a springy scale and
-        // never deforms the glass. On in the Ultra preset only, which is where
-        // the example opens.
-        ripple: _settings.glassRipple,
-        // Over every route: a deploy since this tab loaded is offered here.
-        child: SiteUpdateBanner(child: child!),
+      child: ValueListenableBuilder<GlassAdaptive?>(
+        valueListenable: siteAdaptive,
+        builder: (BuildContext context, GlassAdaptive? adaptive, Widget? _) => GlassHost(
+          adaptive: adaptive,
+          finish: _settings.finishIn(MediaQuery.platformBrightnessOf(context)),
+          tier: _settings.tierChoice,
+          highContrast: _settings.highContrast,
+          // The opaque rung fills with the level over this, and reads nothing
+          // that could tell it otherwise.
+          backdrop: kExampleBackdrop,
+          // What scrolls under the glass is an image as far as legibility goes:
+          // there is no one colour behind a label, so the finish is dimmed until
+          // the worst case still reads. Without these, `clear` over this list
+          // reaches a contrast of 1.76 and the package says so in debug.
+          richBackdrop: true,
+          minLabelContrast: kTextContrastAA,
+          // Not Apple's: iOS answers a touch with light and a springy scale and
+          // never deforms the glass. On in the Ultra preset only, which is where
+          // the example opens.
+          ripple: _settings.glassRipple,
+          // Over every route: a deploy since this tab loaded is offered here.
+          child: SiteUpdateBanner(child: child!),
+        ),
       ),
     ),
   );
