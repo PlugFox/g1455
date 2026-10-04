@@ -485,6 +485,89 @@ void main() {
     expect(scene.seen['dark']!.reading, isNull);
   });
 
+  testWidgets('glass moving inside its travel is read where it is, from the capture held', (
+    WidgetTester tester,
+  ) async {
+    tester.view
+      ..physicalSize = kScreen
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final left = ValueNotifier<double>(20);
+    addTearDown(left.dispose);
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: kScreen),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassHost(
+            hardware: GlassHardware.appleMetal,
+            adaptive: const GlassAdaptive(),
+            child: Stack(
+              children: <Widget>[
+                // Behind a boundary of its own, and the moving glass behind
+                // another, so the move repaints nothing the capture watches
+                // and the capture holds.
+                const Positioned.fill(
+                  child: RepaintBoundary(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Expanded(child: ColoredBox(color: kBlack)),
+                        Expanded(child: ColoredBox(color: kWhite)),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: RepaintBoundary(
+                    child: GlassTravel(
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: left,
+                        builder: (BuildContext context, double x, Widget? _) => Stack(
+                          clipBehavior: Clip.none,
+                          children: <Widget>[
+                            Positioned(
+                              left: x,
+                              top: 70,
+                              width: 160,
+                              height: 60,
+                              child: GlassBar(
+                                child: Builder(
+                                  builder: (BuildContext context) {
+                                    _seen['moving'] = GlassTheme.of(context);
+                                    return const Text('moving');
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await _land(tester);
+    final GlassProxyHandle handle = tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+    expect(_seen['moving']!.finish, GlassFinish.regularDark);
+    final int snapshots = handle.snapshots;
+    final int reads = handle.readBacks;
+
+    // Past the interval, so the move is not a read the reader would defer.
+    await tester.pump(const Duration(seconds: 1));
+    left.value = 220;
+    await tester.pump();
+    expect(handle.snapshots, snapshots, reason: 'a move inside the travel was captured again');
+    expect(handle.readBacks, greaterThan(reads), reason: 'the moved glass was not read');
+    await _land(tester);
+    expect(_seen['moving']!.finish, GlassFinish.regularLight, reason: 'the glass kept what it read where it was');
+  });
+
   testWidgets('a host that goes with a read in flight leaves nothing behind', (WidgetTester tester) async {
     await _mount(tester, adaptive: const GlassAdaptive());
     await tester.pump();

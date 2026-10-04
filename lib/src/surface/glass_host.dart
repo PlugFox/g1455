@@ -1090,8 +1090,10 @@ class _GlassHostState extends State<GlassHost> {
         _handle.throttled = throttled;
       }
       // A reader that has never read — turned on over a still screen — reads
-      // the capture already held, once; every other held frame reads nothing.
-      if (reader != null && reader.hungry) {
+      // the capture already held, once, and so does glass that moved inside
+      // its travel: the capture holds, and what is under the glass does not.
+      // Every other held frame reads nothing.
+      if (reader != null && (reader.hungry || reader.moved(boxes!))) {
         _feed(reader, boxes!);
       }
       return;

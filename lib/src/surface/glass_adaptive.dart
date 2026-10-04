@@ -16,9 +16,10 @@
 //    components take the path they always took. [GlassProxyHandle.readBacks]
 //    is the counter that says so.
 //  - **On, one read-back per capture at most, and never one per frame.** A
-//    frame that keeps its capture — a still screen, glass moving over content
-//    that stays put — has nothing new under the glass and reads nothing. A
-//    frame that captures asks for one read of a texture of 4 × 4 pixels per
+//    frame that keeps its capture over a still screen has nothing new under
+//    the glass and reads nothing. Glass moving inside a [GlassTravel] keeps the
+//    capture too, but not what is under it: it is read from the held capture,
+//    as a capture would be. A frame that captures asks for one read of a texture of 4 × 4 pixels per
 //    surface ([ProxyReading]), at most once per [GlassAdaptive.interval],
 //    asynchronously: the frame that asked does not wait for it, and the answer
 //    is applied on a later one.
@@ -350,8 +351,26 @@ class GlassBackdropReader {
   /// [hungry].
   void captured(List<({GlassSurfaceGeometry surface, Rect box})> surfaces, Duration now) {
     _hungry = false;
+    _fed = <GlassSurfaceGeometry, Rect>{
+      for (final (:GlassSurfaceGeometry surface, :Rect box) in surfaces) surface: box,
+    };
     _due = surfaces;
     _pump(now);
+  }
+
+  /// Each surface's box as last handed to [captured].
+  Map<GlassSurfaceGeometry, Rect> _fed = const <GlassSurfaceGeometry, Rect>{};
+
+  /// Whether a glass is somewhere other than where it was last read: moved
+  /// inside a [GlassTravel], whose held capture already holds what it now
+  /// covers, so the host hands a held frame over for it.
+  bool moved(List<({GlassSurfaceGeometry surface, Rect box})> surfaces) {
+    for (final (:GlassSurfaceGeometry surface, :Rect box) in surfaces) {
+      if (_fed[surface] != box) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Drops the verdicts of surfaces that have left the register.
