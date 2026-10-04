@@ -113,9 +113,11 @@ class GlassProxyHandle extends ChangeNotifier {
   /// The one load of the ripple program per process, which fills the cache
   /// before anything waiting on it runs — shared by [wantRippleProgram] and
   /// [GlassHost.precache].
-  static Future<ui.FragmentProgram> _loadRipple() => _loadingRipple ??= ui.FragmentProgram.fromAsset(
+  static Future<ui.FragmentProgram> _loadRipple() => _loadingRipple ??= _loadShader(
     kGlassRippleShaderAsset,
-  ).then((ui.FragmentProgram program) => _cachedRippleProgram = program);
+    (ui.FragmentProgram program) => _cachedRippleProgram = program,
+    () => _loadingRipple = null,
+  );
 
   /// Loads [rippleProgram], once per process, and notifies when it lands.
   void wantRippleProgram() {
@@ -127,7 +129,7 @@ class GlassProxyHandle extends ChangeNotifier {
         _rippleProgram = program;
         notifyListeners();
       }
-    });
+    }, onError: _reportShaderLoadError);
   }
 
   bool _disposed = false;
@@ -770,13 +772,17 @@ class _GlassHostState extends State<GlassHost> {
   /// The one load of each program per process, which fills the cache before
   /// anything waiting on it runs — shared by every host's `initState` and by
   /// [GlassHost.precache], so neither path compiles a program twice.
-  static Future<ui.FragmentProgram> _loadBase() => _loading ??= ui.FragmentProgram.fromAsset(
+  static Future<ui.FragmentProgram> _loadBase() => _loading ??= _loadShader(
     kGlassShaderAsset,
-  ).then((ui.FragmentProgram program) => _cachedProgram = program);
+    (ui.FragmentProgram program) => _cachedProgram = program,
+    () => _loading = null,
+  );
 
-  static Future<ui.FragmentProgram> _loadGroup() => _loadingGroup ??= ui.FragmentProgram.fromAsset(
+  static Future<ui.FragmentProgram> _loadGroup() => _loadingGroup ??= _loadShader(
     kGlassGroupShaderAsset,
-  ).then((ui.FragmentProgram program) => _cachedGroupProgram = program);
+    (ui.FragmentProgram program) => _cachedGroupProgram = program,
+    () => _loadingGroup = null,
+  );
 
   @override
   void initState() {
@@ -812,7 +818,7 @@ class _GlassHostState extends State<GlassHost> {
       if (mounted) {
         _handle.program = program;
       }
-    });
+    }, onError: _reportShaderLoadError);
   }
 
   /// The same, for the fused draw.
@@ -831,7 +837,7 @@ class _GlassHostState extends State<GlassHost> {
       if (mounted) {
         _handle.groupProgram = program;
       }
-    });
+    }, onError: _reportShaderLoadError);
   }
 
   /// The first build, and a rebuild when the appearance moves `.regular` to
@@ -1601,3 +1607,47 @@ class _Level {
   final List<GlassFinish> finishes;
   final bool mixed;
 }
+
+/// How every host, ripple and [GlassHost.precache] loads a shader:
+/// [ui.FragmentProgram.fromAsset], which a widget test cannot make fail — the
+/// engine reads the asset itself, past the asset channel's mock.
+///
+/// A test that has to see a load fail sets this before anything loads, in a
+/// file of its own, since the programs are cached per process; nothing else
+/// should set it.
+@visibleForTesting
+Future<ui.FragmentProgram> Function(String asset) debugGlassShaderLoader = ui.FragmentProgram.fromAsset;
+
+/// One load of the program at [asset], which fills the cache through [cache]
+/// before anything waiting on it runs.
+///
+/// A load that fails is forgotten through [forget], so the next host to mount,
+/// or the next [GlassHost.precache], tries again instead of being handed the
+/// same failure: an application that caught a failed precache and started
+/// anyway gets its shaders from the host's own attempt.
+Future<ui.FragmentProgram> _loadShader(
+  String asset,
+  void Function(ui.FragmentProgram program) cache,
+  void Function() forget,
+) => debugGlassShaderLoader(asset).then(
+  (ui.FragmentProgram program) {
+    cache(program);
+    return program;
+  },
+  onError: (Object error, StackTrace stack) {
+    forget();
+    Error.throwWithStackTrace(error, stack);
+  },
+);
+
+/// Reports a shader that a host or a ripple waited on and that failed to load,
+/// rather than leaving it to the zone as an uncaught error. The glass draws
+/// its stand-in without the program, as it does while one is loading.
+void _reportShaderLoadError(Object error, StackTrace stack) => FlutterError.reportError(
+  FlutterErrorDetails(
+    exception: error,
+    stack: stack,
+    library: 'glass',
+    context: ErrorDescription('while loading a glass shader'),
+  ),
+);
