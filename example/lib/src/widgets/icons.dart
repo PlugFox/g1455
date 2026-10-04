@@ -34,6 +34,7 @@ const Map<String, IconData> _kIcons = <String, IconData>{
   'vertical_split': Icons.vertical_split_outlined,
   'menu_open': Icons.menu_open,
   'chat_bubble': Icons.chat_bubble_outline,
+  'animation': Icons.animation,
   'view_agenda': Icons.view_agenda_outlined,
   'photo': Icons.photo_outlined,
   'widgets': Icons.widgets_outlined,
