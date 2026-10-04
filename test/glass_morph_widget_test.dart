@@ -132,6 +132,30 @@ void main() {
     expect(tester.getSize(find.byType(GlassMorph)), const Size(120, 160));
   });
 
+  testWidgets('a radius that changes on the same child morphs from the old one', (WidgetTester tester) async {
+    Widget morph(double r) => _Host(
+      child: GlassMorph(
+        borderRadius: BorderRadius.all(Radius.circular(r)),
+        child: const SizedBox(width: 200, height: 120),
+      ),
+    );
+    await _pump(tester, morph(4));
+    await tester.pumpAndSettle();
+    await _pump(tester, morph(40));
+    await tester.pump(kFrame);
+    // The body is the surface of the morph's size; a bud is not.
+    final Size size = tester.getSize(find.byType(GlassMorph));
+    final List<double> radii = <double>[
+      for (final RenderGlassSurface s in tester.renderObjectList<RenderGlassSurface>(find.byType(GlassSurface)))
+        if (s.size == size) s.borderRadius.topLeft.x,
+    ];
+    expect(radii, isNotEmpty, reason: 'no body found');
+    expect(radii.first, inExclusiveRange(4, 40), reason: 'the corners jumped rather than morphed');
+    await tester.pumpAndSettle();
+    final RenderGlassSurface rest = tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface));
+    expect(rest.borderRadius.topLeft.x, 40);
+  });
+
   testWidgets('identity is the key, as in AnimatedSwitcher; state survives the morph', (
     WidgetTester tester,
   ) async {

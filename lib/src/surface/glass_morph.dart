@@ -373,14 +373,17 @@ class _GlassMorphState extends State<GlassMorph> with SingleTickerProviderStateM
     _start(next);
   }
 
+  /// The widget's pins and radius, onto the entry it now shows.
+  void _pin(_Entry next) => next
+    ..width = widget.width
+    ..height = widget.height
+    ..radius = widget.borderRadius;
+
   void _start(_Entry next) {
-    next
-      ..width = widget.width
-      ..height = widget.height
-      ..radius = widget.borderRadius;
     final Size? body = _geometry.body;
     if ((MediaQuery.maybeDisableAnimationsOf(context) ?? false) || body == null) {
       // Reduced motion, or a swap before the first layout: arrive at once.
+      _pin(next);
       _settle(next, notify: false);
       return;
     }
@@ -390,8 +393,11 @@ class _GlassMorphState extends State<GlassMorph> with SingleTickerProviderStateM
     final Size? measured = _measuredCurrent;
     // Everything starts again from where it is, so an interrupted morph does
     // not jump: the body from its size and radius, the content from its
-    // opacity, the buds from their presence.
+    // opacity, the buds from their presence. Read before the new pins land:
+    // a morph that keeps its child is [next] and [_current] at once, and a
+    // radius read after would start where it is going.
     _fromRadius = _morphing ? _bodyRadius(t) : _resolve(_current.radius, body);
+    _pin(next);
     for (final _Entry e in _entries) {
       e.opacity0 = _morphing ? _opacity(e, t) : (identical(e, _current) ? 1 : 0);
     }
