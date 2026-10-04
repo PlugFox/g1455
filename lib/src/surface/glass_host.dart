@@ -108,15 +108,19 @@ class GlassProxyHandle extends ChangeNotifier {
   static ui.FragmentProgram? _cachedRippleProgram;
   static Future<ui.FragmentProgram>? _loadingRipple;
 
+  /// The one load of the ripple program per process, which fills the cache
+  /// before anything waiting on it runs — shared by [wantRippleProgram] and
+  /// [GlassHost.precache].
+  static Future<ui.FragmentProgram> _loadRipple() => _loadingRipple ??= ui.FragmentProgram.fromAsset(
+    kGlassRippleShaderAsset,
+  ).then((ui.FragmentProgram program) => _cachedRippleProgram = program);
+
   /// Loads [rippleProgram], once per process, and notifies when it lands.
   void wantRippleProgram() {
     if (rippleProgram != null) {
       return;
     }
-    (_loadingRipple ??= ui.FragmentProgram.fromAsset(kGlassRippleShaderAsset)).then((
-      ui.FragmentProgram program,
-    ) {
-      _cachedRippleProgram = program;
+    _loadRipple().then((ui.FragmentProgram program) {
       if (_rippleProgram == null && !_disposed) {
         _rippleProgram = program;
         notifyListeners();
@@ -529,6 +533,59 @@ class GlassHost extends StatefulWidget {
   /// and says so keeps the quality the floor of 4096 would have spent.
   final int? maxTextureSide;
 
+  /// Compiles the package's shaders now, so that the first glass on screen is
+  /// drawn through its optics rather than without them.
+  ///
+  /// ```dart
+  /// Future<void> main() async {
+  ///   WidgetsFlutterBinding.ensureInitialized();
+  ///   await GlassHost.precache();
+  ///   runApp(const MyApp());
+  /// }
+  /// ```
+  ///
+  /// **What it changes.** A host otherwise starts compiling in its
+  /// `initState` — `FragmentProgram.fromAsset` is a future — and until a
+  /// program lands, the glass that needs it draws a stand-in:
+  ///
+  ///  - a surface with a proxy and no surface program draws the captured,
+  ///    blurred backdrop clipped to its shape: no tint, no rim, no bend
+  ///    (`RenderGlassSurface.paintsWithOptics` counts the difference). A faded
+  ///    surface, such as a soft `GlassScrollEdge`, draws nothing;
+  ///  - a fused [GlassGroup] with no group program draws nothing at all, and
+  ///    its members leave their glass to it;
+  ///  - a touched surface under a [GlassRipple] with no ripple program draws
+  ///    the surface program, which is the picture without the wave.
+  ///
+  /// The content on the glass — a bar's title, a button's icon — is drawn in
+  /// every case. Once this future completes, every host mounted afterwards
+  /// finds the programs in the cache and hands them to its surfaces in its
+  /// `initState`, before its first frame.
+  ///
+  /// **What it does not change.** A capture reads the frame that was just
+  /// painted, so the very first frame of a host has no proxy and its glass
+  /// draws only its content, precached or not; the first frame that *has* a
+  /// proxy is the one this makes glass. The lower rungs ([GlassTier.cheap],
+  /// [GlassTier.opaque]) read no program and do not need it.
+  ///
+  /// Shares the loads a host starts on its own, so it is idempotent, costs
+  /// nothing once the programs are in, and never compiles one twice — called
+  /// after a host has mounted, it waits for the load already in flight.
+  /// [group] and [ripple] leave out the blend group's program and the
+  /// ripple's, for an application that uses neither; every host still loads
+  /// the group program itself when it mounts. Completes with a load's error
+  /// if one fails.
+  static Future<void> precache({bool group = true, bool ripple = true}) async {
+    // What is cached is not waited on: the load that filled it is done, and
+    // its future belongs to the zone that started it — in a widget test, the
+    // fake clock of a test that may have ended, which nothing flushes again.
+    await Future.wait(<Future<ui.FragmentProgram>>[
+      if (_GlassHostState._cachedProgram == null) _GlassHostState._loadBase(),
+      if (group && _GlassHostState._cachedGroupProgram == null) _GlassHostState._loadGroup(),
+      if (ripple && GlassProxyHandle._cachedRippleProgram == null) GlassProxyHandle._loadRipple(),
+    ]);
+  }
+
   @override
   State<GlassHost> createState() => _GlassHostState();
 }
@@ -635,6 +692,17 @@ class _GlassHostState extends State<GlassHost> {
   static ui.FragmentProgram? _cachedGroupProgram;
   static Future<ui.FragmentProgram>? _loadingGroup;
 
+  /// The one load of each program per process, which fills the cache before
+  /// anything waiting on it runs — shared by every host's `initState` and by
+  /// [GlassHost.precache], so neither path compiles a program twice.
+  static Future<ui.FragmentProgram> _loadBase() => _loading ??= ui.FragmentProgram.fromAsset(
+    kGlassShaderAsset,
+  ).then((ui.FragmentProgram program) => _cachedProgram = program);
+
+  static Future<ui.FragmentProgram> _loadGroup() => _loadingGroup ??= ui.FragmentProgram.fromAsset(
+    kGlassGroupShaderAsset,
+  ).then((ui.FragmentProgram program) => _cachedGroupProgram = program);
+
   @override
   void initState() {
     super.initState();
@@ -664,10 +732,7 @@ class _GlassHostState extends State<GlassHost> {
       _handle.program = cached;
       return;
     }
-    (_loading ??= ui.FragmentProgram.fromAsset(kGlassShaderAsset)).then((
-      ui.FragmentProgram program,
-    ) {
-      _cachedProgram = program;
+    _loadBase().then((ui.FragmentProgram program) {
       if (mounted) {
         _handle.program = program;
       }
@@ -686,10 +751,7 @@ class _GlassHostState extends State<GlassHost> {
       _handle.groupProgram = cached;
       return;
     }
-    (_loadingGroup ??= ui.FragmentProgram.fromAsset(kGlassGroupShaderAsset)).then((
-      ui.FragmentProgram program,
-    ) {
-      _cachedGroupProgram = program;
+    _loadGroup().then((ui.FragmentProgram program) {
       if (mounted) {
         _handle.groupProgram = program;
       }

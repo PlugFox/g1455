@@ -104,6 +104,8 @@ export 'src/surface/glass_finish.dart'
 export 'src/surface/glass_group.dart'
     show GlassBlendGroup, GlassGroup, GlassGroupScope, GlassUnion, RenderGlassGroup, kMaxFusedShapes, unionBlendRadius;
 export 'src/surface/glass_host.dart' show GlassHost;
+export 'src/surface/glass_scaffold.dart'
+    show GlassScaffold, kGlassScaffoldActionGap, kGlassScaffoldBarHeight, kGlassScaffoldBarMargin;
 // The configuration level of the three-level structure (SS7.2), and the finish
 // ladder it carries. Both are API by construction: the ladder has no automatic
 // input at all, so the only way onto a rung below the top one is to say so.
