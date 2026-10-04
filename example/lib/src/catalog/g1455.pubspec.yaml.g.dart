@@ -92,13 +92,13 @@ sealed class Pubspec {
   static const PubspecVersion version = (
     /// Non-canonical string representation of the version as provided
     /// in the pubspec.yaml file.
-    representation: r'0.1.1',
+    representation: r'0.1.2',
 
     /// Returns a 'canonicalized' representation
     /// of the application version.
     /// This represents the version string in accordance with
     /// Semantic Versioning (SemVer) standards.
-    canonical: r'0.1.1',
+    canonical: r'0.1.2',
 
     /// MAJOR version when you make incompatible API changes.
     /// The major version number: 1 in "1.2.3".
@@ -111,7 +111,7 @@ sealed class Pubspec {
 
     /// PATCH version when you make backward compatible bug fixes.
     /// The patch version number: 3 in "1.2.3".
-    patch: 1,
+    patch: 2,
 
     /// The pre-release identifier: "foo" in "1.2.3-foo".
     preRelease: <String>[],
@@ -152,7 +152,7 @@ sealed class Pubspec {
   /// Think of the description as the sales pitch for your package.
   /// Users see it when they [browse for packages](https://pub.dev/packages).
   /// The description is plain text: no markdown or HTML.
-  static const String description = r'Liquid Glass for Flutter: refraction, blur and rim over the live backdrop, with the capture priced, held and shared rather than taken per surface.';
+  static const String description = r'Liquid Glass for Flutter: refraction, blur and finishes; bars, tabs, switches, sliders, menus, sheets, dialogs and fusing groups, all sampling one shared capture.';
 
   /// Homepage
   ///
@@ -203,7 +203,7 @@ sealed class Pubspec {
   /// If your package has additional documentation, add a documentation:
   /// field with that URL; pub shows a link to this documentation
   /// on your package’s page.
-  static const String documentation = r'';
+  static const String documentation = r'https://g1455.plugfox.dev';
 
   /// Publish_to
   ///
@@ -344,10 +344,10 @@ sealed class Pubspec {
   /// Tagging with existing topics helps users discover your package.
   static const List<Object> topics = <Object>[
     r'liquid-glass',
+    r'glass',
     r'glassmorphism',
     r'shader',
     r'ui',
-    r'widget',
   ];
 
   /// Environment
