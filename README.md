@@ -35,6 +35,12 @@ The name is *glass*, spelled in digits.
 > **Status: 0.x.** The API will still change between minor versions; every
 > change is in the [changelog](CHANGELOG.md).
 
+<!-- A whole screen first: glass in an app, not on a stage. 360 px wide, as a
+     tile, so it shrinks to a phone's column the same way. -->
+<p align="center">
+<a href="https://g1455.plugfox.dev"><img src="doc/showcase/screen.webp" width="360" alt="An app screen in glass: a list scrolls under a glass bar, the bar's menu grows out of its button and closes, the tab bar's selection is dragged to another page and back"></a>
+</p>
+
 <!-- Two tiles to a row: pub.dev draws a README 776 px wide, and two 360-px
      tiles with the space between them fit in it with room to spare, as on GitHub. On a
      narrower screen `max-width: 100%` shrinks each tile to the column and they
@@ -612,8 +618,9 @@ publishes to pub.dev and opens a GitHub release with that section as notes.
 ## Re-shooting the animations
 
 ```bash
-tool/showcase.sh                  # every scene
+tool/showcase.sh                  # every tile
 tool/showcase.sh switch,tab_bar   # just these
+tool/showcase.sh screen           # the whole screen at the top
 ```
 
 The script plays each scene of `example/showcase/scenes.dart` under
@@ -623,6 +630,10 @@ settle and records the next, and it fails if the last frame does not lead back
 into the first. It then packs the frames into looping webp files in
 `doc/showcase/` with `cwebp` and `webpmux` (from libwebp: `brew install webp`),
 each frame encoding only the rect that changed.
+
+The whole screen at the top is `example/showcase/screen.dart`. It has its own
+size and no shared backdrop, and it is not one of pub.dev's screenshots, so the
+script shoots it only when it is named.
 
 The screenshots pub.dev shows are the same loops at half the size, because pub
 ships them with the package:
