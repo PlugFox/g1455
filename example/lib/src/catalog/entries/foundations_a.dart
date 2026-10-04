@@ -725,8 +725,9 @@ it wears what the declarations give, exactly as with adaptive off.
 
 The demo above turns adaptive on in the site's own host while the page is open, so the site's top bar and side panel
 follow it too. The site declares a rich backdrop, so the stage nests a `GlassTheme` with `richBackdrop: false` to let
-the labels follow as well. It needs the full tier (the High or Ultra setting) and the Regular material: a lower tier
-captures nothing to read, and a named material is kept.
+the labels follow as well. It needs the full tier (the High or Ultra setting), the Regular material and the Neutral
+tint: a lower tier captures nothing to read, and a named material is kept — and a tint names one, the material with
+that colour.
 
 ## Content on the glass
 

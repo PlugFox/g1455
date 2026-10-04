@@ -79,7 +79,7 @@ class _AdaptiveDemoState extends State<AdaptiveDemo> {
     hint:
         'With Adaptive on, the bar over the sky turns light with a dark label, and the buttons over the ground stay '
         'dark. Drag the horizon past the card: it follows once the hold is over. Needs the High or Ultra setting, '
-        'and the default material.',
+        'the default material and the Neutral tint.',
     // The site declares a rich backdrop, which keeps every label at its worst
     // case. The stage is one flat picture per glass, so here the label follows
     // the reading too.

@@ -38,7 +38,8 @@ Motion:
   repaint the drop's own layer on the frames it deforms.
 - `GlassTabItem` takes an `iconBuilder` and a `labelBuilder`, handed the
   colour the bar draws the item in, so an SVG, an image or a badge matches its
-  neighbours. `GlassTabItem.icon` is now nullable.
+  neighbours. **Breaking for code that reads it:** `GlassTabItem.icon` is now
+  nullable, so `item.icon` used as an `IconData` needs a null check.
 
 Start-up and scaffolding:
 
@@ -52,6 +53,15 @@ Start-up and scaffolding:
   none is above it, a top bar in a soft `GlassScrollEdge`, an optional bottom
   bar and floating action, and a body that scrolls under the bars and is told
   their extents through `MediaQuery.padding`.
+
+Fixed:
+
+- A shader that fails to load no longer escapes as an uncaught error. A host
+  or a ripple that waited on it reports it through `FlutterError`, and the
+  failed load is forgotten, so the next host or `GlassHost.precache()` tries
+  again rather than being handed the same failure.
+- On the web, a painter that throws while a glass layer records no longer
+  leaks the shaders it drew with before the throw.
 
 The package page and the README:
 
