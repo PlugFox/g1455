@@ -49,7 +49,9 @@
 
 import 'package:flutter/widgets.dart';
 
+import 'glass_adaptive.dart';
 import 'glass_finish.dart';
+import 'glass_host.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
@@ -323,7 +325,7 @@ class _GlassButtonState extends State<GlassButton> {
 }
 
 /// The body all three components are presets of.
-class _GlassPanel extends StatelessWidget {
+class _GlassPanel extends StatefulWidget {
   const _GlassPanel({
     required this.borderRadius,
     required this.padding,
@@ -341,28 +343,145 @@ class _GlassPanel extends StatelessWidget {
   final Widget child;
 
   @override
+  State<_GlassPanel> createState() => _GlassPanelState();
+}
+
+/// The panel's one piece of state: what its glass read of the backdrop, when
+/// the host reads it (`GlassHost.adaptive`), and the move between two readings.
+///
+/// Off, none of it runs: no listener, no controller, no ticker — the build is
+/// the one it always was, under an inner [GlassTheme] equal to the outer one.
+/// That theme is there either way so that turning the reading on or off keeps
+/// the tree's shape, and with it the state of whatever the panel holds.
+class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderStateMixin {
+  GlassBackdropReadings? _readings;
+
+  /// This glass's verdict, or null before it has one.
+  GlassBackdropReading? _reading;
+
+  /// The move between two verdicts, made the first time there is one to make.
+  AnimationController? _move;
+
+  /// What was drawn when the verdict last moved — where the move starts.
+  GlassLegibility? _from;
+
+  /// What the last build drew, mid-move included.
+  GlassLegibility? _shown;
+
+  /// What the last build read of the motion it may make: the reading's
+  /// [GlassAdaptive.duration], and whether the platform asks for none.
+  bool _reduceMotion = false;
+  Duration _duration = Duration.zero;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final GlassBackdropReadings? readings = GlassTheme.of(context).adaptive == null
+        ? null
+        : GlassProxyScope.maybeOf(context)?.readings;
+    if (identical(readings, _readings)) {
+      return;
+    }
+    _readings?.removeListener(_onReadings);
+    _readings = readings;
+    if (readings == null) {
+      _reading = null;
+      _from = null;
+      _move?.stop();
+    } else {
+      readings.addListener(_onReadings);
+      _reading = _readingOfGlass();
+    }
+  }
+
+  @override
+  void dispose() {
+    _readings?.removeListener(_onReadings);
+    _move?.dispose();
+    super.dispose();
+  }
+
+  /// The verdict for this panel's own glass: the render object the panel
+  /// builds first is its [RenderGlassSurface], and that is what the host keys
+  /// the verdicts by. Asked when the verdicts move or the theme turns the
+  /// reading on, never from [build], where the answer could be a frame old.
+  GlassBackdropReading? _readingOfGlass() {
+    final RenderObject? glass = context.findRenderObject();
+    return glass is RenderGlassSurface ? _readings?.of(glass) : null;
+  }
+
+  void _onReadings() {
+    final GlassBackdropReading? reading = _readingOfGlass();
+    if (reading == _reading) {
+      return;
+    }
+    setState(() {
+      _reading = reading;
+      final GlassLegibility? shown = _shown;
+      final Duration duration = _duration;
+      if (shown == null || _reduceMotion || duration == Duration.zero) {
+        _from = null;
+        _move?.stop();
+        return;
+      }
+      _from = shown;
+      final AnimationController move = _move ??= AnimationController(vsync: this)..addListener(() => setState(() {}));
+      move
+        ..duration = duration
+        ..forward(from: 0);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final GlassThemeData theme = GlassTheme.of(context);
-    final GlassFinish effective = finish ?? theme.finish;
-    return GlassSurface(
-      borderRadius: borderRadius,
-      finish: finish,
-      child: CustomPaint(
-        // Nothing between this and the glass that would open a `saveLayer`, and
-        // that is the whole requirement: `plus` adds to whatever is already on
-        // the canvas it is recorded on, and a `saveLayer` above it would make
-        // that transparency instead of the glass. A `RepaintBoundary` is **not**
-        // one — it lowers to `SceneBuilder.pushOffset`, whose engine layer
-        // paints its children onto the same canvas — so one here changes
-        // nothing, which is measured rather than assumed (the break that failed
-        // to break, D185). An `Opacity`, a `ColorFilter` or an `ImageFilter`
-        // does open one, and then the press adds to nothing; that is a hazard
-        // for whoever wraps a control, and it is why this sits directly over the
-        // surface rather than under anything convenient.
-        painter: overlay == null ? null : _GlassOverlay(borderRadius, overlay!),
-        child: Padding(
-          padding: padding,
-          child: _labelled(context, theme, effective, child),
+    final GlassThemeData outer = GlassTheme.of(context);
+    final GlassAdaptive? adaptive = outer.adaptive;
+    if (adaptive != null) {
+      _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+      _duration = adaptive.duration;
+    }
+    final GlassBackdropReading? reading = adaptive == null ? null : _reading;
+    final GlassThemeData theme = reading == null ? outer : outer.adaptedTo(reading);
+    final GlassLegibility target = theme.legibility(widget.finish);
+    // Mid-move, the glass draws the finish between where it was and where it
+    // is going, already dimmed at both ends — so it is handed to the surface
+    // as its own and kept from the floor's second dim — and the label moves
+    // with it.
+    final GlassLegibility? from = _from;
+    final AnimationController? move = _move;
+    final double t = from == null || move == null || !move.isAnimating ? 1 : Curves.easeInOut.transform(move.value);
+    final bool moving = from != null && t < 1;
+    final GlassLegibility shown = moving
+        ? GlassLegibility(
+            finish: GlassFinish.lerp(from.finish, target.finish, t),
+            label: Color.lerp(from.label, target.label, t)!,
+            rim: target.rim,
+          )
+        : target;
+    _shown = shown;
+    return GlassTheme(
+      data: theme,
+      child: GlassSurface(
+        borderRadius: widget.borderRadius,
+        finish: moving ? shown.finish : widget.finish,
+        labelled: !moving,
+        child: CustomPaint(
+          // Nothing between this and the glass that would open a `saveLayer`, and
+          // that is the whole requirement: `plus` adds to whatever is already on
+          // the canvas it is recorded on, and a `saveLayer` above it would make
+          // that transparency instead of the glass. A `RepaintBoundary` is **not**
+          // one — it lowers to `SceneBuilder.pushOffset`, whose engine layer
+          // paints its children onto the same canvas — so one here changes
+          // nothing, which is measured rather than assumed (the break that failed
+          // to break, D185). An `Opacity`, a `ColorFilter` or an `ImageFilter`
+          // does open one, and then the press adds to nothing; that is a hazard
+          // for whoever wraps a control, and it is why this sits directly over the
+          // surface rather than under anything convenient.
+          painter: widget.overlay == null ? null : _GlassOverlay(widget.borderRadius, widget.overlay!),
+          child: Padding(
+            padding: widget.padding,
+            child: _labelled(theme, shown, widget.child),
+          ),
         ),
       ),
     );
@@ -379,19 +498,20 @@ class _GlassPanel extends StatelessWidget {
   /// white at 6.05, AA over any image there is (D204). What remains worth
   /// saying is when even the bound is below AA — a light, thin finish over an
   /// undeclared screen — and that is what the report says now.
-  Widget _labelled(
-    BuildContext context,
-    GlassThemeData theme,
-    GlassFinish finish,
-    Widget child,
-  ) {
-    final GlassLegibility legibility = theme.legibility(finish);
-    if (theme.backdrop == null &&
+  ///
+  /// Under a host that reads its backdrop the reading is a third way, and not
+  /// a guess either: it stands in for the declared backdrop for this glass
+  /// alone ([GlassThemeData.adaptedTo]). Nothing is reported there — the label
+  /// is about to be chosen against a measurement, on the frame after the first
+  /// capture, and a complaint about the two frames before it would be noise.
+  Widget _labelled(GlassThemeData theme, GlassLegibility legibility, Widget child) {
+    if (theme.adaptive == null &&
+        theme.backdrop == null &&
         !theme.richBackdrop &&
         legibility.finish.worstContrast(legibility.label) < kTextContrastAA) {
       _reportIllegible(legibility.finish.worstContrast(legibility.label));
     }
-    final Color foreground = enabled
+    final Color foreground = widget.enabled
         ? legibility.label
         : legibility.label.computeLuminance() < 0.5
         ? kGlassDisabledDarkLabel

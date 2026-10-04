@@ -34,6 +34,7 @@ import '../proxy/proxy_retake.dart';
 import '../proxy/proxy_walk.dart';
 import '../proxy/shadow_filter.dart';
 import 'glass_above.dart';
+import 'glass_adaptive.dart';
 import 'glass_finish.dart';
 import 'glass_group.dart';
 import 'glass_ledger.dart';
@@ -217,6 +218,21 @@ class GlassProxyHandle extends ChangeNotifier {
   /// never fired and one that fired every frame are otherwise the same run.
   int throttled = 0;
 
+  /// How many times the host has read the backdrop back for glass that reads
+  /// it (`GlassHost.adaptive`) — zero for ever on a host without it, which is
+  /// the observable that says the feature costs nothing when off.
+  ///
+  /// Counted when a read is started rather than when it lands, because the
+  /// start is what was paid for: a read-back still in flight when the host goes
+  /// away cost its copy all the same.
+  int readBacks = 0;
+
+  /// The verdicts of the glass under this host, when it reads its backdrop;
+  /// null when it does not. What a component listens to — apart from this
+  /// handle, whose own notifications repaint every surface.
+  GlassBackdropReadings? get readings => _readings;
+  GlassBackdropReadings? _readings;
+
   /// Declares a change nothing above the content is painted for.
   ///
   /// The escape hatch that makes [GlassContentDeclaration.declared] usable, and
@@ -344,6 +360,7 @@ class GlassHost extends StatefulWidget {
     this.maxTextureSide,
     this.blurPass,
     this.content = GlassContentDeclaration.byDefault,
+    this.adaptive,
     super.key,
   });
 
@@ -405,6 +422,30 @@ class GlassHost extends StatefulWidget {
   /// The least contrast a component label must reach, met by dimming the glass
   /// when the finish cannot reach it. See [GlassThemeData.minLabelContrast].
   final double? minLabelContrast;
+
+  /// Whether the glass reads its own backdrop, and how; null — the default —
+  /// for glass that goes by what is declared ([backdrop], [richBackdrop], the
+  /// platform's appearance).
+  ///
+  /// Set, each component under this host ([GlassBar], [GlassCard],
+  /// [GlassButton]) is told the mean level of the captured backdrop inside its
+  /// own box, and picks the branch of `.regular` and its label colour from it —
+  /// so a bar over a photograph's sky and a button over its shadow each wear
+  /// the branch Apple's material would. The precedence against what is
+  /// declared, and the band and hold that keep it from flickering, are in
+  /// [GlassAdaptive] and `glass_adaptive.dart`.
+  ///
+  /// **What it costs** is one small asynchronous read-back per capture at most,
+  /// never per frame, and nothing on a frame that keeps its capture; at most one
+  /// per [GlassAdaptive.interval], which is longer on the web, where a
+  /// read-back stalls CanvasKit. Off, nothing is read, recorded or scheduled,
+  /// and [GlassProxyHandle.readBacks] stays at zero.
+  ///
+  /// A raw [GlassSurface] does not adapt on its own: the label is the
+  /// component's, and so is the move between branches.
+  /// [GlassThemeData.adaptedTo] is what a custom component calls to do the
+  /// same.
+  final GlassAdaptive? adaptive;
 
   /// The wave every surface below makes when touched, or null for none — the
   /// platform's behaviour. See [GlassThemeData.ripple] and [GlassRipple].
@@ -623,6 +664,32 @@ class _GlassHostState extends State<GlassHost> {
   /// is inherited, and `initState` may not read it.
   late GlassFinish _finish;
 
+  /// The appearance `.regular` was picked in, or null when a finish was named —
+  /// what lets a reading pick the branch again for one glass.
+  Brightness? get _regularAppearance =>
+      widget.finish != null ? null : (MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light);
+
+  /// Reads the backdrop back for [GlassHost.adaptive]; null — and nothing at
+  /// all — without it.
+  GlassBackdropReader? _reader;
+
+  void _adapt() {
+    final GlassAdaptive? adaptive = widget.adaptive;
+    final GlassBackdropReader? reader = _reader;
+    if (adaptive == null) {
+      if (reader != null) {
+        _handle._readings = null;
+        reader.dispose();
+        _reader = null;
+      }
+    } else if (reader == null) {
+      _reader = GlassBackdropReader(adaptive, _handle);
+      _handle._readings = _reader!.readings;
+    } else {
+      reader.adaptive = adaptive;
+    }
+  }
+
   GlassFinish _resolveFinish() =>
       widget.finish ??
       GlassFinish.regular(
@@ -643,6 +710,7 @@ class _GlassHostState extends State<GlassHost> {
     // rebuilt whenever the finish, the budget or the declaration changes, and a
     // listener bound to the old one would declare changes to a dead object.
     _handle.changes.addListener(_noteDeclaredChange);
+    _adapt();
     _loadProgram();
     _loadGroupProgram();
   }
@@ -742,6 +810,9 @@ class _GlassHostState extends State<GlassHost> {
   @override
   void didUpdateWidget(GlassHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.adaptive != oldWidget.adaptive) {
+      _adapt();
+    }
     final GlassFinish resolved = _resolveFinish();
     final bool finishMoved = resolved != _finish;
     _finish = resolved;
@@ -776,6 +847,7 @@ class _GlassHostState extends State<GlassHost> {
     _pipeline.dispose();
     _oracle.dispose();
     _handle.changes.removeListener(_noteDeclaredChange);
+    _reader?.dispose();
     _handle.dispose();
     _ledger
       ..removeListener(_markersChanged)
@@ -852,6 +924,11 @@ class _GlassHostState extends State<GlassHost> {
     final rects = <Rect>[];
     final present = <GlassSurfaceGeometry>[];
     final finishes = <GlassFinish>[];
+    // The boxes a reading averages, and only when something reads them.
+    final GlassBackdropReader? reader = _reader;
+    final List<({GlassSurfaceGeometry surface, Rect box})>? boxes = reader == null
+        ? null
+        : <({GlassSurfaceGeometry surface, Rect box})>[];
     for (final GlassSurfaceGeometry surface in keys) {
       final GlassSurfaceRecord? record = surface.readGeometry();
       // A surface below the top rung is in the register and not in the capture:
@@ -874,6 +951,7 @@ class _GlassHostState extends State<GlassHost> {
         );
         present.add(surface);
         finishes.add(finish);
+        boxes?.add((surface: surface, box: record.rect));
       }
     }
     if (rects.isEmpty) {
@@ -930,12 +1008,33 @@ class _GlassHostState extends State<GlassHost> {
         throttled++;
         _handle.throttled = throttled;
       }
+      // A reader that has never read — turned on over a still screen — reads
+      // the capture already held, once; every other held frame reads nothing.
+      if (reader != null && reader.hungry) {
+        _feed(reader, keys, boxes!);
+      }
       return;
     }
     recorded++;
     _handle.publish(result.frame);
     _captureUpper(root, levels, present, rects, finishes, dpr);
     _readCounters();
+    // On a frame that published: a held frame has nothing new under the glass,
+    // which is what makes the read-back per capture and not per frame.
+    if (reader != null) {
+      _feed(reader, keys, boxes!);
+    }
+  }
+
+  /// Hands the capture just published, or held, to the reader.
+  void _feed(
+    GlassBackdropReader reader,
+    List<GlassSurfaceGeometry> registered,
+    List<({GlassSurfaceGeometry surface, Rect box})> boxes,
+  ) {
+    reader
+      ..prune(registered.toSet())
+      ..captured(boxes, SchedulerBinding.instance.currentSystemFrameTimeStamp);
   }
 
   /// Records the levels of glass that stand on glass, bottom up, each one
@@ -1238,6 +1337,9 @@ class _GlassHostState extends State<GlassHost> {
           richBackdrop: widget.richBackdrop,
           minLabelContrast: widget.minLabelContrast,
           ripple: widget.ripple,
+          adaptive: widget.adaptive,
+          // Only for a reader: off, the theme is the one it always was.
+          regularAppearance: widget.adaptive == null ? null : _regularAppearance,
         ),
         child: GlassProxyScope(
           handle: _handle,
