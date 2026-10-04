@@ -111,6 +111,9 @@ export 'src/surface/glass_finish.dart'
 // not API at all, because it is a runtime decision about price.
 export 'src/surface/glass_group.dart'
     show GlassBlendGroup, GlassGroup, GlassGroupScope, GlassUnion, RenderGlassGroup, kMaxFusedShapes, unionBlendRadius;
+// One glass that flows to the size of the child it is given, through the
+// group's union while it moves and a lone surface at rest.
+export 'src/surface/glass_morph.dart' show GlassMorph, GlassMorphMotion, kGlassMorphSpacing;
 export 'src/surface/glass_host.dart' show GlassHost;
 export 'src/surface/glass_scaffold.dart'
     show GlassScaffold, kGlassScaffoldActionGap, kGlassScaffoldBarHeight, kGlassScaffoldBarMargin;
