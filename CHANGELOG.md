@@ -1,3 +1,71 @@
+## Unreleased
+
+Glass that reads its backdrop:
+
+- `GlassHost(adaptive: GlassAdaptive())` tells each `GlassBar`, `GlassCard`
+  and `GlassButton` the mean level of the captured backdrop inside its own
+  box, and the glass picks the branch of `.regular` and its label from it: a
+  bar over a photograph's sky and a button over its shadow each wear the
+  branch Apple's material would. Off by default and free when off. On, a
+  frame that captures reads back a 4 × 4-pixel cell per surface,
+  asynchronously, at most once per `interval` (250 ms, a second on the web,
+  where CanvasKit reads back synchronously), and a frame that keeps its
+  capture reads nothing. A band of 12 code values and a hold of 600 ms keep a
+  glass near the threshold from flickering; crossings tween over 300 ms and
+  cut under reduced motion. A finish a component, the host or a theme names
+  is kept, and only its label follows; under `richBackdrop` the label stays
+  chosen against every backdrop. `GlassTheme.of(context).reading` hands the
+  verdict to content on the glass. A raw `GlassSurface`, the scroll edge, the
+  tab bar and the segmented control do not adapt yet.
+
+Motion:
+
+- `GlassMorph`: swap the child and the glass flows to its size, the way a
+  button becomes its menu. It measures the child; `width` and `height` pin an
+  axis, and `alignment` names the point that holds still. While it grows it
+  is a two-shape union, a body on a spring and a capsule running ahead, so
+  the outline has a neck. At rest it is one plain surface, and a settled
+  morph is that surface pixel for pixel. `GlassMorphMotion.fluid` and
+  `.calm`; under reduced motion it changes at once. A morph is a capture per
+  frame, unless a `GlassTravel` around a fixed-size ancestor holds it.
+- The held drop in the switch, the slider, the segmented control and the tab
+  bar stretches as it sets off and squashes as it stops, from its
+  acceleration, and springs back round; at rest and at a constant speed it
+  keeps its shape. `GlassHost.dropMotion` or `GlassThemeData.dropMotion` sets
+  it for the app, and each control's `dropMotion` overrides it;
+  `GlassDropMotion.none` turns it off, and so does reduced motion. It costs no
+  capture: the drop deforms inside the region it already travels in. It does
+  repaint the drop's own layer on the frames it deforms.
+- `GlassTabItem` takes an `iconBuilder` and a `labelBuilder`, handed the
+  colour the bar draws the item in, so an SVG, an image or a badge matches its
+  neighbours. `GlassTabItem.icon` is now nullable.
+
+Start-up and scaffolding:
+
+- `GlassHost.precache()` compiles the package's shaders before the first
+  frame. Call it in `main()` after `WidgetsFlutterBinding.ensureInitialized()`,
+  and the first frame that has a capture is drawn through the optics rather
+  than as the plain blurred backdrop. It shares the loads a host starts on its
+  own, so it never compiles a program twice; `group: false` and
+  `ripple: false` leave those out.
+- `GlassScaffold` is a screen wired the way the README recommends: a host when
+  none is above it, a top bar in a soft `GlassScrollEdge`, an optional bottom
+  bar and floating action, and a body that scrolls under the bars and is told
+  their extents through `MediaQuery.padding`.
+
+The package page and the README:
+
+- The package page links the site as its documentation, names what is in the
+  box in its description, and adds `glass` to its topics.
+- The README opens with a loop of a whole app screen, shot headless like the
+  tiles by `tool/showcase.sh screen`. How it works is four cards. The quick
+  start is a whole app that runs as pasted. New sections give the values of
+  every `GlassFinish` preset, five common patterns, and what is not here and
+  why: no dispersion, because Apple's material has none to measure (D103),
+  and one shape, `RSuperellipse`. A test keeps the README's code identical to
+  files that are analyzed and pumped, and its finish table equal to the
+  constants. Every image is linked relatively.
+
 ## 0.1.1
 
 What a screen reader is told and can do:

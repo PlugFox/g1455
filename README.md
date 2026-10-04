@@ -223,11 +223,13 @@ Every name links to its page in the API reference.
 
 | API | What it is |
 |---|---|
-| [`GlassHost`][GlassHost] | The one capture every glass below it samples. Takes what the application declares: `backdrop`, `hardware`, `thermal`, `highContrast`, `ripple`. |
+| [`GlassHost`][GlassHost] | The one capture every glass below it samples. Takes what the application declares: `backdrop`, `hardware`, `thermal`, `highContrast`, `ripple`. `GlassHost.precache()` in `main()` compiles the shaders before the first frame. |
 | [`GlassSurface`][GlassSurface] | The primitive: a region of the screen that is glass, with a corner radius, an optional finish, and `presence` / `materialize` for appearing. |
 | [`GlassFinish`][GlassFinish] | The optics: `.regularDark`, `.regularLight`, `.clear` and `.frosted`, calibrated against Apple's own materials on iOS 26. Apple's `.regular` is two materials, dark over dark content and light over light, and `GlassHost` picks the branch the same way unless you name one: from `backdrop` and the platform's appearance. |
 | [`GlassTheme`][GlassTheme] · [`GlassThemeData`][GlassThemeData] | The tokens a screen's glass reads: the finish every surface wears unless it names its own, the rung, the label floor. |
 | [`GlassRipple`][GlassRipple] | Optional, and not Apple's. A viscous wave from the touch: a dimple under the finger, a front that travels out, a spring-back on release. `viscosity` goes from water (0) to honey (1). Declare it on `GlassHost.ripple` for every surface, or on `GlassSurface.ripple` for one. A wave takes no capture and repaints nothing; off under reduced motion. |
+| [`GlassAdaptive`][GlassAdaptive] | Optional: glass that reads its own backdrop. Each bar, card and button picks the branch of `.regular` and its label from the mean level of the capture under it, instead of from `backdrop`. Off by default and free when off; on, a small read-back per capture, at most once per `interval` (250 ms, a second on the web), behind a band and a hold. |
+| [`GlassDropMotion`][GlassDropMotion] | How the held drop of the switch, slider, segmented control and tab bar stretches as it sets off and squashes as it stops. On and subtle by default, because it costs no capture; `GlassDropMotion.none` turns it off, and so does reduced motion. Declare it on `GlassHost`, the theme or one control. |
 
 ### Panels and controls
 
@@ -235,10 +237,11 @@ Every name links to its page in the API reference.
 |---|---|
 | [`GlassBar`][GlassBar] · [`GlassButton`][GlassButton] · [`GlassCard`][GlassCard] | Panels with a label colour chosen for legibility. |
 | [`GlassSwitch`][GlassSwitch] · [`GlassSlider`][GlassSlider] | Controls whose knob turns into a clear drop while held. |
-| [`GlassTabBar`][GlassTabBar] · [`GlassSegmentedControl`][GlassSegmentedControl] | The selection lifts into a drop that can be dragged between items. |
+| [`GlassTabBar`][GlassTabBar] · [`GlassSegmentedControl`][GlassSegmentedControl] | The selection lifts into a drop that can be dragged between items. A tab's icon and label can be any widget, through `iconBuilder` and `labelBuilder`. |
 | [`GlassButtonGroup`][GlassButtonGroup] | A toolbar capsule of icon buttons ([`GlassToolbarItem`][GlassToolbarItem]). |
 | [`GlassTextField`][GlassTextField] | A single line of text in a glass capsule. |
 | [`GlassScrollEdge`][GlassScrollEdge] | The scroll edge effect under a bar, and the bar. |
+| [`GlassScaffold`][GlassScaffold] | A screen wired as this README recommends: a host when none is above, a top bar in a soft scroll edge, an optional bottom bar and floating action, and a body that scrolls under the bars. |
 
 ### Modals
 
@@ -258,6 +261,7 @@ budding inside a `GlassGroup`; on a lone panel it narrows to a line.
 |---|---|
 | [`GlassGroup`][GlassGroup] · [`GlassUnion`][GlassUnion] | Several surfaces drawn as one silhouette, fusing where they meet. |
 | [`GlassTravel`][GlassTravel] | Declares the region a moving glass travels in, so the motion does not trigger a capture. |
+| [`GlassMorph`][GlassMorph] | Swap the child and the glass flows to its size, the way a button becomes its menu. A neck forms while it grows; at rest it is one plain surface. |
 | [`GlassAbove`][GlassAbove] | Raises the glass below it a level above the glass beside it: a bar over glass cards sees the cards. |
 
 ### Policy and accounting
@@ -539,6 +543,8 @@ application declares them:
   a flat colour, or `richBackdrop: true` with `minLabelContrast` for an image or
   a scrolling feed. Without either, labels are picked against the worst case,
   and in debug the package warns when a finish cannot be read over it.
+  Or let bars, cards and buttons read it: `GlassHost(adaptive: GlassAdaptive())`
+  measures the capture under each of them, for a small read-back per capture.
 - **Reduce transparency, increase contrast on macOS, and thermal state.**
   Flutter does not pass these on, and this package ships no platform code to
   read them. Read them natively and pass them in: reduce transparency to
@@ -658,6 +664,10 @@ from the tables beside them; change both together.
 [MIT](LICENSE)
 
 [GlassHost]: https://pub.dev/documentation/g1455/latest/g1455/GlassHost-class.html
+[GlassAdaptive]: https://pub.dev/documentation/g1455/latest/g1455/GlassAdaptive-class.html
+[GlassDropMotion]: https://pub.dev/documentation/g1455/latest/g1455/GlassDropMotion-class.html
+[GlassScaffold]: https://pub.dev/documentation/g1455/latest/g1455/GlassScaffold-class.html
+[GlassMorph]: https://pub.dev/documentation/g1455/latest/g1455/GlassMorph-class.html
 [GlassSurface]: https://pub.dev/documentation/g1455/latest/g1455/GlassSurface-class.html
 [GlassFinish]: https://pub.dev/documentation/g1455/latest/g1455/GlassFinish-class.html
 [GlassTheme]: https://pub.dev/documentation/g1455/latest/g1455/GlassTheme-class.html
