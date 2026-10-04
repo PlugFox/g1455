@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="250" viewBox="0 0 360 250" role="img" aria-labelledby="t d">
+  <title id="t">What it costs</title>
+  <desc id="d">GPU cycles on an Adreno 830 under Impeller and Vulkan, as a multiple of stock Material. g1455 glass costs 0.99 to 1.08 times stock Material; the engine's BackdropFilter.grouped costs 1.78 to 3.15 times.</desc>
+  <style>svg { font-family: Roboto, Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }</style>
+  <defs>
+    <radialGradient id="violet"><stop offset="0" stop-color="#7C4DFF" stop-opacity=".5"/><stop offset="1" stop-color="#7C4DFF" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 .5H.5V20" fill="none" stroke="#fff" stroke-opacity=".05"/></pattern>
+    <clipPath id="card"><rect width="360" height="250" rx="20"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect width="360" height="250" fill="#0B0F24"/>
+    <circle cx="330" cy="20" r="120" fill="url(#violet)"/>
+    <rect width="360" height="250" fill="url(#grid)"/>
+
+    <text x="20" y="34" fill="#fff" font-size="16" font-weight="700">What it costs</text>
+    <text x="20" y="54" fill="#fff" fill-opacity=".72" font-size="12">GPU cycles, × stock Material. Lower is cheaper.</text>
+
+    <!-- Scale: ×0 at x 24, 89.14 per ×1, so ×1 = 113.1, ×2 = 202.3, ×3 = 291.4. -->
+    <g stroke="#fff" stroke-opacity=".1">
+      <path d="M202.3 80V184M291.4 80V184"/>
+    </g>
+    <path d="M24 184.5H336" stroke="#fff" stroke-opacity=".3"/>
+    <g fill="#fff" fill-opacity=".72" font-size="11" text-anchor="middle">
+      <text x="24" y="200">×0</text><text x="113.1" y="200">×1</text><text x="202.3" y="200">×2</text><text x="291.4" y="200">×3</text>
+    </g>
+
+    <!-- A solid bar to the low end of the range, a lighter one to the high end. -->
+    <text x="24" y="94" fill="#fff" font-size="12" font-weight="600">g1455</text>
+    <text x="336" y="94" fill="#fff" font-size="12" text-anchor="end">×0.99…1.08</text>
+    <rect x="24" y="102" width="96.3" height="16" rx="4" fill="#00A3CC" fill-opacity=".45"/>
+    <rect x="24" y="102" width="88.3" height="16" rx="4" fill="#00A3CC"/>
+
+    <text x="24" y="146" fill="#fff" font-size="12" font-weight="600">BackdropFilter.grouped</text>
+    <text x="336" y="146" fill="#fff" font-size="12" text-anchor="end">×1.78…3.15</text>
+    <rect x="24" y="154" width="280.8" height="16" rx="4" fill="#FF2D95" fill-opacity=".45"/>
+    <rect x="24" y="154" width="158.7" height="16" rx="4" fill="#FF2D95"/>
+
+    <!-- Stock Material, the ×1 line. -->
+    <path d="M113.1 98V122M113.1 150V184" stroke="#fff" stroke-opacity=".8" stroke-dasharray="3 3"/>
+
+    <text x="20" y="226" fill="#fff" fill-opacity=".72" font-size="11">Adreno 830, Impeller/Vulkan. Solid to the low</text>
+    <text x="20" y="241" fill="#fff" fill-opacity=".72" font-size="11">end of the measured range, light to the high end.</text>
+  </g>
+  <rect x=".5" y=".5" width="359" height="249" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+</svg>

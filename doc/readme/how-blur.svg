@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="360" height="250" viewBox="0 0 360 250" role="img" aria-labelledby="t d">
+  <title id="t">The blur is a downscale</title>
+  <desc id="d">The screen is captured at 1/N of its resolution, here a 6 by 6 grid, and scaled back up. The result is a Gaussian blur of sigma about N/2, to within about 1%.</desc>
+  <style>svg { font-family: Roboto, Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }</style>
+  <defs>
+    <radialGradient id="violet"><stop offset="0" stop-color="#7C4DFF" stop-opacity=".5"/><stop offset="1" stop-color="#7C4DFF" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 .5H.5V20" fill="none" stroke="#fff" stroke-opacity=".05"/></pattern>
+    <clipPath id="card"><rect width="360" height="250" rx="20"/></clipPath>
+    <clipPath id="tile"><rect width="72" height="72" rx="8"/></clipPath>
+    <!-- The sample, 72 × 72. N is 12, so the capture is 6 × 6 and σ is 6. -->
+    <g id="sample">
+      <rect width="72" height="72" fill="#141A3A"/>
+      <circle cx="26" cy="28" r="18" fill="#FF2D95" fill-opacity=".95"/>
+      <circle cx="46" cy="42" r="16" fill="#00D1FF" fill-opacity=".9"/>
+      <rect x="10" y="57" width="52" height="6" fill="#fff" fill-opacity=".95"/>
+    </g>
+    <filter id="sigma" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6" edgeMode="duplicate"/></filter>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect width="360" height="250" fill="#0B0F24"/>
+    <circle cx="330" cy="20" r="120" fill="url(#violet)"/>
+    <rect width="360" height="250" fill="url(#grid)"/>
+
+    <text x="20" y="34" fill="#fff" font-size="16" font-weight="700">The blur is a downscale</text>
+    <text x="20" y="54" fill="#fff" fill-opacity=".72" font-size="12">A capture at 1/N of the resolution, scaled back</text>
+    <text x="20" y="70" fill="#fff" fill-opacity=".72" font-size="12">up, is a Gaussian blur of σ ≈ N/2.</text>
+
+    <g transform="translate(24 98)" clip-path="url(#tile)"><use xlink:href="#sample"/></g>
+
+    <!-- The 1/N capture, each cell the mean of its 12 × 12 block. -->
+    <g transform="translate(144 98)" clip-path="url(#tile)">
+      <rect x="0" y="0" width="12" height="12" fill="#141A3A"/><rect x="12" y="0" width="12" height="12" fill="#1F1B3E"/><rect x="24" y="0" width="12" height="12" fill="#2B1C43"/><rect x="36" y="0" width="12" height="12" fill="#141A3A"/><rect x="48" y="0" width="12" height="12" fill="#141A3A"/><rect x="60" y="0" width="12" height="12" fill="#141A3A"/>
+      <rect x="0" y="12" width="12" height="12" fill="#2C1C43"/><rect x="12" y="12" width="12" height="12" fill="#E12B89"/><rect x="24" y="12" width="12" height="12" fill="#F22C90"/><rect x="36" y="12" width="12" height="12" fill="#652159"/><rect x="48" y="12" width="12" height="12" fill="#141A3A"/><rect x="60" y="12" width="12" height="12" fill="#141A3A"/>
+      <rect x="0" y="24" width="12" height="12" fill="#561F54"/><rect x="12" y="24" width="12" height="12" fill="#F32C90"/><rect x="24" y="24" width="12" height="12" fill="#D73F9D"/><rect x="36" y="24" width="12" height="12" fill="#399BD4"/><rect x="48" y="24" width="12" height="12" fill="#097EA5"/><rect x="60" y="24" width="12" height="12" fill="#141B3B"/>
+      <rect x="0" y="36" width="12" height="12" fill="#1A1A3C"/><rect x="12" y="36" width="12" height="12" fill="#A12571"/><rect x="24" y="36" width="12" height="12" fill="#7370B6"/><rect x="36" y="36" width="12" height="12" fill="#06BFED"/><rect x="48" y="36" width="12" height="12" fill="#02BFEB"/><rect x="60" y="36" width="12" height="12" fill="#123153"/>
+      <rect x="0" y="48" width="12" height="12" fill="#1D2342"/><rect x="12" y="48" width="12" height="12" fill="#4C5069"/><rect x="24" y="48" width="12" height="12" fill="#496680"/><rect x="36" y="48" width="12" height="12" fill="#3FC7E8"/><rect x="48" y="48" width="12" height="12" fill="#41B2D2"/><rect x="60" y="48" width="12" height="12" fill="#1D2443"/>
+      <rect x="0" y="60" width="12" height="12" fill="#1D2342"/><rect x="12" y="60" width="12" height="12" fill="#4C5069"/><rect x="24" y="60" width="12" height="12" fill="#4C5069"/><rect x="36" y="60" width="12" height="12" fill="#4C5069"/><rect x="48" y="60" width="12" height="12" fill="#4C5069"/><rect x="60" y="60" width="12" height="12" fill="#1D2342"/>
+    </g>
+
+    <g transform="translate(264 98)" clip-path="url(#tile)"><use xlink:href="#sample" filter="url(#sigma)"/></g>
+
+    <g fill="none" stroke="#fff" stroke-opacity=".3">
+      <rect x="24.5" y="98.5" width="71" height="71" rx="7.5"/><rect x="144.5" y="98.5" width="71" height="71" rx="7.5"/><rect x="264.5" y="98.5" width="71" height="71" rx="7.5"/>
+    </g>
+
+    <!-- ÷N, then ×N. -->
+    <g fill="#fff" fill-opacity=".8">
+      <path d="M104 134H130" stroke="#fff" stroke-opacity=".8" stroke-width="1.5"/><path d="M128 129.5l7 4.5-7 4.5z"/>
+      <path d="M224 134H250" stroke="#fff" stroke-opacity=".8" stroke-width="1.5"/><path d="M248 129.5l7 4.5-7 4.5z"/>
+    </g>
+    <g fill="#fff" font-size="13" font-weight="600" text-anchor="middle">
+      <text x="120" y="124">÷N</text><text x="240" y="124">×N</text>
+    </g>
+
+    <g fill="#fff" fill-opacity=".72" font-size="11" text-anchor="middle">
+      <text x="60" y="188">screen</text>
+      <text x="180" y="188">capture, 1/N</text>
+      <text x="300" y="188">≈ Gaussian, σ = N/2</text>
+    </g>
+    <text x="20" y="226" fill="#fff" font-size="13" font-weight="600">Within about 1%,</text>
+    <text x="20" y="242" fill="#fff" fill-opacity=".72" font-size="12">at a fraction of a real Gaussian's price.</text>
+  </g>
+  <rect x=".5" y=".5" width="359" height="249" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".12"/>
+</svg>
