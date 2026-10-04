@@ -179,6 +179,14 @@ class GlassDrawLayer extends Layer {
       _recording = shaders;
       try {
         painter?.call(Canvas(recorder));
+      } on Object {
+        // Nothing will hold what was drawn before the throw: the picture is
+        // ended only to be dropped, and the shaders that went into it with it.
+        recorder.endRecording().dispose();
+        for (final ui.FragmentShader shader in shaders) {
+          shader.dispose();
+        }
+        rethrow;
       } finally {
         _recording = outer;
       }
