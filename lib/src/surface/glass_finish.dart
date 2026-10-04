@@ -350,10 +350,13 @@ class GlassFinish {
   ///
   /// Every quantity is interpolated except the name, which is a key into the
   /// damage tables and has no midpoint: it is [a]'s for the first half and
-  /// [b]'s for the second. Between the two branches of `.regular` that changes
-  /// nothing the pipeline does — the blur is 2.6 on both, so no slot is
-  /// re-blurred and nothing is retaken on account of the move — and the tint
-  /// passes through levels between the two, which is the whole of the motion.
+  /// [b]'s for the second. Between the two branches of `.regular` the blur is
+  /// 2.6 on both, so no slot is re-blurred on account of the move, and the
+  /// tint passes through levels between the two, which is the whole of the
+  /// motion. The name is not free: a screen whose glass wears both branches is
+  /// priced by the stricter of their tables, so the flip at the half can lower
+  /// the capture's divisor — a larger atlas — for as long as the screen stays
+  /// mixed.
   static GlassFinish lerp(GlassFinish a, GlassFinish b, double t) {
     if (t <= 0 || a == b) {
       return a;

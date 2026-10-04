@@ -444,15 +444,20 @@ class GlassHost extends StatefulWidget {
   /// [GlassAdaptive] and `glass_adaptive.dart`.
   ///
   /// **What it costs** is one small asynchronous read-back per capture at most,
-  /// never per frame, and nothing on a frame that keeps its capture; at most one
-  /// per [GlassAdaptive.interval], which is longer on the web, where a
-  /// read-back stalls CanvasKit. Off, nothing is read, recorded or scheduled,
-  /// and [GlassProxyHandle.readBacks] stays at zero.
+  /// never per frame, and nothing on a frame that keeps its capture unless a
+  /// glass moved inside its [GlassTravel]; at most one per
+  /// [GlassAdaptive.interval], which is longer on the web, where a read-back
+  /// stalls CanvasKit. A screen whose glass reads both branches of `.regular`
+  /// is priced by the stricter one, which can lower the capture's divisor.
+  /// Off, nothing is read, recorded or scheduled, and
+  /// [GlassProxyHandle.readBacks] stays at zero.
   ///
   /// A raw [GlassSurface] does not adapt on its own: the label is the
   /// component's, and so is the move between branches.
   /// [GlassThemeData.adaptedTo] is what a custom component calls to do the
-  /// same.
+  /// same, with a reading it gets from `GlassProxyHandle.readings` — which,
+  /// with [GlassProxyScope] and [GlassBackdropReadings], is exported by
+  /// `package:g1455/glass_diagnostics.dart`, not by this library.
   final GlassAdaptive? adaptive;
 
   /// The wave every surface below makes when touched, or null for none — the

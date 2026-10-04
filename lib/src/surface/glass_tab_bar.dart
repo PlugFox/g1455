@@ -38,8 +38,9 @@
 // The items are drawn once, under the drop, and the drop shows them magnified:
 // there is no second copy of an item over the glass. A custom icon or label
 // ([GlassTabItem.iconBuilder], [GlassTabItem.labelBuilder]) is therefore built
-// once per item, and again only when the colour the bar gives it changes —
-// which is when the drop moves onto it or off it.
+// once per item for each look the bar gives the row: every item's builder runs
+// again when the drop moves onto an item or off one, not only the two whose
+// colour changed. A builder that is dear to run should cache what it builds.
 
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
