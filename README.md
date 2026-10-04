@@ -65,6 +65,9 @@ on the site.
 - [Install](#install)
 - [Quick start](#quick-start)
 - [What is in the box](#what-is-in-the-box)
+- [Finishes](#finishes)
+- [Common patterns](#common-patterns)
+- [What is not here, and why](#what-is-not-here-and-why)
 - [Things the application has to declare](#things-the-application-has-to-declare)
 - [Platforms](#platforms)
 - [Diagnostics](#diagnostics)
@@ -112,31 +115,93 @@ Requires Flutter 3.47 or later.
 
 ## Quick start
 
+A whole app: a list of coloured tiles to refract, a bar over it and a tab bar
+under it. Paste it over `lib/main.dart`.
+
 ```dart
+import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
 
-GlassHost(
-  child: Stack(
-    children: <Widget>[
-      Positioned.fill(child: content),           // what the glass refracts
-      Positioned(
-        top: 16, left: 16, right: 16,
-        child: GlassBar(child: Text('Library')),  // the glass
-      ),
-    ],
-  ),
-)
+void main() => runApp(const App());
+
+class App extends StatelessWidget {
+  const App({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    // The host goes above the navigator, so dialogs, sheets and menus are
+    // under it as well as the screens.
+    builder: (BuildContext context, Widget? navigator) => GlassHost(
+      // The backdrop is a feed of colours rather than one flat colour: pick
+      // the labels against any backdrop, and dim the glass if they need it.
+      richBackdrop: true,
+      minLabelContrast: kTextContrastAA,
+      child: navigator!,
+    ),
+    home: const Home(),
+  );
+}
+
+class Home extends StatefulWidget {
+  const Home({super.key});
+
+  @override
+  State<Home> createState() => _HomeState();
+}
+
+class _HomeState extends State<Home> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Stack(
+      children: <Widget>[
+        // What the glass refracts: coloured tiles, scrolling under both bars.
+        ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 120, 16, 120),
+          itemCount: 40,
+          itemBuilder: (BuildContext context, int i) => Container(
+            height: 96,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: HSLColor.fromAHSL(1, i * 27.0 % 360, 0.7, 0.55).toColor(),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
+        const Positioned(
+          top: 0,
+          left: 16,
+          right: 16,
+          child: SafeArea(
+            child: GlassBar(child: Text('Library')),
+          ),
+        ),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 0,
+          child: SafeArea(
+            child: GlassTabBar(
+              items: const <GlassTabItem>[
+                GlassTabItem(icon: Icons.photo_library_outlined, label: 'Library'),
+                GlassTabItem(icon: Icons.favorite_border, label: 'For You'),
+                GlassTabItem(icon: Icons.search, label: 'Search'),
+              ],
+              selectedIndex: _tab,
+              onSelected: (int i) => setState(() => _tab = i),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 ```
 
-Dialogs, sheets and menus are built in the navigator's overlay, so for them the
-host has to be above the navigator — in a `MaterialApp`, that is `builder:`:
-
-```dart
-MaterialApp(
-  builder: (context, navigator) => GlassHost(child: navigator!),
-  home: const HomeScreen(),
-)
-```
+The host goes in `MaterialApp.builder`, above the navigator, rather than around
+one screen: dialogs, sheets and menus are built in the navigator's overlay, and
+a host below the navigator does not see them.
 
 Every component is live at **[g1455.plugfox.dev](https://g1455.plugfox.dev)**,
 with its guide, its code and its API. The site is the [`example/`](example/)
@@ -199,6 +264,265 @@ budding inside a `GlassGroup`; on a lone panel it narrows to a line.
 
 The whole library is at
 [pub.dev/documentation/g1455](https://pub.dev/documentation/g1455/latest/g1455/).
+
+## Finishes
+
+A finish is what the glass does to the light it lets through. The four presets,
+every number as `GlassFinish` holds it:
+
+| Finish | Blur σ, px | Tint, RGB | Tint alpha | Rim adds, of 255 | Bend at the rim, px | Falloff with depth u, px | Magnification |
+|---|---|---|---|---|---|---|---|
+| `.regularDark` | 2.6 | 29, 29, 32 | 0.693 | 50.2 | -58.2 | (1 - (u/21)^0.6)^1.9 | 1 |
+| `.regularLight` | 2.6 | 252, 252, 252 | 0.718 | 50.2 | -58.2 | (1 - (u/21)^0.6)^1.9 | 1 |
+| `.clear` | 0 | 249, 249, 249 | 0.22 | 50.2 | -58.2 | (1 - (u/21)^0.6)^1.9 | 1 |
+| `.frosted` | 8 | 249, 249, 249 | 0.22 | 50.2 | -58.2 | (1 - (u/21)^0.6)^1.9 | 1 |
+
+- **Blur** is the sigma applied to the capture before it is sampled, in
+  logical pixels.
+- **Tint** is laid over the refracted sample as `mix(sample, tint, alpha)`, so
+  `1 - alpha` of the backdrop comes through: 0.307 of it under
+  `.regularDark`, 0.282 under `.regularLight`. `.regular` is dark because it
+  barely transmits the backdrop, not because it lays something dark over it.
+- **Rim** is a white outline 0.79 px wide that adds to what is under it rather
+  than mixing over it, and has no light direction.
+- **Bend** is how far a sample is pulled at the rim; negative is inward. It
+  falls to nothing 21 px in from the edge along the falloff curve.
+- **Magnification** is 1 for every finish. What magnifies is the tab bar's
+  held drop, by `kGlassTabDropZoom` (1.17), as iOS's does.
+
+`.regularDark` and `.regularLight` are the two branches of Apple's `.regular`,
+which is dark over a dark backdrop and light over a light one.
+`GlassFinish.regular(appearance:, backdrop:)` picks the branch, and `GlassHost`
+calls it unless a finish is named. `.clear` and `.frosted` differ only in blur.
+`.frosted` is a heavy blur kept under its old name: scored against Apple's
+material, it is a `UIVisualEffectView` blur rather than Liquid Glass.
+
+A finish of your own is a `GlassFinish(...)` or a `copyWith` of a preset. The
+package's damage tables are keyed by the four names above, so a finish under
+another name gets no measured price.
+
+## Common patterns
+
+Each snippet assumes a `GlassHost` above it, as in the quick start.
+
+### Glass over a scrolling list
+
+The commonest screen there is, and the case the capture is built for: a frame
+the list moves is one capture for all the glass on the screen, and a frame it
+rests is none. For iOS's soft edge under the bar, put the bar in a
+[`GlassScrollEdge`][GlassScrollEdge].
+
+```dart
+class Feed extends StatelessWidget {
+  const Feed({super.key});
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: <Widget>[
+      // A frame the list moves is one capture for every glass on the screen;
+      // a frame it rests is none.
+      ListView.builder(
+        padding: const EdgeInsets.only(top: 96),
+        itemCount: 100,
+        itemBuilder: (BuildContext context, int i) => ListTile(title: Text('Message $i')),
+      ),
+      const Positioned(
+        top: 0,
+        left: 16,
+        right: 16,
+        child: SafeArea(
+          child: GlassBar(child: Text('Inbox')),
+        ),
+      ),
+    ],
+  );
+}
+```
+
+### Moving glass inside a `GlassTravel`
+
+Glass that moves over still content would otherwise be captured on every frame
+it moves, because its slot in the capture is its own box. `GlassTravel` makes
+the slot the whole region, so the drag costs no capture. The content under it
+goes behind its own `RepaintBoundary`, and so does the moving glass: a repaint
+under the glass counts as changed content. The switch, slider, segmented
+control and tab bar already do this for their drops.
+
+```dart
+class Lens extends StatefulWidget {
+  const Lens({super.key});
+
+  @override
+  State<Lens> createState() => _LensState();
+}
+
+class _LensState extends State<Lens> {
+  Offset _at = const Offset(100, 100);
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: <Widget>[
+      // What the lens moves over, behind its own boundary: the drag repaints
+      // none of it.
+      const Positioned.fill(
+        child: RepaintBoundary(child: FlutterLogo(style: FlutterLogoStyle.stacked)),
+      ),
+      // The lens may go anywhere in here, and the host captures all of it
+      // once: dragging the lens over still content takes no capture.
+      Positioned.fill(
+        child: GlassTravel(
+          child: RepaintBoundary(
+            child: Stack(
+              children: <Widget>[
+                Positioned(
+                  left: _at.dx - 48,
+                  top: _at.dy - 48,
+                  width: 96,
+                  height: 96,
+                  child: GestureDetector(
+                    onPanUpdate: (DragUpdateDetails d) => setState(() => _at += d.delta),
+                    child: const GlassSurface(
+                      borderRadius: kGlassCapsule,
+                      finish: GlassFinish.clear,
+                      labelled: false,
+                      child: SizedBox.expand(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+```
+
+### Glass on glass
+
+A bar over a list of glass cards is the cards' sibling, and by default it sees
+the page with the cards cut out. `GlassAbove` raises it a level, so it refracts
+the cards. A level costs one more snapshot on a frame that captures, and nothing
+when there is no glass under the lifted one.
+
+```dart
+class Cards extends StatelessWidget {
+  const Cards({super.key});
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: <Widget>[
+      ListView(
+        padding: const EdgeInsets.fromLTRB(16, 96, 16, 16),
+        children: <Widget>[
+          for (int i = 0; i < 20; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GlassCard(child: Text('Card $i')),
+            ),
+        ],
+      ),
+      // The bar is the cards' sibling, not their parent. Without GlassAbove
+      // it would show the page with the cards cut out of it; with it, the bar
+      // is a level above them and refracts them.
+      const Positioned(
+        top: 0,
+        left: 16,
+        right: 16,
+        child: SafeArea(
+          child: GlassAbove(child: GlassBar(child: Text('Cards'))),
+        ),
+      ),
+    ],
+  );
+}
+```
+
+### A menu or a dialog over a bar
+
+Both are built in the navigator's overlay, so the host has to be above the
+navigator: `MaterialApp(builder: (context, navigator) => GlassHost(child: navigator!))`.
+The package's own modals are already lifted above the bars.
+
+```dart
+class NotesBar extends StatelessWidget {
+  const NotesBar({super.key});
+
+  @override
+  Widget build(BuildContext context) => GlassBar(
+    child: Row(
+      children: <Widget>[
+        const Expanded(child: Text('Notes')),
+        GlassMenuAnchor(
+          items: <GlassMenuItem>[
+            GlassMenuItem(label: 'Delete all', isDestructive: true, onPressed: () => _confirm(context)),
+          ],
+          builder: (BuildContext context, GlassMenuController menu) => GlassButton(
+            onPressed: menu.open,
+            semanticLabel: 'More',
+            padding: EdgeInsets.zero,
+            child: const Icon(Icons.more_horiz),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _confirm(BuildContext context) => showGlassDialog<void>(
+    context: context,
+    builder: (BuildContext context) => GlassAlert(
+      title: const Text('Delete all notes?'),
+      actions: <GlassAlertAction>[
+        GlassAlertAction(label: 'Cancel', isDefault: true, onPressed: () => Navigator.pop(context)),
+        GlassAlertAction(label: 'Delete', isDestructive: true, onPressed: () => Navigator.pop(context)),
+      ],
+    ),
+  );
+}
+```
+
+### The cheap rung
+
+`GlassTier.cheap` draws the tint over the backdrop and captures nothing. The
+package sets no ceiling itself, because whether a screen can afford full glass
+is a fact about the application's frame. The application decides, and declares
+it. Reduce transparency gives `GlassTier.opaque`, a solid fill matched to the
+glass over the declared `backdrop`.
+
+```dart
+MaterialApp(
+  builder: (BuildContext context, Widget? navigator) => GlassHost(
+    backdrop: Colors.white, // what the opaque rung fills to match
+    tier: GlassTierPolicy(
+      reduceTransparency: reduceTransparency, // read natively by the app
+      ceiling: lowEndDevice ? GlassTier.cheap : null, // the app's own benchmark or device table
+    ).choose(),
+    child: navigator!,
+  ),
+  home: const Scaffold(body: Feed()),
+)
+```
+
+To put one part of a screen on another rung, wrap it in a `GlassTheme` with a
+`tier` of its own.
+
+## What is not here, and why
+
+- **Dispersion, or chromatic aberration.** Apple's material sends the red,
+  green and blue channels to the same place, to within 0.155 logical px
+  against a measurement floor of 0.457. One sample per pixel is what the
+  reference does, not a shortcut, and a dispersion effect would be a departure
+  from it.
+- **Shapes other than `RSuperellipse`.** Every surface is a `BorderRadius`
+  drawn as the engine's round superellipse, the shape a
+  `RoundedRectangleBorder` already lowers to and the continuous corner Apple's
+  material has. A plain rounded rectangle is not a substitute: the curvature
+  jumps where its straight side meets the arc, and the rim's shading would show
+  the jump. The refraction is an analytic distance to that one shape, with one
+  corner radius per surface, so four different corners, a star or an arbitrary
+  path are not drawn. A capsule is a radius larger than the box,
+  [`kGlassCapsule`](https://pub.dev/documentation/g1455/latest/g1455/kGlassCapsule-constant.html).
 
 ## Things the application has to declare
 

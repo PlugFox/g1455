@@ -1,18 +1,22 @@
 name: g1455
 description: >-
-  Liquid Glass for Flutter: refraction, blur and rim over the live backdrop,
-  with the capture priced, held and shared rather than taken per surface.
+  Liquid Glass for Flutter: refraction, blur and finishes; bars, tabs,
+  switches, sliders, menus, sheets, dialogs and fusing groups, all sampling one
+  shared capture.
 version: 0.1.1
 homepage: https://github.com/PlugFox/g1455
 repository: https://github.com/PlugFox/g1455
 issue_tracker: https://github.com/PlugFox/g1455/issues
+documentation: https://g1455.plugfox.dev
 
+# Five at most. `shader` rather than `shaders`: on pub.dev the singular is the
+# topic with about twice the packages, and neither is an alias of the other.
 topics:
   - liquid-glass
+  - glass
   - glassmorphism
   - shader
   - ui
-  - widget
 
 # Half-size loops shot by `tool/showcase.sh` (SHOWCASE_DPR=1): pub ships every
 # file listed here, and the README's full-size ones stay in the repository.
