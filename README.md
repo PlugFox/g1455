@@ -1,5 +1,5 @@
 <p align="center">
-<a href="https://g1455.plugfox.dev"><img src="doc/readme/banner.svg" width="776" alt="g1455 — Liquid Glass for Flutter"></a>
+<a href="https://g1455.plugfox.dev"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/readme/banner.svg" width="776" alt="g1455 — Liquid Glass for Flutter"></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ The name is *glass*, spelled in digits.
 <!-- A whole screen first: glass in an app, not on a stage. 360 px wide, as a
      tile, so it shrinks to a phone's column the same way. -->
 <p align="center">
-<a href="https://g1455.plugfox.dev"><img src="doc/showcase/screen.webp" width="360" alt="An app screen in glass: a list scrolls under a glass bar, the bar's menu grows out of its button and closes, the tab bar's selection is dragged to another page and back"></a>
+<a href="https://g1455.plugfox.dev"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/screen.webp" width="360" alt="An app screen in glass: a list scrolls under a glass bar, the bar's menu grows out of its button and closes, the tab bar's selection is dragged to another page and back"></a>
 </p>
 
 <!-- Two tiles to a row: pub.dev draws a README 776 px wide, and two 360-px
@@ -46,16 +46,16 @@ The name is *glass*, spelled in digits.
      narrower screen `max-width: 100%` shrinks each tile to the column and they
      wrap one to a row. Each tile opens its page on the site. -->
 <p align="center">
-<a href="https://g1455.plugfox.dev/foundations/groups"><img src="doc/showcase/group.webp" width="360" alt="GlassGroup: three clear glass blobs orbit over the word GLASS and fuse into one silhouette where they meet"></a>
-<a href="https://g1455.plugfox.dev/foundations/finishes"><img src="doc/showcase/finishes.webp" width="360" alt="GlassFinish: regular, clear and frosted glass panels side by side over the same backdrop"></a>
-<a href="https://g1455.plugfox.dev/foundations/ripple"><img src="doc/showcase/ripple.webp" width="360" alt="GlassRipple: taps and a drag send viscous waves across a clear glass panel"></a>
-<a href="https://g1455.plugfox.dev/foundations/surface"><img src="doc/showcase/materialize.webp" width="360" alt="GlassSurface.materialize: a bar and two buttons arrive one after another, blur first and tint last, and leave"></a>
-<a href="https://g1455.plugfox.dev/components/switch"><img src="doc/showcase/switch.webp" width="360" alt="GlassSwitch: switches on a glass card, the knob turning into a clear drop while held"></a>
-<a href="https://g1455.plugfox.dev/components/slider"><img src="doc/showcase/slider.webp" width="360" alt="GlassSlider: two sliders dragged, the knob a clear drop while held"></a>
-<a href="https://g1455.plugfox.dev/components/tab-bar"><img src="doc/showcase/tab_bar.webp" width="360" alt="GlassTabBar: the selection lifts into a drop that magnifies the bar and is dragged between tabs"></a>
-<a href="https://g1455.plugfox.dev/components/segmented-control"><img src="doc/showcase/segmented.webp" width="360" alt="GlassSegmentedControl: the selected segment lifts into a drop and slides to another"></a>
-<a href="https://g1455.plugfox.dev/components/menu"><img src="doc/showcase/menu.webp" width="360" alt="GlassMenuAnchor and GlassButtonGroup: a Sort button grows into a glass menu, and toolbar cells are pressed"></a>
-<a href="https://g1455.plugfox.dev/components/alert"><img src="doc/showcase/alert.webp" width="360" alt="GlassAlert: an alert materializes over the screen, blur first and tint last, and is dismissed"></a>
+<a href="https://g1455.plugfox.dev/foundations/groups"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/group.webp" width="360" alt="GlassGroup: three clear glass blobs orbit over the word GLASS and fuse into one silhouette where they meet"></a>
+<a href="https://g1455.plugfox.dev/foundations/finishes"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/finishes.webp" width="360" alt="GlassFinish: regular, clear and frosted glass panels side by side over the same backdrop"></a>
+<a href="https://g1455.plugfox.dev/foundations/ripple"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/ripple.webp" width="360" alt="GlassRipple: taps and a drag send viscous waves across a clear glass panel"></a>
+<a href="https://g1455.plugfox.dev/foundations/surface"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/materialize.webp" width="360" alt="GlassSurface.materialize: a bar and two buttons arrive one after another, blur first and tint last, and leave"></a>
+<a href="https://g1455.plugfox.dev/components/switch"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/switch.webp" width="360" alt="GlassSwitch: switches on a glass card, the knob turning into a clear drop while held"></a>
+<a href="https://g1455.plugfox.dev/components/slider"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/slider.webp" width="360" alt="GlassSlider: two sliders dragged, the knob a clear drop while held"></a>
+<a href="https://g1455.plugfox.dev/components/tab-bar"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/tab_bar.webp" width="360" alt="GlassTabBar: the selection lifts into a drop that magnifies the bar and is dragged between tabs"></a>
+<a href="https://g1455.plugfox.dev/components/segmented-control"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/segmented.webp" width="360" alt="GlassSegmentedControl: the selected segment lifts into a drop and slides to another"></a>
+<a href="https://g1455.plugfox.dev/components/menu"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/menu.webp" width="360" alt="GlassMenuAnchor and GlassButtonGroup: a Sort button grows into a glass menu, and toolbar cells are pressed"></a>
+<a href="https://g1455.plugfox.dev/components/alert"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/showcase/alert.webp" width="360" alt="GlassAlert: an alert materializes over the screen, blur first and tint last, and is dismissed"></a>
 </p>
 
 <p align="center"><sub>
@@ -91,10 +91,10 @@ different route:
      on a phone, as the tiles above. Each is drawn by hand in doc/readme/ and
      opens its page on the site. The tables below carry the same facts as text. -->
 <p align="center">
-<a href="https://g1455.plugfox.dev/start/how-it-works"><img src="doc/readme/how-capture.svg" width="360" alt="One host, one capture: the bar, card and button on a screen are captured into one atlas, one slot each: one capture, three draws"></a>
-<a href="https://g1455.plugfox.dev/foundations/travel"><img src="doc/readme/how-reuse.svg" width="360" alt="A capture only on change: over twelve frames the host captures on the three where the content changed, and keeps its capture while the glass moves"></a>
-<a href="https://g1455.plugfox.dev/start/how-it-works"><img src="doc/readme/how-blur.svg" width="360" alt="The blur is a downscale: a capture at 1/N of the resolution, scaled back up, is a Gaussian blur of sigma about N/2"></a>
-<a href="https://g1455.plugfox.dev/foundations/performance"><img src="doc/readme/how-cost.svg" width="360" alt="What it costs on Adreno 830: g1455 at 0.99 to 1.08 times stock Material, BackdropFilter.grouped at 1.78 to 3.15 times"></a>
+<a href="https://g1455.plugfox.dev/start/how-it-works"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/readme/how-capture.svg" width="360" alt="One host, one capture: the bar, card and button on a screen are captured into one atlas, one slot each: one capture, three draws"></a>
+<a href="https://g1455.plugfox.dev/foundations/travel"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/readme/how-reuse.svg" width="360" alt="A capture only on change: over twelve frames the host captures on the three where the content changed, and keeps its capture while the glass moves"></a>
+<a href="https://g1455.plugfox.dev/start/how-it-works"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/readme/how-blur.svg" width="360" alt="The blur is a downscale: a capture at 1/N of the resolution, scaled back up, is a Gaussian blur of sigma about N/2"></a>
+<a href="https://g1455.plugfox.dev/foundations/performance"><img src="https://raw.githubusercontent.com/PlugFox/g1455/master/doc/readme/how-cost.svg" width="360" alt="What it costs on Adreno 830: g1455 at 0.99 to 1.08 times stock Material, BackdropFilter.grouped at 1.78 to 3.15 times"></a>
 </p>
 
 | | |
@@ -654,7 +654,7 @@ list order, two to a row, so a scene's position in the list is its place in the
 grid; keep the count even, and at most ten — as many screenshots as pub.dev
 shows.
 
-The banner at the top is [`doc/readme/banner.svg`](doc/readme/banner.svg),
+The banner at the top is [`doc/readme/banner.svg`](https://github.com/PlugFox/g1455/blob/master/doc/readme/banner.svg),
 drawn by hand over the same backdrop, and so are the four cards under
 [How it works](#how-it-works), `doc/readme/how-*.svg`. Their numbers are copied
 from the tables beside them; change both together.

@@ -1,3 +1,9 @@
+## 0.1.3
+
+- The README's images show on pub.dev again. 0.1.2 linked the banner, the
+  showcase loops and the How it works cards by relative path, and pub.dev
+  drops a relative image; they are linked from GitHub again, as in 0.1.1.
+
 ## 0.1.2
 
 Glass that reads its backdrop:

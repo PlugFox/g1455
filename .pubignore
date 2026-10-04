@@ -17,9 +17,10 @@ doc/api/
 .env.*
 local.properties
 
-# Repository-only. The README links its images relatively, and pub.dev resolves
-# them against `repository`, so the full-size loops are served from GitHub; the
-# half-size ones in doc/screenshots/ are what pub ships.
+# Repository-only. The README links its images by absolute URL to
+# raw.githubusercontent.com: pub.dev drops a relative image rather than resolve
+# it, so the full-size loops are served from GitHub; the half-size ones in
+# doc/screenshots/ are what pub ships.
 /doc/showcase/
 /tool/
 /.github/
