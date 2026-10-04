@@ -1,9 +1,15 @@
 // The README's animations: every scene in `scenes.dart` played headless under
-// flutter_tester and written out as frames, one directory per scene.
+// flutter_tester and written out as frames, one directory per scene — and the
+// whole screens of `screen.dart` after them.
 //
 //   SHOWCASE_OUT     where the frames go; unset, the loops still play and the
 //                    seam is still checked, and nothing is written
 //   SHOWCASE_SCENES  comma-separated names, to re-shoot a few
+//
+// A screen is shot only when it is named: with SHOWCASE_OUT set and no names,
+// the grid is re-shot and the screens are skipped, so the half-size run that
+// writes pub's screenshots writes the ten the pubspec lists and nothing more.
+// Unshot, a screen still plays, and its seam is still checked.
 //
 // `tool/showcase.sh` runs this and packs the frames into webp.
 
@@ -12,9 +18,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'backdrop.dart';
 import 'harness.dart';
 import 'scenes.dart';
+import 'screen.dart';
 
 // ignore_for_file: avoid_print
 
@@ -29,14 +35,17 @@ const int kSeamTolerance = 3;
 void main() {
   setUpAll(loadShowcaseFonts);
 
-  for (var i = 0; i < kShowcaseScenes.length; i++) {
-    final ShowcaseScene scene = kShowcaseScenes[i];
-    if (_only.isNotEmpty && !_only.split(',').contains(scene.name)) {
+  final List<String> names = _only.isEmpty ? const <String>[] : _only.split(',');
+  final scenes = <ShowcaseScene>[...kShowcaseScenes, ...kShowcaseScreens];
+  for (var i = 0; i < scenes.length; i++) {
+    final ShowcaseScene scene = scenes[i];
+    final bool named = names.contains(scene.name);
+    if (names.isNotEmpty && !named || !scene.onStage && _out.isNotEmpty && !named) {
       continue;
     }
     testWidgets(scene.name, (WidgetTester tester) async {
       tester.view
-        ..physicalSize = kTile * kDpr
+        ..physicalSize = scene.size * kDpr
         ..devicePixelRatio = kDpr;
       addTearDown(tester.view.reset);
       // Shadows are real here: the knob's is part of what a switch looks like.
