@@ -30,7 +30,17 @@
 // the drop changes what it shows while it lifts and settles, and those frames
 // are captures; while it slides, the labels under it do not change and it
 // moves inside its own `GlassTravel` behind its own boundary, so a slide is
-// drawn from the proxy already held.
+// drawn from the proxy already held. Its stretch and squash
+// ([GlassDropMotion]) stays inside that region too: down, the region is grown
+// by the most the motion reaches; across, where the region is fixed before the
+// width is known, the drop is pressed flat against the region's end rather
+// than let out of it — so no capture either way, and a relayout of the drop on
+// the frames it changes.
+//
+// A segment is any widget. The selected one is drawn over the white capsule,
+// so it is handed an ink that reads there through [IconTheme] and
+// [DefaultTextStyle] — which is what a custom glyph (an SVG, an image) reads
+// its colour from, as an [Icon] and a [Text] do.
 
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
@@ -41,6 +51,7 @@ import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
 import 'glass_controls.dart' show kGlassDropOptics;
+import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_surface.dart';
 import 'glass_travel.dart';
@@ -94,11 +105,20 @@ const Size _kMargin = Size(
   (_kHeight - 2 * _kInset + 2 * _kGrowY - _kHeight) / 2 + 2,
 );
 
+/// [_kMargin] and, down, the most [motion] can squash the held drop — whose
+/// height is the same at every width. Across it is not, so a stretch is kept
+/// inside the region by [_DropLayout] instead.
+Size _marginFor(GlassDropMotion motion) =>
+    _kMargin + Offset(0, motion.reach(const Size(0, _kHeight - 2 * _kInset + 2 * _kGrowY)).height);
+
 /// A row of mutually exclusive segments; the selected one lifts into a clear
 /// glass drop while a finger is on it. See the file comment for what it costs.
 ///
 /// The labels take the ambient [DefaultTextStyle] and [IconTheme]: the control
-/// sits in the content layer, and its track is not glass.
+/// sits in the content layer, and its track is not glass. The selected one is
+/// given an ink that reads on the capsule through the same two, so a segment
+/// that is not an [Icon] or a [Text] reads `IconTheme.of(context).color` to
+/// match.
 class GlassSegmentedControl extends StatefulWidget {
   const GlassSegmentedControl({
     required this.segments,
@@ -106,6 +126,7 @@ class GlassSegmentedControl extends StatefulWidget {
     required this.onSelected,
     this.trackColor = kGlassSegmentTrack,
     this.thumbColor = const Color(0xFFFFFFFF),
+    this.dropMotion,
     super.key,
   }) : assert(segments.length >= 2);
 
@@ -121,6 +142,11 @@ class GlassSegmentedControl extends StatefulWidget {
   /// The resting capsule under the selected segment.
   final Color thumbColor;
 
+  /// How the held drop deforms as it launches and brakes. Null takes
+  /// [GlassThemeData.dropMotion]; [GlassDropMotion.none] keeps its shape.
+  /// Off under reduced motion either way.
+  final GlassDropMotion? dropMotion;
+
   @override
   State<GlassSegmentedControl> createState() => _GlassSegmentedControlState();
 }
@@ -133,6 +159,11 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   );
 
   late final _WhileVisible _capsuleRepaint = _WhileVisible(_lift, _at);
+  late final GlassDropStretchDriver _stretch = GlassDropStretchDriver(
+    vsync: this,
+    position: () => _at.value * (_geometry?.pitch ?? 1),
+  );
+  GlassDropMotion _motion = GlassDropMotion.none;
   bool _down = false;
   bool _moved = false;
   double _downX = 0;
@@ -148,8 +179,23 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   bool get _enabled => widget.onSelected != null;
 
   @override
+  void initState() {
+    super.initState();
+    // Only while there is a drop to deform: the resting capsule keeps its
+    // shape and needs no ticker.
+    _at.addListener(() => _down || _lift.value > 0 ? _stretch.wake() : null);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
+  }
+
+  @override
   void didUpdateWidget(GlassSegmentedControl oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     if (!_enabled && _down) {
       _down = false;
       _liftTo(0);
@@ -161,6 +207,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
 
   @override
   void dispose() {
+    _stretch.dispose();
     _capsuleRepaint.dispose();
     _lift.dispose();
     _at.dispose();
@@ -287,11 +334,11 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
                 ),
                 Positioned.fill(child: RepaintBoundary(child: _labels())),
                 Positioned(
-                  left: -_kMargin.width,
-                  right: -_kMargin.width,
-                  top: -_kMargin.height,
-                  bottom: -_kMargin.height,
-                  child: _dropStage(),
+                  left: -_marginFor(_motion).width,
+                  right: -_marginFor(_motion).width,
+                  top: -_marginFor(_motion).height,
+                  bottom: -_marginFor(_motion).height,
+                  child: _dropStage(_marginFor(_motion)),
                 ),
               ],
             ),
@@ -342,17 +389,24 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     );
   }
 
-  /// The drop's region — the control plus [_kMargin] — and the boundary it
+  /// The drop's region — the control plus [margin] — and the boundary it
   /// moves behind. Rebuilt on every tick, which is safe here and only here:
   /// no `LayoutBuilder` above it in this control, and the stage is a relayout
   /// boundary (tight constraints), so a tick relays out the drop and nothing
   /// else.
-  Widget _dropStage() => GlassTravel(
+  Widget _dropStage(Size margin) => GlassTravel(
     child: RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge(<Listenable>[_lift, _at]),
+        animation: Listenable.merge(<Listenable>[_lift, _at, _stretch]),
         builder: (BuildContext context, Widget? _) => CustomSingleChildLayout(
-          delegate: _DropLayout(lift: _lift.value, at: _at.value, count: widget.segments.length),
+          delegate: _DropLayout(
+            lift: _lift.value,
+            at: _at.value,
+            count: widget.segments.length,
+            margin: margin,
+            // Deformed only as far as it has lifted: the drop arriving is round.
+            stretch: _stretch.value * _lift.value.clamp(0.0, 1.0),
+          ),
           child: GlassSurface(
             borderRadius: kGlassCapsule,
             finish: GlassFinish.clear.copyWith(
@@ -369,39 +423,64 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
 }
 
 /// Places the drop in the stage: the stage is the control grown by
-/// [_kMargin], so the control's own geometry is read off the stage's size.
+/// [margin], so the control's own geometry is read off the stage's size.
 class _DropLayout extends SingleChildLayoutDelegate {
-  _DropLayout({required this.lift, required this.at, required this.count});
+  _DropLayout({
+    required this.lift,
+    required this.at,
+    required this.count,
+    required this.margin,
+    required this.stretch,
+  });
 
   final double lift;
   final double at;
   final int count;
+  final Size margin;
 
-  _SegmentGeometry _geometry(Size stage) => _SegmentGeometry(stage.width - 2 * _kMargin.width, count);
+  /// See [GlassDropStretch.apply].
+  final double stretch;
 
-  Size _size(Size stage) {
+  _SegmentGeometry _geometry(Size stage) => _SegmentGeometry(stage.width - 2 * margin.width, count);
+
+  /// The drop's box in the stage, and never past it: a drop stretched out of
+  /// its travel region would be captured again on every frame it was out, so
+  /// at the ends it is pressed flat against the region instead.
+  Rect _rect(Size stage) {
     final _SegmentGeometry g = _geometry(stage);
-    return Size(
-      lerpDouble(g.capsule.width, g.drop.width, lift)!,
-      lerpDouble(g.capsule.height, g.drop.height, lift)!,
+    final Size size = GlassDropStretch.apply(
+      Size(
+        lerpDouble(g.capsule.width, g.drop.width, lift)!,
+        lerpDouble(g.capsule.height, g.drop.height, lift)!,
+      ),
+      stretch,
     );
+    final Rect drop = Rect.fromCenter(
+      center: Offset(margin.width + g.centre(at), margin.height + _kHeight / 2),
+      width: size.width,
+      height: size.height,
+    );
+    if (stretch == 0) {
+      return drop;
+    }
+    final Rect inside = drop.intersect(Offset.zero & stage);
+    return inside.isEmpty ? drop : inside;
   }
 
   @override
-  BoxConstraints getConstraintsForChild(BoxConstraints constraints) => BoxConstraints.tight(_size(constraints.biggest));
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      BoxConstraints.tight(_rect(constraints.biggest).size);
 
   @override
-  Offset getPositionForChild(Size size, Size childSize) {
-    final _SegmentGeometry g = _geometry(size);
-    return Offset(
-      _kMargin.width + g.centre(at) - childSize.width / 2,
-      _kMargin.height + (_kHeight - childSize.height) / 2,
-    );
-  }
+  Offset getPositionForChild(Size size, Size childSize) => _rect(size).topLeft;
 
   @override
   bool shouldRelayout(_DropLayout oldDelegate) =>
-      oldDelegate.lift != lift || oldDelegate.at != at || oldDelegate.count != count;
+      oldDelegate.lift != lift ||
+      oldDelegate.at != at ||
+      oldDelegate.count != count ||
+      oldDelegate.margin != margin ||
+      oldDelegate.stretch != stretch;
 }
 
 /// The resting capsule under the selected segment, fading as the drop lifts.

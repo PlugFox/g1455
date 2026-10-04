@@ -21,7 +21,10 @@
 //  - it grows and fades in through `presence`, which is a field offset and
 //    costs no capture;
 //  - it moves inside a [GlassTravel] region behind its own repaint boundary, so
-//    a drag is drawn from the proxy already held.
+//    a drag is drawn from the proxy already held;
+//  - it stretches as it launches and squashes as it brakes
+//    ([GlassDropMotion]) inside that same region, grown by the most the
+//    motion can reach — a repaint of the drop's own layer, and no capture.
 //
 // What is *not* free is content that changes under the drop. The switch's track
 // changes colour only when the value commits, so a drag costs one capture when
@@ -35,6 +38,7 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_surface.dart';
 import 'glass_travel.dart';
@@ -92,7 +96,7 @@ const double _kSliderTrack = 6;
 /// Laid out at its resting size and drawn past it, so what places it — a
 /// `Positioned`, an `Align` — places the knob's centre and not the drop's box.
 class _Drop extends StatelessWidget {
-  const _Drop({required this.rest, required this.lift, required this.scale, this.widen = 0});
+  const _Drop({required this.rest, required this.lift, required this.scale, this.widen = 0, this.stretch = 0});
 
   final Size rest;
 
@@ -105,17 +109,20 @@ class _Drop extends StatelessWidget {
   /// 0 at rest, 1 held.
   final double lift;
 
+  /// The deformation along x, already scaled by [lift]: see
+  /// [GlassDropStretch.apply].
+  final double stretch;
+
   @override
   Widget build(BuildContext context) {
     final double now = 1 + (scale - 1) * lift;
-    final Size held = rest * scale;
     return SizedBox.fromSize(
       size: rest,
       child: OverflowBox(
-        maxWidth: held.width,
-        maxHeight: held.height,
+        maxWidth: double.infinity,
+        maxHeight: double.infinity,
         child: SizedBox.fromSize(
-          size: rest * now,
+          size: GlassDropStretch.apply(rest * now, stretch),
           child: GlassSurface(
             borderRadius: kGlassCapsule,
             finish: GlassFinish.clear.copyWith(optics: kGlassDropOptics.copyWith(widen: widen)),
@@ -160,8 +167,9 @@ Widget _disabled(Widget child) => Opacity(opacity: kGlassDisabledOpacity, child:
 /// The region a drop may move and grow in, and the boundary it moves behind.
 ///
 /// [margin] past the control's own box on every side, because a held drop is
-/// larger than the track it sits on and a drop that grew out of its region
-/// would be retaken on every frame of the growth.
+/// larger than the track it sits on — and larger again stretched or squashed —
+/// and a drop that grew out of its region would be retaken on every frame of
+/// the growth.
 class _DropStage extends StatelessWidget {
   const _DropStage({required this.margin, required this.child});
 
@@ -185,6 +193,30 @@ class _DropStage extends StatelessWidget {
   );
 }
 
+/// How far past its box a control's drop region reaches, per side: the held
+/// drop's growth over the resting knob, and the most [motion] can stretch or
+/// squash the held drop, plus 4 for the rounding.
+double _margin(Size knob, double scale, GlassDropMotion motion) {
+  final Size reach = motion.reach(knob * scale);
+  return (scale - 1) * knob.width / 2 + math.max(reach.width, reach.height) + 4;
+}
+
+/// The drop at [lift] (0 at rest, 1 held) and its [stretch]: eased in, and
+/// deformed only as far as it is lifted, so the resting knob keeps its shape.
+_Drop _drop({
+  required Size rest,
+  required double scale,
+  required double widen,
+  required double lift,
+  required double stretch,
+}) => _Drop(
+  rest: rest,
+  scale: scale,
+  widen: widen,
+  lift: Curves.easeOut.transform(lift),
+  stretch: stretch * lift.clamp(0.0, 1.0),
+);
+
 /// A switch whose knob becomes a clear glass drop while it is held.
 class GlassSwitch extends StatefulWidget {
   const GlassSwitch({
@@ -194,6 +226,7 @@ class GlassSwitch extends StatefulWidget {
     this.trackColor = const Color(0x29787880),
     this.dropScale = kGlassDropScale,
     this.dropWiden = kGlassSwitchDropWiden,
+    this.dropMotion,
     this.semanticLabel,
     super.key,
   }) : assert(dropScale >= 1);
@@ -205,6 +238,11 @@ class GlassSwitch extends StatefulWidget {
   /// How much of the backdrop past its box the held drop shows, which
   /// minifies it. See [kGlassSwitchDropWiden]; 0 is a drop that does not.
   final double dropWiden;
+
+  /// How the held drop deforms as it launches and brakes. Null takes
+  /// [GlassThemeData.dropMotion]; [GlassDropMotion.none] keeps its shape.
+  /// Off under reduced motion either way.
+  final GlassDropMotion? dropMotion;
 
   final bool value;
 
@@ -243,13 +281,34 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
   );
   bool _dragging = false;
 
+  late final GlassDropStretchDriver _stretch = GlassDropStretchDriver(
+    vsync: this,
+    position: () => lerpDouble(_from, _to, _position.value)!,
+  );
+  GlassDropMotion _motion = GlassDropMotion.none;
+
   static const double _inset = (28 - 24) / 2;
   static double get _from => _inset + _kSwitchKnob.width / 2;
   static double get _to => kGlassSwitchSize.width - _inset - _kSwitchKnob.width / 2;
 
   @override
+  void initState() {
+    super.initState();
+    // Only while there is a drop to deform: a value set from outside moves
+    // the resting knob, which keeps its shape and needs no ticker.
+    _position.addListener(() => _lift.value > 0 ? _stretch.wake() : null);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
+  }
+
+  @override
   void didUpdateWidget(GlassSwitch oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     if (!_enabled && _lift.value > 0) {
       // Disabled mid-drag: the drag's end will never arrive. A finger held
       // still needs none of this — the disposed tap recognizer calls the
@@ -269,6 +328,7 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    _stretch.dispose();
     _lift.dispose();
     _position.dispose();
     _colour.dispose();
@@ -287,7 +347,7 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    final double margin = (widget.dropScale - 1) * _kSwitchKnob.width / 2 + _inset + 4;
+    final double margin = _margin(_kSwitchKnob, widget.dropScale, _motion) + _inset;
     return Semantics(
       label: widget.semanticLabel,
       toggled: widget.value,
@@ -368,7 +428,7 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
           _DropStage(
             margin: margin,
             child: AnimatedBuilder(
-              animation: Listenable.merge(<Listenable>[_lift, _position]),
+              animation: Listenable.merge(<Listenable>[_lift, _position, _stretch]),
               builder: (BuildContext context, Widget? _) => Positioned.fromRect(
                 rect: Rect.fromCenter(
                   center: Offset(
@@ -378,11 +438,12 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
                   width: _kSwitchKnob.width,
                   height: _kSwitchKnob.height,
                 ),
-                child: _Drop(
+                child: _drop(
                   rest: _kSwitchKnob,
                   scale: widget.dropScale,
                   widen: widget.dropWiden,
-                  lift: Curves.easeOut.transform(_lift.value),
+                  lift: _lift.value,
+                  stretch: _stretch.value,
                 ),
               ),
             ),
@@ -407,6 +468,7 @@ class GlassSlider extends StatefulWidget {
     this.trackColor = const Color(0x29787880),
     this.dropScale = kGlassDropScale,
     this.dropWiden = 0,
+    this.dropMotion,
     this.semanticLabel,
     this.semanticStep = 0.1,
     super.key,
@@ -420,6 +482,9 @@ class GlassSlider extends StatefulWidget {
   /// See [GlassSwitch.dropWiden]. 0, because iOS's slider drop does not
   /// minify (D218).
   final double dropWiden;
+
+  /// See [GlassSwitch.dropMotion].
+  final GlassDropMotion? dropMotion;
 
   /// Between 0 and 1.
   final double value;
@@ -443,23 +508,55 @@ class GlassSlider extends StatefulWidget {
   State<GlassSlider> createState() => _GlassSliderState();
 }
 
-class _GlassSliderState extends State<GlassSlider> with SingleTickerProviderStateMixin {
+class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin {
   late final AnimationController _lift = AnimationController(
     vsync: this,
     duration: kGlassDropDuration,
   );
 
+  late final GlassDropStretchDriver _stretch = GlassDropStretchDriver(
+    vsync: this,
+    position: () => widget.value.clamp(0.0, 1.0) * _span,
+  );
+  GlassDropMotion _motion = GlassDropMotion.none;
+
+  /// The next change of value is a tap placing the knob, not a drag moving
+  /// it: the drop is there without having travelled.
+  bool _placing = false;
+
+  double get _span {
+    final RenderObject? box = context.findRenderObject();
+    return box is RenderBox && box.hasSize ? math.max(0, box.size.width - _kSliderKnob.width) : 0;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
+  }
+
   @override
   void didUpdateWidget(GlassSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     if (!_enabled) {
       // Disabled mid-drag: see the switch's.
       _lift.value = 0;
+      _placing = false;
+    }
+    if (widget.value != oldWidget.value) {
+      if (_placing) {
+        _placing = false;
+        _stretch.jump();
+      } else if (_lift.value > 0) {
+        _stretch.wake();
+      }
     }
   }
 
   @override
   void dispose() {
+    _stretch.dispose();
     _lift.dispose();
     super.dispose();
   }
@@ -478,11 +575,13 @@ class _GlassSliderState extends State<GlassSlider> with SingleTickerProviderStat
   void _start(Offset local) {
     _lift.forward();
     final double v = _valueAt(local);
+    _placing = v != widget.value;
     widget.onChangeStart?.call(widget.value);
     widget.onChanged?.call(v);
   }
 
   void _end() {
+    _placing = false;
     _lift.reverse();
     widget.onChangeEnd?.call(widget.value);
   }
@@ -499,7 +598,7 @@ class _GlassSliderState extends State<GlassSlider> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final double margin = (widget.dropScale - 1) * _kSliderKnob.width / 2 + 4;
+    final double margin = _margin(_kSliderKnob, widget.dropScale, _motion);
     final double value = widget.value.clamp(0.0, 1.0);
     final double up = (value + widget.semanticStep).clamp(0.0, 1.0);
     final double down = (value - widget.semanticStep).clamp(0.0, 1.0);
@@ -552,17 +651,18 @@ class _GlassSliderState extends State<GlassSlider> with SingleTickerProviderStat
               child: Padding(
                 padding: EdgeInsets.all(margin),
                 child: AnimatedBuilder(
-                  animation: _lift,
+                  animation: Listenable.merge(<Listenable>[_lift, _stretch]),
                   // `Align` puts the resting knob's centre at
                   // `rest / 2 + value * (width - rest)`, which is where
                   // [SliderGeometry.fillEnd] ends the fill.
                   builder: (BuildContext context, Widget? _) => Align(
                     alignment: Alignment(value * 2 - 1, 0),
-                    child: _Drop(
+                    child: _drop(
                       rest: _kSliderKnob,
                       scale: widget.dropScale,
                       widen: widget.dropWiden,
-                      lift: Curves.easeOut.transform(_lift.value),
+                      lift: _lift.value,
+                      stretch: _stretch.value,
                     ),
                   ),
                 ),
