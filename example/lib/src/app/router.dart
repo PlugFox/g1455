@@ -13,11 +13,15 @@ import 'routes.dart';
 /// reported back as the top route's [AppRoute.uri] and becomes a history
 /// entry, and the browser's back and forward come in as addresses again.
 class AppRouterDelegate extends RouterDelegate<Uri> with ChangeNotifier {
-  AppRouterDelegate(this.controller) {
+  AppRouterDelegate(this.controller, {this.observers = const <NavigatorObserver>[]}) {
     controller.addListener(notifyListeners);
   }
 
   final NavigationController controller;
+
+  /// Handed to the navigator: the app reaches it through one, to show a
+  /// sheet over whatever page is open.
+  final List<NavigatorObserver> observers;
 
   @override
   Uri get currentConfiguration => switch (controller.top) {
@@ -37,7 +41,7 @@ class AppRouterDelegate extends RouterDelegate<Uri> with ChangeNotifier {
   // Not reported by the view: it would report a route's name, not its path,
   // and in a single-entry history. The router reports the address instead.
   @override
-  Widget build(BuildContext context) => NavigationView(controller: controller);
+  Widget build(BuildContext context) => NavigationView(controller: controller, observers: observers);
 
   @override
   void dispose() {

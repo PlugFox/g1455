@@ -6,6 +6,7 @@ import 'package:flutter_md/highlight/dart.dart';
 import 'package:flutter_md/highlight/yaml.dart';
 
 import '../app/theme.dart';
+import 'selection.dart';
 import 'toast.dart';
 
 /// The site's code colours: a dark editor theme whose background lets the
@@ -89,7 +90,10 @@ class CodeView extends StatelessWidget {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(16, 2, 16, 16),
-            child: Text.rich(TextSpan(style: base, children: spans)),
+            // The code selects, the caption and the button over it do not.
+            child: SiteSelectionArea(
+              child: Text.rich(TextSpan(style: base, children: spans)),
+            ),
           ),
         ],
       ),
