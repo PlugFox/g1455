@@ -362,11 +362,12 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
   /// The move between two verdicts, made the first time there is one to make.
   AnimationController? _move;
 
-  /// What was drawn when the verdict last moved — where the move starts.
-  GlassLegibility? _from;
+  /// The finish, before any dim, that was drawn when the verdict last moved —
+  /// where the move starts.
+  GlassFinish? _from;
 
-  /// What the last build drew, mid-move included.
-  GlassLegibility? _shown;
+  /// The finish, before any dim, that the last build drew, mid-move included.
+  GlassFinish? _shown;
 
   /// What the last build read of the motion it may make: the reading's
   /// [GlassAdaptive.duration], and whether the platform asks for none.
@@ -417,7 +418,7 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
     }
     setState(() {
       _reading = reading;
-      final GlassLegibility? shown = _shown;
+      final GlassFinish? shown = _shown;
       final Duration duration = _duration;
       if (shown == null || _reduceMotion || duration == Duration.zero) {
         _from = null;
@@ -442,23 +443,21 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
     }
     final GlassBackdropReading? reading = adaptive == null ? null : _reading;
     final GlassThemeData theme = reading == null ? outer : outer.adaptedTo(reading);
-    final GlassLegibility target = theme.legibility(widget.finish);
+    final GlassFinish target = widget.finish ?? theme.finish;
     // Mid-move, the glass draws the finish between where it was and where it
-    // is going, already dimmed at both ends — so it is handed to the surface
-    // as its own and kept from the floor's second dim — and the label moves
-    // with it.
-    final GlassLegibility? from = _from;
+    // is going, and the floor is met by that finish, not by either end: two
+    // ends that each reach it can pass through a level that no lerped label
+    // reads on (a grey label on grey glass, halfway from dark to light). So
+    // the in-between finish is resolved like any other — dimmed as far as it
+    // needs, with the label that reads on it — and handed to the surface as
+    // its own, kept from the floor's second dim.
+    final GlassFinish? from = _from;
     final AnimationController? move = _move;
     final double t = from == null || move == null || !move.isAnimating ? 1 : Curves.easeInOut.transform(move.value);
     final bool moving = from != null && t < 1;
-    final GlassLegibility shown = moving
-        ? GlassLegibility(
-            finish: GlassFinish.lerp(from.finish, target.finish, t),
-            label: Color.lerp(from.label, target.label, t)!,
-            rim: target.rim,
-          )
-        : target;
-    _shown = shown;
+    final GlassFinish drawn = moving ? GlassFinish.lerp(from, target, t) : target;
+    final GlassLegibility shown = theme.legibility(drawn);
+    _shown = drawn;
     return GlassTheme(
       data: theme,
       child: GlassSurface(

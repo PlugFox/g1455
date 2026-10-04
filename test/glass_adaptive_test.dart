@@ -369,7 +369,7 @@ void main() {
   // 5. How it moves.
   // -------------------------------------------------------------------------
 
-  testWidgets('a move tweens the glass and the label', (WidgetTester tester) async {
+  testWidgets('a move tweens the glass, and the label is the one that reads on it', (WidgetTester tester) async {
     final _Scene scene = await _mount(tester, adaptive: const GlassAdaptive());
     await _land(tester, settle: false);
     // The verdict landed: the theme is the new branch, and the glass is on its
@@ -378,8 +378,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     final Color tint = _surface(tester, 'dark').effectiveFinish.tint;
     expect(tint.r, inExclusiveRange(GlassFinish.regularDark.tint.r, GlassFinish.regularLight.tint.r));
+    // Not a lerp of the two ends' labels, which halfway is grey on grey: the
+    // label the in-between glass reads with, over what is under it.
     final Color label = scene.label['dark']!;
-    expect(label.r, inExclusiveRange(0, 1));
+    final GlassFinish between = _surface(tester, 'dark').effectiveFinish;
+    expect(label, between.foregroundOver(scene.seen['dark']!.backdrop!));
+    expect(
+      GlassFinish.contrastRatio(between.opaqueFillOver(kBlack), label),
+      greaterThanOrEqualTo(kTextContrastAA),
+      reason: 'the label mid-move does not read on the glass it is on',
+    );
     await tester.pump(const Duration(milliseconds: 400));
     expect(_surface(tester, 'dark').effectiveFinish, GlassFinish.regularDark);
     expect(scene.label['dark'], kWhite);

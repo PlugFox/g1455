@@ -716,8 +716,9 @@ it wears what the declarations give, exactly as with adaptive off.
 - **No flicker.** A reading moves a glass only when it is more than `band` (12) code values from the one it last
   moved on, and not within `hold` (600 ms) of its last move. A list of light and dark rows scrolling under a bar keeps
   the bar on the branch it has.
-- **Moves animate.** A glass crossing between branches tweens its tint and its label over `duration` (300 ms). Under
-  reduced motion it is a cut.
+- **Moves animate.** A glass crossing between branches tweens its tint over `duration` (300 ms), and on every frame
+  of it the label is the one that reads on the glass as drawn, so the floor holds halfway too. Under reduced motion it
+  is a cut.
 - **What adapts.** `GlassBar`, `GlassCard` and `GlassButton`. A raw `GlassSurface`, the
   [scroll edge](/foundations/scroll-edge), the [tab bar](/components/tab-bar) and the
   [segmented control](/components/segmented-control) do not adapt yet.

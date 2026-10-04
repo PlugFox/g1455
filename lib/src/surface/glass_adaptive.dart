@@ -29,8 +29,10 @@
 //    scrolling under a bar — keeps the branch it has, and a real change of
 //    backdrop moves it at most once per hold.
 //  - **Moves animate.** A component crossing between branches tweens its
-//    finish and its label over [GlassAdaptive.duration], and snaps under
-//    `MediaQuery.disableAnimations`.
+//    finish over [GlassAdaptive.duration], and snaps under
+//    `MediaQuery.disableAnimations`. The label is not tweened: on each frame
+//    it is the one that reads on the glass as drawn, which keeps the floor
+//    where a lerped label would pass through grey on grey.
 //
 // **What a reading replaces, and what it does not** — the precedence, from the
 // strongest:
