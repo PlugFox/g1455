@@ -447,6 +447,17 @@ void main() {
     expect(scene.seen['dark']!.adaptive, const GlassAdaptive(band: 4));
   });
 
+  testWidgets('the last bars that go with a read in flight take their verdicts', (WidgetTester tester) async {
+    final _Scene scene = await _mount(tester, adaptive: const GlassAdaptive());
+    await tester.pump();
+    expect(scene.handle.readBacks, 1, reason: 'no read was in flight when the bars went');
+    // Same host, no glass at all: the capture publishes nothing, and the read
+    // lands after the bars have left.
+    await _mount(tester, adaptive: const GlassAdaptive(), bars: false);
+    await _land(tester);
+    expect(scene.handle.readings!.length, 0, reason: 'a read that landed late gave a gone bar a verdict');
+  });
+
   testWidgets('a host that goes with a read in flight leaves nothing behind', (WidgetTester tester) async {
     await _mount(tester, adaptive: const GlassAdaptive());
     await tester.pump();
@@ -481,6 +492,7 @@ Future<_Scene> _mount(
   GlassContentDeclaration content = GlassContentDeclaration.byDefault,
   ValueListenable<Color>? left,
   bool onlyDark = false,
+  bool bars = true,
 }) async {
   tester.view
     ..physicalSize = kScreen
@@ -530,8 +542,8 @@ Future<_Scene> _mount(
                   ],
                 ),
               ),
-              Positioned(left: 20, top: 70, width: 160, height: 60, child: bar('dark')),
-              if (!onlyDark) Positioned(left: 220, top: 70, width: 160, height: 60, child: bar('light')),
+              if (bars) Positioned(left: 20, top: 70, width: 160, height: 60, child: bar('dark')),
+              if (bars && !onlyDark) Positioned(left: 220, top: 70, width: 160, height: 60, child: bar('light')),
               // Moves on every frame under the undeclared content, so the
               // host captures every frame.
               if (content == GlassContentDeclaration.undeclared) const _Ticking(),
@@ -541,7 +553,7 @@ Future<_Scene> _mount(
       ),
     ),
   );
-  return _Scene(GlassProxyScope.maybeOf(tester.element(find.text('dark')))!, _seen, _label);
+  return _Scene(tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle, _seen, _label);
 }
 
 /// Lets the engine finish a read-back, and the frames after it apply it.

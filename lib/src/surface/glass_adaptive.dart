@@ -353,7 +353,11 @@ class GlassBackdropReader {
   }
 
   /// Drops the verdicts of surfaces that have left the register.
+  ///
+  /// Kept as well: a read in flight lands after this, and what it read for a
+  /// surface that has left since is dropped rather than given a verdict again.
   void prune(Set<GlassSurfaceGeometry> registered) {
+    _registered = registered;
     final gone = <Object>[
       for (final Object key in _verdicts.keys)
         if (!registered.contains(key)) key,
@@ -366,6 +370,9 @@ class GlassBackdropReader {
     }
     readings._set(const <Object, GlassBackdropReading>{}, gone);
   }
+
+  /// The register as of the last [prune].
+  Set<GlassSurfaceGeometry> _registered = const <GlassSurfaceGeometry>{};
 
   void _pump(Duration now) {
     if (_due == null || _inFlight) {
@@ -420,7 +427,7 @@ class GlassBackdropReader {
       final moved = <Object, GlassBackdropReading>{};
       for (var i = 0; i < keys.length && i < means.length; i++) {
         final Color? mean = means[i];
-        if (mean == null) {
+        if (mean == null || !_registered.contains(keys[i])) {
           continue;
         }
         final GlassBackdropVerdict verdict = _verdicts.putIfAbsent(keys[i], () => GlassBackdropVerdict(_adaptive));

@@ -1036,6 +1036,10 @@ class _GlassHostState extends State<GlassHost> {
       // promised: there is no image for a surface to sample even by mistake.
       _handle.publish(null);
       _publishUpper(const <GlassProxyFrame?>[]);
+      // Nothing to read, but the surfaces that left still leave: a screen
+      // whose last glass went would otherwise keep its verdict, and the
+      // render object it is keyed by, for the host's lifetime.
+      reader?.prune(keys.toSet());
       return;
     }
     // What each slot is blurred by is an input to the capture the oracle
