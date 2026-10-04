@@ -142,6 +142,30 @@ void main() {
     expect(const GlassThemeData().copyWith(dropMotion: own).dropMotion, own);
     expect(const GlassThemeData(dropMotion: own), isNot(const GlassThemeData()));
   });
+
+  testWidgets('a host declares it for every drop below', (WidgetTester tester) async {
+    const own = GlassDropMotion(maxStretch: 0.2);
+    GlassDropMotion? seen;
+    Future<void> pump(GlassHost Function(Widget child) host) => tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: host(
+          Builder(
+            builder: (BuildContext context) {
+              seen = GlassDropMotion.resolve(context, null);
+              return const SizedBox();
+            },
+          ),
+        ),
+      ),
+    );
+    await pump((Widget child) => GlassHost(child: child));
+    expect(seen, const GlassDropMotion());
+    await pump((Widget child) => GlassHost(dropMotion: own, child: child));
+    expect(seen, own);
+    await pump((Widget child) => GlassHost(dropMotion: GlassDropMotion.none, child: child));
+    expect(seen, GlassDropMotion.none);
+  });
 }
 
 /// The tab bar's slide spring (stiffness 380, damping 36, unit mass) from rest

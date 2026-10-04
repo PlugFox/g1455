@@ -37,6 +37,10 @@ export 'src/proxy/proxy_role.dart'
 // target. What a component adds is the label's colour, which is D178's law spent
 // rather than restated.
 export 'src/surface/glass_above.dart' show GlassAbove, RenderGlassAbove, kGlassModalLift;
+// Glass that reads its own backdrop: opt-in on the host, and what a reading is
+// — the one input to the label and the branch that is measured on the device
+// rather than declared.
+export 'src/surface/glass_adaptive.dart' show GlassAdaptive, GlassBackdropReading;
 export 'src/surface/glass_components.dart'
     show GlassBar, GlassButton, GlassCard, kGlassDisabledDarkLabel, kGlassDisabledLightLabel, kGlassMinTapTarget;
 // Controls whose knob becomes a clear drop while held (spike 27): the drop

@@ -18,8 +18,12 @@ export 'src/surface/glass_group.dart'
         fusedDrawTiles,
         kGlassGroupShaderAsset,
         kMaxFusedTiles;
-// The host's published proxy and its counters — `recorded`, `held` — which is
-// what a report reads to say whether a frame captured.
+// The verdicts a host that reads its backdrop publishes, and the band-and-hold
+// rule each one is kept by — which a test drives without a frame. The count of
+// read-backs is `GlassProxyHandle.readBacks`.
+export 'src/surface/glass_adaptive.dart' show GlassBackdropReadings, GlassBackdropVerdict;
+// The host's published proxy and its counters — `recorded`, `held`,
+// `readBacks` — which is what a report reads to say whether a frame captured.
 export 'src/surface/glass_host.dart' show GlassProxyHandle, GlassProxyScope, kGlassRippleShaderAsset, kGlassShaderAsset;
 // The ripple's model, which a test drives without a frame.
 export 'src/surface/glass_ripple.dart' show GlassRippleField, GlassRippleWave;

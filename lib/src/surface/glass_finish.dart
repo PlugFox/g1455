@@ -181,6 +181,22 @@ class GlassOptics {
     zoom: zoom ?? this.zoom,
   );
 
+  /// The optics part of the way from [a] to [b], every field linearly.
+  static GlassOptics lerp(GlassOptics a, GlassOptics b, double t) {
+    if (a == b) {
+      return a;
+    }
+    double mix(double x, double y) => x + (y - x) * t;
+    return GlassOptics(
+      thickness: mix(a.thickness, b.thickness),
+      strength: mix(a.strength, b.strength),
+      edgePower: mix(a.edgePower, b.edgePower),
+      shoulder: mix(a.shoulder, b.shoulder),
+      widen: mix(a.widen, b.widen),
+      zoom: mix(a.zoom, b.zoom),
+    );
+  }
+
   /// The optics with the refraction switched off, for the control that says the
   /// whole route is transparent when the optics are.
   ///
@@ -314,9 +330,44 @@ class GlassFinish {
     if (backdrop == null) {
       return appearance == Brightness.dark ? regularDark : regularLight;
     }
-    final double level = 255 * (0.2126 * backdrop.r + 0.7152 * backdrop.g + 0.0722 * backdrop.b);
+    final double level = levelOf(backdrop);
     final double threshold = appearance == Brightness.dark ? kRegularSwitchDark : kRegularSwitchLight;
     return level < threshold ? regularDark : regularLight;
+  }
+
+  /// The level [regular] switches on: [colour]'s Rec.709 luma over its encoded
+  /// channels, in code values of 255 — the scale [kRegularSwitchLight] and
+  /// [kRegularSwitchDark] were read in.
+  ///
+  /// Luma rather than relative luminance because the thresholds were read on
+  /// greys, as code values, and a grey's luma *is* its code value; what a
+  /// colour of the same luma does is the assumption [regular] already names.
+  static double levelOf(Color colour) => 255 * (0.2126 * colour.r + 0.7152 * colour.g + 0.0722 * colour.b);
+
+  /// The finish part of the way from [a] to [b], [t] from 0 to 1 — what a
+  /// glass that reads its backdrop draws while it moves between the branches
+  /// of `.regular` (`GlassHost.adaptive`).
+  ///
+  /// Every quantity is interpolated except the name, which is a key into the
+  /// damage tables and has no midpoint: it is [a]'s for the first half and
+  /// [b]'s for the second. Between the two branches of `.regular` that changes
+  /// nothing the pipeline does — the blur is 2.6 on both, so no slot is
+  /// re-blurred and nothing is retaken on account of the move — and the tint
+  /// passes through levels between the two, which is the whole of the motion.
+  static GlassFinish lerp(GlassFinish a, GlassFinish b, double t) {
+    if (t <= 0 || a == b) {
+      return a;
+    }
+    if (t >= 1) {
+      return b;
+    }
+    return GlassFinish(
+      name: t < 0.5 ? a.name : b.name,
+      blurSigmaLogical: a.blurSigmaLogical + (b.blurSigmaLogical - a.blurSigmaLogical) * t,
+      tint: Color.lerp(a.tint, b.tint, t)!,
+      rim: Color.lerp(a.rim, b.rim, t)!,
+      optics: GlassOptics.lerp(a.optics, b.optics, t),
+    );
   }
 
   /// A heavy blur with a light, thin tint. **Not the working point** since
