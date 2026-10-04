@@ -46,6 +46,14 @@
 //    it dims under the glass, which is Apple's answer and in this machine a
 //    change of tint, not a new layer.
 //
+// And one for motion:
+//
+//  - [GlassThemeData.dropMotion] is how the held drop of the switch, the
+//    slider, the segmented control and the tab bar deforms as it speeds up and
+//    slows down. On by default and subtle, because it costs no capture (see
+//    `glass_drop_motion.dart`); [GlassDropMotion.none] turns it off app-wide,
+//    and the platform's reduced-motion switch turns it off regardless.
+//
 // What is deliberately **not** here: a quality tier of its own. SS7.2 sketched
 // `GlassQuality` (minimal / standard / premium, benchmarked at start-up) beside
 // the ladder of SS7.4, as if they were two axes. They are one, and the sketch
@@ -57,6 +65,7 @@
 
 import 'package:flutter/widgets.dart';
 
+import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_ripple.dart';
 import 'glass_tier.dart';
@@ -72,6 +81,7 @@ class GlassThemeData {
     this.richBackdrop = false,
     this.minLabelContrast,
     this.ripple,
+    this.dropMotion = const GlassDropMotion(),
   });
 
   /// The material every surface wears unless it names its own.
@@ -166,6 +176,11 @@ class GlassThemeData {
   /// null for none, which is the platform's behaviour. See [GlassRipple].
   final GlassRipple? ripple;
 
+  /// How a held drop deforms as it launches and brakes, unless a control
+  /// declares its own; [GlassDropMotion.none] for a drop that keeps its shape.
+  /// Ignored under reduced motion. See [GlassDropMotion].
+  final GlassDropMotion dropMotion;
+
   /// The finish surfaces draw, and the label and outline colours they use —
   /// everything the three tokens above decide, in one place, so the surface,
   /// the group and the components cannot disagree.
@@ -239,6 +254,7 @@ class GlassThemeData {
     bool? richBackdrop,
     double? minLabelContrast,
     GlassRipple? ripple,
+    GlassDropMotion? dropMotion,
   }) => GlassThemeData(
     finish: finish ?? this.finish,
     tier: tier ?? this.tier,
@@ -247,6 +263,7 @@ class GlassThemeData {
     richBackdrop: richBackdrop ?? this.richBackdrop,
     minLabelContrast: minLabelContrast ?? this.minLabelContrast,
     ripple: ripple ?? this.ripple,
+    dropMotion: dropMotion ?? this.dropMotion,
   );
 
   @override
@@ -258,10 +275,12 @@ class GlassThemeData {
       other.highContrast == highContrast &&
       other.richBackdrop == richBackdrop &&
       other.minLabelContrast == minLabelContrast &&
-      other.ripple == ripple;
+      other.ripple == ripple &&
+      other.dropMotion == dropMotion;
 
   @override
-  int get hashCode => Object.hash(finish, tier, backdrop, highContrast, richBackdrop, minLabelContrast, ripple);
+  int get hashCode =>
+      Object.hash(finish, tier, backdrop, highContrast, richBackdrop, minLabelContrast, ripple, dropMotion);
 
   @override
   String toString() =>
@@ -269,7 +288,8 @@ class GlassThemeData {
       '${highContrast ? ', high contrast' : ''}'
       '${richBackdrop ? ', rich backdrop' : ''}'
       '${minLabelContrast == null ? '' : ', label >= $minLabelContrast'}'
-      '${ripple == null ? '' : ', $ripple'})';
+      '${ripple == null ? '' : ', $ripple'}'
+      '${dropMotion == const GlassDropMotion() ? '' : ', $dropMotion'})';
 }
 
 /// What a surface under a theme actually draws: the finish after any dim, the

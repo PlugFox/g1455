@@ -30,7 +30,16 @@
 //    highlight is an item, not a blend, and the drop moves inside its own
 //    `GlassTravel` behind its own boundary;
 //  - the bar's growth is inside a `GlassTravel` of the grown box, so the bar's
-//    own capture is not retaken for it.
+//    own capture is not retaken for it;
+//  - the drop's stretch and squash ([GlassDropMotion]) is a change of its size
+//    inside its own region, grown by the most the motion reaches: no capture
+//    of either level, and a repaint of the bar's draw while it changes.
+//
+// The items are drawn once, under the drop, and the drop shows them magnified:
+// there is no second copy of an item over the glass. A custom icon or label
+// ([GlassTabItem.iconBuilder], [GlassTabItem.labelBuilder]) is therefore built
+// once per item, and again only when the colour the bar gives it changes —
+// which is when the drop moves onto it or off it.
 
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
@@ -41,17 +50,100 @@ import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart';
 import 'glass_controls.dart' show kGlassDropOptics;
+import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_surface.dart';
 import 'glass_travel.dart';
 
+/// What a [GlassTabBar] resolved for one of its items, as it draws it.
+///
+/// Handed to [GlassTabItem.iconBuilder] and [GlassTabItem.labelBuilder], so a
+/// glyph the bar cannot colour itself — an SVG, an image, a badge — takes the
+/// colour its neighbours are drawn in.
+@immutable
+class GlassTabItemLook {
+  const GlassTabItemLook({
+    required this.index,
+    required this.color,
+    required this.iconSize,
+    required this.labelStyle,
+    required this.selected,
+    required this.highlighted,
+    required this.inline,
+  });
+
+  /// Which item.
+  final int index;
+
+  /// The colour this item is drawn in now: [GlassTabBar.activeColor] when
+  /// [highlighted], and otherwise the label colour the bar's glass chose
+  /// against what is behind it ([GlassThemeData.legibility]).
+  final Color color;
+
+  /// The size the bar draws its own icons at: 26 stacked, 20 side by side.
+  final double iconSize;
+
+  /// The label's style, [color] included.
+  final TextStyle labelStyle;
+
+  /// Whether this is [GlassTabBar.selectedIndex].
+  final bool selected;
+
+  /// Whether this item takes the accent: the selected one at rest, and the
+  /// one under the drop while it is held — which is when the two differ.
+  final bool highlighted;
+
+  /// Whether the bar lays its items out icon beside label (a wide bar, an
+  /// iPad's) rather than icon over label.
+  final bool inline;
+
+  @override
+  bool operator ==(Object other) =>
+      other is GlassTabItemLook &&
+      other.index == index &&
+      other.color == color &&
+      other.iconSize == iconSize &&
+      other.labelStyle == labelStyle &&
+      other.selected == selected &&
+      other.highlighted == highlighted &&
+      other.inline == inline;
+
+  @override
+  int get hashCode => Object.hash(index, color, iconSize, labelStyle, selected, highlighted, inline);
+
+  @override
+  String toString() =>
+      'GlassTabItemLook($index, $color${selected ? ', selected' : ''}'
+      '${highlighted ? ', highlighted' : ''}${inline ? ', inline' : ''})';
+}
+
+/// Builds an item's icon or label from what the bar resolved for it.
+typedef GlassTabItemBuilder = Widget Function(BuildContext context, GlassTabItemLook look);
+
 /// One item of a [GlassTabBar].
+///
+/// An [IconData] and a string, or anything at all through [iconBuilder] and
+/// [labelBuilder] — which are handed the colour the bar draws the item in.
+/// [label] is what a screen reader says either way.
 @immutable
 class GlassTabItem {
-  const GlassTabItem({required this.icon, required this.label});
+  const GlassTabItem({required this.label, this.icon, this.iconBuilder, this.labelBuilder})
+    : assert(icon != null || iconBuilder != null, 'A tab item needs an icon or an iconBuilder.');
 
-  final IconData icon;
+  /// Drawn by the bar in the colour it resolved. Ignored when [iconBuilder]
+  /// is given.
+  final IconData? icon;
+
+  /// The item's name: the text drawn unless [labelBuilder] is given, and what
+  /// a screen reader says always.
   final String label;
+
+  /// Builds the icon instead of [icon]. Sized by the caller; the bar's own
+  /// icons are [GlassTabItemLook.iconSize].
+  final GlassTabItemBuilder? iconBuilder;
+
+  /// Builds the label instead of the text of [label].
+  final GlassTabItemBuilder? labelBuilder;
 }
 
 /// How much the held drop magnifies the bar under it (D218).
@@ -104,11 +196,15 @@ class _TabGeometry {
   /// The item index under [x], fractional, clamped to the items.
   double indexAt(double x, int count) => ((x - pad) / pitch - 0.5).clamp(0.0, count - 1.0);
 
-  /// How far the drop reaches past the bar's resting box, per side.
-  Size margin(int count) => Size(
-    math.max(drop.width / 2 - centre(0), _kBarGrow.width) + 2,
-    math.max((drop.height - height) / 2, _kBarGrow.height) + 2,
-  );
+  /// How far the drop reaches past the bar's resting box, per side — held,
+  /// and stretched or squashed as far as [motion] can.
+  Size margin(int count, GlassDropMotion motion) {
+    final Size reach = motion.reach(drop);
+    return Size(
+      math.max(drop.width / 2 + reach.width - centre(0), _kBarGrow.width) + 2,
+      math.max((drop.height - height) / 2 + reach.height, _kBarGrow.height) + 2,
+    );
+  }
 }
 
 /// A bottom bar of tabs whose selection becomes a glass drop under a finger.
@@ -123,6 +219,7 @@ class GlassTabBar extends StatefulWidget {
     required this.onSelected,
     this.activeColor = const Color(0xFF007AFF),
     this.dropZoom = kGlassTabDropZoom,
+    this.dropMotion,
     super.key,
   }) : assert(items.length >= 2),
        assert(dropZoom > 0);
@@ -138,6 +235,11 @@ class GlassTabBar extends StatefulWidget {
 
   /// See [kGlassTabDropZoom]; 1 is a drop that does not magnify.
   final double dropZoom;
+
+  /// How the held drop deforms as it launches and brakes. Null takes
+  /// [GlassThemeData.dropMotion]; [GlassDropMotion.none] keeps its shape.
+  /// Off under reduced motion either way.
+  final GlassDropMotion? dropMotion;
 
   @override
   State<GlassTabBar> createState() => _GlassTabBarState();
@@ -157,6 +259,12 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   /// binary so a drag repaints the items only when it crosses into another.
   final ValueNotifier<int> _over = ValueNotifier<int>(0);
 
+  late final GlassDropStretchDriver _stretch = GlassDropStretchDriver(
+    vsync: this,
+    position: () => _at.value * (_geometry?.pitch ?? 1),
+  );
+  GlassDropMotion _motion = GlassDropMotion.none;
+
   _TabGeometry? _geometry;
   bool _down = false;
   bool _moved = false;
@@ -173,12 +281,23 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   void initState() {
     super.initState();
     _over.value = widget.selectedIndex;
-    _at.addListener(_noteOver);
+    _at
+      ..addListener(_noteOver)
+      // Only while there is a drop to deform: the resting capsule keeps its
+      // shape and needs no ticker.
+      ..addListener(() => _down || _lift.value > 0 ? _stretch.wake() : null);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
   }
 
   @override
   void didUpdateWidget(GlassTabBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
       _slideTo(widget.selectedIndex, 0);
     }
@@ -186,6 +305,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
 
   @override
   void dispose() {
+    _stretch.dispose();
     _lift.dispose();
     _at.dispose();
     _over.dispose();
@@ -297,7 +417,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
         builder: (BuildContext context, BoxConstraints constraints) {
           final double width = constraints.maxWidth;
           final _TabGeometry g = _geometry = _TabGeometry(width, widget.items.length);
-          final Size margin = g.margin(widget.items.length);
+          final Size margin = g.margin(widget.items.length, _motion);
           return SizedBox(
             width: width,
             height: math.max(g.height, kGlassMinTapTarget.height),
@@ -438,19 +558,6 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
 
   Widget _item(_TabGeometry g, int i, {required bool highlighted}) {
     final GlassTabItem item = widget.items[i];
-    final Color? colour = highlighted ? widget.activeColor : null;
-    final Widget icon = Icon(item.icon, size: g.inline ? 20 : 26, color: colour);
-    final Widget label = Text(
-      item.label,
-      maxLines: 1,
-      overflow: TextOverflow.fade,
-      softWrap: false,
-      style: TextStyle(
-        fontSize: g.inline ? 12 : 11,
-        fontWeight: FontWeight.w600,
-        color: colour,
-      ),
-    );
     return Semantics(
       button: true,
       label: item.label,
@@ -458,20 +565,57 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       enabled: _enabled,
       onTap: _enabled ? () => widget.onSelected?.call(i) : null,
       child: ExcludeSemantics(
-        child: g.inline
-            ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  icon,
-                  const SizedBox(width: 6),
-                  Flexible(child: label),
-                ],
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[icon, const SizedBox(height: 2), label],
-              ),
+        // Under the bar's glass, so the ambient colour is the one its
+        // legibility chose — read here rather than at the bar's build, which
+        // is above the glass.
+        child: Builder(
+          builder: (BuildContext context) {
+            final GlassTabItemLook look = _look(context, g, i, highlighted: highlighted);
+            final Widget icon =
+                item.iconBuilder?.call(context, look) ?? Icon(item.icon, size: look.iconSize, color: look.color);
+            final Widget label =
+                item.labelBuilder?.call(context, look) ??
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.fade,
+                  softWrap: false,
+                  style: look.labelStyle,
+                );
+            return g.inline
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      icon,
+                      const SizedBox(width: 6),
+                      Flexible(child: label),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[icon, const SizedBox(height: 2), label],
+                  );
+          },
+        ),
       ),
+    );
+  }
+
+  GlassTabItemLook _look(BuildContext context, _TabGeometry g, int i, {required bool highlighted}) {
+    final TextStyle ambient = DefaultTextStyle.of(context).style;
+    final Color colour = highlighted
+        ? widget.activeColor
+        : IconTheme.of(context).color ?? ambient.color ?? const Color(0xFF000000);
+    return GlassTabItemLook(
+      index: i,
+      color: colour,
+      iconSize: g.inline ? 20 : 26,
+      labelStyle: ambient.merge(
+        TextStyle(fontSize: g.inline ? 12 : 11, fontWeight: FontWeight.w600, color: colour),
+      ),
+      selected: i == widget.selectedIndex,
+      highlighted: highlighted,
+      inline: g.inline,
     );
   }
 
@@ -484,13 +628,17 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   /// here was tried and broke no arm when removed (D218).
   Widget _dropStage(_TabGeometry g, Size margin) => GlassTravel(
     child: AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[_lift, _at]),
+      animation: Listenable.merge(<Listenable>[_lift, _at, _stretch]),
       builder: (BuildContext context, Widget? _) {
         final double lift = _lift.value;
         final double appear = lift.clamp(0.0, 1.0);
-        final Size size = Size(
-          lerpDouble(g.pill.width, g.drop.width, lift)!,
-          lerpDouble(g.pill.height, g.drop.height, lift)!,
+        // Deformed only as far as it has lifted: the drop arriving is round.
+        final Size size = GlassDropStretch.apply(
+          Size(
+            lerpDouble(g.pill.width, g.drop.width, lift)!,
+            lerpDouble(g.pill.height, g.drop.height, lift)!,
+          ),
+          _stretch.value * appear,
         );
         return Stack(
           clipBehavior: Clip.none,

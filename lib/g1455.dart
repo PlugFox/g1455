@@ -52,6 +52,9 @@ export 'src/surface/glass_controls.dart'
         kGlassDropScale,
         kGlassSwitchDropWiden,
         kGlassSwitchSize;
+// How a held drop deforms as it launches and brakes: a theme token, the pure
+// model a custom control can feed, and the ticker that runs it.
+export 'src/surface/glass_drop_motion.dart' show GlassDropMotion, GlassDropStretch, GlassDropStretchDriver;
 export 'src/surface/glass_scroll_edge.dart'
     show
         GlassScrollEdge,
@@ -83,7 +86,8 @@ export 'src/surface/glass_modal.dart'
         kGlassSheetRadius,
         showGlassDialog,
         showGlassSheet;
-export 'src/surface/glass_tab_bar.dart' show GlassTabBar, GlassTabItem, kGlassTabDropGrow, kGlassTabDropZoom;
+export 'src/surface/glass_tab_bar.dart'
+    show GlassTabBar, GlassTabItem, GlassTabItemBuilder, GlassTabItemLook, kGlassTabDropGrow, kGlassTabDropZoom;
 export 'src/surface/glass_text_field.dart' show GlassTextField, kGlassFieldHeight;
 export 'src/surface/glass_toolbar.dart'
     show GlassButtonGroup, GlassToolbarItem, kGlassToolbarHeight, kGlassToolbarItemWidth;

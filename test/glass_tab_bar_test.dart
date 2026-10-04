@@ -6,7 +6,12 @@
 // Breaks, each undone by swapping the string back:
 //  - in `_GlassTabBarState._onUp`, `: _pressed;` -> `: _at.value.round();`: a
 //    quick tap lands on the item the drop has reached, not the one pressed,
-//    and the tap arm selects the wrong one.
+//    and the tap arm selects the wrong one;
+//  - in `_TabGeometry.margin`, `+ reach.height` -> `+ 0`: the drop squashed
+//    arriving at the last item stands out of its region above and below, and
+//    the spring arm says so. (`+ reach.width` -> `+ 0` breaks nothing at the
+//    defaults: the bar's own growth leaves 3.5 px spare at the ends, more than
+//    the stretch a spring launch reaches.)
 //
 // The mechanisms the cost arms lean on — the drop as a level of its own, and
 // the watch over what the bar bears — are `GlassHost`'s, and their breaks are
@@ -14,6 +19,7 @@
 // nothing, and were removed rather than kept (D218): a repaint boundary around
 // the drop's stage, and watching where the bar actually is.
 
+import 'dart:math' as math;
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
@@ -86,8 +92,12 @@ void main() {
 
     // Within the first item: the drop moves, the highlight does not change,
     // and so nothing under any glass changes.
+    // And it stretches and squashes as it goes — inside its region, so that
+    // is not a capture either.
     final int lifted = host.recorded as int;
+    final Size held = drop.size;
     var moved = 0;
+    var deformed = 0;
     Rect where = drop.globalRect;
     for (final double dx in <double>[8, 6, 6, -4, -6, 5]) {
       await gesture.moveBy(Offset(dx, 0));
@@ -96,8 +106,12 @@ void main() {
         moved++;
         where = drop.globalRect;
       }
+      if (drop.size != held) {
+        deformed++;
+      }
     }
     expect(moved, 6, reason: 'the drop did not follow the finger');
+    expect(deformed, greaterThan(0), reason: 'the drop did not stretch as it moved');
     expect((host.recorded as int) - lifted, 0, reason: 'moving the drop inside one item retook the proxy');
     expect(_iconColour(tester, Icons.home), const Color(0xFF007AFF));
 
@@ -115,6 +129,115 @@ void main() {
     expect(selected, <int>[2]);
     expect(_drop(tester).materialize, 0, reason: 'the drop did not settle');
     expect(_handle(tester).upper.whereType<GlassProxyFrame>(), isEmpty, reason: 'the settled drop is still stacked');
+  });
+
+  testWidgets('pressed on a far tab, the drop springs there: long setting off, short arriving, round on it', (
+    WidgetTester tester,
+  ) async {
+    for (final GlassDropMotion? motion in <GlassDropMotion?>[null, GlassDropMotion.none]) {
+      await _mount(tester, dropMotion: motion);
+      final TestGesture gesture = await tester.startGesture(_item(3));
+      final RenderGlassSurface drop = _drop(tester);
+      final drawn = <double>[];
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final Rect region = drop.travel!.globalRect!;
+        expect(
+          region.expandToInclude(drop.globalRect) == region,
+          isTrue,
+          reason: '$motion, frame $i: the drop left its region: ${drop.globalRect} in $region',
+        );
+        drawn.add(_stretchOf(drop.size));
+      }
+      if (motion == null) {
+        final double most = drawn.reduce(math.max);
+        final double least = drawn.reduce(math.min);
+        expect(most, greaterThan(0.02), reason: 'the drop did not stretch setting off');
+        expect(least, lessThan(-0.02), reason: 'the drop did not squash arriving');
+        expect(drawn.indexOf(most), lessThan(drawn.indexOf(least)));
+        expect(most, lessThanOrEqualTo(const GlassDropMotion().maxStretch + 1e-6));
+      } else {
+        expect(drawn.map((double s) => s.abs()), everyElement(lessThan(1e-6)), reason: 'none, and deformed');
+      }
+      expect(drawn.last.abs(), lessThan(1e-6), reason: '$motion: arrived and held, the drop is not round');
+      expect(tester.binding.hasScheduledFrame, isFalse, reason: '$motion: a drop held still keeps drawing');
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('custom icons and labels are built with the colour the bar resolved for them', (
+    WidgetTester tester,
+  ) async {
+    final looks = <GlassTabItemLook>[];
+    Widget swatch(BuildContext context, GlassTabItemLook look) {
+      looks.add(look);
+      return SizedBox.square(
+        key: ValueKey<String>('swatch ${look.index}'),
+        dimension: look.iconSize,
+        child: ColoredBox(color: look.color),
+      );
+    }
+
+    Widget badge(BuildContext context, GlassTabItemLook look) =>
+        Text('${look.index} new', key: ValueKey<String>('badge ${look.index}'), style: look.labelStyle);
+
+    final selected = <int>[];
+    await _mount(
+      tester,
+      onSelected: selected.add,
+      items: <GlassTabItem>[
+        const GlassTabItem(icon: Icons.home, label: 'Home'),
+        GlassTabItem(label: 'Search', iconBuilder: swatch, labelBuilder: badge),
+        const GlassTabItem(icon: Icons.favorite, label: 'Saved'),
+        GlassTabItem(label: 'Profile', iconBuilder: swatch),
+      ],
+    );
+    // The colour an unhighlighted built-in icon takes: the bar's label colour.
+    final Color? plain = _iconColour(tester, Icons.favorite);
+    expect(plain, isNotNull);
+    expect(plain, isNot(const Color(0xFF007AFF)));
+    GlassTabItemLook last(int i) => looks.lastWhere((GlassTabItemLook l) => l.index == i);
+    Color swatchColour(int i) => tester
+        .widget<ColoredBox>(
+          find.descendant(of: find.byKey(ValueKey<String>('swatch $i')), matching: find.byType(ColoredBox)),
+        )
+        .color;
+
+    expect(last(1).color, plain);
+    expect(last(1).highlighted, isFalse);
+    expect(last(1).selected, isFalse);
+    expect(last(1).labelStyle.color, plain);
+    expect(last(1).iconSize, 26, reason: 'a phone-wide bar stacks icon over label');
+    expect(last(1).inline, isFalse);
+    expect(swatchColour(1), plain);
+    expect(tester.widget<Text>(find.byKey(const ValueKey<String>('badge 1'))).style?.color, plain);
+
+    // Held on the custom item: it takes the accent, the one it left gives it up.
+    final TestGesture gesture = await tester.startGesture(_item(0));
+    await tester.pump(const Duration(milliseconds: 16));
+    await gesture.moveTo(_item(1));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(last(1).highlighted, isTrue);
+    expect(last(1).selected, isFalse, reason: 'not selected until let go');
+    expect(last(1).color, const Color(0xFF007AFF));
+    expect(last(1).labelStyle.color, const Color(0xFF007AFF));
+    expect(swatchColour(1), const Color(0xFF007AFF));
+    expect(_iconColour(tester, Icons.home), plain);
+    expect(last(3).color, plain);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selected, <int>[1]);
+    expect(last(1).selected, isTrue);
+    expect(last(1).highlighted, isTrue);
+    // The label is still what a screen reader says.
+    final SemanticsHandle semantics = tester.ensureSemantics();
+    await tester.pump();
+    expect(find.semantics.byLabel('Search'), findsOne);
+    semantics.dispose();
   });
 
   testWidgets('let go after resting on an item, the drop settles there', (WidgetTester tester) async {
@@ -159,6 +282,19 @@ void main() {
   });
 }
 
+/// The stretch a tab drop of [size] shows: its unstretched size is the
+/// capsule grown by the same amount on both axes (the lift), and the stretch
+/// keeps the area — so both are solved from the size.
+double _stretchOf(Size size) {
+  const double pw = (300 - 14) / 4 + 7;
+  const double ph = 53;
+  // (pw + g)(ph + g) = w h, for the growth g.
+  final double area = size.width * size.height;
+  final double g = (-(pw + ph) + math.sqrt((pw + ph) * (pw + ph) - 4 * (pw * ph - area))) / 2;
+  final double s = size.width / (pw + g) - 1;
+  return s.abs() < 1e-9 ? 0 : s;
+}
+
 Color? _iconColour(WidgetTester tester, IconData icon) =>
     tester.widget<RichText>(find.descendant(of: find.byIcon(icon), matching: find.byType(RichText))).text.style?.color;
 
@@ -172,7 +308,13 @@ RenderGlassSurface _drop(WidgetTester tester) => tester
     .renderObjectList<RenderGlassSurface>(find.byType(GlassSurface))
     .singleWhere((RenderGlassSurface s) => s.declaredFinish?.name == GlassFinish.clear.name);
 
-Future<void> _mount(WidgetTester tester, {GlobalKey? hostKey, ValueChanged<int>? onSelected}) async {
+Future<void> _mount(
+  WidgetTester tester, {
+  GlobalKey? hostKey,
+  ValueChanged<int>? onSelected,
+  List<GlassTabItem>? items,
+  GlassDropMotion? dropMotion,
+}) async {
   await tester.pumpWidget(
     MediaQuery(
       data: const MediaQueryData(size: kScreen, devicePixelRatio: 2),
@@ -192,7 +334,7 @@ Future<void> _mount(WidgetTester tester, {GlobalKey? hostKey, ValueChanged<int>?
                   ),
                   Positioned.fromRect(
                     rect: kBar,
-                    child: _Tabs(onSelected: onSelected ?? (_) {}),
+                    child: _Tabs(onSelected: onSelected ?? (_) {}, items: items, dropMotion: dropMotion),
                   ),
                 ],
               ),
@@ -208,9 +350,11 @@ Future<void> _mount(WidgetTester tester, {GlobalKey? hostKey, ValueChanged<int>?
 }
 
 class _Tabs extends StatefulWidget {
-  const _Tabs({required this.onSelected});
+  const _Tabs({required this.onSelected, this.items, this.dropMotion});
 
   final ValueChanged<int> onSelected;
+  final List<GlassTabItem>? items;
+  final GlassDropMotion? dropMotion;
 
   @override
   State<_Tabs> createState() => _TabsState();
@@ -221,12 +365,15 @@ class _TabsState extends State<_Tabs> {
 
   @override
   Widget build(BuildContext context) => GlassTabBar(
-    items: const <GlassTabItem>[
-      GlassTabItem(icon: Icons.home, label: 'Home'),
-      GlassTabItem(icon: Icons.search, label: 'Search'),
-      GlassTabItem(icon: Icons.favorite, label: 'Saved'),
-      GlassTabItem(icon: Icons.person, label: 'Profile'),
-    ],
+    items:
+        widget.items ??
+        const <GlassTabItem>[
+          GlassTabItem(icon: Icons.home, label: 'Home'),
+          GlassTabItem(icon: Icons.search, label: 'Search'),
+          GlassTabItem(icon: Icons.favorite, label: 'Saved'),
+          GlassTabItem(icon: Icons.person, label: 'Profile'),
+        ],
+    dropMotion: widget.dropMotion,
     selectedIndex: _index,
     onSelected: (int i) {
       widget.onSelected(i);
