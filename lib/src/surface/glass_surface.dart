@@ -1336,7 +1336,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
         ..shader = shader
         ..isAntiAlias = debugGlassShaderAntiAlias,
     );
-    shader.dispose();
+    releaseGlassShader(shader);
   }
 
   /// The ripple program's tail, from index 34: the count, `uWave[4]`,

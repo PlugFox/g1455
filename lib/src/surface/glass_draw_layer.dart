@@ -16,11 +16,65 @@
 // thing for a picture: the paint hands the layer everything that does not
 // move, and `addToScene` reads where it is, which layout has settled by then,
 // and re-records only when that changed.
+//
+// **The layer also owns the shaders its picture draws with, on the web.**
+// CanvasKit hands a `FragmentShader`'s uniforms to Skia by pointer: the floats
+// live in a buffer the shader mallocs, and `RuntimeEffect.makeShader` passes it
+// as not-owned (`shouldOwnUniforms = !floats._ck`), so the `SkShader` recorded
+// into the picture reads that buffer when the picture is *rasterized* — which
+// is at the end of the frame, and again on every frame the picture is
+// retained. A `dispose()` straight after the draw frees it first: the glass
+// then drew from whatever reused the memory — a shape off by hundreds of
+// pixels, a solid green or grey slab, a different picture each frame. Every
+// Safari, which never gets Skwasm, drew that, and so does Chromium forced onto
+// CanvasKit. [releaseGlassShader] is the one call a draw makes instead.
 
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+
+/// Releases [shader] once nothing drawn with it can be rasterized again.
+///
+/// Natively that is now: the engine copies the uniforms into the display list.
+/// On the web it is when the picture the draw went into is disposed — the
+/// [GlassDrawLayer]'s, when the draw is made while it records — or, for a draw
+/// into any other picture (the capture of a level above), a frame after this
+/// one, by which time that picture has been snapshotted and dropped.
+void releaseGlassShader(ui.FragmentShader shader) {
+  if (!kIsWeb) {
+    shader.dispose();
+    return;
+  }
+  final List<ui.FragmentShader>? recording = GlassDrawLayer._recording;
+  if (recording != null) {
+    recording.add(shader);
+    return;
+  }
+  _releasedAfterFrame.add(shader);
+  if (_releasedAfterFrame.length == 1) {
+    _scheduleRelease(2);
+  }
+}
+
+final List<ui.FragmentShader> _releasedAfterFrame = <ui.FragmentShader>[];
+
+// Two frame ends rather than one: the frame that drew is not always rasterized
+// by the time its own post-frame callbacks run.
+void _scheduleRelease(int frames) {
+  SchedulerBinding.instance.addPostFrameCallback((Duration _) {
+    if (frames > 1) {
+      _scheduleRelease(frames - 1);
+      return;
+    }
+    final List<ui.FragmentShader> due = List<ui.FragmentShader>.of(_releasedAfterFrame);
+    _releasedAfterFrame.clear();
+    for (final ui.FragmentShader shader in due) {
+      shader.dispose();
+    }
+  });
+}
 
 /// A leaf layer whose picture is a function of where its owner is on screen.
 class GlassDrawLayer extends Layer {
@@ -34,6 +88,13 @@ class GlassDrawLayer extends Layer {
   ui.Picture? _picture;
   List<Object?>? _pictureAt;
 
+  /// The shaders [_picture] was drawn with, released with it (web only; see
+  /// [releaseGlassShader]).
+  List<ui.FragmentShader> _shaders = <ui.FragmentShader>[];
+
+  /// Where [releaseGlassShader] puts a shader while a layer records.
+  static List<ui.FragmentShader>? _recording;
+
   /// How many times the picture was recorded, and how many of those were
   /// forced by the owner moving rather than by a paint.
   ///
@@ -45,9 +106,20 @@ class GlassDrawLayer extends Layer {
 
   /// The paint changed what is drawn: the next composite records afresh.
   void invalidate() {
+    _releasePicture();
+    _pictureAt = null;
+  }
+
+  void _releasePicture() {
     _picture?.dispose();
     _picture = null;
-    _pictureAt = null;
+    final List<ui.FragmentShader> shaders = _shaders;
+    if (shaders.isNotEmpty) {
+      _shaders = <ui.FragmentShader>[];
+      for (final ui.FragmentShader shader in shaders) {
+        shader.dispose();
+      }
+    }
   }
 
   // Every frame, because what the picture depends on is not a property of
@@ -64,10 +136,18 @@ class GlassDrawLayer extends Layer {
       if (picture != null) {
         recordsOnMove++;
       }
-      picture?.dispose();
+      _releasePicture();
       final recorder = ui.PictureRecorder();
-      painter?.call(Canvas(recorder));
+      final List<ui.FragmentShader>? outer = _recording;
+      final shaders = <ui.FragmentShader>[];
+      _recording = shaders;
+      try {
+        painter?.call(Canvas(recorder));
+      } finally {
+        _recording = outer;
+      }
       picture = _picture = recorder.endRecording();
+      _shaders = shaders;
       _pictureAt = at;
       records++;
     }

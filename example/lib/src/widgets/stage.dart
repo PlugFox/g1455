@@ -37,63 +37,59 @@ class DemoStage extends StatelessWidget {
   /// One line under the stage: what to try.
   final String? hint;
 
-  // Out of the page's selection: a drag on a demo moves the glass, it does
-  // not select the labels on it.
   @override
   Widget build(BuildContext context) => Semantics(
     container: true,
     label: 'Live demo',
     explicitChildNodes: true,
-    child: SelectionContainer.disabled(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: kSiteLine),
-          color: const Color(0x66070A12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.all(6),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: SizedBox(
-                  height: height,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: <Widget>[
-                      RepaintBoundary(child: background ?? const GridBackdrop()),
-                      // A demo that animates repaints its own layer: not the
-                      // backdrop, the knobs, or the page around the stage.
-                      RepaintBoundary(
-                        child: Material(type: MaterialType.transparency, child: child),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (knobs.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 6, 18, 10),
-                child: Wrap(spacing: 24, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: knobs),
-              ),
-            if (hint case final String hint)
-              Padding(
-                padding: EdgeInsets.fromLTRB(20, knobs.isEmpty ? 6 : 0, 20, 14),
-                child: Row(
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: kSiteLine),
+        color: const Color(0x66070A12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.all(6),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: SizedBox(
+                height: height,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: <Widget>[
-                    const Icon(Icons.touch_app_outlined, size: 16, color: kSiteTextMuted),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(hint, style: const TextStyle(color: kSiteTextMuted, fontSize: 13)),
+                    RepaintBoundary(child: background ?? const GridBackdrop()),
+                    // A demo that animates repaints its own layer: not the
+                    // backdrop, the knobs, or the page around the stage.
+                    RepaintBoundary(
+                      child: Material(type: MaterialType.transparency, child: child),
                     ),
                   ],
                 ),
               ),
-          ],
-        ),
+            ),
+          ),
+          if (knobs.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 6, 18, 10),
+              child: Wrap(spacing: 24, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: knobs),
+            ),
+          if (hint case final String hint)
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, knobs.isEmpty ? 6 : 0, 20, 14),
+              child: Row(
+                children: <Widget>[
+                  const Icon(Icons.touch_app_outlined, size: 16, color: kSiteTextMuted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(hint, style: const TextStyle(color: kSiteTextMuted, fontSize: 13)),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     ),
   );

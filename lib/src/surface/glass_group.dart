@@ -1488,7 +1488,9 @@ class RenderGlassGroup extends RenderProxyBox {
     // `DlColorSource` uncopied), so a draw recorded with it renders whatever
     // the buffer says when the picture is rasterized — the last tile's
     // members, for every tile. Blobs vanished, or showed through the wrong
-    // tile as the bare tint. There each tile gets a shader of its own.
+    // tile as the bare tint. There each tile gets a shader of its own, and
+    // CanvasKit does the same with a raw pointer, so each is released only
+    // with the picture (`releaseGlassShader`).
     final bool shared = !kIsWeb;
     final ui.FragmentShader? shader = shared ? shaded() : null;
 
@@ -1535,7 +1537,7 @@ class RenderGlassGroup extends RenderProxyBox {
       }
       canvas.drawRect(rect, paint);
       if (!shared) {
-        tile.dispose();
+        releaseGlassShader(tile);
       }
       if (!paint.isAntiAlias) {
         fusedDrawsAliased++;

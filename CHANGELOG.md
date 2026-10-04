@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.1
 
 What a screen reader is told and can do:
 
@@ -24,6 +24,12 @@ On a page:
 
 Fixed:
 
+- Glass draws on CanvasKit, which is every Safari and every browser without
+  WasmGC. CanvasKit keeps a fragment shader's uniforms by reference until the
+  picture is rasterized, and the glass released its shaders straight after
+  the draw. So it drew from freed memory: a shape in the wrong place, a solid
+  grey or green slab, a different one each frame. On the web a shader now
+  lives as long as the picture drawn with it.
 - Glass standing on glass no longer moves what is under the glass it stands
   on. When a level was captured, the walk painted the levels below it, and a
   `CompositedTransformTarget` among them wrote the walk's offset into its own
@@ -38,6 +44,13 @@ Fixed:
   as it already was in the base level. It used to be a grey stub. On the web
   every `SelectionArea` lays a transparent platform view under what it holds,
   so a bar over a selectable page showed grey.
+
+Documented:
+
+- The README says what the glass costs on the web outside Chromium — Safari,
+  Firefox and every browser on iOS, Chrome for iOS included, get CanvasKit,
+  where each capture is a synchronous GPU readback — and what to do about it:
+  allow Skwasm on WebKit, or declare a cheaper rung where CanvasKit remains.
 
 ## 0.1.0
 

@@ -3,6 +3,7 @@ import 'package:g1455/g1455.dart';
 import 'package:squid/squid.dart';
 
 import '../style.dart';
+import '../widgets/quality_notice.dart';
 import '../widgets/update_banner.dart';
 import 'router.dart';
 import 'routes.dart';
@@ -23,8 +24,12 @@ class GlassExampleApp extends StatefulWidget {
 
 class _GlassExampleAppState extends State<GlassExampleApp> {
   // The most the package draws, ripple included: an example is for looking
-  // at, and the menu goes down from there.
-  GlassSettings _settings = GlassPreset.ultra.settings;
+  // at, and the menu goes down from there. Medium where the browser draws
+  // with CanvasKit, which pays for every capture with a GPU readback; a sheet
+  // says so on the first frame (see [kOpensReduced]).
+  GlassSettings _settings = kOpensReduced ? GlassPreset.medium.settings : GlassPreset.ultra.settings;
+
+  final NavigatorObserver _navigator = NavigatorObserver();
 
   late final NavigationController _navigation = NavigationController(
     const <NavigationRoute>[HomeRoute()],
@@ -33,7 +38,27 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
     debugLabel: 'site',
   );
 
-  late final AppRouterDelegate _delegate = AppRouterDelegate(_navigation);
+  late final AppRouterDelegate _delegate = AppRouterDelegate(_navigation, observers: <NavigatorObserver>[_navigator]);
+
+  @override
+  void initState() {
+    super.initState();
+    if (kOpensReduced) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _noticeReduced());
+    }
+  }
+
+  void _noticeReduced() {
+    final BuildContext? context = _navigator.navigator?.context;
+    if (context == null || !mounted) {
+      return;
+    }
+    showReducedQualityNotice(
+      context,
+      onFullGlass: () => setState(() => _settings = GlassPreset.high.settings),
+    );
+  }
+
   late final RouterConfig<Uri> _router = appRouterConfig(_delegate, initial: widget.initialLocation);
 
   @override

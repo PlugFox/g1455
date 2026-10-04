@@ -50,14 +50,13 @@ class SiteShell extends StatelessWidget {
               top: 0,
               right: 0,
               bottom: 0,
-              // Every word of the page selects and copies, as on any web page;
-              // a demo opts out where a drag is the glass's (`DemoStage`).
+              // No selection around the page: the text a reader copies has
+              // its own (`SiteSelectionArea`), and a demo, a card or a button
+              // is outside every one.
               child: Semantics(
                 container: true,
                 explicitChildNodes: true,
-                child: SelectionArea(
-                  child: _SelectsWhenCurrent(child: builder(context, insets)),
-                ),
+                child: builder(context, insets),
               ),
             ),
             // The edge across the whole window, as the package asks, and the
@@ -169,7 +168,7 @@ class _TopBar extends StatelessWidget {
 }
 
 /// Where the page is: its section, a link to the section's first page, and
-/// its own title — both selectable, as the page under them is.
+/// its own title.
 class _Breadcrumbs extends StatelessWidget {
   const _Breadcrumbs({required this.title, required this.section, required this.style});
 
@@ -183,23 +182,21 @@ class _Breadcrumbs extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color colour = style?.color ?? kSiteText;
     final TextStyle? muted = style?.copyWith(color: colour.withValues(alpha: 0.6));
-    return SelectionArea(
-      child: Row(
-        children: <Widget>[
-          if (section case final Section section) ...<Widget>[
-            Flexible(
-              child: LinkText(text: section.title, url: '/${section.id}', style: muted, maxLines: 1),
-            ),
-            Text('  /  ', style: muted),
-          ],
+    return Row(
+      children: <Widget>[
+        if (section case final Section section) ...<Widget>[
           Flexible(
-            child: Semantics(
-              header: true,
-              child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
-            ),
+            child: LinkText(text: section.title, url: '/${section.id}', style: muted, maxLines: 1),
           ),
+          Text('  /  ', style: muted),
         ],
-      ),
+        Flexible(
+          child: Semantics(
+            header: true,
+            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -543,31 +540,5 @@ class _NavItemState extends State<_NavItem> {
         ),
       ),
     );
-  }
-}
-
-/// The page's selection, while its route is the one shown.
-///
-/// A page under another — home, under every page — is kept but not laid out,
-/// and a selection area sorting what it holds by where it is on screen asks
-/// that of boxes that have no size yet. Under the top route the page is out
-/// of selection altogether; the global key moves it, state and all, between
-/// the two scopes rather than building it again.
-class _SelectsWhenCurrent extends StatefulWidget {
-  const _SelectsWhenCurrent({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_SelectsWhenCurrent> createState() => _SelectsWhenCurrentState();
-}
-
-class _SelectsWhenCurrentState extends State<_SelectsWhenCurrent> {
-  final GlobalKey _page = GlobalKey();
-
-  @override
-  Widget build(BuildContext context) {
-    final Widget page = KeyedSubtree(key: _page, child: widget.child);
-    return ModalRoute.isCurrentOf(context) ?? true ? page : SelectionContainer.disabled(child: page);
   }
 }

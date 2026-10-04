@@ -4,6 +4,7 @@ import 'package:flutter_md/flutter_md.dart';
 import '../app/theme.dart';
 import 'code_view.dart';
 import 'links.dart';
+import 'selection.dart';
 
 /// A guide in markdown: prose drawn by flutter_md, and every fenced code
 /// block lifted out into a [CodeView] — highlighted, scrolled rather than
@@ -15,8 +16,8 @@ import 'links.dart';
 /// running off the edge.
 ///
 /// The prose and the tables select as one document — a drag runs from a
-/// paragraph into a table — through one flutter_md selection scope; the page
-/// around it selects through the shell's `SelectionArea`, which this leaves.
+/// paragraph into a table — through one flutter_md selection scope; each code
+/// block selects on its own, as [CodeView] does everywhere.
 class DocView extends StatefulWidget {
   const DocView({required this.markdown, super.key});
 
@@ -137,41 +138,36 @@ class _DocViewState extends State<DocView> {
   @override
   Widget build(BuildContext context) {
     final MarkdownThemeData theme = siteMarkdownTheme(context);
-    return SelectionContainer.disabled(
-      child: MarkdownSelectionScope(
-        controller: _selection,
-        selectionColor: kSiteAccent.withValues(alpha: 0.32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            for (final (int i, _Block block) in _blocks.indexed)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: switch (block) {
-                  _Table(:final Markdown markdown, :final int columns) => _ScrollingTable(
-                    minWidth: columns * kTableMinColumnWidth,
-                    child: MarkdownWidget(
-                      markdown: markdown,
-                      theme: theme,
-                      controller: _selection,
-                      documentId: 'block-$i',
-                    ),
-                  ),
-                  _Prose(:final Markdown markdown) => MarkdownWidget(
+    return MarkdownSelectionScope(
+      controller: _selection,
+      selectionColor: kSiteAccent.withValues(alpha: 0.32),
+      contextMenuBuilder: markdownSelectionMenu,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (final (int i, _Block block) in _blocks.indexed)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: switch (block) {
+                _Table(:final Markdown markdown, :final int columns) => _ScrollingTable(
+                  minWidth: columns * kTableMinColumnWidth,
+                  child: MarkdownWidget(
                     markdown: markdown,
                     theme: theme,
                     controller: _selection,
                     documentId: 'block-$i',
                   ),
-                  // Code selects through the shell's area, as code elsewhere
-                  // on the page does.
-                  _Code(:final String code, :final String language) => SelectionArea(
-                    child: CodeView(code: code, language: language),
-                  ),
-                },
-              ),
-          ],
-        ),
+                ),
+                _Prose(:final Markdown markdown) => MarkdownWidget(
+                  markdown: markdown,
+                  theme: theme,
+                  controller: _selection,
+                  documentId: 'block-$i',
+                ),
+                _Code(:final String code, :final String language) => CodeView(code: code, language: language),
+              },
+            ),
+        ],
       ),
     );
   }

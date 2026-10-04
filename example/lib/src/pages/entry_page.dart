@@ -11,6 +11,7 @@ import '../widgets/code_view.dart';
 import '../widgets/doc_view.dart';
 import '../widgets/icons.dart';
 import '../widgets/links.dart';
+import '../widgets/selection.dart';
 
 /// A page of the reference: what the thing is, the thing itself, live, and
 /// then the guide, the code and the API — one tab each, the tab in the
@@ -99,36 +100,44 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Icon(iconFor(entry.icon), size: 18, color: kSiteAccent),
-            const SizedBox(width: 8),
-            Flexible(
-              child: LinkText(
-                text: entry.section.title.toUpperCase(),
-                url: '/${entry.section.id}',
-                style: const TextStyle(
-                  color: kSiteAccent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.4,
+        // The words select; the pills under them are buttons.
+        SiteSelectionArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(iconFor(entry.icon), size: 18, color: kSiteAccent),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: LinkText(
+                      text: entry.section.title.toUpperCase(),
+                      url: '/${entry.section.id}',
+                      style: const TextStyle(
+                        color: kSiteAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Semantics(
+                header: true,
+                child: Text(
+                  entry.title,
+                  style: (narrow ? text.headlineMedium : text.displaySmall)?.copyWith(color: kSiteText),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Semantics(
-          header: true,
-          child: Text(
-            entry.title,
-            style: (narrow ? text.headlineMedium : text.displaySmall)?.copyWith(color: kSiteText),
+              const SizedBox(height: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Text(entry.summary, style: text.bodyLarge?.copyWith(color: kSiteTextMuted, fontSize: 18)),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 10),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: Text(entry.summary, style: text.bodyLarge?.copyWith(color: kSiteTextMuted, fontSize: 18)),
         ),
         const SizedBox(height: 18),
         Wrap(

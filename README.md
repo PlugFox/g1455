@@ -217,11 +217,33 @@ application declares them:
 | Impeller — Vulkan | Android | ✅ |
 | Impeller — GLES | Android | ✅ |
 | Skia — GLES | Android below API 29, Vivante GPUs | ✅ |
-| CanvasKit · Skwasm | Web | ✅ |
+| Skwasm | Web | ✅ |
+| CanvasKit | Web | ✅, slow; see below |
 
 The route renders byte-identically on all of them. Every bundled shader is
 compiled for all five shader targets in `test/shader_targets_test.dart`, so a
 shader that SkSL would reject fails the tests rather than a user's app.
+
+> [!WARNING]
+> **On the web, outside Chromium, the glass is slow.** Every capture of the
+> backdrop goes through `Picture.toImageSync`. On CanvasKit that call reads
+> the pixels back from the GPU and waits for them. On the same machine, an
+> M3 Max, a frame of full glass took 15 to 30 ms on CanvasKit and 4 to 10 ms on
+> Skwasm. On a phone CanvasKit is well past a 60 Hz frame.
+>
+> Flutter's loader picks Skwasm only in Chromium browsers (Chrome, Edge,
+> Opera, Brave and others) unless the app allows more. Safari, Firefox and
+> **every browser on iOS, Chrome for iOS included** (they all run WebKit)
+> get dart2js and CanvasKit. Two things help:
+>
+> - Build with `flutter build web --wasm` and allow Skwasm on WebKit as well:
+>   `_flutter.loader.load({config: {wasmAllowList: {webkit: true}}})`. Test it
+>   on the devices you ship to. Flutter leaves WebKit off by default, and
+>   Skwasm on WebKit still costs about twice what it costs in Chromium.
+> - Where the app still runs on CanvasKit (`kIsWeb && !kIsWasm`), declare a
+>   cheaper rung: `GlassTierPolicy(ceiling: GlassTier.cheap)` draws the tint
+>   over the backdrop and captures nothing, and the two renderers are level
+>   there. The example site opens that way on CanvasKit and says so.
 
 ## Diagnostics
 

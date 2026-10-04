@@ -2,7 +2,7 @@ name: g1455
 description: >-
   Liquid Glass for Flutter: refraction, blur and rim over the live backdrop,
   with the capture priced, held and shared rather than taken per surface.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/PlugFox/g1455
 repository: https://github.com/PlugFox/g1455
 issue_tracker: https://github.com/PlugFox/g1455/issues
