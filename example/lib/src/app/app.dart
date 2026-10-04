@@ -13,10 +13,14 @@ import 'theme.dart';
 /// (`builder:`), so that a dialog, a sheet or a menu — all built in the
 /// navigator's overlay — is captured by it like any other glass.
 class GlassExampleApp extends StatefulWidget {
-  const GlassExampleApp({this.initialLocation, super.key});
+  const GlassExampleApp({this.initialLocation, this.opensReduced = kOpensReduced, super.key});
 
   /// The address to open at; null for the one the platform was opened at.
   final String? initialLocation;
+
+  /// Whether to open on Medium and say why — [kOpensReduced], which a test
+  /// cannot reach otherwise: it is a constant, and false off the web.
+  final bool opensReduced;
 
   @override
   State<GlassExampleApp> createState() => _GlassExampleAppState();
@@ -27,7 +31,7 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
   // at, and the menu goes down from there. Medium where the browser draws
   // with CanvasKit, which pays for every capture with a GPU readback; a sheet
   // says so on the first frame (see [kOpensReduced]).
-  GlassSettings _settings = kOpensReduced ? GlassPreset.medium.settings : GlassPreset.ultra.settings;
+  late GlassSettings _settings = widget.opensReduced ? GlassPreset.medium.settings : GlassPreset.ultra.settings;
 
   final NavigatorObserver _navigator = NavigatorObserver();
 
@@ -43,7 +47,7 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
   @override
   void initState() {
     super.initState();
-    if (kOpensReduced) {
+    if (widget.opensReduced) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _noticeReduced());
     }
   }

@@ -40,10 +40,10 @@ import 'package:flutter/scheduler.dart';
 /// Natively that is now: the engine copies the uniforms into the display list.
 /// On the web it is when the picture the draw went into is disposed — the
 /// [GlassDrawLayer]'s, when the draw is made while it records — or, for a draw
-/// into any other picture (the capture of a level above), a frame after this
-/// one, by which time that picture has been snapshotted and dropped.
+/// into any other picture (the capture of a level above), two frame ends after
+/// this one, by which time that picture has been snapshotted and dropped.
 void releaseGlassShader(ui.FragmentShader shader) {
-  if (!kIsWeb) {
+  if (!kIsWeb && !debugReleaseGlassShadersAsOnWeb) {
     shader.dispose();
     return;
   }
@@ -52,28 +52,64 @@ void releaseGlassShader(ui.FragmentShader shader) {
     recording.add(shader);
     return;
   }
-  _releasedAfterFrame.add(shader);
-  if (_releasedAfterFrame.length == 1) {
-    _scheduleRelease(2);
-  }
+  // Two frame ends rather than one: the frame that drew is not always
+  // rasterized by the time its own post-frame callbacks run. And one more when
+  // the draw is made in a post-frame callback, which is where the host
+  // captures: the countdown's own callback may still be due in this batch, and
+  // would count the end that is already under way.
+  final bool ending = SchedulerBinding.instance.schedulerPhase == SchedulerPhase.postFrameCallbacks;
+  _releasedAfterFrame.add((shader, _frameEnds + (ending ? 3 : 2)));
+  _scheduleRelease();
 }
 
-final List<ui.FragmentShader> _releasedAfterFrame = <ui.FragmentShader>[];
+/// Routes [releaseGlassShader] through the web's deferred release on every
+/// platform, for a test to watch it: `kIsWeb` is a constant, and the release
+/// it guards is otherwise unreachable from `flutter test`.
+@visibleForTesting
+bool debugReleaseGlassShadersAsOnWeb = false;
 
-// Two frame ends rather than one: the frame that drew is not always rasterized
-// by the time its own post-frame callbacks run.
-void _scheduleRelease(int frames) {
-  SchedulerBinding.instance.addPostFrameCallback((Duration _) {
-    if (frames > 1) {
-      _scheduleRelease(frames - 1);
-      return;
+/// How many shaders [releaseGlassShader] is holding for a frame to end,
+/// outside any [GlassDrawLayer].
+@visibleForTesting
+int get debugGlassShadersAwaitingRelease => _releasedAfterFrame.length;
+
+/// Each shader with the count of frame ends at which it goes, so one queued
+/// while the countdown runs still gets its own two.
+final List<(ui.FragmentShader, int)> _releasedAfterFrame = <(ui.FragmentShader, int)>[];
+
+/// Frame ends seen by [_releaseDue] since the process started.
+int _frameEnds = 0;
+
+bool _releaseScheduled = false;
+
+// A post-frame callback alone does not ask for a frame, so a scene that went
+// idle on the frame that queued a shader would keep it — and, held here, past
+// the host that drew it — until something else repainted. The frame asked for
+// is otherwise empty: nothing is marked dirty.
+void _scheduleRelease() {
+  if (_releaseScheduled) {
+    return;
+  }
+  _releaseScheduled = true;
+  SchedulerBinding.instance
+    ..addPostFrameCallback(_releaseDue, debugLabel: 'releaseGlassShader')
+    ..ensureVisualUpdate();
+}
+
+void _releaseDue(Duration _) {
+  _releaseScheduled = false;
+  _frameEnds++;
+  _releasedAfterFrame.removeWhere(((ui.FragmentShader, int) entry) {
+    final (ui.FragmentShader shader, int at) = entry;
+    if (at > _frameEnds) {
+      return false;
     }
-    final List<ui.FragmentShader> due = List<ui.FragmentShader>.of(_releasedAfterFrame);
-    _releasedAfterFrame.clear();
-    for (final ui.FragmentShader shader in due) {
-      shader.dispose();
-    }
+    shader.dispose();
+    return true;
   });
+  if (_releasedAfterFrame.isNotEmpty) {
+    _scheduleRelease();
+  }
 }
 
 /// A leaf layer whose picture is a function of where its owner is on screen.

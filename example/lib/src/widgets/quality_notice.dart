@@ -52,8 +52,11 @@ class _Notice extends StatelessWidget {
     );
   }
 
+  // Scrolls: the sheet caps its content at what fits (a `Flexible`), and a
+  // short landscape window or large text would otherwise push the buttons out
+  // of reach under an overflow stripe.
   Widget _content(TextTheme text, Color label, TextStyle? body, BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
