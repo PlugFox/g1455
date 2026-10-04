@@ -46,6 +46,21 @@
 //    it dims under the glass, which is Apple's answer and in this machine a
 //    change of tint, not a new layer.
 //
+// And one for motion:
+//
+//  - [GlassThemeData.dropMotion] is how the held drop of the switch, the
+//    slider, the segmented control and the tab bar deforms as it speeds up and
+//    slows down. On by default and subtle, because it costs no capture (see
+//    `glass_drop_motion.dart`); [GlassDropMotion.none] turns it off app-wide,
+//    and the platform's reduced-motion switch turns it off regardless.
+//
+// And one that *is* a reading, opt-in: [GlassThemeData.adaptive]. With it the
+// host reads the captured backdrop back under each glass, and a component
+// installs [GlassThemeData.adaptedTo] around its own — the same tokens with
+// the reading in place of the declared mean, for that glass alone. The theme
+// is still configuration: a verdict moves a handful of times a session, behind
+// a band and a hold (`glass_adaptive.dart`), never per frame.
+//
 // What is deliberately **not** here: a quality tier of its own. SS7.2 sketched
 // `GlassQuality` (minimal / standard / premium, benchmarked at start-up) beside
 // the ladder of SS7.4, as if they were two axes. They are one, and the sketch
@@ -57,6 +72,8 @@
 
 import 'package:flutter/widgets.dart';
 
+import 'glass_adaptive.dart';
+import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_ripple.dart';
 import 'glass_tier.dart';
@@ -72,6 +89,10 @@ class GlassThemeData {
     this.richBackdrop = false,
     this.minLabelContrast,
     this.ripple,
+    this.dropMotion = const GlassDropMotion(),
+    this.adaptive,
+    this.regularAppearance,
+    this.reading,
   });
 
   /// The material every surface wears unless it names its own.
@@ -111,7 +132,9 @@ class GlassThemeData {
   /// answers which appearance the platform is in, not what this screen's average
   /// level is, and the gap between those two is exactly the quantity being
   /// fixed. The package has no automatic input to this axis for the same reason
-  /// it has none to the ladder itself (D175).
+  /// it has none to the ladder itself (D175) — except the one an application
+  /// opts into, [adaptive], which measures the level under each glass instead
+  /// of guessing it, and installs it here for that glass ([adaptedTo]).
   final Color? backdrop;
 
   /// Whether the platform's increase-contrast switch is on.
@@ -165,6 +188,80 @@ class GlassThemeData {
   /// The wave every surface makes when touched, unless it declares its own;
   /// null for none, which is the platform's behaviour. See [GlassRipple].
   final GlassRipple? ripple;
+
+  /// How a held drop deforms as it launches and brakes, unless a control
+  /// declares its own; [GlassDropMotion.none] for a drop that keeps its shape.
+  /// Ignored under reduced motion. See [GlassDropMotion].
+  final GlassDropMotion dropMotion;
+
+  /// Whether glass under this theme reads its own backdrop, and how; null for
+  /// glass that goes by what is declared. Installed by `GlassHost.adaptive`.
+  ///
+  /// An inner theme may take it away for a subtree ([withAdaptive] with null),
+  /// and then the components there go by the declarations again. The host
+  /// still reads them back — it does not know which theme a surface is under —
+  /// so that saves nothing on the read-back; it is a choice of picture.
+  final GlassAdaptive? adaptive;
+
+  /// The platform appearance [finish] was picked in when it is `.regular` —
+  /// nobody named it — and null when it was named.
+  ///
+  /// What lets a reading pick the branch again for one glass ([adaptedTo]): a
+  /// [finish] that is [GlassFinish.regularDark] because the screen is dark and
+  /// one that is because the application said so look the same, and only the
+  /// first may move. Set by a [GlassHost] that reads its backdrop, and cleared
+  /// by [copyWith] when it is given a finish.
+  final Brightness? regularAppearance;
+
+  /// What the glass this theme was installed for read of its backdrop, or
+  /// null when it read nothing.
+  ///
+  /// Set by [adaptedTo], which a component that reads its backdrop installs
+  /// around its glass — so content on the glass reads
+  /// `GlassTheme.of(context).reading` to follow it.
+  final GlassBackdropReading? reading;
+
+  /// This theme as it applies over one glass whose backdrop read [reading].
+  ///
+  /// The reading stands in for [backdrop] — the label, the outline under
+  /// increase contrast and the [minLabelContrast] dim are all chosen against
+  /// it — unless the screen is declared [richBackdrop], where a mean is the
+  /// wrong statistic for a label and the declared backdrop is kept for the one
+  /// rung that reads it. And when [finish] is `.regular` ([regularAppearance]
+  /// is set) the branch is picked from the reading, as [GlassFinish.regular]
+  /// picks it from a declared level; a named finish is kept.
+  GlassThemeData adaptedTo(GlassBackdropReading reading) {
+    final Brightness? appearance = regularAppearance;
+    return GlassThemeData(
+      finish: appearance == null ? finish : GlassFinish.regular(appearance: appearance, backdrop: reading.mean),
+      tier: tier,
+      backdrop: richBackdrop ? backdrop : reading.mean,
+      highContrast: highContrast,
+      richBackdrop: richBackdrop,
+      minLabelContrast: minLabelContrast,
+      ripple: ripple,
+      dropMotion: dropMotion,
+      adaptive: adaptive,
+      regularAppearance: appearance,
+      reading: reading,
+    );
+  }
+
+  /// This theme with [adaptive] replaced — null included, which [copyWith]
+  /// cannot say.
+  GlassThemeData withAdaptive(GlassAdaptive? adaptive) => GlassThemeData(
+    finish: finish,
+    tier: tier,
+    backdrop: backdrop,
+    highContrast: highContrast,
+    richBackdrop: richBackdrop,
+    minLabelContrast: minLabelContrast,
+    ripple: ripple,
+    dropMotion: dropMotion,
+    adaptive: adaptive,
+    regularAppearance: regularAppearance,
+    reading: reading,
+  );
 
   /// The finish surfaces draw, and the label and outline colours they use —
   /// everything the three tokens above decide, in one place, so the surface,
@@ -239,6 +336,10 @@ class GlassThemeData {
     bool? richBackdrop,
     double? minLabelContrast,
     GlassRipple? ripple,
+    GlassDropMotion? dropMotion,
+    GlassAdaptive? adaptive,
+    Brightness? regularAppearance,
+    GlassBackdropReading? reading,
   }) => GlassThemeData(
     finish: finish ?? this.finish,
     tier: tier ?? this.tier,
@@ -247,6 +348,12 @@ class GlassThemeData {
     richBackdrop: richBackdrop ?? this.richBackdrop,
     minLabelContrast: minLabelContrast ?? this.minLabelContrast,
     ripple: ripple ?? this.ripple,
+    dropMotion: dropMotion ?? this.dropMotion,
+    adaptive: adaptive ?? this.adaptive,
+    // A finish given here is named, and a named finish does not move with a
+    // reading unless the caller says in which appearance it was picked.
+    regularAppearance: finish != null ? regularAppearance : (regularAppearance ?? this.regularAppearance),
+    reading: reading ?? this.reading,
   );
 
   @override
@@ -258,10 +365,26 @@ class GlassThemeData {
       other.highContrast == highContrast &&
       other.richBackdrop == richBackdrop &&
       other.minLabelContrast == minLabelContrast &&
-      other.ripple == ripple;
+      other.ripple == ripple &&
+      other.dropMotion == dropMotion &&
+      other.adaptive == adaptive &&
+      other.regularAppearance == regularAppearance &&
+      other.reading == reading;
 
   @override
-  int get hashCode => Object.hash(finish, tier, backdrop, highContrast, richBackdrop, minLabelContrast, ripple);
+  int get hashCode => Object.hash(
+    finish,
+    tier,
+    backdrop,
+    highContrast,
+    richBackdrop,
+    minLabelContrast,
+    ripple,
+    dropMotion,
+    adaptive,
+    regularAppearance,
+    reading,
+  );
 
   @override
   String toString() =>
@@ -269,7 +392,10 @@ class GlassThemeData {
       '${highContrast ? ', high contrast' : ''}'
       '${richBackdrop ? ', rich backdrop' : ''}'
       '${minLabelContrast == null ? '' : ', label >= $minLabelContrast'}'
-      '${ripple == null ? '' : ', $ripple'})';
+      '${ripple == null ? '' : ', $ripple'}'
+      '${dropMotion == const GlassDropMotion() ? '' : ', $dropMotion'}'
+      '${adaptive == null ? '' : ', reads its backdrop'}'
+      '${reading == null ? '' : ', $reading'})';
 }
 
 /// What a surface under a theme actually draws: the finish after any dim, the

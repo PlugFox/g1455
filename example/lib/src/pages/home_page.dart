@@ -13,55 +13,111 @@ import '../widgets/code_view.dart';
 import '../widgets/icons.dart';
 import '../widgets/links.dart';
 import 'entry_page.dart' show Pill;
+import 'home_showcase.dart';
 
-/// The front page: what the package is, the glass itself moving, how to get
-/// it, and every page of the reference as a card.
+/// The front page: what the package is, the glass itself moving, a gallery
+/// of glass in app-like scenes, and every page of the reference as a card.
+///
+/// One sliver list, and every run of cards in it a builder: only what is on
+/// screen, and a little past it, is built — a scene scrolled away is
+/// disposed with its glass, and the host stops capturing for it.
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+
+  /// The widest the page's column is set.
+  static const double maxWidth = 1100;
 
   @override
   Widget build(BuildContext context) => SiteShell(
     title: 'Overview',
-    builder: (BuildContext context, EdgeInsets insets) {
-      final double width = MediaQuery.sizeOf(context).width;
-      final double gutter = width < 600 ? 16 : 32;
-      return SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(gutter, insets.top + 12, gutter, insets.bottom + 24),
-        // Its own layer: a scroll moves it rather than repainting it.
-        child: RepaintBoundary(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const _Hero(),
-                  const SizedBox(height: 56),
-                  const _Principles(),
-                  for (final Section section in Section.values) ...<Widget>[
-                    const SizedBox(height: 48),
-                    _SectionGrid(section: section),
-                  ],
-                  const SizedBox(height: 56),
-                  const _Footer(),
-                ],
+    builder: (BuildContext context, EdgeInsets insets) => LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double width = constraints.maxWidth;
+        final double gutter = width < 600 ? 16 : 32;
+        final double side = math.max(gutter, (width - maxWidth) / 2);
+        final double column = width - side * 2;
+        EdgeInsets band(double top) => EdgeInsets.fromLTRB(side, top, side, 0);
+        return CustomScrollView(
+          slivers: <Widget>[
+            SliverPadding(
+              padding: band(insets.top + 12),
+              sliver: SliverToBoxAdapter(child: _Hero(width: column)),
+            ),
+            SliverPadding(
+              padding: band(48),
+              sliver: const SliverToBoxAdapter(child: _WhatsNew()),
+            ),
+            SliverPadding(
+              padding: band(56),
+              sliver: const SliverToBoxAdapter(
+                child: _Heading(
+                  title: 'Made of glass',
+                  blurb: 'Real screens, live. Tap, drag and scroll them — every scene opens its component.',
+                ),
               ),
             ),
-          ),
-        ),
-      );
-    },
+            SliverPadding(padding: band(18), sliver: const _Gallery()),
+            SliverPadding(
+              padding: band(56),
+              sliver: SliverToBoxAdapter(child: _Principles(width: column)),
+            ),
+            for (final Section section in Section.values) ...<Widget>[
+              SliverPadding(
+                padding: band(56),
+                sliver: SliverToBoxAdapter(
+                  child: _Heading(title: section.title, blurb: _SectionGrid.blurbs[section]!),
+                ),
+              ),
+              SliverPadding(
+                padding: band(18),
+                sliver: _SectionGrid(section: section, width: column),
+              ),
+            ],
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(side, 56, side, insets.bottom + 24),
+              sliver: const SliverToBoxAdapter(child: _Footer()),
+            ),
+          ],
+        );
+      },
+    ),
   );
 }
 
-class _Hero extends StatelessWidget {
-  const _Hero();
+/// A section's title and the line under it.
+class _Heading extends StatelessWidget {
+  const _Heading({required this.title, required this.blurb});
+
+  final String title;
+  final String blurb;
 
   @override
   Widget build(BuildContext context) {
     final TextTheme text = Theme.of(context).textTheme;
-    final double width = MediaQuery.sizeOf(context).width;
-    final bool narrow = width < 1100;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Semantics(
+          header: true,
+          child: Text(title, style: text.headlineMedium?.copyWith(color: kSiteText)),
+        ),
+        const SizedBox(height: 6),
+        Text(blurb, style: text.bodyLarge?.copyWith(color: kSiteTextMuted)),
+      ],
+    );
+  }
+}
+
+class _Hero extends StatelessWidget {
+  const _Hero({required this.width});
+
+  /// The page's column.
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    final bool narrow = width < 900;
     final Widget copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -84,8 +140,8 @@ class _Hero extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          'Refraction, blur, tint and a rim over the live backdrop — in the shape the engine already draws. '
-          'One capture shared by every surface, and none at all while nothing under the glass moves.',
+          'Glass that bends, blurs and glows over whatever is behind it: photos, maps, video, your own UI. '
+          'Bars, buttons, sliders, tab bars, sheets and menus, as in iOS 26 — and fast enough to scroll.',
           style: text.bodyLarge?.copyWith(color: kSiteTextMuted, fontSize: 18),
         ),
         const SizedBox(height: 24),
@@ -255,69 +311,423 @@ class _HeroStageState extends State<_HeroStage> with SingleTickerProviderStateMi
   );
 }
 
-class _Principles extends StatelessWidget {
-  const _Principles();
+/// What is new in this release, as a row of links that scrolls sideways.
+class _WhatsNew extends StatelessWidget {
+  const _WhatsNew();
 
-  static const List<(IconData, String, String)> _items = <(IconData, String, String)>[
-    (
-      Icons.layers_outlined,
-      'One host, one capture',
-      'A GlassHost records what is under all of its glass into one atlas. Every surface samples its own slot of it '
-          '— no BackdropFilter per surface.',
-    ),
-    (
-      Icons.pause_circle_outline,
-      'A capture only when something changed',
-      'Nothing under the glass moved? The host keeps the proxy it has. A still screen, or glass moving over still '
-          'content, costs no capture at all.',
-    ),
-    (
-      Icons.blur_on,
-      'The blur is a downscale',
-      'A 1/N proxy is a Gaussian of σ ≈ N/2 to within about 1%, at a fraction of the price of a real Gaussian.',
-    ),
-  ];
+  static const List<(String, String, String, IconData, List<Color>)> _items =
+      <(String, String, String, IconData, List<Color>)>[
+        (
+          'components',
+          'morph',
+          'A button that flows into a menu',
+          Icons.animation,
+          <Color>[
+            Color(0xFFFF375F),
+            Color(0xFFFF9F0A),
+          ],
+        ),
+        (
+          'foundations',
+          'adaptive',
+          'Glass that reads what is under it',
+          Icons.brightness_6_outlined,
+          <Color>[
+            Color(0xFF5E5CE6),
+            Color(0xFF64D2FF),
+          ],
+        ),
+        (
+          'foundations',
+          'drop-motion',
+          'Drops that stretch and squash',
+          Icons.water_drop_outlined,
+          <Color>[
+            Color(0xFF30D158),
+            Color(0xFF64D2FF),
+          ],
+        ),
+        (
+          'components',
+          'scaffold',
+          'A whole glass screen in one widget',
+          Icons.space_dashboard_outlined,
+          <Color>[
+            Color(0xFFBF5AF2),
+            Color(0xFFFF375F),
+          ],
+        ),
+        (
+          'components',
+          'tab-bar',
+          'Tab icons and badges of your own',
+          Icons.tab_outlined,
+          <Color>[
+            Color(0xFF0A84FF),
+            Color(0xFF5E5CE6),
+          ],
+        ),
+        (
+          'start',
+          'installation',
+          'Shaders ready before the first frame',
+          Icons.bolt,
+          <Color>[
+            Color(0xFFFFD60A),
+            Color(0xFFFF9F0A),
+          ],
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.sizeOf(context).width;
-    final int columns = width >= 1100 ? 3 : (width >= 700 ? 2 : 1);
-    return _Grid(
-      columns: columns,
+    // A page the catalog does not have is left out rather than linked dead.
+    final List<(Entry, String, IconData, List<Color>)> items = <(Entry, String, IconData, List<Color>)>[
+      for (final (String section, String id, String line, IconData icon, List<Color> colours) in _items)
+        if (findEntry(section, id) case final Entry entry) (entry, line, icon, colours),
+    ];
+    final double scale = MediaQuery.textScalerOf(context).scale(1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        for (final (IconData icon, String title, String body) in _items)
-          GlassCard(
-            padding: const EdgeInsets.all(22),
-            child: Builder(
-              builder: (BuildContext context) {
-                final Color label = DefaultTextStyle.of(context).style.color ?? kSiteText;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Icon(icon, size: 26, color: label),
-                    const SizedBox(height: 14),
-                    Text(
-                      title,
-                      style: TextStyle(color: label, fontSize: 18, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(body, style: TextStyle(color: label.withValues(alpha: 0.78), fontSize: 14.5, height: 1.5)),
-                  ],
-                );
-              },
-            ),
+        Text(
+          'NEW IN THIS RELEASE',
+          style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 36 + 72 * scale,
+          // A builder: the cards past the edge are not built until scrolled to.
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (BuildContext context, int i) {
+              final (Entry entry, String line, IconData icon, List<Color> colours) = items[i];
+              return _NewCard(entry: entry, line: line, icon: icon, colours: colours);
+            },
           ),
+        ),
       ],
     );
   }
 }
 
+class _NewCard extends StatefulWidget {
+  const _NewCard({required this.entry, required this.line, required this.icon, required this.colours});
+
+  final Entry entry;
+  final String line;
+  final IconData icon;
+  final List<Color> colours;
+
+  @override
+  State<_NewCard> createState() => _NewCardState();
+}
+
+class _NewCardState extends State<_NewCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    link: true,
+    label: '${widget.entry.title}: ${widget.line}',
+    excludeSemantics: true,
+    child: SelectionContainer.disabled(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTap: () => openEntry(context, widget.entry),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 250,
+            padding: const EdgeInsets.all(16),
+            transform: Matrix4.translationValues(0, _hover ? -2 : 0, 0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[
+                  for (final Color c in widget.colours) c.withValues(alpha: _hover ? 0.32 : 0.2),
+                ],
+              ),
+              border: Border.all(color: widget.colours.first.withValues(alpha: _hover ? 0.8 : 0.45)),
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(colors: widget.colours),
+                  ),
+                  child: Icon(widget.icon, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        widget.entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: kSiteText, fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.line,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: kSiteTextMuted, fontSize: 13, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// The gallery: a grid of live scenes, built as they scroll into view.
+class _Gallery extends StatelessWidget {
+  const _Gallery();
+
+  static const double _stage = 360;
+
+  @override
+  Widget build(BuildContext context) {
+    final double caption = MediaQuery.textScalerOf(context).scale(1) * 64 + 20;
+    return SliverGrid.builder(
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 560,
+        mainAxisSpacing: 28,
+        crossAxisSpacing: 20,
+        mainAxisExtent: _stage + caption,
+      ),
+      itemCount: kShowcases.length,
+      itemBuilder: (BuildContext context, int i) => _ShowcaseTile(showcase: kShowcases[i], stage: _stage),
+    );
+  }
+}
+
+class _ShowcaseTile extends StatelessWidget {
+  const _ShowcaseTile({required this.showcase, required this.stage});
+
+  final Showcase showcase;
+  final double stage;
+
+  @override
+  Widget build(BuildContext context) {
+    final Entry? entry = findEntry(showcase.section, showcase.page);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        SizedBox(
+          height: stage,
+          child: Semantics(
+            container: true,
+            label: showcase.semantics,
+            explicitChildNodes: true,
+            // Out of the page's selection, as a demo stage is: a drag here
+            // moves a slider or scrolls a chat.
+            child: SelectionContainer.disabled(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: kSiteLine),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  // A scene repaints its own layer, not the page's.
+                  child: RepaintBoundary(
+                    child: Material(type: MaterialType.transparency, child: showcase.builder(context)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _Caption(showcase: showcase, entry: entry),
+      ],
+    );
+  }
+}
+
+class _Caption extends StatefulWidget {
+  const _Caption({required this.showcase, required this.entry});
+
+  final Showcase showcase;
+  final Entry? entry;
+
+  @override
+  State<_Caption> createState() => _CaptionState();
+}
+
+class _CaptionState extends State<_Caption> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Entry? entry = widget.entry;
+    final Widget text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Flexible(
+              child: Text(
+                widget.showcase.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _hover ? kSiteAccent : kSiteText,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (entry != null) ...<Widget>[
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  '· ${entry.title}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: kSiteTextMuted, fontSize: 14),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_forward, size: 16, color: _hover ? kSiteAccent : kSiteTextMuted),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          widget.showcase.blurb,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: kSiteTextMuted, fontSize: 14, height: 1.4),
+        ),
+      ],
+    );
+    if (entry == null) {
+      return text;
+    }
+    return Semantics(
+      link: true,
+      label: '${widget.showcase.title}: open ${entry.title}',
+      excludeSemantics: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => openEntry(context, entry), child: text),
+      ),
+    );
+  }
+}
+
+/// Why it is fast, in three cards on glass.
+class _Principles extends StatelessWidget {
+  const _Principles({required this.width});
+
+  final double width;
+
+  static const List<(IconData, String, String, Color)> _items = <(IconData, String, String, Color)>[
+    (
+      Icons.layers_outlined,
+      'One look for the whole screen',
+      'Every piece of glass shares one snapshot of what is behind it. Ten panels cost about what one does.',
+      Color(0xFF64D2FF),
+    ),
+    (
+      Icons.pause_circle_outline,
+      'Free while nothing moves',
+      'A still screen takes no new snapshot at all, and glass gliding over still content does not either.',
+      Color(0xFF30D158),
+    ),
+    (
+      Icons.tune,
+      'Turn it down, not off',
+      'Thermal state, low-end GPUs and reduce transparency get a cheaper rung of the same look.',
+      Color(0xFFFF9F0A),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final int columns = width >= 900 ? 3 : (width >= 600 ? 2 : 1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const _Heading(
+          title: 'Fast by design',
+          blurb: 'Glass is expensive when done naively. Here is what this package does instead.',
+        ),
+        const SizedBox(height: 18),
+        _Grid(
+          columns: columns,
+          children: <Widget>[
+            for (final (IconData icon, String title, String body, Color colour) in _items)
+              GlassCard(
+                padding: const EdgeInsets.all(22),
+                child: Builder(
+                  builder: (BuildContext context) {
+                    final Color label = DefaultTextStyle.of(context).style.color ?? kSiteText;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: colour.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(icon, size: 24, color: colour),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          title,
+                          style: TextStyle(color: label, fontSize: 18, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          body,
+                          style: TextStyle(color: label.withValues(alpha: 0.78), fontSize: 14.5, height: 1.5),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// A section's pages as cards, built as they scroll into view.
 class _SectionGrid extends StatelessWidget {
-  const _SectionGrid({required this.section});
+  const _SectionGrid({required this.section, required this.width});
 
   final Section section;
+  final double width;
 
-  static const Map<Section, String> _blurbs = <Section, String>{
+  static const Map<Section, String> blurbs = <Section, String>{
     Section.start: 'Install the package, put one host over the screen, and know what it is doing.',
     Section.foundations: 'The material, the host that captures for it, and the rules every surface follows.',
     Section.components: 'Bars, buttons, controls and modals, each live with its guide, its code and its API.',
@@ -326,24 +736,20 @@ class _SectionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextTheme text = Theme.of(context).textTheme;
-    final double width = MediaQuery.sizeOf(context).width;
-    final int columns = width >= 1300 ? 3 : (width >= 640 ? 2 : 1);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Semantics(
-          header: true,
-          child: Text(section.title, style: text.headlineMedium?.copyWith(color: kSiteText)),
-        ),
-        const SizedBox(height: 6),
-        Text(_blurbs[section]!, style: text.bodyLarge?.copyWith(color: kSiteTextMuted)),
-        const SizedBox(height: 18),
-        _Grid(
-          columns: columns,
-          children: <Widget>[for (final Entry e in entriesOf(section)) _EntryCard(entry: e)],
-        ),
-      ],
+    final List<Entry> entries = entriesOf(section).toList();
+    final int columns = width >= 900 ? 3 : (width >= 560 ? 2 : 1);
+    // The cards are one height, set for three lines of summary at the
+    // reader's text size: a sliver grid lays out cells it has not built.
+    final double extent = 112 + MediaQuery.textScalerOf(context).scale(1) * 84;
+    return SliverGrid.builder(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 14,
+        mainAxisExtent: extent,
+      ),
+      itemCount: entries.length,
+      itemBuilder: (BuildContext context, int i) => _EntryCard(entry: entries[i]),
     );
   }
 }
@@ -428,10 +834,21 @@ class _EntryCardState extends State<_EntryCard> {
                   const SizedBox(height: 14),
                   Text(
                     entry.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: kSiteText, fontSize: 17, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
-                  Text(entry.summary, style: const TextStyle(color: kSiteTextMuted, fontSize: 14, height: 1.5)),
+                  // Loose: a card one line short ends its summary early rather
+                  // than overflowing.
+                  Flexible(
+                    child: Text(
+                      entry.summary,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: kSiteTextMuted, fontSize: 14, height: 1.5),
+                    ),
+                  ),
                 ],
               ),
             ),

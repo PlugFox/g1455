@@ -34,12 +34,16 @@ const Map<String, IconData> _kIcons = <String, IconData>{
   'vertical_split': Icons.vertical_split_outlined,
   'menu_open': Icons.menu_open,
   'chat_bubble': Icons.chat_bubble_outline,
+  'animation': Icons.animation,
   'view_agenda': Icons.view_agenda_outlined,
   'photo': Icons.photo_outlined,
   'widgets': Icons.widgets_outlined,
   'arrow_upward': Icons.arrow_upward,
   'speed': Icons.speed_outlined,
   'visibility': Icons.visibility_outlined,
+  'brightness_6': Icons.brightness_6_outlined,
+  'water_drop': Icons.water_drop_outlined,
+  'space_dashboard': Icons.space_dashboard_outlined,
 };
 
 /// The icon named [name], or a neutral one for a name the map lacks.

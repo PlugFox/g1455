@@ -976,4 +976,333 @@ class SortButton extends StatelessWidget {
 `GlassMenuController`: `open()`, `close()`, `bool get isOpen`. The panel closes only on a tap outside or `close()`.
 ''',
   ),
+
+  // ------------------------------------------------------------------ morph
+  Entry(
+    section: Section.components,
+    id: 'morph',
+    title: 'Morph',
+    icon: 'animation',
+    summary:
+        'One piece of glass that flows to the size of whatever child it holds: a button that becomes a panel, '
+        'with a liquid neck while it moves.',
+    api: <String>['GlassMorph', 'GlassMorphMotion', 'kGlassMorphSpacing'],
+    source: 'lib/src/surface/glass_morph.dart',
+    guide: r'''
+`GlassMorph` holds one child on glass. Give it a child of another identity, another type or another `Key`, and the
+glass flows to the new child's size while the old content fades out and the new fades in. It's how a button becomes its
+menu in iOS 26.
+
+You never type a size: the glass measures the child. `width` and `height` are overrides that pin one axis.
+
+## When to use
+
+- A control that turns into the panel it opens, in place: a "+" into a list of actions, a pill into a search field.
+- A card whose content changes size, where the glass should follow rather than jump.
+- **Not** for a menu that floats over the page and closes on a tap outside. Use the [menu](/components/menu) or the
+  [popover](/components/popover), which bring their own overlay and barrier.
+
+## Usage
+
+```dart
+Align(
+  alignment: Alignment.topRight,
+  child: GlassMorph(
+    alignment: Alignment.topRight,
+    borderRadius: open ? const BorderRadius.all(Radius.circular(28)) : kGlassCapsule,
+    child: open
+        ? ActionsPanel(key: const ValueKey<String>('panel'), onDone: close)
+        : PlusButton(key: const ValueKey<String>('plus'), onTap: openPanel),
+  ),
+)
+```
+
+## Alignment: what holds still
+
+`alignment` is the point of the glass that stays put **inside the morph's own box** while the size changes. The box is
+placed by the morph's parent, so to hold a corner on the screen, the parent has to hold the same corner: an `Align`, a
+`Positioned` with `top` and `right`, the end of a `Row`. Inside a `Center`, the glass grows from its centre whatever
+`alignment` says. Give the parent and the morph the same alignment, as the demo does.
+
+## Identity
+
+The rule is `AnimatedSwitcher`'s. A child of the same type and key is updated in place: no morph, and the glass takes its
+new size at once. Changing `width`, `height` or `borderRadius` alone does morph. A child swapped back while it is still
+fading out keeps its state.
+
+## Motion
+
+- `GlassMorphMotion.fluid`, the default: a spring with a little overshoot.
+- `GlassMorphMotion.calm`: no overshoot, a little slower, for large panels.
+- Or your own: `GlassMorphMotion(duration: ..., bounce: ...)`, SwiftUI's spring parameters.
+- With reduce motion on, there is no motion: the new child and its size arrive at once.
+
+## Cost
+
+- At rest it's one plain glass surface.
+- While it grows, it's a [group](/foundations/groups) of two shapes, and a capture on every frame, because the glass
+  changes size. Wrap a fixed-size ancestor that holds every size the morph takes in a `GlassTravel`, and the motion is
+  drawn from the proxy already held.
+- `spacing: 0` turns the neck off: a plain resize with the cross-fade, and no group even mid-morph.
+
+## Accessibility
+
+- Only the new child is hit and read by a screen reader while the glass moves.
+- Label the controls inside the panel as you would anywhere else.
+''',
+    code: r'''
+import 'package:flutter/material.dart';
+import 'package:g1455/g1455.dart';
+
+/// A "+" in the corner that flows into a panel of actions.
+/// Assumes a GlassHost above, e.g. in MaterialApp.builder.
+class NewThing extends StatefulWidget {
+  const NewThing({super.key});
+
+  @override
+  State<NewThing> createState() => _NewThingState();
+}
+
+class _NewThingState extends State<NewThing> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    // The parent holds the top-right corner, and so does the glass.
+    alignment: Alignment.topRight,
+    child: GlassMorph(
+      alignment: Alignment.topRight,
+      borderRadius: _open ? const BorderRadius.all(Radius.circular(28)) : kGlassCapsule,
+      child: _open
+          ? Column(
+              key: const ValueKey<String>('panel'),
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                for (final String name in <String>['Note', 'List', 'Photo'])
+                  SizedBox(
+                    width: 200,
+                    child: TextButton(onPressed: () => setState(() => _open = false), child: Text(name)),
+                  ),
+              ],
+            )
+          : IconButton(
+              key: const ValueKey<String>('plus'),
+              tooltip: 'New',
+              onPressed: () => setState(() => _open = true),
+              icon: const Icon(Icons.add),
+            ),
+    ),
+  );
+}
+''',
+    properties: r'''
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `child` | `Widget` | **required** | What the glass holds and measures. A child of another type or key starts a morph. |
+| `alignment` | `AlignmentGeometry` | `Alignment.center` | The point that holds still in the morph's box. The parent has to hold it on screen. |
+| `width` | `double?` | `null` | Pins the glass's width; the child is laid out at it. Null measures. |
+| `height` | `double?` | `null` | Pins the glass's height; the child is laid out at it. Null measures. |
+| `borderRadius` | `BorderRadius` | `24` all round | The corners around this child. `kGlassCapsule` is a pill at any size. |
+| `motion` | `GlassMorphMotion` | `GlassMorphMotion.fluid` | The spring. `GlassMorphMotion.calm` has no overshoot. |
+| `spacing` | `double` | `kGlassMorphSpacing` (16) | How far the neck reaches while the glass moves. Zero: no neck and no group. |
+| `finish` | `GlassFinish?` | `null` | The glass. Null takes the theme's. |
+| `labelled` | `bool` | `true` | Whether a label is drawn over the glass, so the theme's label floor applies. |
+| `onEnd` | `VoidCallback?` | `null` | Called when a morph has settled. |
+''',
+  ),
+  // --------------------------------------------------------------- scaffold
+  Entry(
+    section: Section.components,
+    id: 'scaffold',
+    title: 'Scaffold',
+    icon: 'space_dashboard',
+    summary:
+        'GlassScaffold is a whole screen wired the recommended way: a top bar in a scroll edge, an optional bottom bar '
+        'and floating action, and a body that scrolls under them.',
+    api: <String>['GlassScaffold', 'kGlassScaffoldBarHeight', 'kGlassScaffoldBarMargin', 'kGlassScaffoldActionGap'],
+    source: 'lib/src/surface/glass_scaffold.dart',
+    guide: r'''
+`GlassScaffold` lays out a screen of glass: a [bar](/components/bar) at the top in a soft
+[scroll edge](/foundations/scroll-edge), an optional bottom bar such as a [tab bar](/components/tab-bar), an optional
+floating action, and a body that scrolls **under** all of them. It is composition and nothing else: every pixel is
+drawn by a widget you could place yourself. It writes the arrangement once, so you don't have to measure the bars and
+pad the list by hand.
+
+## When to use
+
+- A screen with a scrolling list or grid under a top bar, with or without a tab bar.
+- **Not** for a screen whose glass doesn't sit at the edges, such as a full-screen map with a floating card. Use a
+  `Stack` there.
+- **Not** instead of a host for dialogs and sheets: those are built in the navigator's overlay and need the host above
+  the navigator (see below).
+
+## Usage
+
+```dart
+GlassScaffold(
+  topBar: const GlassBar(
+    child: Row(
+      children: <Widget>[Icon(Icons.arrow_back), SizedBox(width: 12), Text('Library')],
+    ),
+  ),
+  bottomBar: GlassTabBar(
+    items: const <GlassTabItem>[
+      GlassTabItem(icon: Icons.home, label: 'Home'),
+      GlassTabItem(icon: Icons.search, label: 'Search'),
+    ],
+    selectedIndex: tab,
+    onSelected: (int i) => setState(() => tab = i),
+  ),
+  // No padding: the list takes it from the media query.
+  body: ListView.builder(itemCount: 50, itemBuilder: buildRow),
+)
+```
+
+## The body
+
+The body is laid out under the whole scaffold, so content scrolls under the glass. It is told the bars' extents as
+`MediaQuery.padding`, the way Flutter's `Scaffold` does with `extendBody`. A `ListView`, `GridView` or
+`CustomScrollView` with no padding of its own takes it from there: its first row starts below the top bar and its last
+ends above the bottom bar.
+
+A body that isn't a scroll view can read the same padding, or wrap itself in a `SafeArea`. The keyboard is not handled:
+the body sees `MediaQuery.viewInsets` as it is.
+
+## The bars
+
+- **The top bar** is laid out `topBarHeight` tall (`kGlassScaffoldBarHeight`, 56), inside `barMargin` and the safe
+  area. It is declared rather than measured because the scroll edge is laid out from it. `scrollEdge: null` drops the
+  edge and keeps the bar lifted.
+- **The bottom bar** takes its own height, which is measured: a tab bar is 60 tall on a phone and 44 on a wide screen.
+- **The floating action** sits `kGlassScaffoldActionGap` (16) from the end edge and above the bottom bar. It is on the
+  left in a right-to-left app.
+- All three are [lifted](/foundations/above), so glass cards scrolling under them show through.
+
+## The host
+
+With `host: null`, the default, the scaffold mounts a [GlassHost](/foundations/host) only when there is none above it,
+and that host takes every default. `host: true` always mounts one, `host: false` never does.
+
+> [!WARNING]
+> Dialogs, sheets, menus and popovers are built in the navigator's overlay, which a host inside the route does not
+> reach. For an app that uses any of them, put your own host in `MaterialApp(builder: ...)`, as in
+> [Installation](/start/installation), and the scaffold uses it. That is also where you declare the backdrop, the
+> finish and the rest.
+
+The demo above is inside the site, whose host is above, so the scaffold mounts none.
+
+## Cost
+
+It costs what the same screen built by hand costs. While the body scrolls, the content under the bars changes on every
+frame, so every frame of a scroll is one capture, for every glass on the screen at once. A still screen keeps its
+capture. Being lifted is free over plain content, and one more snapshot per recorded frame over glass cards.
+''',
+    code: r'''
+import 'package:flutter/material.dart';
+import 'package:g1455/g1455.dart';
+
+void main() => runApp(const LibraryApp());
+
+class LibraryApp extends StatelessWidget {
+  const LibraryApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    theme: ThemeData.dark(),
+    // The app's host, above the navigator: the scaffold uses it, and so do
+    // dialogs and sheets.
+    builder: (BuildContext context, Widget? child) => GlassHost(
+      backdrop: const Color(0xFF101014),
+      richBackdrop: true,
+      minLabelContrast: kTextContrastAA,
+      child: child!,
+    ),
+    home: const LibraryPage(),
+  );
+}
+
+class LibraryPage extends StatefulWidget {
+  const LibraryPage({super.key});
+
+  @override
+  State<LibraryPage> createState() => _LibraryPageState();
+}
+
+class _LibraryPageState extends State<LibraryPage> {
+  static const List<GlassTabItem> _tabs = <GlassTabItem>[
+    GlassTabItem(icon: Icons.photo_library, label: 'Library'),
+    GlassTabItem(icon: Icons.favorite, label: 'Saved'),
+    GlassTabItem(icon: Icons.search, label: 'Search'),
+  ];
+
+  int _tab = 0;
+  int _count = 30;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFF101014),
+    body: GlassScaffold(
+      topBar: GlassBar(
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(_tabs[_tab].label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+            ),
+            const Icon(Icons.more_horiz),
+          ],
+        ),
+      ),
+      bottomBar: GlassTabBar(items: _tabs, selectedIndex: _tab, onSelected: (int i) => setState(() => _tab = i)),
+      floatingAction: GlassButton(
+        onPressed: () => setState(() => _count++),
+        semanticLabel: 'Add',
+        padding: const EdgeInsets.all(14),
+        child: const Icon(Icons.add),
+      ),
+      // Starts below the top bar, ends above the tab bar, scrolls under both.
+      body: ListView.builder(
+        itemCount: _count,
+        itemBuilder: (BuildContext context, int i) => Container(
+          height: 96,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              colors: <Color>[
+                HSVColor.fromAHSV(1, (i * 37) % 360.0, 0.7, 0.9).toColor(),
+                HSVColor.fromAHSV(1, (i * 37 + 60) % 360.0, 0.8, 0.5).toColor(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+''',
+    properties: r'''
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `body` | `Widget` | **required** | The content. Laid out under the whole scaffold and told the bars' extents through `MediaQuery.padding`. |
+| `topBar` | `Widget?` | `null` | The bar at the top, usually a `GlassBar`. Null for no top bar and no scroll edge. |
+| `topBarHeight` | `double` | `kGlassScaffoldBarHeight` (56) | The height the top bar is laid out in. Must be ≥ 0. |
+| `scrollEdge` | `GlassScrollEdgeStyle?` | `GlassScrollEdgeStyle.soft` | The scroll edge under the top bar. Null for none: the bar is only lifted. |
+| `bottomBar` | `Widget?` | `null` | The bar at the bottom, usually a `GlassTabBar`, at its own height. Lifted. |
+| `floatingAction` | `Widget?` | `null` | A control at the end edge above the bottom bar, usually a `GlassButton`, at its own size. Lifted. |
+| `barMargin` | `EdgeInsets` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. |
+| `host` | `bool?` | `null` | Whether to mount a `GlassHost`: null when there is none above, `true` always, `false` never. |
+| `key` | `Key?` | `null` | |
+
+`double topExtentFor(EdgeInsets safe)`: the top bar's extent from the top of the screen, which the body is told as its
+top padding: the safe area, `barMargin` above and below, and `topBarHeight`.
+
+## Constants
+
+| Name | Value | Description |
+|---|---|---|
+| `kGlassScaffoldBarHeight` | `56` | The default `topBarHeight`. Material's toolbar height. |
+| `kGlassScaffoldBarMargin` | `EdgeInsets.fromLTRB(12, 8, 12, 8)` | The default `barMargin`. |
+| `kGlassScaffoldActionGap` | `16` | How far the floating action stands from the end edge and from the bottom bar. |
+''',
+  ),
 ];

@@ -37,6 +37,10 @@ export 'src/proxy/proxy_role.dart'
 // target. What a component adds is the label's colour, which is D178's law spent
 // rather than restated.
 export 'src/surface/glass_above.dart' show GlassAbove, RenderGlassAbove, kGlassModalLift;
+// Glass that reads its own backdrop: opt-in on the host, and what a reading is
+// — the one input to the label and the branch that is measured on the device
+// rather than declared.
+export 'src/surface/glass_adaptive.dart' show GlassAdaptive, GlassBackdropReading;
 export 'src/surface/glass_components.dart'
     show GlassBar, GlassButton, GlassCard, kGlassDisabledDarkLabel, kGlassDisabledLightLabel, kGlassMinTapTarget;
 // Controls whose knob becomes a clear drop while held (spike 27): the drop
@@ -52,6 +56,9 @@ export 'src/surface/glass_controls.dart'
         kGlassDropScale,
         kGlassSwitchDropWiden,
         kGlassSwitchSize;
+// How a held drop deforms as it launches and brakes: a theme token, the pure
+// model a custom control can feed, and the ticker that runs it.
+export 'src/surface/glass_drop_motion.dart' show GlassDropMotion, GlassDropStretch, GlassDropStretchDriver;
 export 'src/surface/glass_scroll_edge.dart'
     show
         GlassScrollEdge,
@@ -83,7 +90,8 @@ export 'src/surface/glass_modal.dart'
         kGlassSheetRadius,
         showGlassDialog,
         showGlassSheet;
-export 'src/surface/glass_tab_bar.dart' show GlassTabBar, GlassTabItem, kGlassTabDropGrow, kGlassTabDropZoom;
+export 'src/surface/glass_tab_bar.dart'
+    show GlassTabBar, GlassTabItem, GlassTabItemBuilder, GlassTabItemLook, kGlassTabDropGrow, kGlassTabDropZoom;
 export 'src/surface/glass_text_field.dart' show GlassTextField, kGlassFieldHeight;
 export 'src/surface/glass_toolbar.dart'
     show GlassButtonGroup, GlassToolbarItem, kGlassToolbarHeight, kGlassToolbarItemWidth;
@@ -103,7 +111,12 @@ export 'src/surface/glass_finish.dart'
 // not API at all, because it is a runtime decision about price.
 export 'src/surface/glass_group.dart'
     show GlassBlendGroup, GlassGroup, GlassGroupScope, GlassUnion, RenderGlassGroup, kMaxFusedShapes, unionBlendRadius;
+// One glass that flows to the size of the child it is given, through the
+// group's union while it moves and a lone surface at rest.
+export 'src/surface/glass_morph.dart' show GlassMorph, GlassMorphMotion, kGlassMorphSpacing;
 export 'src/surface/glass_host.dart' show GlassHost;
+export 'src/surface/glass_scaffold.dart'
+    show GlassScaffold, kGlassScaffoldActionGap, kGlassScaffoldBarHeight, kGlassScaffoldBarMargin;
 // The configuration level of the three-level structure (SS7.2), and the finish
 // ladder it carries. Both are API by construction: the ladder has no automatic
 // input at all, so the only way onto a rung below the top one is to say so.

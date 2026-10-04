@@ -88,11 +88,13 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('held, the drop is captured once in its own finish; dragged, not again', (
-    WidgetTester tester,
-  ) async {
+  Future<void> heldAndDragged(WidgetTester tester, GlassDropMotion motion) async {
     final GlobalKey hostKey = GlobalKey();
-    await _mount(tester, hostKey, const _Screen(control: _Control.toggle));
+    await _mount(
+      tester,
+      hostKey,
+      _Screen(key: ValueKey<GlassDropMotion>(motion), control: _Control.toggle, dropMotion: motion),
+    );
     final dynamic host = hostKey.currentState! as dynamic;
     final int atRest = host.recorded as int;
 
@@ -119,29 +121,193 @@ void main() {
     // Small steps: the knob travels 22 px in all, and a step that pinned it at
     // the stop would move nothing.
     final int moves = drop.drawRecordsOnMove;
+    final int records = drop.drawRecords;
     var moved = 0;
+    var deformed = 0;
     Rect where = drop.globalRect;
     for (var i = 0; i < 6; i++) {
       await gesture.moveBy(const Offset(2, 0));
       await tester.pump(const Duration(milliseconds: 16));
       if (drop.globalRect != where) {
         moved++;
+        if (drop.globalRect.size != where.size) {
+          deformed++;
+        }
         where = drop.globalRect;
       }
     }
-    expect(moved, 6, reason: 'the drop did not follow the finger');
-    expect((host.recorded as int) - lifted, 0, reason: 'dragging a held drop retook the proxy');
-    expect(
-      drop.drawRecordsOnMove - moves,
-      moved,
-      reason: 'the drop was redrawn by a paint, not by moving',
-    );
+    expect(moved, 6, reason: '$motion: the drop did not follow the finger');
+    expect((host.recorded as int) - lifted, 0, reason: '$motion: dragging a held drop retook the proxy');
+    if (motion.isNone) {
+      expect(deformed, 0);
+      expect(
+        drop.drawRecordsOnMove - moves,
+        moved,
+        reason: 'the drop was redrawn by a paint, not by moving',
+      );
+    } else {
+      // Deformed, it is drawn by a paint of its own layer instead — one draw
+      // a frame all the same, and nothing captured.
+      expect(deformed, greaterThan(0), reason: 'the drop did not stretch');
+      expect(drop.drawRecords - records, moved, reason: 'a deformed drop is more than one draw a frame');
+    }
 
     // Past the middle at release, so the value commits.
     await gesture.up();
     await tester.pumpAndSettle();
     expect(find.text('on'), findsOneWidget, reason: 'a drag past the middle did not commit');
     expect(_handle(tester).frame!.keys, hasLength(1), reason: 'the settled drop is still captured');
+  }
+
+  testWidgets('held, the drop is captured once in its own finish; dragged, not again', (
+    WidgetTester tester,
+  ) async {
+    // Twice: keeping its shape, where a drag is drawn by moving alone; and
+    // stretching, the default.
+    for (final GlassDropMotion motion in const <GlassDropMotion>[GlassDropMotion.none, GlassDropMotion()]) {
+      await heldAndDragged(tester, motion);
+    }
+  });
+
+  testWidgets('the drop stretches launching and squashes braking, inside its region', (
+    WidgetTester tester,
+  ) async {
+    await _mount(tester, GlobalKey(), const _Screen(control: _Control.toggle));
+    final TestGesture gesture = await tester.startGesture(
+      tester.getTopLeft(find.byType(GlassSwitch)) + const Offset(21, 22),
+    );
+    await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveBy(const Offset(-20, 0));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final RenderGlassSurface drop = _drop(tester);
+    final Size held = drop.size;
+    expect(held, _kSwitchKnob * kGlassDropScale, reason: 'held still, the drop is not round');
+    final RenderGlassTravel travel = tester.renderObject<RenderGlassTravel>(find.byType(GlassTravel));
+    final Rect region = MatrixUtils.transformRect(travel.getTransformTo(null), Offset.zero & travel.size);
+    // Across the track by hand, fast, then held still: launch, brake, settle.
+    var most = 0.0;
+    var least = 0.0;
+    for (final double dx in <double>[6, 6, 6, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) {
+      if (dx != 0) {
+        await gesture.moveBy(Offset(dx, 0));
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      final double s = _stretchOf(drop.size, held);
+      most = math.max(most, s);
+      least = math.min(least, s);
+      expect(
+        region.expandToInclude(drop.globalRect) == region,
+        isTrue,
+        reason: 'the deformed drop left its region: ${drop.globalRect} in $region',
+      );
+    }
+    expect(most, greaterThan(0.005), reason: 'the drop did not stretch launching');
+    expect(least, lessThan(-0.005), reason: 'the drop did not squash braking');
+    expect(most, lessThanOrEqualTo(const GlassDropMotion().maxStretch));
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(drop.size, held, reason: 'held still, the drop did not spring back');
+    expect(tester.binding.hasScheduledFrame, isFalse, reason: 'a drop held still keeps drawing');
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a drop held at its rest size still narrows as it stretches and as it squashes', (
+    WidgetTester tester,
+  ) async {
+    // At `dropScale` 1 the held drop is the knob, and each deformation takes
+    // one axis below it: the height setting off, the width braking.
+    await _mount(tester, GlobalKey(), const _Screen(control: _Control.toggle, dropScale: 1));
+    final TestGesture gesture = await tester.startGesture(
+      tester.getTopLeft(find.byType(GlassSwitch)) + const Offset(21, 22),
+    );
+    await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveBy(const Offset(-20, 0));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final RenderGlassSurface drop = _drop(tester);
+    expect(drop.size, _kSwitchKnob, reason: 'held still at scale 1, the drop is not the knob');
+    var lowest = double.infinity;
+    var narrowest = double.infinity;
+    for (final double dx in <double>[6, 6, 6, 4, 0, 0, 0, 0, 0, 0]) {
+      if (dx != 0) {
+        await gesture.moveBy(Offset(dx, 0));
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      lowest = math.min(lowest, drop.size.height);
+      narrowest = math.min(narrowest, drop.size.width);
+    }
+    expect(lowest, lessThan(_kSwitchKnob.height - 0.1), reason: 'stretched, the drop kept its rest height');
+    expect(narrowest, lessThan(_kSwitchKnob.width - 0.1), reason: 'squashed, the drop kept its rest width');
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the slider\'s drop is round at rest and gliding, and long setting off', (
+    WidgetTester tester,
+  ) async {
+    await _mount(tester, GlobalKey(), const _Screen(control: _Control.slider));
+    final Rect slider = tester.getRect(find.byType(GlassSlider));
+    final TestGesture gesture = await tester.startGesture(slider.centerLeft + const Offset(40, 0));
+    // Past the slop, back, and held: the drop placed by the tap is round.
+    await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveBy(const Offset(-20, 0));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final RenderGlassSurface drop = _drop(tester);
+    final Size held = drop.size;
+    expect(held, _kSliderKnob * kGlassDropScale, reason: 'at rest, the drop is not round');
+    var most = 0.0;
+    final glide = <double>[];
+    for (var i = 0; i < 50; i++) {
+      await gesture.moveBy(const Offset(4, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+      final double s = _stretchOf(drop.size, held);
+      most = math.max(most, s);
+      if (i >= 40) {
+        glide.add(s);
+      }
+    }
+    expect(most, greaterThan(0.005), reason: 'the drop did not stretch setting off');
+    for (final double s in glide) {
+      expect(s.abs(), lessThan(0.002), reason: 'gliding at a constant speed, the drop is deformed');
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('no stretch under reduced motion, or with none', (WidgetTester tester) async {
+    for (final (GlassDropMotion? motion, bool reduced) in <(GlassDropMotion?, bool)>[
+      (GlassDropMotion.none, false),
+      (null, true),
+    ]) {
+      await _mount(
+        tester,
+        GlobalKey(),
+        _Screen(control: _Control.toggle, dropMotion: motion),
+        reducedMotion: reduced,
+      );
+      final TestGesture gesture = await tester.startGesture(
+        tester.getTopLeft(find.byType(GlassSwitch)) + const Offset(21, 22),
+      );
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final RenderGlassSurface drop = _drop(tester);
+      final Size held = drop.size;
+      for (final double dx in <double>[20, 6, 6, 0, 0, 0]) {
+        await gesture.moveBy(Offset(dx, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(drop.size, held, reason: '$motion, reduced motion $reduced: the drop deformed');
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
   });
 
   test('the drop optics reproduce the two readings they were fitted to (D218)', () {
@@ -321,6 +487,13 @@ void main() {
 
 enum _Control { none, toggle, slider }
 
+const Size _kSwitchKnob = Size(38, 24);
+const Size _kSliderKnob = Size(38, 24);
+
+/// The stretch a drop of [size] shows against its round [held] size: its
+/// aspect is `(1 + s)²` times the held one.
+double _stretchOf(Size size, Size held) => math.sqrt(size.aspectRatio / held.aspectRatio) - 1;
+
 Finder _finder(_Control control) => find.byType(control == _Control.toggle ? GlassSwitch : GlassSlider);
 
 Iterable<RenderGlassSurface> _drops(WidgetTester tester) => tester
@@ -328,7 +501,17 @@ Iterable<RenderGlassSurface> _drops(WidgetTester tester) => tester
     .where((RenderGlassSurface s) => s.declaredFinish?.name == GlassFinish.clear.name);
 
 class _Screen extends StatefulWidget {
-  const _Screen({required this.control, this.dropScale, this.enabled = true, this.on = false});
+  const _Screen({
+    required this.control,
+    this.dropScale,
+    this.dropMotion,
+    this.enabled = true,
+    this.on = false,
+    super.key,
+  });
+
+  /// Passed to the control.
+  final GlassDropMotion? dropMotion;
 
   /// Null `onChanged` when false.
   final bool enabled;
@@ -367,6 +550,7 @@ class _ScreenState extends State<_Screen> {
               value: _on,
               onChanged: widget.enabled ? (bool v) => setState(() => _on = v) : null,
               dropScale: widget.dropScale ?? kGlassDropScale,
+              dropMotion: widget.dropMotion,
             ),
           ),
         if (widget.control == _Control.slider)
@@ -378,6 +562,7 @@ class _ScreenState extends State<_Screen> {
               value: _value,
               onChanged: widget.enabled ? (double v) => setState(() => _value = v) : null,
               dropScale: widget.dropScale ?? kGlassDropScale,
+              dropMotion: widget.dropMotion,
             ),
           ),
         Positioned(
@@ -393,10 +578,10 @@ class _ScreenState extends State<_Screen> {
   );
 }
 
-Future<void> _mount(WidgetTester tester, GlobalKey hostKey, Widget screen) async {
+Future<void> _mount(WidgetTester tester, GlobalKey hostKey, Widget screen, {bool reducedMotion = false}) async {
   await tester.pumpWidget(
     MediaQuery(
-      data: const MediaQueryData(size: kScreen, devicePixelRatio: 2),
+      data: MediaQueryData(size: kScreen, devicePixelRatio: 2, disableAnimations: reducedMotion),
       child: Directionality(
         textDirection: TextDirection.ltr,
         child: Align(

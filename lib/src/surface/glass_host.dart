@@ -34,6 +34,8 @@ import '../proxy/proxy_retake.dart';
 import '../proxy/proxy_walk.dart';
 import '../proxy/shadow_filter.dart';
 import 'glass_above.dart';
+import 'glass_adaptive.dart';
+import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_group.dart';
 import 'glass_ledger.dart';
@@ -108,20 +110,26 @@ class GlassProxyHandle extends ChangeNotifier {
   static ui.FragmentProgram? _cachedRippleProgram;
   static Future<ui.FragmentProgram>? _loadingRipple;
 
+  /// The one load of the ripple program per process, which fills the cache
+  /// before anything waiting on it runs — shared by [wantRippleProgram] and
+  /// [GlassHost.precache].
+  static Future<ui.FragmentProgram> _loadRipple() => _loadingRipple ??= _loadShader(
+    kGlassRippleShaderAsset,
+    (ui.FragmentProgram program) => _cachedRippleProgram = program,
+    () => _loadingRipple = null,
+  );
+
   /// Loads [rippleProgram], once per process, and notifies when it lands.
   void wantRippleProgram() {
     if (rippleProgram != null) {
       return;
     }
-    (_loadingRipple ??= ui.FragmentProgram.fromAsset(kGlassRippleShaderAsset)).then((
-      ui.FragmentProgram program,
-    ) {
-      _cachedRippleProgram = program;
+    _loadRipple().then((ui.FragmentProgram program) {
       if (_rippleProgram == null && !_disposed) {
         _rippleProgram = program;
         notifyListeners();
       }
-    });
+    }, onError: _reportShaderLoadError);
   }
 
   bool _disposed = false;
@@ -216,6 +224,21 @@ class GlassProxyHandle extends ChangeNotifier {
   /// [generation]: the two reset together, with the tree, and a throttle that
   /// never fired and one that fired every frame are otherwise the same run.
   int throttled = 0;
+
+  /// How many times the host has read the backdrop back for glass that reads
+  /// it (`GlassHost.adaptive`) — zero for ever on a host without it, which is
+  /// the observable that says the feature costs nothing when off.
+  ///
+  /// Counted when a read is started rather than when it lands, because the
+  /// start is what was paid for: a read-back still in flight when the host goes
+  /// away cost its copy all the same.
+  int readBacks = 0;
+
+  /// The verdicts of the glass under this host, when it reads its backdrop;
+  /// null when it does not. What a component listens to — apart from this
+  /// handle, whose own notifications repaint every surface.
+  GlassBackdropReadings? get readings => _readings;
+  GlassBackdropReadings? _readings;
 
   /// Declares a change nothing above the content is painted for.
   ///
@@ -334,6 +357,7 @@ class GlassHost extends StatefulWidget {
     this.richBackdrop = false,
     this.minLabelContrast,
     this.ripple,
+    this.dropMotion = const GlassDropMotion(),
     this.thermal,
     this.thermalPolicy = const GlassThermalPolicy(),
     this.budgetDeltaE = ProxyResolutionPolicy.defaultDamageBudgetDeltaE,
@@ -344,6 +368,7 @@ class GlassHost extends StatefulWidget {
     this.maxTextureSide,
     this.blurPass,
     this.content = GlassContentDeclaration.byDefault,
+    this.adaptive,
     super.key,
   });
 
@@ -406,9 +431,44 @@ class GlassHost extends StatefulWidget {
   /// when the finish cannot reach it. See [GlassThemeData.minLabelContrast].
   final double? minLabelContrast;
 
+  /// Whether the glass reads its own backdrop, and how; null — the default —
+  /// for glass that goes by what is declared ([backdrop], [richBackdrop], the
+  /// platform's appearance).
+  ///
+  /// Set, each component under this host ([GlassBar], [GlassCard],
+  /// [GlassButton]) is told the mean level of the captured backdrop inside its
+  /// own box, and picks the branch of `.regular` and its label colour from it —
+  /// so a bar over a photograph's sky and a button over its shadow each wear
+  /// the branch Apple's material would. The precedence against what is
+  /// declared, and the band and hold that keep it from flickering, are in
+  /// [GlassAdaptive] and `glass_adaptive.dart`.
+  ///
+  /// **What it costs** is one small asynchronous read-back per capture at most,
+  /// never per frame, and nothing on a frame that keeps its capture unless a
+  /// glass moved inside its [GlassTravel]; at most one per
+  /// [GlassAdaptive.interval], which is longer on the web, where a read-back
+  /// stalls CanvasKit. A screen whose glass reads both branches of `.regular`
+  /// is priced by the stricter one, which can lower the capture's divisor.
+  /// Off, nothing is read, recorded or scheduled, and
+  /// [GlassProxyHandle.readBacks] stays at zero.
+  ///
+  /// A raw [GlassSurface] does not adapt on its own: the label is the
+  /// component's, and so is the move between branches.
+  /// [GlassThemeData.adaptedTo] is what a custom component calls to do the
+  /// same, with a reading it gets from `GlassProxyHandle.readings` — which,
+  /// with [GlassProxyScope] and [GlassBackdropReadings], is exported by
+  /// `package:g1455/glass_diagnostics.dart`, not by this library.
+  final GlassAdaptive? adaptive;
+
   /// The wave every surface below makes when touched, or null for none — the
   /// platform's behaviour. See [GlassThemeData.ripple] and [GlassRipple].
   final GlassRipple? ripple;
+
+  /// How the held drop of the switch, the slider, the segmented control and
+  /// the tab bar deforms as it launches and brakes, unless a control declares
+  /// its own. [GlassDropMotion.none] keeps every drop round. It costs no
+  /// capture; see [GlassThemeData.dropMotion] and [GlassDropMotion].
+  final GlassDropMotion dropMotion;
 
   /// The device's thermal state, as the application read it — the package
   /// ships no platform code to read it (D219). Null is nominal.
@@ -529,6 +589,59 @@ class GlassHost extends StatefulWidget {
   /// and says so keeps the quality the floor of 4096 would have spent.
   final int? maxTextureSide;
 
+  /// Compiles the package's shaders now, so that the first glass on screen is
+  /// drawn through its optics rather than without them.
+  ///
+  /// ```dart
+  /// Future<void> main() async {
+  ///   WidgetsFlutterBinding.ensureInitialized();
+  ///   await GlassHost.precache();
+  ///   runApp(const MyApp());
+  /// }
+  /// ```
+  ///
+  /// **What it changes.** A host otherwise starts compiling in its
+  /// `initState` — `FragmentProgram.fromAsset` is a future — and until a
+  /// program lands, the glass that needs it draws a stand-in:
+  ///
+  ///  - a surface with a proxy and no surface program draws the captured,
+  ///    blurred backdrop clipped to its shape: no tint, no rim, no bend
+  ///    (`RenderGlassSurface.paintsWithOptics` counts the difference). A faded
+  ///    surface, such as a soft `GlassScrollEdge`, draws nothing;
+  ///  - a fused [GlassGroup] with no group program draws nothing at all, and
+  ///    its members leave their glass to it;
+  ///  - a touched surface under a [GlassRipple] with no ripple program draws
+  ///    the surface program, which is the picture without the wave.
+  ///
+  /// The content on the glass — a bar's title, a button's icon — is drawn in
+  /// every case. Once this future completes, every host mounted afterwards
+  /// finds the programs in the cache and hands them to its surfaces in its
+  /// `initState`, before its first frame.
+  ///
+  /// **What it does not change.** A capture reads the frame that was just
+  /// painted, so the very first frame of a host has no proxy and its glass
+  /// draws only its content, precached or not; the first frame that *has* a
+  /// proxy is the one this makes glass. The lower rungs ([GlassTier.cheap],
+  /// [GlassTier.opaque]) read no program and do not need it.
+  ///
+  /// Shares the loads a host starts on its own, so it is idempotent, costs
+  /// nothing once the programs are in, and never compiles one twice — called
+  /// after a host has mounted, it waits for the load already in flight.
+  /// [group] and [ripple] leave out the blend group's program and the
+  /// ripple's, for an application that uses neither; every host still loads
+  /// the group program itself when it mounts. Completes with a load's error
+  /// if one fails.
+  static Future<void> precache({bool group = true, bool ripple = true}) async {
+    // What is cached is not waited on: the load that filled it is done, and
+    // its future belongs to the zone that started it — in a widget test, the
+    // fake clock of a test that may have ended, which nothing flushes again.
+    await Future.wait(<Future<ui.FragmentProgram>>[
+      if (_GlassHostState._cachedProgram == null) _GlassHostState._loadBase(),
+      if (group && _GlassHostState._cachedGroupProgram == null) _GlassHostState._loadGroup(),
+      if (ripple && GlassProxyHandle._cachedRippleProgram == null) GlassProxyHandle._loadRipple(),
+    ]);
+  }
+
   @override
   State<GlassHost> createState() => _GlassHostState();
 }
@@ -623,6 +736,32 @@ class _GlassHostState extends State<GlassHost> {
   /// is inherited, and `initState` may not read it.
   late GlassFinish _finish;
 
+  /// The appearance `.regular` was picked in, or null when a finish was named —
+  /// what lets a reading pick the branch again for one glass.
+  Brightness? get _regularAppearance =>
+      widget.finish != null ? null : (MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light);
+
+  /// Reads the backdrop back for [GlassHost.adaptive]; null — and nothing at
+  /// all — without it.
+  GlassBackdropReader? _reader;
+
+  void _adapt() {
+    final GlassAdaptive? adaptive = widget.adaptive;
+    final GlassBackdropReader? reader = _reader;
+    if (adaptive == null) {
+      if (reader != null) {
+        _handle._readings = null;
+        reader.dispose();
+        _reader = null;
+      }
+    } else if (reader == null) {
+      _reader = GlassBackdropReader(adaptive, _handle);
+      _handle._readings = _reader!.readings;
+    } else {
+      reader.adaptive = adaptive;
+    }
+  }
+
   GlassFinish _resolveFinish() =>
       widget.finish ??
       GlassFinish.regular(
@@ -635,6 +774,21 @@ class _GlassHostState extends State<GlassHost> {
   static ui.FragmentProgram? _cachedGroupProgram;
   static Future<ui.FragmentProgram>? _loadingGroup;
 
+  /// The one load of each program per process, which fills the cache before
+  /// anything waiting on it runs — shared by every host's `initState` and by
+  /// [GlassHost.precache], so neither path compiles a program twice.
+  static Future<ui.FragmentProgram> _loadBase() => _loading ??= _loadShader(
+    kGlassShaderAsset,
+    (ui.FragmentProgram program) => _cachedProgram = program,
+    () => _loading = null,
+  );
+
+  static Future<ui.FragmentProgram> _loadGroup() => _loadingGroup ??= _loadShader(
+    kGlassGroupShaderAsset,
+    (ui.FragmentProgram program) => _cachedGroupProgram = program,
+    () => _loadingGroup = null,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -643,6 +797,7 @@ class _GlassHostState extends State<GlassHost> {
     // rebuilt whenever the finish, the budget or the declaration changes, and a
     // listener bound to the old one would declare changes to a dead object.
     _handle.changes.addListener(_noteDeclaredChange);
+    _adapt();
     _loadProgram();
     _loadGroupProgram();
   }
@@ -664,14 +819,11 @@ class _GlassHostState extends State<GlassHost> {
       _handle.program = cached;
       return;
     }
-    (_loading ??= ui.FragmentProgram.fromAsset(kGlassShaderAsset)).then((
-      ui.FragmentProgram program,
-    ) {
-      _cachedProgram = program;
+    _loadBase().then((ui.FragmentProgram program) {
       if (mounted) {
         _handle.program = program;
       }
-    });
+    }, onError: _reportShaderLoadError);
   }
 
   /// The same, for the fused draw.
@@ -686,14 +838,11 @@ class _GlassHostState extends State<GlassHost> {
       _handle.groupProgram = cached;
       return;
     }
-    (_loadingGroup ??= ui.FragmentProgram.fromAsset(kGlassGroupShaderAsset)).then((
-      ui.FragmentProgram program,
-    ) {
-      _cachedGroupProgram = program;
+    _loadGroup().then((ui.FragmentProgram program) {
       if (mounted) {
         _handle.groupProgram = program;
       }
-    });
+    }, onError: _reportShaderLoadError);
   }
 
   /// The first build, and a rebuild when the appearance moves `.regular` to
@@ -742,6 +891,9 @@ class _GlassHostState extends State<GlassHost> {
   @override
   void didUpdateWidget(GlassHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.adaptive != oldWidget.adaptive) {
+      _adapt();
+    }
     final GlassFinish resolved = _resolveFinish();
     final bool finishMoved = resolved != _finish;
     _finish = resolved;
@@ -776,6 +928,7 @@ class _GlassHostState extends State<GlassHost> {
     _pipeline.dispose();
     _oracle.dispose();
     _handle.changes.removeListener(_noteDeclaredChange);
+    _reader?.dispose();
     _handle.dispose();
     _ledger
       ..removeListener(_markersChanged)
@@ -852,6 +1005,11 @@ class _GlassHostState extends State<GlassHost> {
     final rects = <Rect>[];
     final present = <GlassSurfaceGeometry>[];
     final finishes = <GlassFinish>[];
+    // The boxes a reading averages, and only when something reads them.
+    final GlassBackdropReader? reader = _reader;
+    final List<({GlassSurfaceGeometry surface, Rect box})>? boxes = reader == null
+        ? null
+        : <({GlassSurfaceGeometry surface, Rect box})>[];
     for (final GlassSurfaceGeometry surface in keys) {
       final GlassSurfaceRecord? record = surface.readGeometry();
       // A surface below the top rung is in the register and not in the capture:
@@ -874,6 +1032,7 @@ class _GlassHostState extends State<GlassHost> {
         );
         present.add(surface);
         finishes.add(finish);
+        boxes?.add((surface: surface, box: record.rect));
       }
     }
     if (rects.isEmpty) {
@@ -882,6 +1041,11 @@ class _GlassHostState extends State<GlassHost> {
       // promised: there is no image for a surface to sample even by mistake.
       _handle.publish(null);
       _publishUpper(const <GlassProxyFrame?>[]);
+      // Nothing to read, but the surfaces that left still leave: a screen
+      // whose last glass went, or whose glass all fell to a rung that reads
+      // nothing, would otherwise keep its verdicts, and the render objects
+      // they are keyed by, for the host's lifetime.
+      reader?.prune(const <GlassSurfaceGeometry>{});
       return;
     }
     // What each slot is blurred by is an input to the capture the oracle
@@ -930,12 +1094,36 @@ class _GlassHostState extends State<GlassHost> {
         throttled++;
         _handle.throttled = throttled;
       }
+      // A reader that has never read — turned on over a still screen — reads
+      // the capture already held, once, and so does glass that moved inside
+      // its travel: the capture holds, and what is under the glass does not.
+      // Every other held frame reads nothing.
+      if (reader != null && (reader.hungry || reader.moved(boxes!))) {
+        _feed(reader, boxes!);
+      }
       return;
     }
     recorded++;
     _handle.publish(result.frame);
     _captureUpper(root, levels, present, rects, finishes, dpr);
     _readCounters();
+    // On a frame that published: a held frame has nothing new under the glass,
+    // which is what makes the read-back per capture and not per frame.
+    if (reader != null) {
+      _feed(reader, boxes!);
+    }
+  }
+
+  /// Hands the capture just published, or held, to the reader.
+  ///
+  /// Pruned to the surfaces in the capture, not to every one registered: a
+  /// glass that fell to a rung that reads nothing, or to presence zero, is
+  /// registered and has nothing under it to read, and a verdict kept for it
+  /// would go on standing in for the declarations it should be back on.
+  void _feed(GlassBackdropReader reader, List<({GlassSurfaceGeometry surface, Rect box})> boxes) {
+    reader
+      ..prune(<GlassSurfaceGeometry>{for (final (:GlassSurfaceGeometry surface, box: _) in boxes) surface})
+      ..captured(boxes, SchedulerBinding.instance.currentSystemFrameTimeStamp);
   }
 
   /// Records the levels of glass that stand on glass, bottom up, each one
@@ -1238,6 +1426,10 @@ class _GlassHostState extends State<GlassHost> {
           richBackdrop: widget.richBackdrop,
           minLabelContrast: widget.minLabelContrast,
           ripple: widget.ripple,
+          dropMotion: widget.dropMotion,
+          adaptive: widget.adaptive,
+          // Only for a reader: off, the theme is the one it always was.
+          regularAppearance: widget.adaptive == null ? null : _regularAppearance,
         ),
         child: GlassProxyScope(
           handle: _handle,
@@ -1428,3 +1620,47 @@ class _Level {
   final List<GlassFinish> finishes;
   final bool mixed;
 }
+
+/// How every host, ripple and [GlassHost.precache] loads a shader:
+/// [ui.FragmentProgram.fromAsset], which a widget test cannot make fail — the
+/// engine reads the asset itself, past the asset channel's mock.
+///
+/// A test that has to see a load fail sets this before anything loads, in a
+/// file of its own, since the programs are cached per process; nothing else
+/// should set it.
+@visibleForTesting
+Future<ui.FragmentProgram> Function(String asset) debugGlassShaderLoader = ui.FragmentProgram.fromAsset;
+
+/// One load of the program at [asset], which fills the cache through [cache]
+/// before anything waiting on it runs.
+///
+/// A load that fails is forgotten through [forget], so the next host to mount,
+/// or the next [GlassHost.precache], tries again instead of being handed the
+/// same failure: an application that caught a failed precache and started
+/// anyway gets its shaders from the host's own attempt.
+Future<ui.FragmentProgram> _loadShader(
+  String asset,
+  void Function(ui.FragmentProgram program) cache,
+  void Function() forget,
+) => debugGlassShaderLoader(asset).then(
+  (ui.FragmentProgram program) {
+    cache(program);
+    return program;
+  },
+  onError: (Object error, StackTrace stack) {
+    forget();
+    Error.throwWithStackTrace(error, stack);
+  },
+);
+
+/// Reports a shader that a host or a ripple waited on and that failed to load,
+/// rather than leaving it to the zone as an uncaught error. The glass draws
+/// its stand-in without the program, as it does while one is loading.
+void _reportShaderLoadError(Object error, StackTrace stack) => FlutterError.reportError(
+  FlutterErrorDetails(
+    exception: error,
+    stack: stack,
+    library: 'glass',
+    context: ErrorDescription('while loading a glass shader'),
+  ),
+);

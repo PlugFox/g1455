@@ -17,9 +17,9 @@ doc/api/
 .env.*
 local.properties
 
-# Repository-only. The README's full-size loops are served from GitHub (pub.dev
-# resolves the README's relative links against `repository`); the half-size
-# ones in doc/screenshots/ are what pub ships.
+# Repository-only. The README links its images relatively, and pub.dev resolves
+# them against `repository`, so the full-size loops are served from GitHub; the
+# half-size ones in doc/screenshots/ are what pub ships.
 /doc/showcase/
 /tool/
 /.github/
@@ -29,5 +29,9 @@ local.properties
 # The runs the constants in lib/ came from, and the tests that check them, live
 # in the repository: 6.9 MB nobody's build reads.
 /provenance/
-# The README's banner, served from GitHub like the full-size loops.
+# The README's banner and How it works cards, served from GitHub like the
+# full-size loops.
 /doc/readme/
+
+# The plan; the changelog is what shipped.
+/ROADMAP.md

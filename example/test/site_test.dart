@@ -7,6 +7,7 @@ import 'package:g1455_example/src/catalog/catalog.dart';
 import 'package:g1455_example/src/demos/demos.dart';
 import 'package:g1455_example/src/pages/entry_page.dart';
 import 'package:g1455_example/src/pages/home_page.dart';
+import 'package:g1455_example/src/pages/home_showcase.dart';
 import 'package:g1455_example/src/pages/not_found_page.dart';
 import 'package:g1455_example/src/widgets/icons.dart';
 import 'package:squid/squid.dart';
@@ -95,16 +96,37 @@ void main() {
   });
 
   group('pages', () {
-    testWidgets('the home page, wide: a side panel and every section', (WidgetTester tester) async {
-      _size(tester, const Size(1440, 900));
-      await tester.pumpWidget(const GlassExampleApp(initialLocation: '/'));
-      await _frames(tester, 6);
-      expect(find.byType(HomePage), findsOneWidget);
-      expect(find.byType(GlassHost), findsOneWidget);
-      for (final Section s in Section.values) {
-        expect(find.text(s.title), findsWidgets, reason: s.title);
-      }
-    });
+    for (final Size size in const <Size>[Size(1440, 900), Size(375, 812)]) {
+      testWidgets('the home page at ${size.width.toInt()} wide: every scene and every section', (
+        WidgetTester tester,
+      ) async {
+        _size(tester, size);
+        await tester.pumpWidget(const GlassExampleApp(initialLocation: '/'));
+        await _frames(tester, 6);
+        expect(find.byType(HomePage), findsOneWidget);
+        expect(find.byType(GlassHost), findsOneWidget);
+        // Built as it scrolls: the footer only once scrolled to, and every
+        // scene and every section on the way builds and runs.
+        final Finder page = find.descendant(of: find.byType(HomePage), matching: find.byType(CustomScrollView));
+        Finder onPage(Finder finder) => find.descendant(of: page, matching: finder);
+        expect(onPage(find.textContaining('MIT licensed')), findsNothing);
+        final Finder scrollable = find.descendant(of: page, matching: find.byType(Scrollable)).first;
+        for (final String title in <String>[
+          for (final Showcase showcase in kShowcases) showcase.title,
+          for (final Section s in Section.values) s.title,
+        ]) {
+          // Built is enough: the grid builds a little past the screen's edge.
+          for (var i = 0; i < 40 && onPage(find.text(title)).evaluate().isEmpty; i++) {
+            await tester.drag(scrollable, const Offset(0, -200));
+            await _frames(tester, 2, title);
+          }
+          expect(onPage(find.text(title)), findsWidgets, reason: title);
+        }
+        await tester.scrollUntilVisible(onPage(find.textContaining('MIT licensed')), 400, scrollable: scrollable);
+        await _frames(tester, 2);
+        expect(onPage(find.text(kShowcases.first.title)), findsNothing);
+      });
+    }
 
     testWidgets('a deep link opens its page and its tab, and a tab is an address', (WidgetTester tester) async {
       _size(tester, const Size(1280, 900));

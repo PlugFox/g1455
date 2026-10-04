@@ -549,6 +549,7 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
 | `trackColor` | `Color` | `Color(0x29787880)` | Track colour when off. |
 | `dropScale` | `double` | `kGlassDropScale` | Size of the held drop relative to the knob. At least 1. |
 | `dropWiden` | `double` | `kGlassSwitchDropWiden` | How many px of the surroundings the drop pulls in (a slight zoom-out). 0 for none. |
+| `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `semanticLabel` | `String?` | `null` | Screen-reader label. Or wrap the row in `MergeSemantics` with a `Text`. |
 | `key` | `Key?` | `null` | |
 
@@ -701,6 +702,7 @@ class _DisplayControlsState extends State<DisplayControls> {
 | `trackColor` | `Color` | `Color(0x29787880)` | The rest of the track. |
 | `dropScale` | `double` | `kGlassDropScale` | Size of the held drop relative to the knob. At least 1. |
 | `dropWiden` | `double` | `0` | How many px of the surroundings the drop pulls in. |
+| `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `semanticLabel` | `String?` | `null` | Screen-reader label. |
 | `semanticStep` | `double` | `0.1` | How far one accessibility increase or decrease moves the value. Between 0 (exclusive) and 1. |
 | `key` | `Key?` | `null` | |
@@ -837,6 +839,7 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
 | `onSelected` | `ValueChanged<int>?` | **required** | Called with the new index. Null disables the control (half opacity). |
 | `trackColor` | `Color` | `kGlassSegmentTrack` | The track's fill. |
 | `thumbColor` | `Color` | `Color(0xFFFFFFFF)` | The capsule under the selected segment at rest. |
+| `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `key` | `Key?` | `null` | |
 
 ## Constants
@@ -856,7 +859,14 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
     summary:
         'GlassTabBar is the floating iOS 26 tab bar. The selected tab lifts into a glass drop that magnifies '
         'the bar and can be dragged from tab to tab.',
-    api: <String>['GlassTabBar', 'GlassTabItem', 'kGlassTabDropZoom', 'kGlassTabDropGrow'],
+    api: <String>[
+      'GlassTabBar',
+      'GlassTabItem',
+      'GlassTabItemLook',
+      'GlassTabItemBuilder',
+      'kGlassTabDropZoom',
+      'kGlassTabDropGrow',
+    ],
     source: 'lib/src/surface/glass_tab_bar.dart',
     guide: r'''
 `GlassTabBar` is the floating tab bar of iOS 26: a [Bar](/components/bar) holding two to five tabs,
@@ -909,10 +919,35 @@ behind it.
 - The drop is glass over glass (the bar), so while it is held the host captures one extra level.
   At rest, the bar is one surface.
 - Each tab is a button for screen readers, labelled with its `label` and marked selected.
+- The held drop stretches as it sets off and squashes as it lands. `dropMotion:` tunes it or turns it off; see
+  [Drop motion](/foundations/drop-motion).
+
+## Custom icons and badges
+
+An `IconData` is drawn by the bar in the right colour: the accent when selected, otherwise the label colour its glass
+chose. For anything else, an SVG, an image, a badge, give `iconBuilder` (or `labelBuilder`), which is handed that
+colour and size in a `GlassTabItemLook`:
+
+```dart
+GlassTabItem(
+  label: 'Inbox',
+  iconBuilder: (BuildContext context, GlassTabItemLook look) => Badge(
+    label: const Text('3'),
+    child: Icon(Icons.inbox, color: look.color, size: look.iconSize),
+  ),
+)
+```
+
+`label` stays what a screen reader says, whatever the builders draw. The items are built once and again only when
+their colour changes, which is when the drop moves onto them or off them.
 
 > [!WARNING]
 > If glass cards scroll under the tab bar, wrap it in [`GlassAbove`](/foundations/above), or put a bottom
 > [scroll edge](/foundations/scroll-edge) under it. Otherwise the bar shows the content but not the cards.
+
+> [!TIP]
+> [`GlassScaffold`](/components/scaffold) places a tab bar as its `bottomBar`: lifted, at the bottom of the safe area,
+> with the list padded to end above it.
 ''',
     code: r'''
 import 'package:flutter/material.dart';
@@ -978,14 +1013,34 @@ class _AppShellState extends State<AppShell> {
 | `onSelected` | `ValueChanged<int>?` | **required** | Called with the new tab. Null disables the bar. |
 | `activeColor` | `Color` | `Color(0xFF007AFF)` | Icon and label colour of the selected tab, and of the tab under a held drop. |
 | `dropZoom` | `double` | `kGlassTabDropZoom` | How much the held drop magnifies the bar. `1` for none; must be above 0. |
+| `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `key` | `Key?` | `null` | |
 
 ## GlassTabItem
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `icon` | `IconData` | **required** | The tab's icon. |
-| `label` | `String` | **required** | The tab's label, also read by screen readers. |
+| `label` | `String` | **required** | The tab's name: the text drawn unless `labelBuilder` is given, and what a screen reader says always. |
+| `icon` | `IconData?` | `null` | The tab's icon, drawn in the colour the bar resolved. Ignored when `iconBuilder` is given. |
+| `iconBuilder` | `GlassTabItemBuilder?` | `null` | Builds the icon instead of `icon`: an SVG, an image, a badge. Sized by you; the bar's own icons are `look.iconSize`. |
+| `labelBuilder` | `GlassTabItemBuilder?` | `null` | Builds the label instead of the text of `label`. |
+
+An item needs an `icon` or an `iconBuilder`; it asserts. `GlassTabItemBuilder` is
+`Widget Function(BuildContext context, GlassTabItemLook look)`.
+
+## GlassTabItemLook
+
+What the bar resolved for one item, as it draws it.
+
+| Field | Type | Description |
+|---|---|---|
+| `index` | `int` | Which item. |
+| `color` | `Color` | The colour the item is drawn in now: `activeColor` when `highlighted`, otherwise the label colour the bar's glass chose. |
+| `iconSize` | `double` | The size the bar draws its own icons at: 26 stacked, 20 side by side. |
+| `labelStyle` | `TextStyle` | The label's style, `color` included. |
+| `selected` | `bool` | Whether this is `selectedIndex`. |
+| `highlighted` | `bool` | Whether this item takes the accent: the selected one at rest, the one under the drop while it is held. |
+| `inline` | `bool` | Whether the bar lays icon beside label (a wide bar) rather than icon over label. |
 
 ## Constants
 

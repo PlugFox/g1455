@@ -1,3 +1,4 @@
+import 'adaptive_demo.dart';
 import 'demos.dart';
 import 'finishes_demo.dart';
 import 'host_demo.dart';
@@ -11,5 +12,6 @@ final Map<String, DemoBuilder> kDemosFoundationsA = <String, DemoBuilder>{
   'surface': () => const SurfaceDemo(),
   'finishes': () => const FinishesDemo(),
   'legibility': () => const LegibilityDemo(),
+  'adaptive': () => const AdaptiveDemo(),
   'tiers': () => const TiersDemo(),
 };

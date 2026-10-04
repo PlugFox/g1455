@@ -1,7 +1,9 @@
 import 'alert_demo.dart';
 import 'demos.dart';
 import 'menu_demo.dart';
+import 'morph_demo.dart';
 import 'popover_demo.dart';
+import 'scaffold_demo.dart';
 import 'sheet_demo.dart';
 import 'text_field_demo.dart';
 import 'toolbar_demo.dart';
@@ -14,4 +16,6 @@ final Map<String, DemoBuilder> kDemosComponentsB = <String, DemoBuilder>{
   'sheet': () => const SheetDemo(),
   'menu': () => const MenuDemo(),
   'popover': () => const PopoverDemo(),
+  'morph': () => const MorphDemo(),
+  'scaffold': () => const ScaffoldDemo(),
 };

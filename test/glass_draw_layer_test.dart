@@ -159,11 +159,13 @@ void main() {
     });
 
     testWidgets('a painter that throws leaves no recording behind', (WidgetTester tester) async {
+      final ui.FragmentShader before = program.fragmentShader();
       layer.painter = (Canvas canvas) {
-        releaseGlassShader(program.fragmentShader());
+        releaseGlassShader(before);
         throw StateError('painter');
       };
       expect(composite, throwsStateError);
+      expect(before.debugDisposed, isTrue, reason: 'the shader drawn before the throw was kept by nothing');
 
       // Outside the layer again: a release goes to the frame queue.
       final ui.FragmentShader after = program.fragmentShader();
