@@ -215,6 +215,38 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('a drop held at its rest size still narrows as it stretches and as it squashes', (
+    WidgetTester tester,
+  ) async {
+    // At `dropScale` 1 the held drop is the knob, and each deformation takes
+    // one axis below it: the height setting off, the width braking.
+    await _mount(tester, GlobalKey(), const _Screen(control: _Control.toggle, dropScale: 1));
+    final TestGesture gesture = await tester.startGesture(
+      tester.getTopLeft(find.byType(GlassSwitch)) + const Offset(21, 22),
+    );
+    await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveBy(const Offset(-20, 0));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final RenderGlassSurface drop = _drop(tester);
+    expect(drop.size, _kSwitchKnob, reason: 'held still at scale 1, the drop is not the knob');
+    var lowest = double.infinity;
+    var narrowest = double.infinity;
+    for (final double dx in <double>[6, 6, 6, 4, 0, 0, 0, 0, 0, 0]) {
+      if (dx != 0) {
+        await gesture.moveBy(Offset(dx, 0));
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      lowest = math.min(lowest, drop.size.height);
+      narrowest = math.min(narrowest, drop.size.width);
+    }
+    expect(lowest, lessThan(_kSwitchKnob.height - 0.1), reason: 'stretched, the drop kept its rest height');
+    expect(narrowest, lessThan(_kSwitchKnob.width - 0.1), reason: 'squashed, the drop kept its rest width');
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('the slider\'s drop is round at rest and gliding, and long setting off', (
     WidgetTester tester,
   ) async {

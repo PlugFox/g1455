@@ -118,7 +118,12 @@ class _Drop extends StatelessWidget {
     final double now = 1 + (scale - 1) * lift;
     return SizedBox.fromSize(
       size: rest,
+      // Loose both ways: the squashed axis of a drop held at `dropScale` 1 is
+      // smaller than its rest, and a minimum left to the tight box above
+      // would hold it there.
       child: OverflowBox(
+        minWidth: 0,
+        minHeight: 0,
         maxWidth: double.infinity,
         maxHeight: double.infinity,
         child: SizedBox.fromSize(
