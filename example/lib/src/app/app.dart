@@ -77,8 +77,11 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
     final WebClient? client = widget.webClient();
     // Once a day at most: closed less than [kNoticeQuiet] ago, it stays closed.
     // Only a close counts — a reload with the sheet still open shows it again.
+    // A close dated in the future — a clock set ahead then, or a stored value
+    // gone wrong — is not trusted: it would keep the notice away until then.
+    final DateTime now = DateTime.now();
     final DateTime? closed = widget.noticeClosed();
-    final bool quiet = closed != null && DateTime.now().difference(closed) < kNoticeQuiet;
+    final bool quiet = closed != null && !closed.isAfter(now) && now.difference(closed) < kNoticeQuiet;
     if (!quiet && needsSiteNotice(reduced: widget.opensReduced, client: client)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_notice(client)));
     }
