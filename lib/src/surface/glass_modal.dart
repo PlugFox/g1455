@@ -373,25 +373,66 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) =>
       themes.wrap(_GlassSheet(route: this));
 
-  void _drag(double fraction) {
+  /// How far a sheet a drag cannot close is pulled, in its heights. Its own
+  /// offset rather than the route's controller: the controller's value goes
+  /// through the entrance curve, which is flat near the top, and a pull there
+  /// moved the sheet by a few pixels at most.
+  final ValueNotifier<double> _pull = ValueNotifier<double>(0);
+  AnimationController? _back;
+  double _pulledFrom = 0;
+  final GlobalKey _sheet = GlobalKey();
+
+  double _sheetHeight() => _sheet.currentContext?.size?.height ?? double.infinity;
+
+  /// [fraction] is the drag in the page's heights, [sheet] in the sheet's.
+  void _drag(double fraction, {required double sheet}) {
+    if (!dismissible) {
+      // A quarter of the way, and never more than half its height: a pull
+      // that is felt, and goes nowhere.
+      _back?.stop();
+      _pull.value = (_pull.value + sheet / 4).clamp(0.0, 0.5);
+      return;
+    }
     final AnimationController? c = controller;
     if (c != null) {
-      // One a drag cannot close gives a quarter of the way, and never more
-      // than half its height: a pull that is felt, and goes nowhere.
-      c.value = dismissible ? (c.value - fraction).clamp(0.0, 1.0) : (c.value - fraction / 4).clamp(0.5, 1.0);
+      c.value = (c.value - fraction).clamp(0.0, 1.0);
     }
   }
 
   void _release(double velocityFraction) {
+    if (!dismissible) {
+      _springBack();
+      return;
+    }
     final AnimationController? c = controller;
     if (c == null) {
       return;
     }
-    if (dismissible && (velocityFraction > 1.5 || c.value < 2 / 3)) {
+    if (velocityFraction > 1.5 || c.value < 2 / 3) {
       navigator?.pop();
     } else {
       c.forward();
     }
+  }
+
+  void _springBack() {
+    final NavigatorState? navigator = this.navigator;
+    if (_pull.value == 0 || navigator == null) {
+      return;
+    }
+    _pulledFrom = _pull.value;
+    final AnimationController back = _back ??= AnimationController(
+      vsync: navigator,
+      duration: const Duration(milliseconds: 300),
+    )..addListener(() => _pull.value = _pulledFrom * (1 - Curves.easeOutCubic.transform(_back!.value)));
+    back.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _back?.dispose();
+    _pull.dispose();
+    super.dispose();
   }
 }
 
@@ -414,21 +455,22 @@ class _GlassSheet extends StatelessWidget {
           child: GlassAbove(
             lift: kGlassModalLift,
             child: AnimatedBuilder(
-              animation: progress,
+              animation: Listenable.merge(<Listenable>[progress, route._pull]),
               builder: (BuildContext context, Widget? child) {
                 final double t = Curves.easeOutCubic.transform(progress.value.clamp(0.0, 1.0));
-                return FractionalTranslation(translation: Offset(0, 1.05 * (1 - t)), child: child);
+                return FractionalTranslation(translation: Offset(0, 1.05 * (1 - t) + route._pull.value), child: child);
               },
               child: GestureDetector(
                 onVerticalDragUpdate: (DragUpdateDetails d) {
                   final double h = context.size?.height ?? 1;
-                  route._drag(d.primaryDelta! / h);
+                  route._drag(d.primaryDelta! / h, sheet: d.primaryDelta! / route._sheetHeight());
                 },
                 onVerticalDragEnd: (DragEndDetails d) {
                   final double h = context.size?.height ?? 1;
                   route._release(d.primaryVelocity! / h);
                 },
                 child: GlassSurface(
+                  key: route._sheet,
                   borderRadius: const BorderRadius.all(Radius.circular(kGlassSheetRadius)),
                   finish: route.finish,
                   child: Column(

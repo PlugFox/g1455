@@ -129,11 +129,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('close'), findsOneWidget, reason: 'Escape closed it');
 
+    // A quarter of the way, up to half the sheet's height: felt, not a hair.
+    final double height = _surfaceAbove(tester, find.text('close')).globalRect.height;
     final TestGesture pull = await tester.startGesture(tester.getCenter(find.text('close')));
     await pull.moveBy(const Offset(0, 20));
-    await pull.moveBy(const Offset(0, 300));
+    await pull.moveBy(const Offset(0, 200));
     await tester.pump();
-    expect(tester.getBottomLeft(find.text('close')).dy, greaterThan(bottom), reason: 'a pull is not felt');
+    expect(tester.getBottomLeft(find.text('close')).dy - bottom, closeTo(200 / 4, 1), reason: 'a pull is not felt');
+    await pull.moveBy(const Offset(0, 2000));
+    await tester.pump();
+    expect(tester.getBottomLeft(find.text('close')).dy - bottom, closeTo(height / 2, 1), reason: 'past half');
     await pull.up();
     await tester.pumpAndSettle();
     expect(tester.getBottomLeft(find.text('close')).dy, closeTo(bottom, 0.01), reason: 'it did not spring back');
