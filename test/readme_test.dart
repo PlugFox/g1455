@@ -83,7 +83,7 @@ void main() {
     test('every block is a verbatim piece of test/readme/patterns.dart', () {
       final String source = File('test/readme/patterns.dart').readAsStringSync();
       final List<String> blocks = _dartBlocks(_section('Common patterns'));
-      expect(blocks, hasLength(5));
+      expect(blocks, hasLength(6));
       for (final String block in blocks) {
         expect(source.contains(block.trim()), isTrue, reason: 'not in patterns.dart:\n$block');
       }
@@ -110,6 +110,15 @@ void main() {
       await _frames(tester);
       expect(find.byType(GlassAbove), findsOneWidget);
       expect(find.byType(GlassCard), findsWidgets);
+    });
+
+    testWidgets('a stand-in for a video under glass', (WidgetTester tester) async {
+      await tester.pumpWidget(_hosted(const Player(video: ColoredBox(color: Color(0xFF000000)))));
+      await _frames(tester);
+      expect(tester.takeException(), isNull);
+      final GlassProxy proxy = tester.widget(find.byType(GlassProxy));
+      expect(proxy.role, GlassProxyRole.replace);
+      expect(find.byType(GlassBar), findsOneWidget);
     });
 
     testWidgets('a menu and a dialog over a bar', (WidgetTester tester) async {

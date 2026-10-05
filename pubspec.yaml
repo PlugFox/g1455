@@ -20,7 +20,14 @@ topics:
 
 # Half-size loops shot by `tool/showcase.sh` (SHOWCASE_DPR=1): pub ships every
 # file listed here, and the README's full-size ones stay in the repository.
+#
+# The first is the package's picture in pub.dev's search results, which shows
+# one still frame of the first screenshot: so a square, still image leads, the
+# site's 512-px icon (`example/web/icons/Icon-512.png`, drawn by the package
+# itself in `example/tool/brand_test.dart`).
 screenshots:
+  - description: 'The g1455 icon: a disc of clear glass refracting a grid and a yellow disc behind it.'
+    path: doc/screenshots/g1455.png
   - description: 'GlassGroup: three clear glass blobs orbit and fuse into one silhouette where they meet.'
     path: doc/screenshots/group.webp
   - description: 'GlassFinish: regular, clear and frosted glass side by side over the same backdrop.'

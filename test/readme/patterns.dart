@@ -148,6 +148,30 @@ class NotesBar extends StatelessWidget {
   );
 }
 
+class Player extends StatelessWidget {
+  const Player({super.key, required this.video});
+
+  /// A platform view, a `Texture`, anything that paints outside Flutter's own
+  /// pictures.
+  final Widget video;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: <Widget>[
+      GlassProxy.replace(
+        // A gradient of the poster's colours. Write a GlassProxyPainter of your
+        // own for anything else: the last frame as an image, the map's tiles.
+        painter: const GradientProxyPainter(
+          LinearGradient(colors: <Color>[Color(0xFF1B1F2A), Color(0xFFFF9F0A)]),
+        ),
+        child: video,
+      ),
+      const Positioned(left: 16, right: 16, bottom: 16, child: GlassBar(child: Text('Live'))),
+    ],
+  );
+}
+
 Widget cheapApp({required bool reduceTransparency, required bool lowEndDevice}) => MaterialApp(
   builder: (BuildContext context, Widget? navigator) => GlassHost(
     backdrop: Colors.white, // what the opaque rung fills to match

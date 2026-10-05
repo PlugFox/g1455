@@ -1,14 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:g1455/g1455.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/theme.dart';
+import '../catalog/catalog.dart';
 import '../platform/browser_info.dart';
+import '../platform/site_update.dart';
 import 'site_icon.dart';
 
 /// Read once per visit: a WebGL2 context is not free, and the answers do not
 /// change while the page is open.
 final BrowserInfo? _kInfo = readBrowserInfo();
+
+/// When it was read: a number on this page is only good for its moment.
+final DateTime _kReadAt = DateTime.now();
+
+/// What the site was built with, beside what the browser says: the numbers on
+/// this page mean something only next to the versions that drew them.
+BrowserFacts _build() {
+  final DateTime t = _kReadAt.toLocal();
+  String two(int v) => v.toString().padLeft(2, '0');
+  final Duration offset = t.timeZoneOffset;
+  final String zone =
+      '${offset.isNegative ? '−' : '+'}${two(offset.inHours.abs())}:${two(offset.inMinutes.abs() % 60)}';
+  return BrowserFacts('Build', <(String, String)>[
+    ('g1455', Site.version),
+    (
+      'Flutter',
+      '${FlutterVersion.version ?? '—'}${FlutterVersion.channel == null ? '' : ' (${FlutterVersion.channel})'}',
+    ),
+    (
+      'Engine',
+      switch (FlutterVersion.engineRevision) {
+        final String e => e.length > 10 ? e.substring(0, 10) : e,
+        null => '—',
+      },
+    ),
+    ('Dart', FlutterVersion.dartVersion?.split(' ').first ?? '—'),
+    ('Site build', kSiteVersion.isEmpty ? 'local' : kSiteVersion),
+    ('Read at', '${t.year}-${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)} $zone'),
+  ]);
+}
 
 /// What this browser says about its GPU and screen, next to what the package
 /// assumes about them — on the web only; nothing at all elsewhere.
@@ -68,7 +101,7 @@ class BrowserReport extends StatelessWidget {
                 spacing: 28,
                 runSpacing: 16,
                 children: <Widget>[
-                  for (final BrowserFacts group in info.groups)
+                  for (final BrowserFacts group in <BrowserFacts>[...info.groups, _build()])
                     SizedBox(
                       width: width < 600 ? double.infinity : 300,
                       child: _Group(group: group),
