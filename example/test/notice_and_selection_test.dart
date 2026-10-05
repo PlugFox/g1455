@@ -70,15 +70,20 @@ void main() {
       expect(_barLabel(GlassPreset.medium.label), findsOneWidget);
     });
 
-    testWidgets('copies the address and says so', (WidgetTester tester) async {
+    testWidgets('copies the address, says so, and stays open with no close kept', (WidgetTester tester) async {
       _size(tester, const Size(1280, 800));
       final List<String> copied = _clipboard(tester);
-      await _open(tester);
+      final closes = <DateTime>[];
+      await tester.pumpWidget(
+        GlassExampleApp(initialLocation: '/', opensReduced: true, noticeClosed: () => null, onNoticeClosed: closes.add),
+      );
+      await _frames(tester, 20);
       await tester.tap(find.text('Copy link'));
       await _frames(tester, 30);
       expect(copied, <String>[Uri.base.toString()]);
-      expect(find.text(_title), findsNothing);
       expect(find.text('Link copied: paste it into Chrome'), findsOneWidget);
+      expect(find.text(_title), findsOneWidget, reason: 'copying the link closed the notice');
+      expect(closes, isEmpty, reason: 'copying the link kept a close');
       await _settle(tester);
     });
 
@@ -160,7 +165,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Copy link'));
       await _frames(tester, 30);
       expect(copied, hasLength(1));
-      expect(find.text('Best on a desktop'), findsNothing);
+      expect(find.text('Best on a desktop'), findsOneWidget);
       await _settle(tester);
     });
 

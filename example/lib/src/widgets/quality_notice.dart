@@ -228,8 +228,9 @@ class _Notice extends StatelessWidget {
         // size, with the link's.
         final bool compact = constraints.maxWidth < scaler.scale(reduced ? 450 : 320);
         final EdgeInsets pad = EdgeInsets.symmetric(horizontal: compact ? 14 : 20, vertical: 10);
-        // Each closes the sheet. Off the recommended setup the one that closes
-        // and stays is red: it is the choice the sheet advises against.
+        // Each closes the sheet; the link button does not. Off the recommended
+        // setup the one that closes and stays is red: it is the choice the
+        // sheet advises against.
         final List<Widget> actions = <Widget>[
           if (reduced) ...<Widget>[
             Tooltip(
@@ -283,11 +284,13 @@ class _Notice extends StatelessWidget {
       child: GlassButton(
         semanticLabel: compact ? 'Copy link' : null,
         padding: compact ? const EdgeInsets.all(10) : const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        // Copies and stays: the sheet is still open, unanswered, and comes
+        // back on the next load if this browser is kept. The toast is in the
+        // root overlay, over the sheet.
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: Uri.base.toString()));
           if (context.mounted) {
             showGlassToast(context, 'Link copied: paste it into Chrome', icon: SFIcons.sf_link);
-            Navigator.of(context).pop();
           }
         },
         child: compact
