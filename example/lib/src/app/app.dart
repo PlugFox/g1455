@@ -92,8 +92,8 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
     if (context == null || !mounted) {
       return;
     }
-    // Closed by any of its buttons, the barrier or a drag: the sheet's route
-    // completes only when it is popped.
+    // Closed only by its buttons: the sheet's route completes when it is
+    // popped, and nothing else pops it.
     await showSiteNotice(
       context,
       reduced: widget.opensReduced,
