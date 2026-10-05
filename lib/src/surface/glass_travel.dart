@@ -23,6 +23,11 @@ import 'package:flutter/widgets.dart';
 /// Owned by [GlassTravel]'s state for the reason [GlassBlendGroup] is: the
 /// surfaces find it while they are being built, where no render object is
 /// reachable.
+///
+/// Made by [GlassTravel] and found through [GlassTravelScope.maybeOf]; an
+/// application does not make one.
+///
+/// {@category Composition}
 class GlassTravelRegion {
   RenderGlassTravel? _box;
 
@@ -55,9 +60,46 @@ class GlassTravelRegion {
 /// parent should paint nothing of its own — the content it moves over belongs
 /// behind a `RepaintBoundary` of its own, which is what the package's own
 /// components do.
+///
+/// A surface that leaves the region is captured again, so the declaration is
+/// a price and never a correctness claim: a region drawn too small costs
+/// captures, never a wrong picture.
+///
+/// ```dart
+/// GlassTravel(
+///   child: SizedBox(
+///     width: 320,
+///     height: 64,
+///     child: Stack(
+///       children: <Widget>[
+///         const Positioned.fill(child: RepaintBoundary(child: Track())), // still content
+///         AnimatedPositioned(
+///           duration: const Duration(milliseconds: 200),
+///           left: knobX,
+///           top: 8,
+///           width: 48,
+///           height: 48,
+///           child: const GlassSurface(borderRadius: kGlassCapsule),
+///         ),
+///       ],
+///     ),
+///   ),
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [GlassSlider], [GlassSwitch] and [GlassTabBar], whose drops move inside
+///    one.
+///  * [GlassMorph], which can move inside one around a fixed-size ancestor.
+///  * [Travel on the site](https://g1455.plugfox.dev/foundations/travel).
+///
+/// {@category Composition}
 class GlassTravel extends StatefulWidget {
+  /// Declares [child]'s box as the region the glass inside it moves within.
   const GlassTravel({required this.child, super.key});
 
+  /// The subtree whose glass moves; the region is this child's box.
   final Widget child;
 
   @override
@@ -76,11 +118,19 @@ class _GlassTravelState extends State<GlassTravel> {
 
 /// Carries the region down to the surfaces inside it. Never notifies: the
 /// region's identity is fixed and its geometry is read when asked.
+///
+/// Put in the tree by [GlassTravel]; a custom glass control reads it.
+///
+/// {@category Composition}
 class GlassTravelScope extends InheritedWidget {
+  /// Makes [region] the travel region of the surfaces in [child].
   const GlassTravelScope({required this.region, required super.child, super.key});
 
+  /// The region the surfaces below may move within.
   final GlassTravelRegion region;
 
+  /// The region of the nearest [GlassTravel] above [context], or null when
+  /// there is none.
   static GlassTravelRegion? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<GlassTravelScope>()?.region;
 
@@ -103,10 +153,17 @@ class _GlassTravelBox extends SingleChildRenderObjectWidget {
 }
 
 /// The box behind [GlassTravel]. Transparent to layout, paint and hit testing.
+///
+/// {@category Composition}
 class RenderGlassTravel extends RenderProxyBox {
+  /// The box that answers for [GlassTravelRegion.globalRect] while it is
+  /// attached.
   RenderGlassTravel(this._region);
 
   GlassTravelRegion _region;
+
+  /// The region this box answers for. Setting another hands the old one back
+  /// to "no declaration".
   set region(GlassTravelRegion value) {
     if (identical(value, _region)) {
       return;

@@ -44,9 +44,38 @@ import 'surface/glass_ledger.dart';
 /// *choices* — the proxy's divisor, whether slots merge — no longer depend on
 /// it at all: they are made on quality, and the lever they pull has the same
 /// sign on every family measured, the unmeasured one included (D136).
+///
+/// Handed to [GlassHost.hardware]; null there means [detect]. The same value
+/// reads the glass ledger through [surfaceCostModel]:
+///
+/// ```dart
+/// final GlassHardware hardware = GlassHardware.detect();
+/// final GlassLoad? load = GlassScope.maybeOf(context)?.read(
+///   viewSize: MediaQuery.sizeOf(context),
+///   model: hardware.surfaceCostModel,
+/// );
+/// ```
+///
+/// A host that knows it runs on an Adreno 830 says so, because nothing in Dart
+/// can tell it:
+///
+/// ```dart
+/// GlassHost(hardware: GlassHardware.adrenoVulkan, child: const MyScreen())
+/// ```
+///
+/// See also:
+///
+///  * [ProxyCostModel] and [GlassSurfaceCostModel], the two model shapes this
+///    one name selects.
+///  * [ProxyBlurPass.defaultFor], the one default keyed on it.
+///  * <https://g1455.plugfox.dev/start/declarations> and
+///    <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 enum GlassHardware {
   /// Adreno 830 / Impeller-Vulkan, which is where every cycle number in this
-  /// project comes from (SM-S938B).
+  /// project comes from (Galaxy S25 Ultra SM-S938B, Snapdragon 8 Elite,
+  /// Android 16, cycles read off kgsl as busy × frequency).
   ///
   /// Declaring this on another Adreno is an extrapolation the host owns: the
   /// laws were fitted on one chip. Declaring it on a Mali or an Xclipse is
@@ -54,7 +83,8 @@ enum GlassHardware {
   /// resolution for a saving nobody has seen.
   adrenoVulkan,
 
-  /// Apple Metal, measured on an M2 iPad Pro on iOS 26 (D56, D71, D119, D128).
+  /// Apple Metal, measured on an M2 iPad Pro (11" 4th generation, iPad14,3) on
+  /// iPadOS 26.6.1 (D56, D71, D119, D128).
   ///
   /// The one family where our whole route has been measured against its own
   /// floor rather than assembled out of other people's grids, and where the
@@ -66,7 +96,8 @@ enum GlassHardware {
   ///
   /// They used to. "The conservative end of every policy" was full resolution
   /// and no merging, and the first unmeasured device anybody ran got 37 fps
-  /// from it where a quarter gets 115 and the stock Material 120 (D134). Two
+  /// from it where a quarter gets 115 and the stock Material 120 (D134, Galaxy
+  /// S22 Ultra, Xclipse 920). Two
   /// refusals made for one reason multiplied into an atlas larger than the
   /// screen it sampled (D135). The conservative end of a lever whose sign is
   /// measured on every family is the *pulled* end.
@@ -92,7 +123,7 @@ enum GlassHardware {
   }
 
   /// How this hardware charges for a capture — the input
-  /// `ProxyResolutionPolicy.choose` needs.
+  /// [ProxyResolutionPolicy.choose] needs.
   ProxyCostModel get captureCostModel {
     switch (this) {
       case GlassHardware.adrenoVulkan:
@@ -105,7 +136,8 @@ enum GlassHardware {
   }
 
   /// The largest texture this family is *guaranteed* to allocate, in device
-  /// pixels a side — the bound [AtlasLayout.fitsTexture] is asked about (D186).
+  /// pixels a side — the bound the atlas is checked against before it is
+  /// recorded (`AtlasLayout.fitsTexture`, D186).
   ///
   /// **Every number here is a specification floor, not a measurement**, and
   /// that is the whole of its authority: Vulkan guarantees
@@ -114,8 +146,8 @@ enum GlassHardware {
   /// which no shipping GPU sits at, and which is where this package's own
   /// `shelfWidth` default came from. Real devices are far above all three
   /// (16384 on both Apple GPUs, Xclipse and Adreno, D188/D195), so a host that
-  /// knows its device should say so: `GlassProxyPipeline(maxTextureSide: ...)`
-  /// overrides this, and raising it buys quality back, because the only
+  /// knows its device should say so: [GlassHost.maxTextureSide] overrides
+  /// this, and raising it buys quality back, because the only
   /// response the pipeline has to the ceiling is a deeper divisor.
   ///
   /// It cannot be detected, which is the same sentence as everything else in
@@ -144,7 +176,8 @@ enum GlassHardware {
     }
   }
 
-  /// Which measurements the glass ledger reads itself against.
+  /// Which measurements the glass ledger reads itself against — the `model`
+  /// [GlassLedger.read] takes.
   GlassSurfaceCostModel get surfaceCostModel {
     switch (this) {
       case GlassHardware.adrenoVulkan:

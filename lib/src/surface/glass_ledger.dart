@@ -60,8 +60,18 @@ import 'glass_tier.dart';
 /// or scrolled subtree reports where it actually is, and a *rotated* one
 /// reports its bounding box, which is larger than the glass. The rotation case
 /// is named rather than handled: no measurement covers it.
+///
+/// Produced by [GlassSurfaceGeometry.readGeometry] and read through
+/// [GlassLedger.surfaces]; an application reads these rather than builds them.
+///
+/// See also:
+///
+///  * [GlassLedger.read], which sums them into a [GlassLoad].
+///
+/// {@category Cost and policy}
 @immutable
 class GlassSurfaceRecord {
+  /// A surface at [rect] covering [shapeArea], as its render object reports it.
   const GlassSurfaceRecord({
     required this.rect,
     required this.shapeArea,
@@ -135,6 +145,11 @@ class GlassSurfaceRecord {
 /// surface was before the list moved, for as long as nothing else dirties it —
 /// measured, in `glass_surface_test.dart`, where a jump of 60 logical pixels
 /// left the cached rect exactly where it started.
+///
+/// Implemented by [RenderGlassSurface]; a custom render object that draws
+/// glass implements it and calls [GlassLedger.register] when it attaches.
+///
+/// {@category Cost and policy}
 abstract interface class GlassSurfaceGeometry {
   /// Where this surface is now, or null if it cannot say — not attached to a
   /// tree, or attached and not yet laid out. Null is a surface that is not on
@@ -143,7 +158,7 @@ abstract interface class GlassSurfaceGeometry {
 
   /// The layer this surface composites into, or null before it has painted.
   ///
-  /// Read by [ProxyLayerWatch], which has to skip it: a published proxy
+  /// Read by the host's layer watch, which has to skip it: a published proxy
   /// repaints every surface by construction, so a watch that looked at them
   /// would see the pipeline's own output and record for ever. Where the surface
   /// *is* stays this register's business, which is why the watch skips the
@@ -173,6 +188,11 @@ abstract interface class GlassSurfaceGeometry {
 /// invariant, and the only thing about grouping that is not an optimisation.
 /// The reverse does not hold and must not be assumed: a tab bar and a floating
 /// button can share a texture without ever fusing.
+///
+/// Implemented by the blend group ([GlassBlendGroup]), and registered with
+/// [GlassLedger.registerCluster].
+///
+/// {@category Cost and policy}
 abstract interface class GlassSurfaceCluster {
   /// The surfaces this cluster draws as one shape, in a stable order.
   ///
@@ -184,7 +204,7 @@ abstract interface class GlassSurfaceCluster {
   /// The layer the cluster's own glass composites into, or null before it has
   /// painted.
   ///
-  /// Read by [ProxyLayerWatch] for the same reason a surface's is: a cluster
+  /// Read by the host's layer watch for the same reason a surface's is: a cluster
   /// *draws* glass, so a watch that looked at its layer would see the pipeline's
   /// own output and record for ever. The members' layers are inside this one and
   /// are excluded with it, which is right rather than convenient — the walk
@@ -223,6 +243,28 @@ abstract interface class GlassSurfaceCluster {
 /// stops repainting keeps its last known place instead of vanishing from the
 /// tally on a frame where nothing moved. It leaves the register when its render
 /// object detaches, which is what a disposed list cell does.
+///
+/// [GlassHost] owns one and provides it through [GlassScope]; reading it is
+/// the way to put a number on how much glass a screen carries:
+///
+/// ```dart
+/// final GlassLoad? load = GlassScope.maybeOf(context)?.read(
+///   viewSize: MediaQuery.sizeOf(context),
+///   model: GlassHardware.detect().surfaceCostModel,
+/// );
+/// if (load != null && load.verdict != GlassLoadVerdict.withinMeasured) {
+///   debugPrint('$load'); // e.g. past the 0.30 screens Adreno was measured to
+/// }
+/// ```
+///
+/// See also:
+///
+///  * [GlassLoad], what a read returns.
+///  * [GlassSurfaceRecord], one entry, read now.
+///  * <https://g1455.plugfox.dev/foundations/performance>, for the
+///    measurements the read is held against.
+///
+/// {@category Cost and policy}
 class GlassLedger extends ChangeNotifier {
   final Set<GlassSurfaceGeometry> _surfaces = <GlassSurfaceGeometry>{};
 
@@ -260,6 +302,8 @@ class GlassLedger extends ChangeNotifier {
     }
   }
 
+  /// Removes a surface, notifying if it was registered. Called when its render
+  /// object detaches.
   void unregister(GlassSurfaceGeometry surface) {
     if (_surfaces.remove(surface)) {
       notifyListeners();
@@ -280,6 +324,7 @@ class GlassLedger extends ChangeNotifier {
     }
   }
 
+  /// Removes a blend group, notifying if it was registered.
   void unregisterCluster(GlassSurfaceCluster cluster) {
     if (_clusters.remove(cluster)) {
       notifyListeners();
@@ -422,13 +467,24 @@ class GlassLedger extends ChangeNotifier {
 /// were taken on one device each. The third value is what every other device
 /// gets, and it is not a placeholder — most of them have neither a counter nor
 /// a run.
+///
+/// Normally read off the declared hardware with
+/// [GlassHardware.surfaceCostModel] rather than named.
+///
+/// See also:
+///
+///  * [GlassLedger.read], which takes it.
+///  * <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 enum GlassSurfaceCostModel {
-  /// Adreno 830 / Impeller-Vulkan (D21, D26). A linear law in the glass area
+  /// Adreno 830 / Impeller-Vulkan, on a Galaxy S25 Ultra (D21, D26). A linear
+  /// law in the glass area
   /// plus a superlinear excess in the surface count, measured over 0.10…0.30
   /// screens of glass and 2…12 surfaces.
   adrenoCycles,
 
-  /// Apple M2 / Metal (D71). No law: raster time is flat and cheap out to 12.8
+  /// Apple M2 / Metal, on an 11" iPad Pro (D71). No law: raster time is flat and cheap out to 12.8
   /// screens of glass and falls off a cliff by 19.2, and the surface count is
   /// nearly free to 256.
   metalThroughput,
@@ -438,8 +494,31 @@ enum GlassSurfaceCostModel {
 }
 
 /// What the register says, read against one platform's measurements.
+///
+/// Returned by [GlassLedger.read]. Every price on it is null where the model
+/// has no law ([GlassSurfaceCostModel.metalThroughput] has a cliff and no
+/// slope; [GlassSurfaceCostModel.unmeasured] has nothing), and [verdict] is
+/// the one reading every model answers:
+///
+/// ```dart
+/// final GlassLoad? load = GlassScope.maybeOf(context)?.read(
+///   viewSize: MediaQuery.sizeOf(context),
+///   model: GlassHardware.detect().surfaceCostModel,
+/// );
+/// final double? saves = load?.mergingSaves; // Adreno only
+/// ```
+///
+/// See also:
+///
+///  * [GlassLoadVerdict], what [verdict] can say.
+///  * [GlassTier], whose rungs below [GlassTier.full] count towards
+///    [surfaceCount] and not towards [capturedSurfaceCount].
+///  * <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 @immutable
 class GlassLoad {
+  /// A reading as [GlassLedger.read] assembles it.
   const GlassLoad({
     required this.surfaceCount,
     required this.rectAreaLogical,
@@ -452,6 +531,8 @@ class GlassLoad {
     this.capturedRectAreaLogical = 0,
   });
 
+  /// How many surfaces could say where they are, on every rung — the count
+  /// the fragmentation excess follows.
   final int surfaceCount;
 
   /// How many of them read a proxy, which is how many the capture is for.
@@ -467,7 +548,7 @@ class GlassLoad {
   /// is not the same as the glass the eye sees: a rounded panel covers
   /// [shapeAreaLogical]. On the panels the law was measured on — 118…205 px
   /// square at radius 18 — the two differ by 0.7…2.1%, which is inside the
-  /// fit's own worst residual of 2.2%, so **that measurement cannot tell the
+  /// fit's own worst residual of 2.2% (Adreno 830), so **that measurement cannot tell the
   /// two denominators apart**. It matters for shapes the measurement never had:
   /// a stadium or a circle covers 21% less than its rect, and which of the two
   /// the cost follows there is not known.
@@ -503,6 +584,8 @@ class GlassLoad {
   /// platforms' limits are quoted in.
   final double screensOfGlass;
 
+  /// Whose measurements this reading was held against. Decides which of the
+  /// prices below are null.
   final GlassSurfaceCostModel model;
 
   /// Dead area one shared capture would pay for, logical px².
@@ -586,13 +669,14 @@ class GlassLoad {
   static const double kTaxPerLogicalPx2 = 1.1101;
 
   /// D26: the excess over `k·area` at twelve surfaces and 56 160 logical px²,
-  /// in cycles. 715 at n = 2 and 5 776 at n = 6 on the same area.
+  /// in cycles on Adreno 830. 715 at n = 2 and 5 776 at n = 6 on the same area.
   static const double kFragmentationExcessAt12 = 26769;
 
   /// The deepest the Adreno grid went: 30% of a 360x780 screen.
   static const double kAdrenoMeasuredScreens = 0.30;
 
-  /// The most glass Metal was measured carrying comfortably: 12.8 screens, at
+  /// The most glass Metal was measured carrying comfortably, on the M2 iPad
+  /// Pro: 12.8 screens, at
   /// 0.17 ms of raster on 32 stacked panels and 0.42 on 128 half-size ones.
   static const double kMetalComfortableScreens = 12.8;
 
@@ -601,7 +685,8 @@ class GlassLoad {
   /// found.
   static const double kMetalCliffScreens = 19.2;
 
-  /// Apple's own limit on the same device, for contrast: `.glassEffect` falls
+  /// Apple's own limit on the same device (the M2 iPad Pro, iPadOS 26), for
+  /// contrast: `.glassEffect` falls
   /// to ~90 fps somewhere between 128 and 192 surfaces, **whatever area they
   /// cover** — 0.8 screens and 19.2 give 91.5 and 90.0 fps.
   ///
@@ -618,6 +703,26 @@ class GlassLoad {
 }
 
 /// Where a screen's glass sits against the runs that exist.
+///
+/// Not a grade: only [overMeasuredCliff] says something was measured to go
+/// wrong. The others say how far the reading is from a measurement.
+///
+/// ```dart
+/// final String? warning = switch (load.verdict) {
+///   GlassLoadVerdict.overMeasuredCliff => 'past the measured cliff',
+///   GlassLoadVerdict.betweenMeasuredPoints ||
+///   GlassLoadVerdict.pastMeasuredRange => 'outside what was measured',
+///   GlassLoadVerdict.withinMeasured ||
+///   GlassLoadVerdict.hardwareUnmeasured => null,
+/// };
+/// ```
+///
+/// See also:
+///
+///  * [GlassLoad.verdict], which returns it.
+///  * <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 enum GlassLoadVerdict {
   /// Inside the range something was measured on.
   withinMeasured,
@@ -627,10 +732,11 @@ enum GlassLoadVerdict {
   pastMeasuredRange,
 
   /// Between the last comfortable measurement and the first bad one. On Metal
-  /// that gap is 12.8 to 19.2 screens and nothing was run inside it.
+  /// (the M2 iPad Pro) that gap is 12.8 to 19.2 screens and nothing was run inside it.
   betweenMeasuredPoints,
 
-  /// At or past a point measured to fall over: on Metal, 19.2 screens of glass,
+  /// At or past a point measured to fall over: on Metal (the M2 iPad Pro), 19.2
+  /// screens of glass,
   /// where raster time steps by a factor of 18.
   overMeasuredCliff,
 
@@ -643,11 +749,34 @@ enum GlassLoadVerdict {
 /// The value is the ledger's *identity*, which never changes, so this never
 /// notifies and a surface moving never rebuilds anything. Everything that
 /// actually changes travels through the ledger as a [Listenable].
+///
+/// [GlassHost] builds one around its child, so every surface under a host
+/// registers with that host's ledger. Reading it:
+///
+/// ```dart
+/// final GlassLoad? load = GlassScope.maybeOf(context)?.read(
+///   viewSize: MediaQuery.sizeOf(context),
+///   model: GlassHardware.detect().surfaceCostModel,
+/// );
+/// ```
+///
+/// See also:
+///
+///  * [GlassLedger], what it carries.
+///  * <https://g1455.plugfox.dev/start/how-it-works>.
+///
+/// {@category Cost and policy}
 class GlassScope extends InheritedWidget {
+  /// Provides [ledger] to [child]. The same ledger for the scope's whole life:
+  /// a new one is a new register, and every surface below re-registers.
   const GlassScope({required this.ledger, required super.child, super.key});
 
+  /// The register the surfaces below this scope enter.
   final GlassLedger ledger;
 
+  /// The nearest enclosing scope's ledger, or null outside any [GlassHost] or
+  /// scope. Depends on the scope, which never notifies while its ledger stays
+  /// the same.
   static GlassLedger? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<GlassScope>()?.ledger;
 
   @override

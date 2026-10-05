@@ -1,0 +1,32 @@
+# How the API reference is grouped: a topic per part of the package, each with a
+# page of its own in doc/topics/. pub.dev reads this file when it builds the
+# documentation, and lists the topics in the sidebar in this order.
+dartdoc:
+  categories:
+    "Getting started":
+      markdown: doc/topics/getting-started.md
+      displayName: "Getting started"
+    "Foundations":
+      markdown: doc/topics/foundations.md
+    "Panels and controls":
+      markdown: doc/topics/panels-and-controls.md
+    "Modals":
+      markdown: doc/topics/modals.md
+    "Composition":
+      markdown: doc/topics/composition.md
+    "Capture control":
+      markdown: doc/topics/capture-control.md
+    "Cost and policy":
+      markdown: doc/topics/cost-and-policy.md
+    "Diagnostics":
+      markdown: doc/topics/diagnostics.md
+  categoryOrder:
+    - "Getting started"
+    - "Foundations"
+    - "Panels and controls"
+    - "Modals"
+    - "Composition"
+    - "Capture control"
+    - "Cost and policy"
+    - "Diagnostics"
+  showUndocumentedCategories: true

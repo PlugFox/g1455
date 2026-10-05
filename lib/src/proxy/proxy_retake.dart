@@ -139,6 +139,7 @@ abstract final class ProxyStaleness {
     return best;
   }
 
+  /// The finishes the staleness table has rows for; any other name refuses.
   static const List<String> measuredFinishes = <String>[
     'clear',
     'thinLight',
@@ -152,7 +153,7 @@ abstract final class ProxyStaleness {
 /// thermal lever, and a policy rather than a panic.
 ///
 /// **Thermals act on the retake, not on the ladder** (`glass_tier.dart`). A
-/// frame of staleness has a measured price per finish ([ProxyStaleness]): 0.384
+/// frame of staleness has a measured price per finish (`ProxyStaleness`): 0.384
 /// ΔE behind `regular`, 0.488 behind `frosted`, 1.496 behind `clear`. So the
 /// same allowance buys a heavy finish frames and a clear one none, which is the
 /// sentence the roadmap wrote before the table existed — throttling under a
@@ -183,8 +184,41 @@ abstract final class ProxyStaleness {
 ///
 /// — before whatever the resolution already spent, which comes off first in
 /// quadrature (D124), so a screen at a coarse divisor gets fewer.
+///
+/// The host takes the state and the policy side by side; the state is the
+/// application's to read, since the package ships no platform code:
+///
+/// ```dart
+/// GlassHost(
+///   thermal: GlassThermalState.serious, // as the application read it
+///   thermalPolicy: const GlassThermalPolicy(), // the default allowances
+///   child: const MyScreen(),
+/// )
+/// ```
+///
+/// A host that would rather spend frames than staleness passes
+/// [GlassThermalPolicy.never]; one that wants to spend more names its own
+/// allowances, in ΔE:
+///
+/// ```dart
+/// const GlassThermalPolicy(
+///   fairDeltaE: 0.01 * ProxyResolution.kMaterialScaleDeltaE,
+///   seriousDeltaE: 0.04 * ProxyResolution.kMaterialScaleDeltaE,
+/// );
+/// ```
+///
+/// See also:
+///
+///  * [GlassThermalState], the vocabulary.
+///  * [RetakeReason.throttled], the decision a frame held under it reports.
+///  * <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 @immutable
 class GlassThermalPolicy {
+  /// A policy with the given allowance per state, in ΔE against the same
+  /// finish at full quality. The defaults are 0, 2% and 4% of
+  /// [ProxyResolution.kMaterialScaleDeltaE].
   const GlassThermalPolicy({
     this.fairDeltaE = 0,
     this.seriousDeltaE = 0.02 * ProxyResolution.kMaterialScaleDeltaE,
@@ -197,8 +231,16 @@ class GlassThermalPolicy {
     criticalDeltaE: 0,
   );
 
+  /// What [GlassThermalState.fair] may spend on staleness. Zero by default:
+  /// both platforms say the user notices nothing there.
   final double fairDeltaE;
+
+  /// What [GlassThermalState.serious] may spend: 0.696 ΔE by default, which
+  /// buys `regular` two frames and `clear` none.
   final double seriousDeltaE;
+
+  /// What [GlassThermalState.critical] may spend: 1.392 ΔE by default, which
+  /// buys `regular` four frames and `clear` none.
   final double criticalDeltaE;
 
   /// The whole quality allowance at [state], or zero — no raise at all — for
@@ -244,7 +286,7 @@ class GlassThermalPolicy {
 /// here at all: `ProxyLayerWatch` reads the host's composited subtree, and what
 /// is left in this enum is a permission to use that answer.
 ///
-/// **Why it exists at all.** [RetakeOracle.ceiling] is zero on every measured
+/// **Why it exists at all.** The retake oracle's staleness ceiling is zero on every measured
 /// finish at the default budget, so before this enum the `hold` branch was
 /// unreachable and the proxy was re-recorded on every frame of every
 /// application, a completely still screen included (D142). That zero is not a
@@ -266,6 +308,27 @@ class GlassThermalPolicy {
 /// against `layer.dart` in D162, the one hole in it was closed, and it is now
 /// checked against the SDK in a test rather than by reading. What the walk
 /// costs: under 3 µs a frame, below what a device run can resolve (D160).
+///
+/// Passed to [GlassHost.content]. The default needs nothing written; the
+/// opt-out is for a host that composites through something the watch cannot
+/// read, or for a benchmark arm:
+///
+/// ```dart
+/// GlassHost(
+///   content: GlassContentDeclaration.undeclared, // re-record every frame
+///   child: const MyScreen(),
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [RetakeReason], which says per frame what was decided.
+///  * [GlassProxyHandle.noteChange], for a change the composited output does
+///    not show.
+///  * <https://g1455.plugfox.dev/start/declarations> and
+///    <https://g1455.plugfox.dev/start/how-it-works>.
+///
+/// {@category Cost and policy}
 enum GlassContentDeclaration {
   /// Assume anything may have changed since the last frame, and re-record.
   ///
@@ -273,7 +336,7 @@ enum GlassContentDeclaration {
   /// the proxy is re-recorded on every frame regardless of what the composited
   /// subtree says. It is the most expensive thing this package can be asked to
   /// do — the capture is 77% of what the route adds at the divisor the policy
-  /// picks on a dpr-2 screen (D141) — and it is worth asking for in exactly two
+  /// picks on a dpr-2 screen (D141, M2 iPad Pro) — and it is worth asking for in exactly two
   /// situations: a host that composites through a layer type it has reason to
   /// think this package misreads, and an arm of a benchmark that wants the
   /// capture measured on every frame.
@@ -348,6 +411,28 @@ enum GlassContentDeclaration {
 }
 
 /// Why the oracle decided what it decided.
+///
+/// One per frame, from the oracle the host runs; the host counts the outcomes
+/// on its [GlassProxyHandle]. [holds] is the only part the pipeline acts on;
+/// the rest is for a report, which needs to tell a held frame that is right
+/// from one that is knowingly behind.
+///
+/// ```dart
+/// String describe(RetakeReason reason) => switch (reason) {
+///   RetakeReason.first || RetakeReason.changed || RetakeReason.ceiling =>
+///     'recorded',
+///   RetakeReason.throttled => 'held, behind by choice',
+///   RetakeReason.hold || RetakeReason.declared => 'held, still right',
+/// };
+/// ```
+///
+/// See also:
+///
+///  * [GlassContentDeclaration], which decides whether [declared] is reachable.
+///  * [GlassThermalPolicy], which decides whether [throttled] is.
+///  * <https://g1455.plugfox.dev/start/how-it-works>.
+///
+/// {@category Cost and policy}
 enum RetakeReason {
   /// There is no proxy yet.
   first,
@@ -375,7 +460,8 @@ enum RetakeReason {
   /// Separate from [hold] rather than folded into it because the two are held
   /// for opposite reasons — one is inside a measured budget, the other is
   /// outside it by declaration — and a report that could not tell them apart
-  /// would be unreadable the moment a host raises [RetakeOracle.budgetDeltaE].
+  /// would be unreadable the moment a host raises its budget
+  /// ([GlassHost.budgetDeltaE]).
   declared;
 
   /// Whether this decision keeps the proxy that is already there.
@@ -402,6 +488,8 @@ enum RetakeReason {
 ///
 /// **How long it may be held** is the measured half, and it is [ProxyStaleness].
 class RetakeOracle {
+  /// An oracle for [finish], with nothing captured yet: the first [decide]
+  /// returns [RetakeReason.first].
   RetakeOracle({
     required this.finish,
     this.budgetDeltaE = ProxyResolutionPolicy.defaultDamageBudgetDeltaE,
@@ -478,6 +566,7 @@ class RetakeOracle {
   /// Whether something the oracle can see has changed since the last capture.
   bool get dirty => _dirty;
 
+  /// Frames since the last [noteCapture] — how far behind a held proxy is.
   int get framesSinceCapture => _framesSinceCapture;
 
   /// Declares a change the oracle cannot observe.
@@ -511,6 +600,7 @@ class RetakeOracle {
     visit(root);
   }
 
+  /// Drops every subscription [watch] made.
   void unwatch() {
     for (final Listenable listenable in _watched) {
       listenable.removeListener(noteChange);
@@ -583,5 +673,6 @@ class RetakeOracle {
   /// Called once per frame that did not record.
   void noteFrame() => _framesSinceCapture++;
 
+  /// Drops every subscription. The oracle is not used afterwards.
   void dispose() => unwatch();
 }

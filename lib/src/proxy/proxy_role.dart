@@ -36,8 +36,22 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 /// The four declarations, in the order of how much they subtract.
+///
+/// Each is made with the [GlassProxy] constructor of the same name, and read
+/// back from [GlassProxy.role] or [RenderGlassProxy.role].
+///
+/// | Role | What the capture does with the subtree |
+/// |---|---|
+/// | [hidden] | Skips it: nothing drawn, its `paint` not run. |
+/// | [replace] | Draws a [GlassProxyPainter] in its place. |
+/// | [opaque] | Draws it, and treats its box as an occlusion cover. |
+/// | [verbatim] | Draws it with the shadow filter off. |
+///
+/// {@category Capture control}
 enum GlassProxyRole {
-  /// Not drawn into the proxy, and not descended into.
+  /// Not drawn into the proxy, and not descended into: the subtree's `paint`
+  /// does not run for the capture, so counters, analytics and lazy
+  /// initialisation in it happen once per frame rather than twice.
   ///
   /// Painter's order still holds, so this is a subtraction and not a hole:
   /// whatever painted earlier at that place stays visible. Over a page with an
@@ -45,6 +59,10 @@ enum GlassProxyRole {
   hidden,
 
   /// Drawn by a [GlassProxyPainter] instead of by the subtree's own `paint`.
+  ///
+  /// The only way to put something into the capture where a platform view or
+  /// a `Texture` is: those record nothing into it, and glass over them shows
+  /// a hole without a stand-in.
   replace,
 
   /// Paints opaquely over its own box, so the descent may stop before it.
@@ -64,7 +82,7 @@ enum GlassProxyRole {
   verbatim,
 }
 
-/// Draws a stand-in for a subtree in the proxy.
+/// Draws a stand-in for a subtree in the proxy, for [GlassProxy.replace].
 ///
 /// Deliberately shaped like `CustomPainter`, including the `runtimeType`
 /// comparison in front of [shouldRepaint] — this is the same problem and there
@@ -77,7 +95,40 @@ enum GlassProxyRole {
 ///    no visual signal anywhere and no pixel test that would catch it.
 ///  - [isOpaque] is read, and answering true makes the stub an occlusion cover
 ///    as well as a substitution.
+///
+/// [SolidProxyPainter] and [GradientProxyPainter] cover the common cases. A
+/// painter of one's own:
+///
+/// ```dart
+/// class MapTilePainter extends GlassProxyPainter {
+///   const MapTilePainter(this.land, this.water);
+///
+///   final Color land;
+///   final Color water;
+///
+///   @override
+///   void paint(Canvas canvas, Size size) {
+///     canvas
+///       ..drawRect(Offset.zero & size, Paint()..color = land)
+///       ..drawRect(Rect.fromLTWH(0, size.height * 0.6, size.width, size.height * 0.4), Paint()..color = water);
+///   }
+///
+///   @override
+///   bool shouldRepaint(MapTilePainter oldPainter) => oldPainter.land != land || oldPainter.water != water;
+///
+///   @override
+///   bool get isOpaque => land.a >= 1 && water.a >= 1;
+/// }
+/// ```
+///
+/// See also:
+///
+///  * [GlassProxy.replace], which takes one.
+///  * [Capture control on the site](https://g1455.plugfox.dev/foundations/capture).
+///
+/// {@category Capture control}
 abstract class GlassProxyPainter {
+  /// Lets subclasses be `const`.
   const GlassProxyPainter();
 
   /// Paints the stand-in. Local space: the subtree's origin is `Offset.zero`,
@@ -89,8 +140,12 @@ abstract class GlassProxyPainter {
   ///
   /// The retake oracle is what reads this, through
   /// [RenderGlassProxy.proxyChanges]. A painter that always answers false is a
-  /// subtree that can never dirty the proxy — which is the cost lever this
-  /// class carries, and it is a lever over *frames*, not over pixels.
+  /// declaration that never dirties the proxy by changing.
+  ///
+  /// It does not hide the subtree from the host, which watches the composited
+  /// layers: a child that composites a new frame — a video, a platform view —
+  /// is still a change and still a retake. What the painter decides is what
+  /// that retake shows, not whether it happens.
   bool shouldRepaint(covariant GlassProxyPainter oldPainter);
 
   /// Whether [paint] covers the whole of `size` opaquely.
@@ -102,9 +157,15 @@ abstract class GlassProxyPainter {
 }
 
 /// A stub of one flat colour — the cheapest thing that stands for a subtree.
+///
+/// Opaque, and so an occlusion cover too, when [color] is.
+///
+/// {@category Capture control}
 class SolidProxyPainter extends GlassProxyPainter {
+  /// A stub that fills the subtree's box with [color].
   const SolidProxyPainter(this.color);
 
+  /// The fill. A change repaints the proxy.
   final Color color;
 
   @override
@@ -120,9 +181,15 @@ class SolidProxyPainter extends GlassProxyPainter {
 /// A stub of one gradient. Keeps a local mean where a flat colour would not —
 /// which is the axis a blur cannot restore (D29): a low-pass removes what is
 /// above its cutoff and cannot bring back a mean that is no longer there.
+///
+/// Never reported opaque, whatever the gradient's stops are.
+///
+/// {@category Capture control}
 class GradientProxyPainter extends GlassProxyPainter {
+  /// A stub that fills the subtree's box with [gradient].
   const GradientProxyPainter(this.gradient);
 
+  /// The fill, stretched over the subtree's box. A change repaints the proxy.
   final Gradient gradient;
 
   @override
@@ -146,21 +213,82 @@ class GradientProxyPainter extends GlassProxyPainter {
 /// [GlassProxy.replace] under a [GlassProxy.hidden] is never visited, because
 /// the descent stops at the outer one. That is worth knowing rather than
 /// pretending the two compose.
+///
+/// ## What it changes
+///
+/// **What the capture sees, not when the host captures.** The host decides
+/// when to retake by watching the composited layers, and a declaration does
+/// not hide a subtree from that: a video that composites a new frame is still
+/// a change, under [GlassProxy.replace] as anywhere. What changes is what the
+/// glass shows of it. In the real frame every declaration paints its child as
+/// if it were not there.
+///
+/// | Constructor | Use it for |
+/// |---|---|
+/// | [GlassProxy.hidden] | Content the glass should not show, or whose `paint` must not run twice. |
+/// | [GlassProxy.replace] | A platform view, a `Texture`, or anything the glass should see as something simpler. |
+/// | [GlassProxy.opaque] | A box that paints every pixel of itself, so what is under it need not be drawn. |
+/// | [GlassProxy.verbatim] | A blurred highlight the shadow filter would drop. |
+///
+/// > **Note:** A platform view or a `Texture` records nothing into the
+/// > capture. Glass over one shows a hole — whatever painted before it, which
+/// > is usually the page's background — unless a [GlassProxy.replace] stands
+/// > in for it.
+///
+/// ```dart
+/// GlassProxy.replace(
+///   painter: const SolidProxyPainter(Color(0xFF1C2B3A)), // the map's mean colour
+///   child: const AndroidView(viewType: 'map'),
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [GlassProxyRole], what each declaration does.
+///  * [SolidProxyPainter] and [GradientProxyPainter], the stand-ins it ships.
+///  * [GlassContentDeclaration], which governs when a proxy may be held.
+///  * [Capture control on the site](https://g1455.plugfox.dev/foundations/capture).
+///
+/// {@category Capture control}
 class GlassProxy extends SingleChildRenderObjectWidget {
-  /// See [GlassProxyRole.hidden].
+  /// See [GlassProxyRole.hidden]. The capture skips [child] and does not run
+  /// its `paint`; whatever painted earlier at that place shows instead.
+  ///
+  /// ```dart
+  /// GlassProxy.hidden(child: ImpressionTracker(child: banner))
+  /// ```
   const GlassProxy.hidden({super.key, required Widget super.child}) : role = GlassProxyRole.hidden, painter = null;
 
   /// See [GlassProxyRole.replace]. [child] still lays out and still paints into
   /// the real frame; only the proxy sees [painter] instead.
+  ///
+  /// ```dart
+  /// GlassProxy.replace(
+  ///   painter: const GradientProxyPainter(LinearGradient(colors: <Color>[Color(0xFF0B3D2E), Color(0xFF6FA8DC)])),
+  ///   child: Texture(textureId: cameraTextureId),
+  /// )
+  /// ```
   const GlassProxy.replace({super.key, required Widget super.child, required this.painter})
     : role = GlassProxyRole.replace;
 
-  /// See [GlassProxyRole.opaque].
+  /// See [GlassProxyRole.opaque]. A promise that [child] paints every pixel
+  /// of its box opaquely, which makes it an occlusion cover: what is under it
+  /// is not drawn into the capture. Nothing checks the promise.
+  ///
+  /// ```dart
+  /// GlassProxy.opaque(child: const ColoredBox(color: Color(0xFFFFFFFF), child: header))
+  /// ```
   const GlassProxy.opaque({super.key, required Widget super.child}) : role = GlassProxyRole.opaque, painter = null;
 
-  /// See [GlassProxyRole.verbatim].
+  /// See [GlassProxyRole.verbatim]. [child] is drawn into the capture with
+  /// the shadow filter off, so a deliberate `MaskFilter` blur survives.
+  ///
+  /// ```dart
+  /// GlassProxy.verbatim(child: GlowingOrb(color: accent))
+  /// ```
   const GlassProxy.verbatim({super.key, required Widget super.child}) : role = GlassProxyRole.verbatim, painter = null;
 
+  /// Which of the four declarations this is, set by the constructor.
   final GlassProxyRole role;
 
   /// Non-null exactly when [role] is [GlassProxyRole.replace].
@@ -194,7 +322,10 @@ class GlassProxy extends SingleChildRenderObjectWidget {
 /// arrives at `PaintingContext.paintChild` by itself and the pass does one `is`
 /// check on it. Any design where the pass *searches* for a declaration pays on
 /// every node of the tree instead.
+///
+/// {@category Capture control}
 class RenderGlassProxy extends RenderProxyBox {
+  /// A marker declaring [role], with [painter] for [GlassProxyRole.replace].
   RenderGlassProxy({
     GlassProxyRole role = GlassProxyRole.opaque,
     GlassProxyPainter? painter,
@@ -208,6 +339,7 @@ class RenderGlassProxy extends RenderProxyBox {
        _painter = painter,
        super(child);
 
+  /// The declaration. A change fires [proxyChanges].
   GlassProxyRole get role => _role;
   GlassProxyRole _role;
   set role(GlassProxyRole value) {
@@ -218,6 +350,9 @@ class RenderGlassProxy extends RenderProxyBox {
     _proxyChanges.notify();
   }
 
+  /// The stand-in drawn under [GlassProxyRole.replace]. A change fires
+  /// [proxyChanges] when the new painter is of another type, or its
+  /// [GlassProxyPainter.shouldRepaint] says so.
   GlassProxyPainter? get painter => _painter;
   GlassProxyPainter? _painter;
   set painter(GlassProxyPainter? value) {

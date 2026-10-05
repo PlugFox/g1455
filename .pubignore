@@ -33,6 +33,8 @@ local.properties
 # The README's banner and How it works cards, served from GitHub like the
 # full-size loops.
 /doc/readme/
+# A loop pub.dev has no room for: it takes ten screenshots.
+/doc/screenshots/materialize.webp
 
 # The plan; the changelog is what shipped.
 /ROADMAP.md

@@ -49,9 +49,16 @@ import 'glass_tier.dart';
 /// One key in every bundle: the pubspec declares it through `packages/g1455/`
 /// and keeps the file under `lib/`, which the tool keys identically whether
 /// this package is the root or a dependency (see `pubspec.yaml`).
+///
+/// {@category Diagnostics}
 const String kGlassShaderAsset = 'packages/g1455/shaders/glass_surface.frag';
 
 /// The surface's shader with the ripple compiled in (D229).
+///
+/// Loaded the first time a surface under a host declares a [GlassRipple], or
+/// by [GlassHost.precache].
+///
+/// {@category Diagnostics}
 const String kGlassRippleShaderAsset = 'packages/g1455/shaders/glass_surface_ripple.frag';
 
 /// The current proxy, as something a surface can listen to.
@@ -59,8 +66,23 @@ const String kGlassRippleShaderAsset = 'packages/g1455/shaders/glass_surface_rip
 /// A [Listenable] holding one frame, so a surface repaints when the proxy is
 /// re-recorded and not when anything else happens. The frame's ownership stays
 /// with the pipeline; this only points at it.
+///
+/// Every [GlassHost] owns one and hands it down through [GlassProxyScope].
+/// What a report reads off it is the counters — [generation], [snapshots],
+/// [repacks], [readBacks] and the rest — which say whether a frame captured.
+///
+/// ```dart
+/// final GlassProxyHandle? handle = GlassProxyScope.maybeOf(context);
+/// debugPrint('published ${handle?.generation} frames, '
+///     '${handle?.snapshots} snapshots');
+/// ```
+///
+/// {@category Diagnostics}
 class GlassProxyHandle extends ChangeNotifier {
   GlassProxyFrame? _frame;
+
+  /// The proxy last published at the base level, or null before the first
+  /// capture and on a screen with nothing to capture.
   GlassProxyFrame? get frame => _frame;
 
   /// The compiled shader, once it has arrived.
@@ -216,7 +238,13 @@ class GlassProxyHandle extends ChangeNotifier {
   /// pack only refuses, and both can drop a frame. Non-zero means the reasoning
   /// was wrong, which is a bug report and not a measurement.
   int ceilingDeepenings = 0;
+
+  /// Frames on which nothing fit under the texture limit and no proxy was
+  /// produced. See [ceilingDeepenings].
   int ceilingRefusals = 0;
+
+  /// Frames the pack overran a limit the search had reasoned it would fit
+  /// under. Should stay at zero; see [ceilingDeepenings].
   int ceilingOverruns = 0;
 
   /// Frames held across a change because thermal pressure bought the lag
@@ -246,8 +274,7 @@ class GlassProxyHandle extends ChangeNotifier {
   /// it is now the *last* resort rather than the first: the host observes a
   /// scroll (D147) and its own repaint, which between them cover every change
   /// that is not behind a nested repaint boundary. What is left is content that
-  /// repaints inside one — and [GlassChangingContent] is the same thing said by
-  /// placement instead of by timing, which is usually the honest way round.
+  /// repaints inside one.
   ///
   /// Reach it with `GlassProxyScope.maybeOf(context)?.noteChange()`.
   ///
@@ -267,6 +294,9 @@ class GlassProxyHandle extends ChangeNotifier {
     super.dispose();
   }
 
+  /// Publishes [frame] as the base level and starts a new [generation].
+  ///
+  /// Called by the host; silent when [frame] is the one already published.
   void publish(GlassProxyFrame? frame) {
     if (identical(frame, _frame)) {
       return;
@@ -329,11 +359,21 @@ class _HandleChanges extends ChangeNotifier {
 }
 
 /// Carries the current proxy down the tree.
+///
+/// Installed by [GlassHost] around its child; an application does not build
+/// one. [maybeOf] is how a test, a benchmark or a custom component reaches the
+/// host's [GlassProxyHandle].
+///
+/// {@category Diagnostics}
 class GlassProxyScope extends InheritedWidget {
+  /// Hands [handle] to [child] and everything below it.
   const GlassProxyScope({required this.handle, required super.child, super.key});
 
+  /// The host's handle.
   final GlassProxyHandle handle;
 
+  /// The handle of the nearest [GlassHost] above [context], or null when there
+  /// is none. Registers [context] for a rebuild when the handle is replaced.
   static GlassProxyHandle? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<GlassProxyScope>()?.handle;
 
@@ -341,12 +381,93 @@ class GlassProxyScope extends InheritedWidget {
   bool updateShouldNotify(GlassProxyScope oldWidget) => oldWidget.handle != handle;
 }
 
-/// Owns the whole proxy pipeline for one screen.
+/// Owns the whole proxy pipeline for one screen: it captures what is painted
+/// under the glass and hands it to every [GlassSurface] below it.
 ///
-/// Put it above everything the glass is meant to show. Its child is the screen:
-/// the register finds the surfaces inside it, the pass reads it, and the
-/// surfaces sample the result.
+/// Put it above everything the glass is meant to show — in an application,
+/// once, above the navigator.
+///
+/// ## How it captures
+///
+/// Its child is the screen: the register finds the surfaces inside it, the
+/// pass reads it, and the surfaces sample the result. After each frame is
+/// painted the host records what is under the glass into one atlas, at a
+/// resolution chosen against a measured quality budget ([budgetDeltaE]), and
+/// publishes it; the surfaces draw it through their finish on the frame after.
+///
+/// **The one-frame delay is structural.** A capture reads the tree that was
+/// just painted, so the earliest a surface can show it is the following frame,
+/// and the first frame of any screen paints its glass without a proxy. The
+/// shaders arrive asynchronously too, which [precache] moves to before the
+/// first frame.
+///
+/// It records only when something under the glass changed ([content]): a
+/// still screen captures nothing, and glass moving over still content inside a
+/// [GlassTravel] captures nothing either. Below the top rung ([tier]) nothing
+/// is captured at all.
+///
+/// ## What the application declares
+///
+/// What the render tree does not carry, the host is told:
+///
+///  * what is behind the glass: [backdrop], and whether it is an image,
+///    [richBackdrop];
+///  * the accessibility the platform does not relay everywhere:
+///    [highContrast], and a floor for the labels, [minLabelContrast];
+///  * the device: [hardware], and its [thermal] state;
+///  * the look: [finish], [tier], [ripple], [dropMotion], and whether the
+///    glass reads its own backdrop, [adaptive].
+///
+/// Each is installed into a [GlassThemeData] for the screen, which an inner
+/// [GlassTheme] can change for a subtree. The rest — [maxCaptures], [blurPass],
+/// [resolution], [maxTextureSide], [shadowFilter], [occlusion] — are
+/// diagnostic seams and overrides that a shipping application leaves alone.
+///
+/// ## Where it goes
+///
+/// Above the navigator, in `MaterialApp.builder` (or the `builder` of
+/// `CupertinoApp` or `WidgetsApp`), so that a dialog, a sheet or a menu — all
+/// built in the navigator's overlay — is under it and captured like any other
+/// glass. A host inside a route would not see them.
+///
+/// ```dart
+/// Future<void> main() async {
+///   WidgetsFlutterBinding.ensureInitialized();
+///   await GlassHost.precache();
+///   runApp(const MyApp());
+/// }
+///
+/// class MyApp extends StatelessWidget {
+///   const MyApp({super.key});
+///
+///   @override
+///   Widget build(BuildContext context) => MaterialApp(
+///     builder: (BuildContext context, Widget? child) => GlassHost(
+///       backdrop: const Color(0xFF101014),
+///       richBackdrop: true,
+///       minLabelContrast: kTextContrastAA,
+///       child: child!,
+///     ),
+///     home: const HomePage(),
+///   );
+/// }
+/// ```
+///
+/// See also:
+///
+///  * [GlassSurface], the glass that samples what the host captures.
+///  * [GlassTheme] and [GlassThemeData], what the host installs for its
+///    subtree.
+///  * [GlassFinish], the material named by [finish].
+///  * [GlassTravel] and [GlassProxy], which tell the host where glass moves
+///    and how a subtree is captured.
+///  * [The host](https://g1455.plugfox.dev/foundations/host) and
+///    [Installation](https://g1455.plugfox.dev/start/installation) on the site.
+///
+/// {@category Foundations}
 class GlassHost extends StatefulWidget {
+  /// A host over [child]. Every other argument is optional, and its default is
+  /// the shipping behaviour.
   const GlassHost({
     required this.child,
     this.hardware,
@@ -372,6 +493,9 @@ class GlassHost extends StatefulWidget {
     super.key,
   });
 
+  /// The screen: everything the glass under this host may show, and the
+  /// glass itself. In an application, the navigator `MaterialApp.builder`
+  /// hands over.
   final Widget child;
 
   /// Whose measurements apply. Defaults to what the platform can be asked —
@@ -405,7 +529,7 @@ class GlassHost extends StatefulWidget {
   /// reads a proxy, so nothing is captured, no atlas is packed and no shader is
   /// sampled. The host still mounts — its register still counts the glass,
   /// because the translucency tax does not care which rung drew it — and
-  /// [recorded] stays at zero, which is the observable the requirement is
+  /// `recorded` stays at zero, which is the observable the requirement is
   /// stated in (D58: the cheap finish reads no backdrop at all).
   final GlassTierChoice tier;
 
@@ -631,6 +755,16 @@ class GlassHost extends StatefulWidget {
   /// ripple's, for an application that uses neither; every host still loads
   /// the group program itself when it mounts. Completes with a load's error
   /// if one fails.
+  ///
+  /// > **Note:** the shaders are declared in this package's own pubspec, so an
+  /// > application adds nothing to its `flutter: shaders:` for them.
+  ///
+  /// See also:
+  ///
+  ///  * [GlassRipple], whose program `ripple: false` leaves out.
+  ///  * [GlassGroup], whose program `group: false` leaves out.
+  ///  * [Installation](https://g1455.plugfox.dev/start/installation) on the
+  ///    site.
   static Future<void> precache({bool group = true, bool ripple = true}) async {
     // What is cached is not waited on: the load that filled it is done, and
     // its future belongs to the zone that started it — in a widget test, the
@@ -1628,6 +1762,8 @@ class _Level {
 /// A test that has to see a load fail sets this before anything loads, in a
 /// file of its own, since the programs are cached per process; nothing else
 /// should set it.
+///
+/// {@category Diagnostics}
 @visibleForTesting
 Future<ui.FragmentProgram> Function(String asset) debugGlassShaderLoader = ui.FragmentProgram.fromAsset;
 

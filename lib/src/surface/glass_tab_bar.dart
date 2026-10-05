@@ -61,8 +61,22 @@ import 'glass_travel.dart';
 /// Handed to [GlassTabItem.iconBuilder] and [GlassTabItem.labelBuilder], so a
 /// glyph the bar cannot colour itself — an SVG, an image, a badge — takes the
 /// colour its neighbours are drawn in.
+///
+/// ```dart
+/// GlassTabItem(
+///   label: 'Inbox',
+///   iconBuilder: (BuildContext context, GlassTabItemLook look) => Badge(
+///     isLabelVisible: unread > 0,
+///     child: Icon(Icons.inbox, size: look.iconSize, color: look.color),
+///   ),
+/// )
+/// ```
+///
+/// {@category Panels and controls}
 @immutable
 class GlassTabItemLook {
+  /// What the bar resolved for item [index]. Built by the bar; a test of a
+  /// builder can build one by hand.
   const GlassTabItemLook({
     required this.index,
     required this.color,
@@ -119,6 +133,12 @@ class GlassTabItemLook {
 }
 
 /// Builds an item's icon or label from what the bar resolved for it.
+///
+/// The type of [GlassTabItem.iconBuilder] and [GlassTabItem.labelBuilder].
+/// Run again for every item whenever the drop moves onto an item or off one,
+/// so a builder that is dear to run should cache what it builds.
+///
+/// {@category Panels and controls}
 typedef GlassTabItemBuilder = Widget Function(BuildContext context, GlassTabItemLook look);
 
 /// One item of a [GlassTabBar].
@@ -126,8 +146,16 @@ typedef GlassTabItemBuilder = Widget Function(BuildContext context, GlassTabItem
 /// An [IconData] and a string, or anything at all through [iconBuilder] and
 /// [labelBuilder] — which are handed the colour the bar draws the item in.
 /// [label] is what a screen reader says either way.
+///
+/// ```dart
+/// const GlassTabItem(icon: Icons.photo_library, label: 'Library')
+/// ```
+///
+/// {@category Panels and controls}
 @immutable
 class GlassTabItem {
+  /// An item named [label], drawn with [icon] or built by [iconBuilder] —
+  /// one of the two is required, which an assert checks.
   const GlassTabItem({required this.label, this.icon, this.iconBuilder, this.labelBuilder})
     : assert(icon != null || iconBuilder != null, 'A tab item needs an icon or an iconBuilder.');
 
@@ -148,10 +176,21 @@ class GlassTabItem {
 }
 
 /// How much the held drop magnifies the bar under it (D218).
+///
+/// Read off iOS 26.5's own tab bar on a phone and an iPad, both at 1.17x once
+/// the bar's own growth under the drop is taken out. [GlassTabBar.dropZoom]'s
+/// default.
+///
+/// {@category Panels and controls}
 const double kGlassTabDropZoom = 1.17;
 
 /// How much larger than the resting capsule the held drop is, on every side,
 /// logical px (D218).
+///
+/// Read off iOS 26.5: 73 x 53 -> 94 x 72 on the phone, 85 x 36 -> 110 x 56.5
+/// on the iPad, so the held drop stands out of the bar above and below.
+///
+/// {@category Panels and controls}
 const double kGlassTabDropGrow = 10.5;
 
 /// How much the bar grows while held, logical px per side (D218).
@@ -213,7 +252,48 @@ class _TabGeometry {
 /// The bar is a [GlassBar] — the theme's finish, the theme's label colour —
 /// and the drop is a clear glass that magnifies it. See the file comment for
 /// what each part costs.
+///
+/// At rest the selected item sits on a grey capsule in [activeColor], and
+/// nothing about it but the bar is glass. Pressed, the capsule lifts into a
+/// drop [kGlassTabDropGrow] larger on every side that magnifies the bar by
+/// [dropZoom]; dragged, it follows the finger and the item under it takes the
+/// accent; let go, it settles on an item and [onSelected] is told which. A
+/// flick carries the drop on to the item it was heading for.
+///
+/// The items stack icon over label, as an iPhone's do, while the bar gives
+/// each less than 80 px, and sit side by side, as an iPad's do, above that.
+/// The bar is 60 tall stacked and 44 side by side, and takes the whole width
+/// it is given.
+///
+/// ```dart
+/// GlassTabBar(
+///   items: const <GlassTabItem>[
+///     GlassTabItem(icon: Icons.home, label: 'Home'),
+///     GlassTabItem(icon: Icons.search, label: 'Search'),
+///     GlassTabItem(icon: Icons.person, label: 'Profile'),
+///   ],
+///   selectedIndex: tab,
+///   onSelected: (int i) => setState(() => tab = i),
+/// )
+/// ```
+///
+/// > **Note:** the drop is glass on glass, so the frames that record while it
+/// > is held take a second snapshot. While it moves, only the frames where
+/// > the highlighted item changes record at all.
+///
+/// See also:
+///
+///  * [GlassTabItem] and [GlassTabItemLook], for an icon or a label the bar
+///    cannot colour itself.
+///  * [GlassScaffold.bottomBar], where a tab bar usually goes.
+///  * [GlassSegmentedControl], the same drop over a track that is not glass.
+///  * [Tab bar on the site](https://g1455.plugfox.dev/components/tab-bar).
+///
+/// {@category Panels and controls}
 class GlassTabBar extends StatefulWidget {
+  /// A bar of [items] — at least two — with [selectedIndex] highlighted.
+  ///
+  /// [dropZoom] must be above 0. [onSelected] null disables the bar.
   const GlassTabBar({
     required this.items,
     required this.selectedIndex,
@@ -225,10 +305,15 @@ class GlassTabBar extends StatefulWidget {
   }) : assert(items.length >= 2),
        assert(dropZoom > 0);
 
+  /// The tabs, left to right.
   final List<GlassTabItem> items;
+
+  /// The selected item's index into [items]. The capsule slides to it when it
+  /// changes, unless a finger is down on the bar.
   final int selectedIndex;
 
-  /// Null disables the bar.
+  /// Called with the item a tap or a drag settles on, when it is not
+  /// [selectedIndex]. Null disables the bar.
   final ValueChanged<int>? onSelected;
 
   /// The selected item's icon and label, and the one under a held drop.

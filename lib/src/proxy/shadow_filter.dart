@@ -35,8 +35,11 @@ import 'package:flutter/rendering.dart';
 /// matters which fired: `drawShadow` is the physical-model route (`Material`
 /// elevation), a blur `MaskFilter` is the `BoxShadow` route.
 class ShadowFilter {
+  /// A filter with both switches on by default.
   ShadowFilter({this.dropShadowCalls = true, this.dropMaskFiltered = true});
 
+  /// Every `Canvas.drawShadow`: the physical-model route, exact rather than
+  /// heuristic.
   final bool dropShadowCalls;
 
   /// Anything painted through a `MaskFilter`.
@@ -47,9 +50,13 @@ class ShadowFilter {
   /// instead of in a screenshot.
   final bool dropMaskFiltered;
 
+  /// `drawShadow` calls dropped so far.
   int shadowCalls = 0;
+
+  /// Mask-filtered draws dropped so far.
   int maskFilteredDraws = 0;
 
+  /// Every draw dropped so far, of either kind.
   int get dropped => shadowCalls + maskFilteredDraws;
 
   bool _dropPaint(ui.Paint paint) {
@@ -64,12 +71,14 @@ class ShadowFilter {
 /// A `Canvas` that forwards everything and refuses the draws a [ShadowFilter]
 /// names.
 class FilteringCanvas implements Canvas {
+  /// Wraps [inner], dropping what [filter] names.
   FilteringCanvas(this.inner, this.filter);
 
   /// The canvas being wrapped. Exposed so a caller can tell whether its
   /// wrapper is still the right one after the context started a new recording.
   final Canvas inner;
 
+  /// Which draws to drop, and where they are counted.
   final ShadowFilter filter;
 
   @override

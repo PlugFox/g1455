@@ -57,6 +57,15 @@ const List<double> _kFadeStops = <double>[0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.7
 /// one that registered in the wrong coordinate system look identical on screen,
 /// which is the shape of defect that survives longest. Debug builds only,
 /// wired the way `debugPaintSizeEnabled` is.
+///
+/// ```dart
+/// void main() {
+///   debugPaintGlassSurfaces = true;
+///   runApp(const MyApp());
+/// }
+/// ```
+///
+/// {@category Foundations}
 bool debugPaintGlassSurfaces = false;
 
 /// Whether a glass draw asks the engine for antialiasing — `Paint.isAntiAlias`
@@ -82,17 +91,21 @@ bool debugPaintGlassSurfaces = false;
 /// layout: the identity finish differs from the bare backdrop by up to 136
 /// code values through the SDF draw and by nothing directly. D191 and D199
 /// saw no difference because the `false` never arrived — see
-/// [primeAliasedDraw] — so their "the flag changes nothing" compared the SDF
+/// `primeAliasedDraw` — so their "the flag changes nothing" compared the SDF
 /// draw with itself. A global for the reason [debugGlassFusedSplit] is one;
 /// set it before the tree mounts, and read which arm ran off
 /// [RenderGlassSurface.opticsDrawsAliased] and
 /// [RenderGlassGroup.fusedDrawsAliased], never off the label.
+///
+/// {@category Diagnostics}
 bool debugGlassShaderAntiAlias = debugGlassShaderAntiAliasDefault;
 
 /// What [debugGlassShaderAntiAlias] ships as, for a harness that has to name
 /// the arm it did not override — a host that wrote its own constant here would
 /// report the old default after the package moved, which is the trap D190 and
 /// D199 each fell into once with the split.
+///
+/// {@category Diagnostics}
 const bool debugGlassShaderAntiAliasDefault = false;
 
 /// Makes an `isAntiAlias = false` draw that follows it on [canvas] reach
@@ -134,6 +147,18 @@ final Paint _aliasPrimer = Paint()..blendMode = BlendMode.dst;
 /// raw: `RSuperellipse.contains` uses the radii **as given**, so an unscaled
 /// capsule reads as an *ellipse* — 9425 px² against the 11 214 the engine draws
 /// on a 200x60 box, 16% low (D183).
+///
+/// ```dart
+/// GlassSurface(
+///   borderRadius: kGlassCapsule,
+///   child: const Padding(
+///     padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+///     child: Text('Capsule'),
+///   ),
+/// )
+/// ```
+///
+/// {@category Foundations}
 const BorderRadius kGlassCapsule = BorderRadius.all(Radius.circular(1e9));
 
 /// A fade across a glass surface: whole at [begin], gone at [end], a
@@ -146,8 +171,19 @@ const BorderRadius kGlassCapsule = BorderRadius.all(Radius.circular(1e9));
 ///
 /// Not drawn by a fused group, whose one draw carries one set of optics: a
 /// faded member of a fusing group is drawn whole.
+///
+/// ```dart
+/// // Whole along the top 24 px of the glass, gone 32 px further down.
+/// GlassSurface(
+///   fade: GlassFade.vertical(from: 24, extent: 32),
+///   child: header,
+/// )
+/// ```
+///
+/// {@category Foundations}
 @immutable
 class GlassFade {
+  /// A fade from whole at [begin] to gone at [end].
   const GlassFade({required this.begin, required this.end});
 
   /// A vertical fade over [extent] logical px: whole at [from], gone [extent]
@@ -155,7 +191,11 @@ class GlassFade {
   factory GlassFade.vertical({required double from, required double extent}) =>
       GlassFade(begin: Offset(0, from), end: Offset(0, from + extent));
 
+  /// Where the glass is still whole, in the surface's logical coordinates.
   final Offset begin;
+
+  /// Where the glass is gone, in the surface's logical coordinates. Equal to
+  /// [begin], the fade has no direction and the glass is whole everywhere.
   final Offset end;
 
   /// `(x, y, z)` with `clamp(dot(rel, (x, y)) + z)` the fade's argument, for a
@@ -191,7 +231,51 @@ class GlassFade {
 /// because the two differ where it shows: the curvature at the join of the two
 /// arcs jumps by 1.6…4.7x on a plain rounded rect and by less on this one
 /// (D79), and a bevel's shading carries that jump.
+///
+/// It needs a [GlassHost] above it to draw glass: the host captures what is
+/// painted under the surface, and the surface samples that capture through
+/// its finish. Without a host it paints its child over nothing, and the first
+/// frame under a new host is the same, because a capture reads the frame that
+/// was just painted.
+///
+/// Its child is drawn on top of the glass and is not in the capture.
+///
+/// ```dart
+/// GlassHost(
+///   child: Stack(
+///     children: <Widget>[
+///       Positioned.fill(child: Image.asset('assets/photo.jpg', fit: BoxFit.cover)),
+///       Center(
+///         child: GlassSurface(
+///           borderRadius: const BorderRadius.all(Radius.circular(28)),
+///           finish: GlassFinish.clear,
+///           child: const Padding(
+///             padding: EdgeInsets.all(20),
+///             child: Text('Clear glass'),
+///           ),
+///         ),
+///       ),
+///     ],
+///   ),
+/// )
+/// ```
+///
+/// Most screens never use it directly: [GlassBar], [GlassButton] and
+/// [GlassCard] are surfaces with a padding, a shape and a label colour chosen
+/// for legibility.
+///
+/// See also:
+///
+///  * [GlassHost], which captures what the glass shows.
+///  * [GlassFinish], what the glass does to it.
+///  * [GlassTheme], the tokens a surface reads when it names none.
+///  * [GlassGroup], which draws several surfaces as one silhouette.
+///  * [The surface](https://g1455.plugfox.dev/foundations/surface) on the site.
+///
+/// {@category Foundations}
 class GlassSurface extends SingleChildRenderObjectWidget {
+  /// Glass of [borderRadius] around [child], in the theme's finish unless
+  /// [finish] names another.
   const GlassSurface({
     this.borderRadius = const BorderRadius.all(Radius.circular(24)),
     this.finish,
@@ -288,7 +372,15 @@ class GlassSurface extends SingleChildRenderObjectWidget {
 }
 
 /// The render object behind [GlassSurface].
+///
+/// Public for its counters — [paintsWithoutProxy], [paintsWithOptics] and the
+/// rest — which a test or a benchmark reads to say what a frame actually drew,
+/// and for [shape], the shape the glass is drawn with.
+///
+/// {@category Foundations}
 class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry {
+  /// A surface with the given corner radii, registered with the given ledger
+  /// once it is attached.
   RenderGlassSurface(this._borderRadius, this._ledger);
 
   /// A surface repaints on every published proxy, and nothing else should.
@@ -314,9 +406,12 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   @override
   bool get isRepaintBoundary => true;
 
-  // Reachable because this is the class that owns it: `RenderObject.layer` is
-  // `@protected`, and `debugLayer` returns null in profile, which is where the
-  // package runs.
+  /// This surface's own layer, for the host's layer watch (`ProxyLayerWatch`)
+  /// to exclude from the walk.
+  ///
+  /// Reachable because this is the class that owns it: `RenderObject.layer` is
+  /// `@protected`, and `debugLayer` returns null in profile, which is where the
+  /// package runs.
   @override
   Layer? get compositedLayer => layer;
 
@@ -333,6 +428,9 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   }
 
   BorderRadius _borderRadius;
+
+  /// See [GlassSurface.borderRadius]. Read the drawn shape through [shape],
+  /// which scales radii that do not fit.
   set borderRadius(BorderRadius value) {
     if (value == _borderRadius) {
       return;
@@ -341,6 +439,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     markNeedsPaint();
   }
 
+  /// The corner radii as declared, before any scaling. See [shape].
   BorderRadius get borderRadius => _borderRadius;
 
   GlassFinish? _finish;
@@ -485,6 +584,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// [paintsWithOptics]: a wave's frame paints nothing — it invalidates the
   /// draw, which re-records at composite time.
   int rippleTicks = 0;
+
+  /// Draws made through the ripple program. See [rippleTicks].
   int rippleDraws = 0;
 
   /// Translucent where it ripples: the glass hears a touch inside its shape
@@ -850,6 +951,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// surfaces on the same screen — nested themes are how a screen mixes them —
   /// so "which rung ran" cannot be read off the host's configuration.
   int paintsCheap = 0;
+
+  /// Frames it painted the opaque rung. See [paintsCheap].
   int paintsOpaque = 0;
 
   /// Of [paintsWithOptics], the draws made with `isAntiAlias` false.
@@ -1020,6 +1123,9 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// which a moving glass that happened to be repainted anyway would pass every
   /// pixel arm.
   int get drawRecords => _drawLayer.layer?.records ?? 0;
+
+  /// Of [drawRecords], the ones forced by the glass having moved. See
+  /// [drawRecords].
   int get drawRecordsOnMove => _drawLayer.layer?.recordsOnMove ?? 0;
 
   List<Object?> _drawProbe() {

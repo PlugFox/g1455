@@ -43,6 +43,8 @@ import 'package:flutter/painting.dart';
 /// Apple materials, three device rows each, and returned **0.790** with an rms
 /// residual of 0.54 code values; a ramp, a smoothstep and a gaussian given the
 /// same freedom are 4.7x worse.
+///
+/// {@category Foundations}
 const double kRimWidthLogical = 0.79;
 
 /// What the outline adds, and it *adds* rather than mixes.
@@ -51,10 +53,14 @@ const double kRimWidthLogical = 0.79;
 /// agree to 2-5%, so this is white at a fraction rather than a colour. A mix
 /// toward any colour would necessarily be weaker on the brighter material, and
 /// Apple's is not (D88).
+///
+/// {@category Foundations}
 const Color kCalibratedRim = Color.fromRGBO(255, 255, 255, 50.2 / 255);
 
 /// ΔE between `Glass.regular` and `Glass.clear` on one backdrop (S4) — the only
 /// external unit this project has.
+///
+/// {@category Foundations}
 const double kMaterialScaleDeltaE = 34.78;
 
 /// Width of the outline under the platform's increase-contrast switch, logical
@@ -67,6 +73,8 @@ const double kMaterialScaleDeltaE = 34.78;
 /// which is the property the calibrated 0.79 does not have and the switch
 /// exists to provide: a sub-pixel band is a coverage fraction, and a fraction
 /// is what "increase contrast" is asked to remove.
+///
+/// {@category Foundations}
 const double kHighContrastRimWidthLogical = 1;
 
 /// WCAG 2.2's contrast floor for a component's boundary against what is next
@@ -74,9 +82,13 @@ const double kHighContrastRimWidthLogical = 1;
 ///
 /// What [GlassFinish.highContrastRim] is checked against. An external
 /// documented constant, like `kGlassMinTapTarget`, which is why it has a name.
+///
+/// {@category Foundations}
 const double kNonTextContrast = 3;
 
 /// WCAG 2.2's AA floor for body text (SC 1.4.3).
+///
+/// {@category Foundations}
 const double kTextContrastAA = 4.5;
 
 /// The dimming layer Apple's guidelines put behind clear Liquid Glass over
@@ -87,12 +99,36 @@ const double kTextContrastAA = 4.5;
 /// its answer: the guideline is a suggestion for one finish, and what a label
 /// needs is a function of the finish's own transmission — which the arithmetic
 /// has and the guideline does not (D204).
+///
+/// {@category Foundations}
 const double kAppleDimmingOpacity = 0.35;
 
 /// The shape of the refraction: how far in it reaches, how hard it bends, and
 /// how it falls off.
+///
+/// Every [GlassFinish] carries one, and the default is the measured one: an
+/// inward bend of [strength] at the rim, falling off over [thickness] with the
+/// profile [shoulder] and [edgePower] describe. [widen] and [zoom] are 0 and 1
+/// on every finish; they are what the drops of the controls use to minify or
+/// magnify what is under them.
+///
+/// ```dart
+/// // A lens that magnifies what is under it, as iOS's tab-bar drop does.
+/// final GlassFinish lens = GlassFinish.clear.copyWith(
+///   optics: const GlassOptics(zoom: 1.17),
+/// );
+/// ```
+///
+/// See also:
+///
+///  * [GlassFinish], which pairs these optics with a blur, a tint and a rim.
+///  * [GlassOptics.none], the optics with the refraction switched off.
+///  * [Finishes](https://g1455.plugfox.dev/foundations/finishes) on the site.
+///
+/// {@category Foundations}
 @immutable
 class GlassOptics {
+  /// Optics with the measured defaults; name a field to change only that one.
   const GlassOptics({
     this.thickness = 21,
     this.strength = -58.2,
@@ -165,6 +201,7 @@ class GlassOptics {
   /// half-extents [half] — what the capture has to hold beyond it.
   double reach(Size half) => math.max(0, widen) + math.max(0, 1 / zoom - 1) * half.longestSide;
 
+  /// These optics with the named fields replaced.
   GlassOptics copyWith({
     double? thickness,
     double? strength,
@@ -230,10 +267,56 @@ class GlassOptics {
 /// What the glass does to the light it lets through: how much it blurs and how
 /// much of it survives.
 ///
+/// A finish is a blur ([blurSigmaLogical]), a tint laid over the blurred
+/// sample ([tint]), an additive outline ([rim]) and the bend at the edge
+/// ([optics]). The host's finish is what every surface under it wears;
+/// a [GlassSurface] or a [GlassTheme] can name another.
+///
 /// The names are the M11 ladder's, because every damage number the package
 /// carries is keyed by them.
+///
+/// Four finishes are calibrated against Apple's own materials:
+///
+/// | Finish | Blur sigma | Looks like |
+/// |---|---|---|
+/// | [regularDark] | 2.6 | `.regular` over dark content: dark, and barely transmitting |
+/// | [regularLight] | 2.6 | `.regular` over light content |
+/// | [clear] | 0 | `.clear`: no blur, a light tint, the bend in full |
+/// | [frosted] | 8 | a heavy blur with a light, thin tint |
+///
+/// [regular] picks between the two branches of `.regular` the way Apple's
+/// material does, and is what a host with no [GlassHost.finish] wears.
+/// [identity] is the control finish: a surface wearing it is invisible.
+///
+/// ```dart
+/// GlassSurface(
+///   finish: GlassFinish.clear,
+///   borderRadius: const BorderRadius.all(Radius.circular(28)),
+///   child: const Padding(
+///     padding: EdgeInsets.all(20),
+///     child: Text('Clear glass'),
+///   ),
+/// )
+/// ```
+///
+/// > **Note:** a finish whose [name] is not one of the measured ones gets
+/// > refusals from the resolution policy rather than numbers. Derive a custom
+/// > finish with [copyWith] and keep the name of the one it is closest to.
+///
+/// See also:
+///
+///  * [GlassOptics], the shape of the bend at the edge.
+///  * [GlassHost.finish] and [GlassThemeData.finish], where a finish is named
+///    for a screen or a subtree.
+///  * [GlassThemeData.legibility], which dims a finish for its label.
+///  * [Finishes](https://g1455.plugfox.dev/foundations/finishes) and
+///    [Legibility](https://g1455.plugfox.dev/foundations/legibility) on the site.
+///
+/// {@category Foundations}
 @immutable
 class GlassFinish {
+  /// A finish of its own. The [name] keys it into the measured damage tables,
+  /// so a finish nobody has graded should borrow the name of its nearest one.
   const GlassFinish({
     required this.name,
     required this.blurSigmaLogical,
@@ -243,7 +326,7 @@ class GlassFinish {
   });
 
   /// Key into the measured damage tables ([ProxyResolution.meanDamage],
-  /// [ProxyStaleness.damageAt]). A finish whose name is not among the measured
+  /// `ProxyStaleness.damageAt`). A finish whose name is not among the measured
   /// ones gets refusals rather than numbers, which is the intended behaviour
   /// for a finish nobody has graded.
   final String name;
@@ -257,6 +340,7 @@ class GlassFinish {
   /// What the outline adds.
   final Color rim;
 
+  /// How the glass bends what it samples at the edge. See [GlassOptics].
   final GlassOptics optics;
 
   /// Calibrated to Apple's `Glass.regular` on both axes S4 found the material
@@ -326,6 +410,14 @@ class GlassFinish {
   /// light in the light appearance, dark in the dark. With one, its Rec.709
   /// luma against the appearance's threshold — the thresholds were read on
   /// greys, and that a colour switches by its luma is the assumption.
+  ///
+  /// ```dart
+  /// // The branch Apple's material would wear over a light grouped background.
+  /// final GlassFinish finish = GlassFinish.regular(
+  ///   appearance: MediaQuery.platformBrightnessOf(context),
+  ///   backdrop: const Color(0xFFF2F2F7),
+  /// );
+  /// ```
   static GlassFinish regular({required Brightness appearance, Color? backdrop}) {
     if (backdrop == null) {
       return appearance == Brightness.dark ? regularDark : regularLight;
@@ -695,6 +787,10 @@ class GlassFinish {
     return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);
   }
 
+  /// This finish with the named fields replaced.
+  ///
+  /// The name is kept unless one is given, so the damage tables keep applying;
+  /// see [name] before changing it.
   GlassFinish copyWith({
     String? name,
     double? blurSigmaLogical,

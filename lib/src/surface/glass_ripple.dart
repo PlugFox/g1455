@@ -28,6 +28,11 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 /// The most waves one draw evaluates; `kMaxWaves` in the shader.
+///
+/// Waves past it are dropped weakest first, and counted in
+/// [GlassRippleField.dropped].
+///
+/// {@category Foundations}
 const int kMaxRippleWaves = 4;
 
 /// The bound of the front's profile `exp(-u^2) * 2u` over u, `sqrt(2 / e)`.
@@ -41,8 +46,45 @@ const double _kGone = 0.02;
 ///
 /// The defaults are chosen by eye, not measured — there is no reference to
 /// measure against, since the platform has no such effect.
+///
+/// A touch launches a front from where the finger landed and another from
+/// where it left, and holds a dimple under the finger while it is down.
+/// [viscosity] is the one knob most applications need: 0 is water, which
+/// rings, and 1 is honey, one slow bump.
+///
+/// Opt-in, and not Apple's: iOS answers a touch with light and a scale and
+/// never deforms the material. It takes no capture and repaints nothing — a
+/// frame of a wave only re-records the glass's draw — and it is not drawn
+/// under the platform's reduced-motion switch, by a member of a fusing
+/// [GlassGroup], or on a rung below [GlassTier.full].
+///
+/// Declared for a whole screen on the host, or for one glass on the surface:
+///
+/// ```dart
+/// GlassHost(
+///   ripple: const GlassRipple(viscosity: 0.3),
+///   child: navigator!,
+/// )
+///
+/// GlassSurface(
+///   ripple: const GlassRipple(viscosity: 1, amplitude: 4),
+///   child: const SizedBox.square(dimension: 120),
+/// )
+/// ```
+///
+/// > **Note:** the ripple is a separate shader, loaded the first time a
+/// > surface asks for one. [GlassHost.precache] loads it up front.
+///
+/// See also:
+///
+///  * [GlassHost.ripple], [GlassThemeData.ripple] and [GlassSurface.ripple],
+///    where a ripple is declared.
+///  * [Ripple](https://g1455.plugfox.dev/foundations/ripple) on the site.
+///
+/// {@category Foundations}
 @immutable
 class GlassRipple {
+  /// A ripple with the defaults chosen by eye; name a field to change it.
   const GlassRipple({
     this.amplitude = 6,
     this.speed = 360,
@@ -98,6 +140,9 @@ class GlassRipple {
 
   /// The dimple's spring: natural frequency, rad/s, and damping ratio.
   double get springOmega => _mix(26, 16);
+
+  /// The dimple spring's damping ratio: below 1 it overshoots, at 1 it settles
+  /// critically damped.
   double get springZeta => _mix(0.22, 1);
 
   /// Seconds for the dimple to sink under a held finger.
@@ -106,6 +151,7 @@ class GlassRipple {
   /// Seconds for a front to rise at birth, so a press does not pop.
   static const double rise = 0.025;
 
+  /// This ripple with the named fields replaced.
   GlassRipple copyWith({
     double? amplitude,
     double? speed,
@@ -147,8 +193,11 @@ class GlassRipple {
 /// One wave as the shader takes it: two `vec4`s, in the order of the uniform
 /// block. Amplitudes are signed heights in displacement px — positive
 /// magnifies — and [uniforms] normalises them.
+///
+/// {@category Diagnostics}
 @immutable
 class GlassRippleWave {
+  /// One wave, from the quantities [GlassRippleField.advance] computes.
   const GlassRippleWave({
     required this.centre,
     required this.radius,
@@ -161,11 +210,24 @@ class GlassRippleWave {
 
   /// The touch, relative to the surface's centre.
   final Offset centre;
+
+  /// How far the front has travelled from [centre], logical px.
   final double radius;
+
+  /// The front's half-width, logical px; it broadens as the front ages.
   final double halfWidth;
+
+  /// The front's signed height, displacement px: negative for the press's
+  /// trough, positive for the release's crest, 0 once it is gone.
   final double front;
+
+  /// Oscillation inside the front, radians per half-width; 0 for one bump.
   final double ringing;
+
+  /// The signed height of the dimple under the finger, displacement px.
   final double dimple;
+
+  /// The dimple's radius, logical px — [GlassRipple.pressRadius].
   final double sigma;
 
   /// The most any fragment is displaced by this wave.
@@ -222,9 +284,14 @@ class _Touch {
 /// Time is whatever [advance] is given — the frame's timestamp — and an event
 /// takes the time of the first frame after it, so every quantity is a function
 /// of one clock. Pointer events carry the platform's own, which is another.
+///
+/// {@category Diagnostics}
 class GlassRippleField {
+  /// An empty field that makes waves of [ripple].
   GlassRippleField(this.ripple);
 
+  /// The ripple the next waves are made of. Changing it reshapes the waves
+  /// already alive, from the next [advance].
   GlassRipple ripple;
 
   final List<_Touch> _touches = <_Touch>[];
@@ -247,6 +314,8 @@ class GlassRippleField {
   /// Waves that were alive and did not fit in the draw, over the field's life.
   int dropped = 0;
 
+  /// Puts a finger down at [relative] to the surface's centre: a press front
+  /// and a dimple. A fifth finger drops the oldest touch.
   void down(int pointer, Offset relative) {
     _touches.removeWhere((_Touch t) => t.pointer == pointer && !t.released);
     if (_touches.length >= maxTouches) {
@@ -280,6 +349,7 @@ class GlassRippleField {
     }
   }
 
+  /// Drops every touch and every wave at once.
   void clear() {
     _touches.clear();
     _waves = const <GlassRippleWave>[];

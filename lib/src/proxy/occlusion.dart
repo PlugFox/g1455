@@ -261,6 +261,7 @@ class OcclusionPlan {
   /// The last node in visit order that opaquely covers the region, or null.
   final RenderObject? cover;
 
+  /// [cover]'s position in visit order, or -1 when there is none.
   final int coverIndex;
 
   /// Render objects in the subtree, so a saving can be quoted as a share.
@@ -269,8 +270,11 @@ class OcclusionPlan {
   /// Nodes that paint *some* opaque rectangle, whether or not it spans the
   /// region, and the biggest one in root coordinates.
   final int opaqueNodes;
+
+  /// See [opaqueNodes].
   final Rect? largestOpaque;
 
+  /// Whether anything covers the region at all.
   bool get hasCover => cover != null;
 
   /// A subtree is dead iff all of it is painted before the cover.
@@ -282,6 +286,8 @@ class OcclusionPlan {
     return end != null && end < coverIndex;
   }
 
+  /// Where [node] was entered in visit order, or null for a node the plan
+  /// never saw.
   int? visitIndexOf(RenderObject node) => _enter[node];
 
   /// How many nodes the cut removes, if paint order agrees with visit order.
@@ -300,8 +306,10 @@ class OcclusionPlan {
 /// `debugLayer` — and a pass that fails it is discarded rather than trusted,
 /// which is the structural fallback D37 asks for.
 class OcclusionPolicy {
+  /// A policy that culls by [plan] and defers everything else to [inner].
   OcclusionPolicy(this.plan, {this.inner = paintEverything, this.enabled = true});
 
+  /// Which subtrees are painted before the cover.
   final OcclusionPlan plan;
 
   /// What to do with a node the cull does not remove. The mandatory skips of
@@ -312,13 +320,18 @@ class OcclusionPolicy {
   /// here rather than in a second code path.
   final bool enabled;
 
+  /// Nodes this pass skipped as occluded.
   int occludedNodes = 0;
+
+  /// Nodes reached out of visit order, or missing from the plan. One is
+  /// enough to make the pass not [valid].
   int orderViolations = 0;
   int _lastIndex = -1;
 
   /// Whether the pass this policy drove may be used.
   bool get valid => orderViolations == 0;
 
+  /// The [WalkPolicy] step: checks the order, then culls or defers.
   WalkAction call(RenderObject child) {
     final int? index = plan.visitIndexOf(child);
     if (index == null) {

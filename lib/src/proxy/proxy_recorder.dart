@@ -70,6 +70,7 @@ class ProxyRecording {
   ({int width, int height}) get expectedSize =>
       (width: (scale * region.width).ceil(), height: (scale * region.height).ceil());
 
+  /// Releases [image] and the layer the recording was taken into.
   void dispose() {
     image.dispose();
     _handle?.layer = null;

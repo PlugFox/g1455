@@ -40,14 +40,20 @@ import 'glass_tab_bar.dart';
 
 /// [GlassScaffold.topBarHeight]'s default, logical px. Layout taste, not a
 /// measurement: Material's toolbar height, which the example's shell uses.
+///
+/// {@category Panels and controls}
 const double kGlassScaffoldBarHeight = 56;
 
 /// [GlassScaffold.barMargin]'s default: the space around each bar, inside the
 /// safe area. Layout taste.
+///
+/// {@category Panels and controls}
 const EdgeInsets kGlassScaffoldBarMargin = EdgeInsets.fromLTRB(12, 8, 12, 8);
 
 /// How far the floating action stands from the screen's end edge and from the
 /// bottom bar, logical px. Layout taste, as Material's.
+///
+/// {@category Panels and controls}
 const double kGlassScaffoldActionGap = 16;
 
 /// A screen: a [body] that scrolls under a glass [topBar], with an optional
@@ -88,8 +94,24 @@ const double kGlassScaffoldActionGap = 16;
 /// can read the same padding, or wrap itself in a `SafeArea`. The keyboard is
 /// not handled: the body sees `MediaQuery.viewInsets` as it is.
 ///
-/// See the file comment for what a scroll costs.
+/// > **Note:** every frame of a scroll is one capture of the whole host, for
+/// > every glass on the screen at once, because the content under the bars
+/// > changes; a still screen is held. Over glass cards, the lifted bars add
+/// > one snapshot to each frame that records.
+///
+/// See also:
+///
+///  * [GlassScrollEdge], the effect under the top bar, for a layout this
+///    does not cover.
+///  * [GlassHost], to declare what the scaffold's own host leaves at its
+///    defaults.
+///  * [GlassBar] and [GlassTabBar], the usual [topBar] and [bottomBar].
+///  * [Scaffold on the site](https://g1455.plugfox.dev/components/scaffold).
+///
+/// {@category Panels and controls}
 class GlassScaffold extends StatelessWidget {
+  /// A screen of [body], with whichever of [topBar], [bottomBar] and
+  /// [floatingAction] are given. [topBarHeight] must not be negative.
   const GlassScaffold({
     required this.body,
     this.topBar,
@@ -106,7 +128,7 @@ class GlassScaffold extends StatelessWidget {
   /// bars' extents through `MediaQuery.padding`.
   final Widget body;
 
-  /// The bar at the top — usually a `GlassBar` — laid out [topBarHeight] tall
+  /// The bar at the top — usually a [GlassBar] — laid out [topBarHeight] tall
   /// and the scaffold's width less [barMargin] and the safe area. Null for no
   /// top bar and no scroll edge.
   final Widget? topBar;
@@ -129,7 +151,7 @@ class GlassScaffold extends StatelessWidget {
   final Widget? bottomBar;
 
   /// A control floating at the end edge, above [bottomBar] — usually a
-  /// `GlassButton` — at its own size, and lifted. Null for none.
+  /// [GlassButton] — at its own size, and lifted. Null for none.
   final Widget? floatingAction;
 
   /// The space around each bar, inside the safe area: the top bar's top and

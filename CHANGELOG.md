@@ -8,6 +8,11 @@
 
 Documentation:
 
+- The API reference is grouped into topics, each with a page of its own:
+  Getting started, Foundations, Panels and controls, Modals, Composition,
+  Capture control, Cost and policy, Diagnostics. Every public name has a doc
+  comment, the main widgets an example and a list of what to see next with
+  their page on the site, and `dart doc` reports no unresolved reference.
 - `GlassProxy`, the way to tell the capture what a subtree is, is in the
   README at last: a stand-in for a video, a map or a platform view (which
   record nothing, so the glass over them showed a hole), a subtree left out,

@@ -38,6 +38,7 @@ import 'proxy_resolution.dart';
 /// One surface's place in the atlas.
 @immutable
 class AtlasSlot {
+  /// A slot as the packer places it.
   const AtlasSlot({
     required this.index,
     required this.members,
@@ -66,6 +67,7 @@ class AtlasSlot {
   /// both aligned; see [AtlasLayout.align].
   final Rect rect;
 
+  /// Texels per logical pixel in this slot: the layout's own ratio.
   final double pixelRatio;
 
   /// Screen (logical) point to atlas texel. The map a shader needs, and the one
@@ -84,6 +86,7 @@ class AtlasSlot {
 /// N surfaces packed into one texture.
 @immutable
 class AtlasLayout {
+  /// A layout as [pack] builds it.
   const AtlasLayout({
     required this.slots,
     required this.size,
@@ -92,11 +95,13 @@ class AtlasLayout {
     required this.align,
   });
 
+  /// The slots, in [AtlasSlot.index] order.
   final List<AtlasSlot> slots;
 
   /// Texture size in device pixels.
   final Size size;
 
+  /// Texels per logical pixel, the same for every slot.
   final double pixelRatio;
 
   /// Logical pixels of context captured beyond each surface, for the blur.
@@ -625,9 +630,13 @@ class _Placement {
 /// two round numbers D24 was written with.
 @immutable
 class CaptureCost {
+  /// A route of [passes] captures covering [areaDevicePx] in total.
   const CaptureCost({required this.passes, required this.areaDevicePx});
 
+  /// How many captures the route takes.
   final int passes;
+
+  /// Device pixels captured, summed over the passes.
   final double areaDevicePx;
 
   /// `C_pass` from M2, heavy content, Adreno 830.
@@ -635,8 +644,11 @@ class CaptureCost {
 
   /// Marginal cycles per device pixel: flat content and heavy content.
   static const double kFlat = 0.198;
+
+  /// See [kFlat].
   static const double kHeavy = 0.271;
 
+  /// `C_pass·n + k·area` in Adreno 830 cycles per frame.
   double cycles({double k = kHeavy}) => passes * cPass + k * areaDevicePx;
 }
 
