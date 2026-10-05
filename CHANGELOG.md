@@ -1,3 +1,11 @@
+## Unreleased
+
+- `showGlassSheet(barrierDismissible: false)` is a sheet only its content
+  closes, as UIKit's `isModalInPresentation`: a drag or a flick used to close
+  it whatever the flag said. Now a pull gives a quarter of the way, no more
+  than half the sheet's height, and springs back; the dim and Escape were
+  already held by the flag.
+
 ## 0.1.3
 
 - The README's images show on pub.dev again. 0.1.2 linked the banner, the

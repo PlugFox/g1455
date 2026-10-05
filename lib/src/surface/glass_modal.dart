@@ -307,6 +307,10 @@ class _AlertButtonState extends State<_AlertButton> {
 /// dim. Dragged down, it follows the finger and goes past a third of its
 /// height or on a flick. See the file comment for where the host has to be.
 ///
+/// [barrierDismissible] false is a sheet only its own content closes, as
+/// UIKit's `isModalInPresentation`: a tap on the dim, Escape and a drag all
+/// leave it where it is — a drag pulls it down and it springs back.
+///
 /// [constraints] bound the sheet inside the window's margins, as
 /// `showModalBottomSheet`'s do: a `maxWidth` keeps it at its content's width
 /// and centred on a wide window, where a sheet across the whole width leaves
@@ -372,7 +376,9 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   void _drag(double fraction) {
     final AnimationController? c = controller;
     if (c != null) {
-      c.value = (c.value - fraction).clamp(0.0, 1.0);
+      // One a drag cannot close gives a quarter of the way, and never more
+      // than half its height: a pull that is felt, and goes nowhere.
+      c.value = dismissible ? (c.value - fraction).clamp(0.0, 1.0) : (c.value - fraction / 4).clamp(0.5, 1.0);
     }
   }
 
@@ -381,7 +387,7 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
     if (c == null) {
       return;
     }
-    if (velocityFraction > 1.5 || c.value < 2 / 3) {
+    if (dismissible && (velocityFraction > 1.5 || c.value < 2 / 3)) {
       navigator?.pop();
     } else {
       c.forward();
