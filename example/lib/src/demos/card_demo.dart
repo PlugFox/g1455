@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A weather widget on a glass card, over a photo.
 class CardDemo extends StatefulWidget {
@@ -22,11 +24,11 @@ const Map<String, GlassFinish?> _kFinishes = <String, GlassFinish?>{
 };
 
 const List<(String, IconData, int)> _kHours = <(String, IconData, int)>[
-  ('Now', Icons.wb_sunny_rounded, 21),
-  ('14', Icons.wb_sunny_rounded, 23),
-  ('15', Icons.wb_cloudy_rounded, 24),
-  ('16', Icons.wb_cloudy_rounded, 22),
-  ('17', Icons.water_drop_rounded, 19),
+  ('Now', SFIcons.sf_sun_max_fill, 21),
+  ('14', SFIcons.sf_sun_max_fill, 23),
+  ('15', SFIcons.sf_cloud_fill, 24),
+  ('16', SFIcons.sf_cloud_fill, 22),
+  ('17', SFIcons.sf_drop_fill, 19),
 ];
 
 class _CardDemoState extends State<CardDemo> {
@@ -105,7 +107,7 @@ class _Weather extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 4),
-                      Icon(Icons.near_me_rounded, size: 14),
+                      SiteIcon(SFIcons.sf_location_fill, size: 14),
                     ],
                   ),
                   Text('21°', style: TextStyle(fontSize: 48, fontWeight: FontWeight.w300, height: 1.1)),
@@ -116,7 +118,7 @@ class _Weather extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: <Widget>[
-                  const Icon(Icons.wb_sunny_rounded, size: 28, color: Color(0xFFFFD60A)),
+                  const SiteIcon(SFIcons.sf_sun_max_fill, size: 28, color: Color(0xFFFFD60A)),
                   const SizedBox(height: 6),
                   const Text(
                     'Mostly sunny',
@@ -141,7 +143,7 @@ class _Weather extends StatelessWidget {
                   children: <Widget>[
                     Text(hour, maxLines: 1, style: muted),
                     const SizedBox(height: 6),
-                    Icon(icon, size: 20),
+                    SiteIcon(icon, size: 20),
                     const SizedBox(height: 6),
                     Text('$temp°', maxLines: 1, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
                   ],

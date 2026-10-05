@@ -4,8 +4,10 @@ import 'package:flutter/gestures.dart';
 
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
+import '../widgets/site_icon.dart';
 
 /// One scene of the home page's gallery: glass in something that looks like
 /// an app, over something worth refracting.
@@ -134,7 +136,7 @@ class _GlassIcon extends StatelessWidget {
       onTap: onTap,
       child: SizedBox.fromSize(
         size: kGlassMinTapTarget,
-        child: Icon(icon, size: size, color: color ?? _label(context)),
+        child: SiteIcon(icon, size: size, color: color ?? _label(context)),
       ),
     ),
   );
@@ -198,7 +200,7 @@ class _NowPlayingSceneState extends State<_NowPlayingScene> {
                             borderRadius: BorderRadius.circular(10),
                             gradient: LinearGradient(colors: <Color>[_hsv(hue, 0.8, 0.95), _hsv(hue + 50, 0.9, 0.6)]),
                           ),
-                          child: const Icon(Icons.graphic_eq, color: Colors.white, size: 22),
+                          child: const SiteIcon(SFIcons.sf_waveform, color: Colors.white, size: 22),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -221,7 +223,7 @@ class _NowPlayingSceneState extends State<_NowPlayingScene> {
                           ),
                         ),
                         _GlassIcon(
-                          icon: _loved ? Icons.favorite : Icons.favorite_border,
+                          icon: _loved ? SFIcons.sf_heart_fill : SFIcons.sf_heart,
                           label: _loved ? 'Unlove' : 'Love',
                           color: _loved ? const Color(0xFFFF375F) : null,
                           onTap: () => setState(() => _loved = !_loved),
@@ -238,21 +240,21 @@ class _NowPlayingSceneState extends State<_NowPlayingScene> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: <Widget>[
-                        _GlassIcon(icon: Icons.shuffle, label: 'Shuffle', size: 20, onTap: () => _skip(2)),
+                        _GlassIcon(icon: SFIcons.sf_shuffle, label: 'Shuffle', size: 20, onTap: () => _skip(2)),
                         _GlassIcon(
-                          icon: Icons.skip_previous_rounded,
+                          icon: SFIcons.sf_backward_end_fill,
                           label: 'Previous',
                           size: 30,
                           onTap: () => _skip(-1),
                         ),
                         _GlassIcon(
-                          icon: _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          icon: _playing ? SFIcons.sf_pause_fill : SFIcons.sf_play_fill,
                           label: _playing ? 'Pause' : 'Play',
                           size: 38,
                           onTap: () => setState(() => _playing = !_playing),
                         ),
-                        _GlassIcon(icon: Icons.skip_next_rounded, label: 'Next', size: 30, onTap: () => _skip(1)),
-                        _GlassIcon(icon: Icons.repeat, label: 'Repeat', size: 20, onTap: () {}),
+                        _GlassIcon(icon: SFIcons.sf_forward_end_fill, label: 'Next', size: 30, onTap: () => _skip(1)),
+                        _GlassIcon(icon: SFIcons.sf_repeat, label: 'Repeat', size: 20, onTap: () {}),
                       ],
                     ),
                   ],
@@ -335,9 +337,9 @@ class _WeatherSceneState extends State<_WeatherScene> {
   _Sky _sky = _Sky.day;
 
   static const Map<_Sky, (String, String, IconData)> _kNow = <_Sky, (String, String, IconData)>{
-    _Sky.day: ('24°', 'Sunny', Icons.wb_sunny_rounded),
-    _Sky.dusk: ('19°', 'Clear evening', Icons.wb_twilight_rounded),
-    _Sky.night: ('14°', 'Starry', Icons.nightlight_round),
+    _Sky.day: ('24°', 'Sunny', SFIcons.sf_sun_max_fill),
+    _Sky.dusk: ('19°', 'Clear evening', SFIcons.sf_sun_horizon_fill),
+    _Sky.night: ('14°', 'Starry', SFIcons.sf_moon_fill),
   };
 
   @override
@@ -397,7 +399,7 @@ class _WeatherSceneState extends State<_WeatherScene> {
                             ],
                           ),
                         ),
-                        Icon(icon, color: label, size: 32),
+                        SiteIcon(icon, color: label, size: 32),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -416,8 +418,8 @@ class _WeatherSceneState extends State<_WeatherScene> {
                                   style: small,
                                 ),
                                 const SizedBox(height: 4),
-                                Icon(
-                                  (_sky == _Sky.night || h == 4) ? Icons.cloud_outlined : Icons.wb_sunny_outlined,
+                                SiteIcon(
+                                  (_sky == _Sky.night || h == 4) ? SFIcons.sf_cloud : SFIcons.sf_sun_max,
                                   color: label,
                                   size: 18,
                                 ),
@@ -652,9 +654,9 @@ class _MessagesSceneState extends State<_MessagesScene> {
                       ],
                     ),
                   ),
-                  Icon(Icons.videocam_outlined, color: label),
+                  SiteIcon(SFIcons.sf_video, color: label),
                   const SizedBox(width: 12),
-                  Icon(Icons.call_outlined, color: label, size: 22),
+                  SiteIcon(SFIcons.sf_phone, color: label, size: 22),
                   const SizedBox(width: 6),
                 ],
               );
@@ -674,7 +676,7 @@ class _MessagesSceneState extends State<_MessagesScene> {
                 child: Builder(
                   builder: (BuildContext context) => Row(
                     children: <Widget>[
-                      Icon(Icons.add_circle_outline, color: _label(context), size: 22),
+                      SiteIcon(SFIcons.sf_plus_circle, color: _label(context), size: 22),
                       const SizedBox(width: 10),
                       Text('Message', style: TextStyle(color: _label(context).withValues(alpha: 0.6))),
                     ],
@@ -687,7 +689,7 @@ class _MessagesSceneState extends State<_MessagesScene> {
               padding: EdgeInsets.zero,
               semanticLabel: 'Send',
               onPressed: _send,
-              child: const Icon(Icons.arrow_upward_rounded),
+              child: const SiteIcon(SFIcons.sf_arrow_up),
             ),
           ],
         ),
@@ -770,7 +772,7 @@ class _SmartHomeSceneState extends State<_SmartHomeScene> {
                 children: <Widget>[
                   Row(
                     children: <Widget>[
-                      Icon(_on ? Icons.lightbulb : Icons.lightbulb_outline, color: label),
+                      SiteIcon(_on ? SFIcons.sf_lightbulb_fill : SFIcons.sf_lightbulb, color: label),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -966,7 +968,7 @@ class _PhotoSceneState extends State<_PhotoScene> {
             _seed++;
             _loved = false;
           }),
-          child: const Icon(Icons.shuffle_rounded),
+          child: const SiteIcon(SFIcons.sf_shuffle),
         ),
       ),
       Positioned(
@@ -977,16 +979,16 @@ class _PhotoSceneState extends State<_PhotoScene> {
           child: GlassButtonGroup(
             items: <GlassToolbarItem>[
               GlassToolbarItem(
-                icon: Icon(
-                  _loved ? Icons.favorite : Icons.favorite_border,
+                icon: SiteIcon(
+                  _loved ? SFIcons.sf_heart_fill : SFIcons.sf_heart,
                   color: _loved ? const Color(0xFFFF375F) : null,
                 ),
                 label: _loved ? 'Unlove' : 'Love',
                 onPressed: () => setState(() => _loved = !_loved),
               ),
-              GlassToolbarItem(icon: const Icon(Icons.ios_share), label: 'Share', onPressed: () {}),
-              GlassToolbarItem(icon: const Icon(Icons.info_outline), label: 'Info', onPressed: () {}),
-              GlassToolbarItem(icon: const Icon(Icons.delete_outline), label: 'Delete', onPressed: () {}),
+              GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_square_and_arrow_up), label: 'Share', onPressed: () {}),
+              GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_info_circle), label: 'Info', onPressed: () {}),
+              GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_trash), label: 'Delete', onPressed: () {}),
             ],
           ),
         ),
@@ -998,10 +1000,10 @@ class _PhotoSceneState extends State<_PhotoScene> {
 // -------------------------------------------------------------------- Morph
 
 const List<(IconData, String, Color)> _kActions = <(IconData, String, Color)>[
-  (Icons.edit_note_rounded, 'Note', Color(0xFFFFD60A)),
-  (Icons.checklist_rounded, 'List', Color(0xFF30D158)),
-  (Icons.photo_camera_rounded, 'Photo', Color(0xFF64D2FF)),
-  (Icons.mic_rounded, 'Voice memo', Color(0xFFFF375F)),
+  (SFIcons.sf_square_and_pencil, 'Note', Color(0xFFFFD60A)),
+  (SFIcons.sf_checklist, 'List', Color(0xFF30D158)),
+  (SFIcons.sf_camera_fill, 'Photo', Color(0xFF64D2FF)),
+  (SFIcons.sf_microphone_fill, 'Voice memo', Color(0xFFFF375F)),
 ];
 
 class _MorphScene extends StatefulWidget {
@@ -1026,7 +1028,7 @@ class _MorphSceneState extends State<_MorphScene> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(icon, size: 72, color: colour, shadows: const <Shadow>[Shadow(blurRadius: 18)]),
+              SiteIcon(icon, size: 72, color: colour, shadows: const <Shadow>[Shadow(blurRadius: 18)]),
               const SizedBox(height: 8),
               Text(
                 'New $name',
@@ -1076,7 +1078,7 @@ class _MorphSceneState extends State<_MorphScene> {
                                           child: Row(
                                             children: <Widget>[
                                               const SizedBox(width: 16),
-                                              Icon(_kActions[i].$1, color: _kActions[i].$3, size: 20),
+                                              SiteIcon(_kActions[i].$1, color: _kActions[i].$3, size: 20),
                                               const SizedBox(width: 12),
                                               Text(_kActions[i].$2, style: TextStyle(color: label, fontSize: 16)),
                                             ],
@@ -1092,7 +1094,7 @@ class _MorphSceneState extends State<_MorphScene> {
                       )
                     : _GlassIcon(
                         key: const ValueKey<String>('plus'),
-                        icon: Icons.add_rounded,
+                        icon: SFIcons.sf_plus,
                         label: 'New',
                         size: 28,
                         onTap: () => setState(() => _open = true),
@@ -1136,12 +1138,12 @@ class _MapSceneState extends State<_MapScene> {
               final Color label = _label(context);
               return Row(
                 children: <Widget>[
-                  Icon(Icons.search, color: label, size: 20),
+                  SiteIcon(SFIcons.sf_magnifyingglass, color: label, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text('Search Maps', style: TextStyle(color: label.withValues(alpha: 0.6))),
                   ),
-                  Icon(Icons.mic_none, color: label, size: 20),
+                  SiteIcon(SFIcons.sf_microphone, color: label, size: 20),
                 ],
               );
             },
@@ -1163,7 +1165,7 @@ class _MapSceneState extends State<_MapScene> {
                     width: 40,
                     height: 40,
                     decoration: const BoxDecoration(color: Color(0xFFFF9F0A), shape: BoxShape.circle),
-                    child: const Icon(Icons.local_cafe, color: Colors.white, size: 20),
+                    child: const SiteIcon(SFIcons.sf_cup_and_saucer_fill, color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1294,10 +1296,10 @@ class _MapPainter extends CustomPainter {
 // --------------------------------------------------------------------- Tabs
 
 const List<(IconData, String, double)> _kTabs = <(IconData, String, double)>[
-  (Icons.home_rounded, 'Home', 210),
-  (Icons.inbox_rounded, 'Inbox', 280),
-  (Icons.explore_rounded, 'Explore', 150),
-  (Icons.person_rounded, 'Profile', 20),
+  (SFIcons.sf_house_fill, 'Home', 210),
+  (SFIcons.sf_tray, 'Inbox', 280),
+  (SFIcons.sf_safari, 'Explore', 150),
+  (SFIcons.sf_person_fill, 'Profile', 20),
 ];
 
 class _TabsScene extends StatefulWidget {
@@ -1331,7 +1333,7 @@ class _TabsSceneState extends State<_TabsScene> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(icon, size: 64, color: Colors.white, shadows: const <Shadow>[Shadow(blurRadius: 16)]),
+                SiteIcon(icon, size: 64, color: Colors.white, shadows: const <Shadow>[Shadow(blurRadius: 16)]),
                 const SizedBox(height: 6),
                 Text(
                   name,
@@ -1363,7 +1365,7 @@ class _TabsSceneState extends State<_TabsScene> {
                       ? (BuildContext context, GlassTabItemLook look) => Stack(
                           clipBehavior: Clip.none,
                           children: <Widget>[
-                            Icon(icon, size: look.iconSize, color: look.color),
+                            SiteIcon(icon, size: look.iconSize, color: look.color),
                             Positioned(
                               // Clear of the label beside the icon on a wide bar.
                               right: look.inline ? -4 : -8,

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
+import '../widgets/site_icon.dart';
 
 /// Content scrolling under the bars, and a few controls floating over it.
 ///
@@ -84,7 +86,7 @@ class _ScrollPageState extends State<ScrollPage> {
               children: <Widget>[
                 GlassButton(
                   onPressed: () => setState(() => _lens = !_lens),
-                  child: Icon(_lens ? Icons.zoom_out : Icons.zoom_in),
+                  child: SiteIcon(_lens ? SFIcons.sf_minus_magnifyingglass : SFIcons.sf_plus_magnifyingglass),
                 ),
                 const SizedBox(width: 12),
                 GlassButton(onPressed: () {}, child: Text('${(_level * 100).round()}%')),

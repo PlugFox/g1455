@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
+
+import 'site_icon.dart';
 
 /// Says, for a moment, that something happened: a capsule of glass at the
 /// foot of the window — "Link copied", "Code copied".
@@ -11,7 +14,7 @@ import 'package:g1455/g1455.dart';
 /// there. It grows in through [GlassSurface.presence] and its finish arrives
 /// through [GlassSurface.materialize], the way the package brings glass in;
 /// a second toast replaces the first rather than stacking on it.
-void showGlassToast(BuildContext context, String message, {IconData icon = Icons.check_circle_outline}) {
+void showGlassToast(BuildContext context, String message, {IconData icon = SFIcons.sf_checkmark_circle}) {
   final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) {
     return;
@@ -122,7 +125,7 @@ class _ToastViewState extends State<_ToastView> with SingleTickerProviderStateMi
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Icon(widget.icon, size: 18, color: label),
+                      SiteIcon(widget.icon, size: 18, color: label),
                       const SizedBox(width: 10),
                       Flexible(
                         child: Text(

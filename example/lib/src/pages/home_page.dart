@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/routes.dart';
 import '../app/theme.dart';
@@ -14,6 +15,7 @@ import '../widgets/icons.dart';
 import '../widgets/links.dart';
 import 'entry_page.dart' show Pill;
 import 'home_showcase.dart';
+import '../widgets/site_icon.dart';
 
 /// The front page: what the package is, the glass itself moving, a gallery
 /// of glass in app-like scenes, and every page of the reference as a card.
@@ -154,18 +156,26 @@ class _Hero extends StatelessWidget {
               onPressed: () => openEntry(context, kEntries.first),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: <Widget>[Text('Get started'), SizedBox(width: 8), Icon(Icons.arrow_forward, size: 18)],
+                children: <Widget>[
+                  Text('Get started'),
+                  SizedBox(width: 8),
+                  SiteIcon(SFIcons.sf_chevron_right, size: 18),
+                ],
               ),
             ),
             GlassButton(
               onPressed: () => openEntry(context, entriesOf(Section.components).first),
               child: const Text('Components'),
             ),
-            Pill(label: 'GitHub', icon: Icons.code, onTap: () => openLink(context, Site.repository)),
-            Pill(label: 'pub.dev', icon: Icons.inventory_2_outlined, onTap: () => openLink(context, Site.pub)),
+            Pill(
+              label: 'GitHub',
+              icon: SFIcons.sf_chevron_left_forwardslash_chevron_right,
+              onTap: () => openLink(context, Site.repository),
+            ),
+            Pill(label: 'pub.dev', icon: SFIcons.sf_shippingbox, onTap: () => openLink(context, Site.pub)),
             Pill(
               label: 'v${Site.version}',
-              icon: Icons.history,
+              icon: SFIcons.sf_clock_arrow_trianglehead_counterclockwise_rotate_90,
               monospace: true,
               tooltip: 'Changelog',
               onTap: () => openLink(context, Site.changelog),
@@ -267,7 +277,7 @@ class _HeroStageState extends State<_HeroStage> with SingleTickerProviderStateMi
                           height: 40,
                           child: Row(
                             children: <Widget>[
-                              const Icon(Icons.blur_on, size: 20),
+                              const SiteIcon(SFIcons.sf_circle_hexagongrid, size: 20),
                               const SizedBox(width: 10),
                               const Expanded(
                                 child: Text('GlassBar over a live backdrop', overflow: TextOverflow.ellipsis),
@@ -321,7 +331,7 @@ class _WhatsNew extends StatelessWidget {
           'components',
           'morph',
           'A button that flows into a menu',
-          Icons.animation,
+          SFIcons.sf_wand_and_sparkles,
           <Color>[
             Color(0xFFFF375F),
             Color(0xFFFF9F0A),
@@ -331,7 +341,7 @@ class _WhatsNew extends StatelessWidget {
           'foundations',
           'adaptive',
           'Glass that reads what is under it',
-          Icons.brightness_6_outlined,
+          SFIcons.sf_circle_lefthalf_filled,
           <Color>[
             Color(0xFF5E5CE6),
             Color(0xFF64D2FF),
@@ -341,7 +351,7 @@ class _WhatsNew extends StatelessWidget {
           'foundations',
           'drop-motion',
           'Drops that stretch and squash',
-          Icons.water_drop_outlined,
+          SFIcons.sf_drop,
           <Color>[
             Color(0xFF30D158),
             Color(0xFF64D2FF),
@@ -351,7 +361,7 @@ class _WhatsNew extends StatelessWidget {
           'components',
           'scaffold',
           'A whole glass screen in one widget',
-          Icons.space_dashboard_outlined,
+          SFIcons.sf_rectangle_3_group,
           <Color>[
             Color(0xFFBF5AF2),
             Color(0xFFFF375F),
@@ -361,7 +371,7 @@ class _WhatsNew extends StatelessWidget {
           'components',
           'tab-bar',
           'Tab icons and badges of your own',
-          Icons.tab_outlined,
+          SFIcons.sf_menubar_dock_rectangle,
           <Color>[
             Color(0xFF0A84FF),
             Color(0xFF5E5CE6),
@@ -371,7 +381,7 @@ class _WhatsNew extends StatelessWidget {
           'start',
           'installation',
           'Shaders ready before the first frame',
-          Icons.bolt,
+          SFIcons.sf_bolt_fill,
           <Color>[
             Color(0xFFFFD60A),
             Color(0xFFFF9F0A),
@@ -466,7 +476,7 @@ class _NewCardState extends State<_NewCard> {
                     borderRadius: BorderRadius.circular(14),
                     gradient: LinearGradient(colors: widget.colours),
                   ),
-                  child: Icon(widget.icon, color: Colors.white, size: 24),
+                  child: SiteIcon(widget.icon, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -609,7 +619,7 @@ class _CaptionState extends State<_Caption> {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(Icons.arrow_forward, size: 16, color: _hover ? kSiteAccent : kSiteTextMuted),
+              SiteIcon(SFIcons.sf_chevron_right, size: 16, color: _hover ? kSiteAccent : kSiteTextMuted),
             ],
           ],
         ),
@@ -647,19 +657,19 @@ class _Principles extends StatelessWidget {
 
   static const List<(IconData, String, String, Color)> _items = <(IconData, String, String, Color)>[
     (
-      Icons.layers_outlined,
+      SFIcons.sf_square_3_layers_3d,
       'One look for the whole screen',
       'Every piece of glass shares one snapshot of what is behind it. Ten panels cost about what one does.',
       Color(0xFF64D2FF),
     ),
     (
-      Icons.pause_circle_outline,
+      SFIcons.sf_pause_circle,
       'Free while nothing moves',
       'A still screen takes no new snapshot at all, and glass gliding over still content does not either.',
       Color(0xFF30D158),
     ),
     (
-      Icons.tune,
+      SFIcons.sf_slider_horizontal_3,
       'Turn it down, not off',
       'Thermal state, low-end GPUs and reduce transparency get a cheaper rung of the same look.',
       Color(0xFFFF9F0A),
@@ -696,7 +706,7 @@ class _Principles extends StatelessWidget {
                             color: colour.withValues(alpha: 0.22),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Icon(icon, size: 24, color: colour),
+                          child: SiteIcon(icon, size: 24, color: colour),
                         ),
                         const SizedBox(height: 14),
                         Text(
@@ -829,7 +839,7 @@ class _EntryCardState extends State<_EntryCard> {
                       color: const Color(0x268AB4FF),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(iconFor(entry.icon), color: kSiteAccent, size: 22),
+                    child: SiteIcon(iconFor(entry.icon), color: kSiteAccent, size: 22),
                   ),
                   const SizedBox(height: 14),
                   Text(
@@ -872,11 +882,15 @@ class _Footer extends StatelessWidget {
         spacing: 20,
         runSpacing: 8,
         children: <Widget>[
-          LinkText(text: 'GitHub', url: Site.repository, icon: Icons.code),
-          LinkText(text: 'pub.dev', url: Site.pub, icon: Icons.inventory_2_outlined),
-          LinkText(text: 'API reference', url: '${Site.pubApi}g1455-library.html', icon: Icons.menu_book_outlined),
-          LinkText(text: 'Changelog', url: Site.changelog, icon: Icons.history),
-          LinkText(text: 'Issues', url: Site.issues, icon: Icons.bug_report_outlined),
+          LinkText(text: 'GitHub', url: Site.repository, icon: SFIcons.sf_chevron_left_forwardslash_chevron_right),
+          LinkText(text: 'pub.dev', url: Site.pub, icon: SFIcons.sf_shippingbox),
+          LinkText(text: 'API reference', url: '${Site.pubApi}g1455-library.html', icon: SFIcons.sf_book),
+          LinkText(
+            text: 'Changelog',
+            url: Site.changelog,
+            icon: SFIcons.sf_clock_arrow_trianglehead_counterclockwise_rotate_90,
+          ),
+          LinkText(text: 'Issues', url: Site.issues, icon: SFIcons.sf_ladybug),
         ],
       ),
       const SizedBox(height: 14),

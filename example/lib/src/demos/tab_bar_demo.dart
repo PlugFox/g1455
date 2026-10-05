@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A floating tab bar at the bottom of a small "app" whose page changes with
 /// the tab, one of its tabs drawn with a badge by `iconBuilder`.
@@ -15,11 +17,11 @@ class TabBarDemo extends StatefulWidget {
 
 /// The tabs, and what each page says.
 const List<(GlassTabItem, String)> _kTabs = <(GlassTabItem, String)>[
-  (GlassTabItem(icon: Icons.home_rounded, label: 'Home'), 'Good morning'),
-  (GlassTabItem(icon: Icons.search_rounded, label: 'Search'), 'Find anything'),
-  (GlassTabItem(icon: Icons.library_music_rounded, label: 'Library'), '128 albums'),
-  (GlassTabItem(icon: Icons.favorite_rounded, label: 'Saved'), '42 songs you love'),
-  (GlassTabItem(icon: Icons.person_rounded, label: 'Profile'), 'Signed in'),
+  (GlassTabItem(icon: SFIcons.sf_house_fill, label: 'Home'), 'Good morning'),
+  (GlassTabItem(icon: SFIcons.sf_magnifyingglass, label: 'Search'), 'Find anything'),
+  (GlassTabItem(icon: SFIcons.sf_music_note_list, label: 'Library'), '128 albums'),
+  (GlassTabItem(icon: SFIcons.sf_heart_fill, label: 'Saved'), '42 songs you love'),
+  (GlassTabItem(icon: SFIcons.sf_person_fill, label: 'Profile'), 'Signed in'),
 ];
 
 /// The "Saved" tab with a badge: drawn by `iconBuilder`, in the colour and
@@ -27,7 +29,7 @@ const List<(GlassTabItem, String)> _kTabs = <(GlassTabItem, String)>[
 Widget _savedWithBadge(BuildContext context, GlassTabItemLook look) => Badge(
   label: const Text('3'),
   backgroundColor: const Color(0xFFFF453A),
-  child: Icon(Icons.favorite_rounded, color: look.color, size: look.iconSize),
+  child: SiteIcon(SFIcons.sf_heart_fill, color: look.color, size: look.iconSize),
 );
 
 const GlassTabItem _kSavedWithBadge = GlassTabItem(label: 'Saved', iconBuilder: _savedWithBadge);
@@ -85,7 +87,7 @@ class _TabBarDemoState extends State<TabBarDemo> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Icon(item.icon, size: 64, color: Colors.white),
+                  SiteIcon(item.icon, size: 64, color: Colors.white),
                   const SizedBox(height: 12),
                   Text(
                     item.label,

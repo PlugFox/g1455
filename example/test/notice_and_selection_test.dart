@@ -161,6 +161,10 @@ void main() {
       await tester.pumpWidget(app(DateTime.now().subtract(const Duration(hours: 25))));
       await _frames(tester, 20);
       expect(find.text(title), findsOneWidget, reason: 'closed more than a day ago');
+
+      await tester.pumpWidget(app(DateTime.now().add(const Duration(days: 365))));
+      await _frames(tester, 20);
+      expect(find.text(title), findsOneWidget, reason: 'a close dated in the future');
     });
 
     testWidgets('outside Blink, on Medium, says both in one sheet', (WidgetTester tester) async {

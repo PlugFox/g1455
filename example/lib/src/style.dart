@@ -4,9 +4,8 @@ import 'package:g1455/g1455.dart';
 /// The material the glass is made of: one of the package's calibrated
 /// finishes.
 enum MaterialChoice {
-  /// Apple's `.regular`: the host picks its dark or light branch from the
-  /// declared backdrop and the appearance. Over this example's dark pages
-  /// that is the dark one in either appearance.
+  /// Apple's `.regular`: the branch of the appearance in the settings — or,
+  /// on the page that reads the backdrop, the branch each glass reads.
   regular('Regular', null),
   dark('Dark', GlassFinish.regularDark),
   light('Light', GlassFinish.regularLight),
@@ -113,21 +112,27 @@ class GlassSettings {
   /// appearance is kept across a change of it.
   final AppearanceChoice appearance;
 
-  /// The material in the chosen tint, in [appearance] — or null for the
-  /// host's own choice of `.regular`'s branch, when nothing is tinted.
+  /// The material in the chosen tint, in [appearance] — or null, under an
+  /// [adaptive] host, for the host's own choice of `.regular`'s branch from
+  /// what each glass reads, when nothing is tinted.
+  ///
+  /// `.regular` is the appearance's branch, named: picked from the declared
+  /// backdrop instead, it would be the dark one in either appearance — every
+  /// page here averages below the level the light branch starts at — and the
+  /// appearance would change nothing.
   ///
   /// The name stays the material's on purpose: the package's damage tables
   /// are keyed by name and grade what the blur and the transmission do to a
   /// reduced capture, and both are the material's — only the tint's colour
-  /// differs. A new name would get refusals instead of numbers. A tint over
-  /// `.regular` goes on the branch the host would have picked.
-  GlassFinish? finishIn(Brightness appearance) {
+  /// differs. A new name would get refusals instead of numbers.
+  GlassFinish? finishIn(Brightness appearance, {bool adaptive = false}) {
     final Color? colour = tint.colour;
-    if (colour == null) {
-      return material.finish;
+    if (colour == null && adaptive && material.finish == null) {
+      return null;
     }
-    final GlassFinish base = material.finish ?? GlassFinish.regular(appearance: appearance, backdrop: kExampleBackdrop);
-    return base.copyWith(tint: colour.withValues(alpha: base.tint.a));
+    final GlassFinish base =
+        material.finish ?? (appearance == Brightness.dark ? GlassFinish.regularDark : GlassFinish.regularLight);
+    return colour == null ? base : base.copyWith(tint: colour.withValues(alpha: base.tint.a));
   }
 
   GlassTierChoice get tierChoice => GlassTierPolicy(pinned: rendering.tier).choose();

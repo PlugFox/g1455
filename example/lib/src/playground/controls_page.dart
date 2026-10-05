@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
+import '../widgets/site_icon.dart';
 
 /// Switches, sliders and buttons on glass cards, over a backdrop they drive.
 ///
@@ -71,7 +73,7 @@ class _ControlsPageState extends State<ControlsPage> with SingleTickerProviderSt
                 title: 'Switches',
                 children: <Widget>[
                   _Row(
-                    icon: Icons.wifi,
+                    icon: SFIcons.sf_wifi,
                     label: 'Wi-Fi',
                     trailing: GlassSwitch(
                       value: _wifi,
@@ -79,7 +81,7 @@ class _ControlsPageState extends State<ControlsPage> with SingleTickerProviderSt
                     ),
                   ),
                   _Row(
-                    icon: Icons.bluetooth,
+                    icon: SFIcons.sf_wave_3_right,
                     label: 'Bluetooth',
                     trailing: GlassSwitch(
                       value: _bluetooth,
@@ -88,7 +90,7 @@ class _ControlsPageState extends State<ControlsPage> with SingleTickerProviderSt
                     ),
                   ),
                   _Row(
-                    icon: Icons.nightlight_round,
+                    icon: SFIcons.sf_moon_fill,
                     label: 'Focus',
                     trailing: GlassSwitch(
                       value: _focus,
@@ -97,12 +99,12 @@ class _ControlsPageState extends State<ControlsPage> with SingleTickerProviderSt
                     ),
                   ),
                   _Row(
-                    icon: Icons.waves,
+                    icon: SFIcons.sf_water_waves,
                     label: 'Drift backdrop',
                     trailing: GlassSwitch(value: _drift.isAnimating, onChanged: _setDrift),
                   ),
                   const _Row(
-                    icon: Icons.block,
+                    icon: SFIcons.sf_nosign,
                     label: 'Disabled',
                     trailing: GlassSwitch(value: true, onChanged: null),
                   ),
@@ -113,27 +115,27 @@ class _ControlsPageState extends State<ControlsPage> with SingleTickerProviderSt
                 title: 'Sliders',
                 children: <Widget>[
                   _SliderRow(
-                    icon: Icons.palette,
+                    icon: SFIcons.sf_paintpalette_fill,
                     label: 'Backdrop hue',
                     value: _hue,
                     color: HSVColor.fromAHSV(1, _hue * 360, 0.8, 1).toColor(),
                     onChanged: (double v) => setState(() => _hue = v),
                   ),
                   _SliderRow(
-                    icon: Icons.volume_up,
+                    icon: SFIcons.sf_speaker_wave_2_fill,
                     label: 'Volume',
                     value: _volume,
                     onChanged: (double v) => setState(() => _volume = v),
                   ),
                   _SliderRow(
-                    icon: Icons.light_mode,
+                    icon: SFIcons.sf_sun_max,
                     label: 'Brightness',
                     value: _brightness,
                     color: const Color(0xFFFFD60A),
                     onChanged: (double v) => setState(() => _brightness = v),
                   ),
                   const _SliderRow(
-                    icon: Icons.block,
+                    icon: SFIcons.sf_nosign,
                     label: 'Disabled',
                     value: 0.4,
                     onChanged: null,
@@ -154,8 +156,8 @@ class _ControlsPageState extends State<ControlsPage> with SingleTickerProviderSt
                           onPressed: () => setState(() => _taps++),
                           child: Text('Tapped $_taps'),
                         ),
-                        GlassButton(onPressed: () {}, child: const Icon(Icons.play_arrow)),
-                        GlassButton(onPressed: () {}, child: const Icon(Icons.share)),
+                        GlassButton(onPressed: () {}, child: const SiteIcon(SFIcons.sf_play_fill)),
+                        GlassButton(onPressed: () {}, child: const SiteIcon(SFIcons.sf_square_and_arrow_up)),
                         const GlassButton(child: Text('Disabled')),
                       ],
                     ),
@@ -214,7 +216,7 @@ class _Row extends StatelessWidget {
     height: 48,
     child: Row(
       children: <Widget>[
-        Icon(icon, size: 20),
+        SiteIcon(icon, size: 20),
         const SizedBox(width: 12),
         Expanded(child: Text(label)),
         trailing,
@@ -246,7 +248,7 @@ class _SliderRow extends StatelessWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            Icon(icon, size: 20),
+            SiteIcon(icon, size: 20),
             const SizedBox(width: 12),
             Expanded(child: Text(label)),
             Text('${(value * 100).round()}'),

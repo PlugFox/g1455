@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// Volume and brightness on a glass card. Brightness dims the backdrop, so
 /// dragging it changes what is under the glass.
@@ -60,8 +62,8 @@ class _SliderDemoState extends State<SliderDemo> {
                 children: <Widget>[
                   _SliderRow(
                     label: 'Volume',
-                    low: Icons.volume_mute_rounded,
-                    high: Icons.volume_up_rounded,
+                    low: SFIcons.sf_speaker_fill,
+                    high: SFIcons.sf_speaker_wave_2_fill,
                     value: _volume,
                     color: accent,
                     onChanged: _enabled ? (double v) => setState(() => _volume = v) : null,
@@ -69,8 +71,8 @@ class _SliderDemoState extends State<SliderDemo> {
                   const SizedBox(height: 8),
                   _SliderRow(
                     label: 'Brightness',
-                    low: Icons.brightness_low_rounded,
-                    high: Icons.brightness_high_rounded,
+                    low: SFIcons.sf_sun_min,
+                    high: SFIcons.sf_sun_max_fill,
                     value: _brightness,
                     color: accent,
                     onChanged: _enabled ? (double v) => setState(() => _brightness = v) : null,
@@ -119,7 +121,7 @@ class _SliderRow extends StatelessWidget {
       ),
       Row(
         children: <Widget>[
-          Icon(low, size: 20),
+          SiteIcon(low, size: 20),
           const SizedBox(width: 4),
           Expanded(
             child: GlassSlider(
@@ -131,7 +133,7 @@ class _SliderRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          Icon(high, size: 20),
+          SiteIcon(high, size: 20),
         ],
       ),
     ],

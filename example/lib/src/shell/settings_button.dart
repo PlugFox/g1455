@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/app.dart';
 import '../settings_menu.dart';
 import '../style.dart';
+import '../widgets/site_icon.dart';
 
 /// The app bar's settings button, which shows the preset in force.
 const Key kSettingsButtonKey = ValueKey<String>('settings');
@@ -48,7 +50,7 @@ class SettingsButton extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     if (!compact) ...<Widget>[Text(settings.preset?.label ?? 'Custom'), const SizedBox(width: 6)],
-                    const Icon(Icons.tune, size: 20),
+                    const SiteIcon(SFIcons.sf_slider_horizontal_3, size: 20),
                   ],
                 ),
               ),

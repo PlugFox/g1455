@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455_example/main.dart';
+import 'package:g1455_example/src/widgets/site_icon.dart';
 import 'package:g1455_example/src/app/routes.dart';
 import 'package:g1455_example/src/catalog/catalog.dart';
 import 'package:g1455_example/src/demos/demos.dart';
@@ -11,6 +12,7 @@ import 'package:g1455_example/src/pages/home_showcase.dart';
 import 'package:g1455_example/src/pages/not_found_page.dart';
 import 'package:g1455_example/src/widgets/icons.dart';
 import 'package:squid/squid.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 Future<void> _frames(WidgetTester tester, [int n = 30, String? reason]) async {
   for (var i = 0; i < n; i++) {
@@ -148,7 +150,7 @@ void main() {
       _size(tester, const Size(390, 844));
       await tester.pumpWidget(const GlassExampleApp(initialLocation: '/'));
       await _frames(tester, 6);
-      await tester.tap(find.byIcon(Icons.menu));
+      await tester.tap(find.byWidgetPredicate((Widget w) => w is SiteIcon && w.icon == SFIcons.sf_line_3_horizontal));
       await _frames(tester, 30);
       // Near the top of the sheet, so it is on screen without a scroll.
       final Entry target = entriesOf(Section.start).elementAt(1);

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A title bar on top and a "now playing" bar at the bottom, over a photo.
 class BarDemo extends StatefulWidget {
@@ -66,7 +68,7 @@ class _BarDemoState extends State<BarDemo> {
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   child: const Row(
                     children: <Widget>[
-                      _BarIcon(icon: Icons.arrow_back_ios_new, label: 'Back'),
+                      _BarIcon(icon: SFIcons.sf_chevron_left, label: 'Back'),
                       Expanded(
                         child: Text(
                           'Library',
@@ -74,7 +76,7 @@ class _BarDemoState extends State<BarDemo> {
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                         ),
                       ),
-                      _BarIcon(icon: Icons.search, label: 'Search'),
+                      _BarIcon(icon: SFIcons.sf_magnifyingglass, label: 'Search'),
                     ],
                   ),
                 ),
@@ -107,11 +109,11 @@ class _BarDemoState extends State<BarDemo> {
                         ),
                       ),
                       _BarIcon(
-                        icon: _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        icon: _playing ? SFIcons.sf_pause_fill : SFIcons.sf_play_fill,
                         label: _playing ? 'Pause' : 'Play',
                         onTap: () => setState(() => _playing = !_playing),
                       ),
-                      const _BarIcon(icon: Icons.fast_forward_rounded, label: 'Next'),
+                      const _BarIcon(icon: SFIcons.sf_forward_fill, label: 'Next'),
                     ],
                   ),
                 ),
@@ -141,7 +143,7 @@ class _BarIcon extends StatelessWidget {
       onTap: onTap ?? () {},
       child: SizedBox.fromSize(
         size: kGlassMinTapTarget,
-        child: Icon(icon, size: 24, color: IconTheme.of(context).color),
+        child: SiteIcon(icon, size: 24, color: IconTheme.of(context).color),
       ),
     ),
   );
@@ -162,6 +164,6 @@ class _Artwork extends StatelessWidget {
         colors: <Color>[Color(0xFFFF9F0A), Color(0xFFFF375F), Color(0xFF5E5CE6)],
       ),
     ),
-    child: const Icon(Icons.music_note_rounded, color: Colors.white, size: 22),
+    child: const SiteIcon(SFIcons.sf_music_note, color: Colors.white, size: 22),
   );
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A button that asks before deleting a photo, and what the alert returned.
 class AlertDemo extends StatefulWidget {
@@ -85,7 +87,7 @@ class _AlertDemoState extends State<AlertDemo> {
             onPressed: _ask,
             child: const Row(
               mainAxisSize: MainAxisSize.min,
-              children: <Widget>[Icon(Icons.delete_outline, size: 20), SizedBox(width: 8), Text('Delete photo')],
+              children: <Widget>[SiteIcon(SFIcons.sf_trash, size: 20), SizedBox(width: 8), Text('Delete photo')],
             ),
           ),
           const SizedBox(height: 18),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/routes.dart';
 import '../app/theme.dart';
@@ -11,6 +12,7 @@ import '../playground/kit_page.dart';
 import '../playground/scroll_page.dart';
 import '../shell/settings_button.dart';
 import '../widgets/icons.dart';
+import '../widgets/site_icon.dart';
 
 /// One screen of glass over a page, full screen: an app bar with the
 /// settings menu, and a tab bar between the pages — the example app as it
@@ -150,7 +152,7 @@ class _AppBar extends StatelessWidget {
                   cursor: SystemMouseCursors.click,
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    child: Icon(Icons.arrow_back),
+                    child: SiteIcon(SFIcons.sf_chevron_left),
                   ),
                 ),
               ),

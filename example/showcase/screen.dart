@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import 'backdrop.dart';
 import 'harness.dart';
+
+import 'package:g1455_example/src/widgets/site_icon.dart';
 
 /// Whole app screens, shot apart from the grid: each is its own size and its
 /// own backdrop, so none is cut from the grid's canvas, none counts against
@@ -47,10 +50,10 @@ final Finder _list = find.byKey(const ValueKey<String>('home list'));
 Alignment _tab(int i) => Alignment(-1 + (2 * i + 1) / _kTabs.length, 0);
 
 const List<GlassTabItem> _kTabs = <GlassTabItem>[
-  GlassTabItem(icon: Icons.home_rounded, label: 'Home'),
-  GlassTabItem(icon: Icons.explore, label: 'Explore'),
-  GlassTabItem(icon: Icons.favorite, label: 'Saved'),
-  GlassTabItem(icon: Icons.person, label: 'Profile'),
+  GlassTabItem(icon: SFIcons.sf_house_fill, label: 'Home'),
+  GlassTabItem(icon: SFIcons.sf_safari, label: 'Explore'),
+  GlassTabItem(icon: SFIcons.sf_heart_fill, label: 'Saved'),
+  GlassTabItem(icon: SFIcons.sf_person_fill, label: 'Profile'),
 ];
 
 /// Where the bars reach in from the screen's edges: the scroll edges' extents.
@@ -130,15 +133,26 @@ class _Bar extends StatelessWidget {
           Expanded(
             child: Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
           ),
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Icon(Icons.search, size: 22)),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: SiteIcon(SFIcons.sf_magnifyingglass, size: 22),
+          ),
           GlassMenuAnchor(
             items: <GlassMenuItem>[
-              GlassMenuItem(label: 'Select', icon: const Icon(Icons.check_circle_outline, size: 20), onPressed: () {}),
-              GlassMenuItem(label: 'Sort by date', icon: const Icon(Icons.schedule, size: 20), onPressed: () {}),
-              GlassMenuItem(label: 'Share', icon: const Icon(Icons.ios_share, size: 20), onPressed: () {}),
+              GlassMenuItem(
+                label: 'Select',
+                icon: const SiteIcon(SFIcons.sf_checkmark_circle, size: 20),
+                onPressed: () {},
+              ),
+              GlassMenuItem(label: 'Sort by date', icon: const SiteIcon(SFIcons.sf_clock, size: 20), onPressed: () {}),
+              GlassMenuItem(
+                label: 'Share',
+                icon: const SiteIcon(SFIcons.sf_square_and_arrow_up, size: 20),
+                onPressed: () {},
+              ),
               GlassMenuItem(
                 label: 'Delete',
-                icon: const Icon(Icons.delete_outline, size: 20),
+                icon: const SiteIcon(SFIcons.sf_trash, size: 20),
                 isDestructive: true,
                 onPressed: () {},
               ),
@@ -151,7 +165,7 @@ class _Bar extends StatelessWidget {
               onTap: menu.open,
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                child: Icon(Icons.more_horiz, size: 24),
+                child: SiteIcon(SFIcons.sf_ellipsis, size: 24),
               ),
             ),
           ),
@@ -172,22 +186,22 @@ Color _hue(int i) => const <Color>[
 ][i % 6];
 
 const List<(String, String, IconData)> _kItems = <(String, String, IconData)>[
-  ('Northern lights', 'Tromsø · 48 photos', Icons.auto_awesome),
-  ('Coral reef', 'Great Barrier Reef · 112 photos', Icons.water),
-  ('Desert dunes', 'Sahara · 36 photos', Icons.wb_sunny),
-  ('City at night', 'Tokyo · 87 photos', Icons.location_city),
-  ('Spring meadow', 'Provence · 54 photos', Icons.local_florist),
-  ('Volcano', 'Iceland · 23 photos', Icons.terrain),
-  ('Lagoon', 'Bora Bora · 65 photos', Icons.beach_access),
-  ('Old town', 'Prague · 41 photos', Icons.account_balance),
-  ('Rainforest', 'Borneo · 76 photos', Icons.park),
-  ('Ice fields', 'Patagonia · 29 photos', Icons.ac_unit),
-  ('Canyon', 'Arizona · 58 photos', Icons.landscape),
-  ('Harbour', 'Lisbon · 33 photos', Icons.sailing),
-  ('Tea hills', 'Darjeeling · 47 photos', Icons.emoji_food_beverage),
-  ('Fjord', 'Geiranger · 39 photos', Icons.directions_boat),
-  ('Night market', 'Taipei · 92 photos', Icons.storefront),
-  ('Glacier', 'Alaska · 26 photos', Icons.filter_hdr),
+  ('Northern lights', 'Tromsø · 48 photos', SFIcons.sf_sparkles),
+  ('Coral reef', 'Great Barrier Reef · 112 photos', SFIcons.sf_water_waves),
+  ('Desert dunes', 'Sahara · 36 photos', SFIcons.sf_sun_max_fill),
+  ('City at night', 'Tokyo · 87 photos', SFIcons.sf_building_2),
+  ('Spring meadow', 'Provence · 54 photos', SFIcons.sf_leaf),
+  ('Volcano', 'Iceland · 23 photos', SFIcons.sf_mountain_2),
+  ('Lagoon', 'Bora Bora · 65 photos', SFIcons.sf_beach_umbrella),
+  ('Old town', 'Prague · 41 photos', SFIcons.sf_building_columns),
+  ('Rainforest', 'Borneo · 76 photos', SFIcons.sf_tree),
+  ('Ice fields', 'Patagonia · 29 photos', SFIcons.sf_snowflake),
+  ('Canyon', 'Arizona · 58 photos', SFIcons.sf_mountain_2_fill),
+  ('Harbour', 'Lisbon · 33 photos', SFIcons.sf_sailboat),
+  ('Tea hills', 'Darjeeling · 47 photos', SFIcons.sf_cup_and_saucer),
+  ('Fjord', 'Geiranger · 39 photos', SFIcons.sf_ferry),
+  ('Night market', 'Taipei · 92 photos', SFIcons.sf_storefront),
+  ('Glacier', 'Alaska · 26 photos', SFIcons.sf_mountain_2),
 ];
 
 class _Home extends StatelessWidget {
@@ -300,7 +314,7 @@ class _Row extends StatelessWidget {
                 borderRadius: const BorderRadius.all(Radius.circular(16)),
                 gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: <Color>[a, b]),
               ),
-              child: Icon(icon, color: Colors.white, size: 30),
+              child: SiteIcon(icon, color: Colors.white, size: 30),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -316,7 +330,7 @@ class _Row extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.5)),
+            SiteIcon(SFIcons.sf_chevron_right, color: Colors.white.withValues(alpha: 0.5)),
           ],
         ),
       ),
@@ -329,14 +343,14 @@ class _Explore extends StatelessWidget {
   const _Explore({super.key});
 
   static const List<(String, IconData)> _kTopics = <(String, IconData)>[
-    ('Nature', Icons.park),
-    ('Cities', Icons.location_city),
-    ('Ocean', Icons.water),
-    ('Night sky', Icons.nightlight_round),
-    ('Food', Icons.restaurant),
-    ('Travel', Icons.flight),
-    ('Art', Icons.palette),
-    ('Music', Icons.music_note),
+    ('Nature', SFIcons.sf_tree),
+    ('Cities', SFIcons.sf_building_2),
+    ('Ocean', SFIcons.sf_water_waves),
+    ('Night sky', SFIcons.sf_moon_fill),
+    ('Food', SFIcons.sf_fork_knife),
+    ('Travel', SFIcons.sf_airplane),
+    ('Art', SFIcons.sf_paintpalette_fill),
+    ('Music', SFIcons.sf_music_note),
   ];
 
   @override
@@ -363,7 +377,7 @@ class _Explore extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(_kTopics[i].$2, color: Colors.white, size: 30),
+          SiteIcon(_kTopics[i].$2, color: Colors.white, size: 30),
           const Spacer(),
           Text(
             _kTopics[i].$1,

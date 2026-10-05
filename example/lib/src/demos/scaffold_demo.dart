@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A small screen built with [GlassScaffold]: a list scrolling under a top
 /// bar in a scroll edge, a tab bar and a floating "+" — each part on a knob.
@@ -19,9 +21,9 @@ class ScaffoldDemo extends StatefulWidget {
 enum _Edge { soft, hard, none }
 
 const List<GlassTabItem> _kTabs = <GlassTabItem>[
-  GlassTabItem(icon: Icons.photo_library_rounded, label: 'Library'),
-  GlassTabItem(icon: Icons.favorite_rounded, label: 'Saved'),
-  GlassTabItem(icon: Icons.search_rounded, label: 'Search'),
+  GlassTabItem(icon: SFIcons.sf_photo_on_rectangle_angled, label: 'Library'),
+  GlassTabItem(icon: SFIcons.sf_heart_fill, label: 'Saved'),
+  GlassTabItem(icon: SFIcons.sf_magnifyingglass, label: 'Search'),
 ];
 
 class _ScaffoldDemoState extends State<ScaffoldDemo> {
@@ -66,7 +68,7 @@ class _ScaffoldDemoState extends State<ScaffoldDemo> {
         topBar: GlassBar(
           child: Row(
             children: <Widget>[
-              Icon(_kTabs[_tab].icon, size: 20),
+              SiteIcon(_kTabs[_tab].icon, size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -86,7 +88,7 @@ class _ScaffoldDemoState extends State<ScaffoldDemo> {
                 onPressed: () => setState(() => _rows++),
                 semanticLabel: 'Add a row',
                 padding: const EdgeInsets.all(14),
-                child: const Icon(Icons.add, size: 24),
+                child: const SiteIcon(SFIcons.sf_plus, size: 24),
               )
             : null,
         // No padding of its own: the list takes the bars' extents from the

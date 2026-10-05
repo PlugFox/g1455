@@ -4,10 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/browser_report.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A number of glass tiles over a backdrop that drifts, so every frame
 /// re-captures, with what the host's [GlassLedger] reports about them.
@@ -19,18 +21,18 @@ class PerformanceDemo extends StatefulWidget {
 }
 
 const List<IconData> _kIcons = <IconData>[
-  Icons.wb_sunny,
-  Icons.music_note,
-  Icons.favorite,
-  Icons.map,
-  Icons.photo_camera,
-  Icons.mail,
-  Icons.bolt,
-  Icons.cloud,
-  Icons.timer,
-  Icons.star,
-  Icons.wifi,
-  Icons.battery_full,
+  SFIcons.sf_sun_max_fill,
+  SFIcons.sf_music_note,
+  SFIcons.sf_heart_fill,
+  SFIcons.sf_map,
+  SFIcons.sf_camera_fill,
+  SFIcons.sf_envelope_fill,
+  SFIcons.sf_bolt_fill,
+  SFIcons.sf_cloud_fill,
+  SFIcons.sf_timer,
+  SFIcons.sf_star_fill,
+  SFIcons.sf_wifi,
+  SFIcons.sf_battery_100percent,
 ];
 
 class _PerformanceDemoState extends State<PerformanceDemo> with SingleTickerProviderStateMixin {
@@ -116,7 +118,7 @@ class _PerformanceDemoState extends State<PerformanceDemo> with SingleTickerProv
                                 child: GlassSurface(
                                   borderRadius: BorderRadius.all(Radius.circular(side * 0.28)),
                                   labelled: false,
-                                  child: Icon(_kIcons[i], color: Colors.white, size: side * 0.4),
+                                  child: SiteIcon(_kIcons[i], color: Colors.white, size: side * 0.4),
                                 ),
                               ),
                           ],

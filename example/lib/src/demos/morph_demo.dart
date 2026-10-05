@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A "+" button in the corner that flows into a panel of actions and back.
 class MorphDemo extends StatefulWidget {
@@ -97,7 +99,7 @@ class _Plus extends StatelessWidget {
       onTap: onTap,
       child: SizedBox.fromSize(
         size: kGlassMinTapTarget,
-        child: Icon(Icons.add, color: label, size: 24),
+        child: SiteIcon(SFIcons.sf_plus, color: label, size: 24),
       ),
     ),
   );
@@ -110,10 +112,10 @@ class _Panel extends StatelessWidget {
   final ValueChanged<String> onChoose;
 
   static const List<(IconData, String)> _kRows = <(IconData, String)>[
-    (Icons.note_add_outlined, 'Note'),
-    (Icons.checklist, 'List'),
-    (Icons.photo_camera_outlined, 'Photo'),
-    (Icons.mic_none, 'Voice memo'),
+    (SFIcons.sf_document_badge_plus, 'Note'),
+    (SFIcons.sf_checklist, 'List'),
+    (SFIcons.sf_camera, 'Photo'),
+    (SFIcons.sf_microphone, 'Voice memo'),
   ];
 
   @override
@@ -135,7 +137,7 @@ class _Panel extends StatelessWidget {
                   child: Row(
                     children: <Widget>[
                       const SizedBox(width: 18),
-                      Icon(icon, color: label, size: 20),
+                      SiteIcon(icon, color: label, size: 20),
                       const SizedBox(width: 12),
                       Text(name, style: TextStyle(color: label, fontSize: 17)),
                     ],
