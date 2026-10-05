@@ -23,17 +23,34 @@ import 'glass_surface.dart';
 import 'glass_theme.dart';
 
 /// The group's height, and the circle a group of one is (spike 33).
+///
+/// {@category Panels and controls}
 const double kGlassToolbarHeight = 48;
 
 /// Each item's width in a group of more than one: 159 pt for three
 /// (spike 33).
+///
+/// A group of n items is n times this wide; a group of one is a circle of
+/// [kGlassToolbarHeight] instead.
+///
+/// {@category Panels and controls}
 const double kGlassToolbarItemWidth = 53;
 
 /// One action of a [GlassButtonGroup].
+///
+/// ```dart
+/// GlassToolbarItem(icon: const Icon(Icons.share), label: 'Share', onPressed: share)
+/// ```
+///
+/// {@category Panels and controls}
 @immutable
 class GlassToolbarItem {
+  /// An action drawn as [icon] and run by [onPressed]. Give it a [label]:
+  /// an icon says nothing to a screen reader.
   const GlassToolbarItem({required this.icon, required this.onPressed, this.label});
 
+  /// What the item shows, centred in its cell. An [Icon] takes the group's
+  /// label colour at size 22; anything else can read them from [IconTheme].
   final Widget icon;
 
   /// Null disables the item.
@@ -45,9 +62,38 @@ class GlassToolbarItem {
 
 /// Adjacent actions in one glass capsule — a circle for one — as iOS 26's
 /// toolbar draws them. One surface whatever the count.
+///
+/// The group is [kGlassToolbarHeight] tall and [kGlassToolbarItemWidth] wide
+/// per item. A held item brightens its own cell of the capsule by
+/// [pressedOverlay], the way [GlassButton] brightens its whole; a disabled
+/// item is drawn at 0.3 opacity.
+///
+/// ```dart
+/// GlassButtonGroup(
+///   items: <GlassToolbarItem>[
+///     GlassToolbarItem(icon: const Icon(Icons.reply), label: 'Reply', onPressed: reply),
+///     GlassToolbarItem(icon: const Icon(Icons.archive), label: 'Archive', onPressed: archive),
+///     GlassToolbarItem(icon: const Icon(Icons.delete), label: 'Delete', onPressed: delete),
+///   ],
+/// )
+/// ```
+///
+/// > **Note:** three [GlassButton]s are three surfaces, and the fragmentation
+/// > excess grows as the square of the count (D26). Three items here are one.
+///
+/// See also:
+///
+///  * [GlassButton], a single action with a label of its own.
+///  * [GlassBar], which a group can sit beside or, at the price of glass on
+///    glass, on.
+///  * [Toolbar on the site](https://g1455.plugfox.dev/components/toolbar).
+///
+/// {@category Panels and controls}
 class GlassButtonGroup extends StatefulWidget {
+  /// A group of [items], of which there must be at least one.
   const GlassButtonGroup({required this.items, this.finish, this.pressedOverlay, super.key}) : assert(items.length > 0);
 
+  /// The actions, left to right.
   final List<GlassToolbarItem> items;
 
   /// The optics. Null takes the theme's.

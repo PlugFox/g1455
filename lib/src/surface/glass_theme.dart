@@ -79,8 +79,39 @@ import 'glass_ripple.dart';
 import 'glass_tier.dart';
 
 /// The tokens a screen's glass reads.
+///
+/// The material ([finish]), the rung of the ladder ([tier]), what is behind
+/// the glass ([backdrop], [richBackdrop]), the platform's increase-contrast
+/// switch ([highContrast]), a floor for the labels ([minLabelContrast]), and
+/// motion ([ripple], [dropMotion]). A [GlassHost] installs one built from its
+/// own arguments; a [GlassTheme] below it changes them for a subtree.
+///
+/// What the glass draws from these — the finish after any dim, the label
+/// colour and the outline — is [legibility], in one place, so the surface, the
+/// group and the components cannot disagree.
+///
+/// ```dart
+/// // The screen's theme, with a label floor of WCAG AA for one subtree.
+/// final GlassThemeData data = GlassTheme.of(context).copyWith(
+///   minLabelContrast: kTextContrastAA,
+/// );
+/// final GlassLegibility drawn = data.legibility();
+/// final Color labelColour = drawn.label;
+/// ```
+///
+/// See also:
+///
+///  * [GlassTheme], which carries these down the tree.
+///  * [GlassHost], whose arguments of the same names fill them for a screen.
+///  * [GlassLegibility], what [legibility] answers.
+///  * [Legibility](https://g1455.plugfox.dev/foundations/legibility) on the site.
+///
+/// {@category Foundations}
 @immutable
 class GlassThemeData {
+  /// Tokens with the package's defaults: the dark branch of `.regular`, the
+  /// top rung, nothing declared about the backdrop, no ripple, and the default
+  /// drop motion.
   const GlassThemeData({
     this.finish = GlassFinish.regularDark,
     this.tier = GlassTierChoice.byDefault,
@@ -328,6 +359,11 @@ class GlassThemeData {
     return hi;
   }
 
+  /// This theme with the named tokens replaced.
+  ///
+  /// A null argument keeps the current value, so [adaptive] cannot be cleared
+  /// here — use [withAdaptive]. Giving a [finish] clears [regularAppearance]
+  /// unless one is given too: a named finish does not follow a reading.
   GlassThemeData copyWith({
     GlassFinish? finish,
     GlassTierChoice? tier,
@@ -400,8 +436,14 @@ class GlassThemeData {
 
 /// What a surface under a theme actually draws: the finish after any dim, the
 /// label colour, and the outline under increase contrast.
+///
+/// Produced by [GlassThemeData.legibility]; a custom component reads [label]
+/// from it to colour what it puts on the glass.
+///
+/// {@category Foundations}
 @immutable
 class GlassLegibility {
+  /// The finish, label colour and outline a surface draws.
   const GlassLegibility({required this.finish, required this.label, this.rim});
 
   /// The finish to draw — the declared one, or it dimmed to meet
@@ -426,9 +468,33 @@ class GlassLegibility {
 /// [GlassTier.cheap] is an inner theme, not a per-surface argument. Scoping
 /// configuration by position is what the inherited level is *for*, and a
 /// per-surface override would put the same decision in two places.
+///
+/// A [GlassHost] installs the screen's theme; a [GlassTheme] is only needed
+/// below it, for a subtree that differs. Start from [GlassTheme.of] so the
+/// subtree keeps every token it does not change:
+///
+/// ```dart
+/// GlassTheme(
+///   data: GlassTheme.of(context).copyWith(
+///     tier: const GlassTierChoice(GlassTier.cheap, GlassTierReason.pinnedByHost),
+///   ),
+///   child: ListView(children: cards),
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [GlassThemeData], the tokens themselves.
+///  * [GlassHost], which installs the theme of a screen.
+///  * [GlassTierChoice], the rung a subtree draws.
+///  * [Legibility](https://g1455.plugfox.dev/foundations/legibility) on the site.
+///
+/// {@category Foundations}
 class GlassTheme extends InheritedWidget {
+  /// Installs [data] for [child] and everything below it.
   const GlassTheme({required this.data, required super.child, super.key});
 
+  /// The tokens this theme hands its subtree.
   final GlassThemeData data;
 
   /// The theme in force, or null if there is none above.

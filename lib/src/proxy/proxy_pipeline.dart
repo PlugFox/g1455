@@ -97,6 +97,8 @@ class GlassProxyFrame {
   /// The atlas texture. Owned by the caller: dispose it or leak it.
   final ui.Image image;
 
+  /// Where each surface's slot sits in [image], and what part of the screen it
+  /// holds.
   final AtlasLayout layout;
 
   /// What the resolution policy chose, and why.
@@ -145,6 +147,7 @@ class GlassProxyFrame {
   /// between them.
   ({Offset srcOrigin, Offset atlasOrigin, double scale}) uniformsFor(int surface) => slotFor(surface).uniforms;
 
+  /// Releases [image]. The frame is unusable afterwards.
   void dispose() => image.dispose();
 }
 
@@ -154,10 +157,32 @@ class GlassProxyFrame {
 /// spellings of one decision and the fourth combination ("no blur, folded")
 /// does not exist. [none] is here for the same reason [split] is: it is an arm
 /// of a measurement, not a mode a surface may ship in.
+///
+/// An application normally leaves this alone: [GlassHost.blurPass] is null by
+/// default and takes [defaultFor] the declared [GlassHardware]. Naming it is
+/// for a benchmark arm, or for a host that has measured its own device:
+///
+/// ```dart
+/// GlassHost(
+///   hardware: GlassHardware.adrenoVulkan,
+///   blurPass: ProxyBlurPass.split, // the arm D140 and D141 measured
+///   child: const MyScreen(),
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [GlassHost.blurPass], where the choice is made.
+///  * [GlassHardware], which [defaultFor] reads.
+///  * <https://g1455.plugfox.dev/foundations/performance>, for what each
+///    spelling costs on the measured devices.
+///
+/// {@category Cost and policy}
 enum ProxyBlurPass {
   /// Two snapshots: rasterize the packed atlas, then draw that image back
-  /// through `ImageFilter.blur` into a second one. What D140 and D141 measured,
-  /// and what every recorded number about the pass is a number about.
+  /// through `ImageFilter.blur` into a second one. What D140 and D141 measured
+  /// (M2 iPad Pro, Impeller/Metal), and what every recorded number about the
+  /// pass is a number about.
   split,
 
   /// One snapshot: the filter rides on a `saveLayer` inside the atlas picture,
@@ -180,7 +205,7 @@ enum ProxyBlurPass {
   /// carrying an image filter cannot take the collapse peephole and allocates
   /// its own MSAA target (`display_list/canvas.cc:1902,147-193`), so what the
   /// fold removes is one `toImageSync` *call* and not one render pass. On
-  /// Adreno it is **cheaper** — 9.1% and 17.1% of the addition at the divisor
+  /// Adreno 830 (Galaxy S25 Ultra, Impeller/Vulkan) it is **cheaper** — 9.1% and 17.1% of the addition at the divisor
   /// the policy picks, and worth 57% and 70% more frames at full resolution,
   /// where the split arm sits off vsync. The mechanism offered for the flip
   /// beforehand (a tiler pays less for MSAA) does **not** survive: Apple
@@ -224,6 +249,9 @@ enum ProxyBlurPass {
 /// rebuilt every frame would repack every frame, which D41 measured as the
 /// dominant cost of the whole route.
 class GlassProxyPipeline {
+  /// A pipeline for one screen. [blurPass] defaults to
+  /// [ProxyBlurPass.defaultFor] and [maxTextureSide] to
+  /// [GlassHardware.maxTextureSide], both read off [hardware].
   GlassProxyPipeline({
     required this.finishSigmaLogical,
     this.hardware = GlassHardware.unmeasured,
@@ -308,6 +336,9 @@ class GlassProxyPipeline {
   /// never fires is worth as much as the counter that says it did not.
   int get ceilingDeepenings => _ceilingDeepenings;
   int _ceilingDeepenings = 0;
+
+  /// The total number of divisor steps the ceiling forced, summed over
+  /// [ceilingDeepenings].
   int get ceilingSteps => _ceilingSteps;
   int _ceilingSteps = 0;
 
@@ -346,6 +377,8 @@ class GlassProxyPipeline {
   /// time instead of as a loop.
   static const int _maxCeilingSteps = 32;
 
+  /// What the walk drops of shadows and mask-filtered draws while it records,
+  /// or null to record them as painted.
   final ShadowFilter? shadowFilter;
 
   /// How the proxy is blurred before the surfaces sample it.
@@ -378,6 +411,8 @@ class GlassProxyPipeline {
   /// How many times the layout has been repacked, and how many slots that
   /// moved. The two numbers retention exists to keep small.
   int get repacks => _retained?.repacks ?? 0;
+
+  /// Slots that moved across all [repacks]. See [repacks].
   int get slotsMoved => _retained?.slotsMoved ?? 0;
 
   /// Whether [change] can have altered a pixel that is actually in the proxy.
@@ -693,6 +728,9 @@ class GlassProxyPipeline {
     return null;
   }
 
+  /// How many snapshots this pipeline has rasterized: one per recorded frame
+  /// on [ProxyBlurPass.folded] and [ProxyBlurPass.none], two on
+  /// [ProxyBlurPass.split] when a residual is left to blur.
   int get snapshots => _snapshots;
   int _snapshots = 0;
 

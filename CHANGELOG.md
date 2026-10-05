@@ -1,3 +1,37 @@
+## 0.1.4
+
+- `showGlassSheet(barrierDismissible: false)` is a sheet only its content
+  closes, as UIKit's `isModalInPresentation`: a drag or a flick used to close
+  it whatever the flag said. Now a pull gives a quarter of the way, no more
+  than half the sheet's height, and springs back; the dim and Escape were
+  already held by the flag.
+
+Documentation:
+
+- The API reference is grouped into topics, each with a page of its own:
+  Getting started, Foundations, Panels and controls, Modals, Composition,
+  Capture control, Cost and policy, Diagnostics. Every public name has a doc
+  comment, the main widgets an example and a list of what to see next with
+  their page on the site, and `dart doc` reports no unresolved reference.
+- `GlassProxy`, the way to tell the capture what a subtree is, is in the
+  README at last: a stand-in for a video, a map or a platform view (which
+  record nothing, so the glass over them showed a hole), a subtree left out,
+  an opaque cover, a blur the shadow filter keeps. The site has a page for it,
+  live: Capture control.
+- Every measured number now says where it comes from: the devices, their
+  systems, the renderer, the metric, the dates, and the Flutter and engine
+  revisions, in the README and on the site's How it works.
+- An agent skill for Claude Code, Codex, Cursor, Antigravity, Gemini CLI and
+  Copilot, in `skills/g1455/`: the rules for writing glass that works, with
+  every page of the site as a reference. `npx skills add PlugFox/g1455`, or
+  `/plugin marketplace add PlugFox/g1455` in Claude Code. The site publishes
+  it at `/.well-known/agent-skills/` (`npx skills add
+  https://g1455.plugfox.dev`), with `llms.txt`, `llms-full.txt` and every
+  page as markdown at its address plus `.md`.
+- pub.dev shows a square, still picture of the package: its icon leads the
+  screenshots, ahead of the loops, which it showed as one frame. pub.dev takes
+  ten, so the materialize loop makes room; the alert's shows the same arrival.
+
 ## 0.1.3
 
 - The README's images show on pub.dev again. 0.1.2 linked the banner, the

@@ -61,6 +61,12 @@ import 'glass_theme.dart';
 /// An external documented constant rather than one of ours, which is why it has
 /// a name at all: the padding defaults in this file are layout taste and say so,
 /// and this is not.
+///
+/// Every control in the package — [GlassButton], [GlassSwitch], [GlassSlider],
+/// [GlassSegmentedControl], [GlassTabBar], each item of a [GlassButtonGroup] and
+/// [GlassTextField] — is at least this tall, whatever it draws.
+///
+/// {@category Panels and controls}
 const Size kGlassMinTapTarget = Size(44, 44);
 
 /// The label of a disabled [GlassButton] whose enabled label is black, and
@@ -75,7 +81,19 @@ const Size kGlassMinTapTarget = Size(44, 44);
 /// appearance — the platform brightness was measured the wrong guess (D179) —
 /// so it picks by the polarity of the label it would have drawn enabled, which
 /// is the same choice wherever Apple's is legible.
+///
+/// This one is `tertiaryLabel` in light: (60, 60, 67) at 0.3, for a label that
+/// would have been dark. [kGlassDisabledLightLabel] is its twin.
+///
+/// {@category Panels and controls}
 const Color kGlassDisabledDarkLabel = Color(0x4D3C3C43);
+
+/// The label of a disabled [GlassButton] whose enabled label is white:
+/// `tertiaryLabel` in dark, (235, 235, 245) at 0.3 (D221).
+///
+/// See [kGlassDisabledDarkLabel] for how the two are chosen between.
+///
+/// {@category Panels and controls}
 const Color kGlassDisabledLightLabel = Color(0x4DEBEBF5);
 
 /// A glass bar: the navigation layer, which is where Apple's guidelines put this
@@ -98,7 +116,32 @@ const Color kGlassDisabledLightLabel = Color(0x4DEBEBF5);
 ///   ),
 /// )
 /// ```
+///
+/// {@template g1455.glass_label_colour}
+/// **The label's colour is the component's, not the child's.** Text and icons
+/// in [child] are given, through [DefaultTextStyle] and [IconTheme], the label
+/// colour that reads over the glass ([GlassFinish.foregroundOver]): against
+/// [GlassThemeData.backdrop] when the screen behind is declared and flat, and
+/// against every backdrop — the worst case, [GlassFinish.foregroundOverAny] —
+/// when it is undeclared or [GlassThemeData.richBackdrop] says it is an image
+/// ([GlassThemeData.legibility]). A colour the child sets on itself wins. In
+/// debug, a finish whose best label is under WCAG AA over that worst case is
+/// reported once per process.
+/// {@endtemplate}
+///
+/// See also:
+///
+///  * [GlassButton], the same panel with a press, for a control inside or
+///    beside a bar.
+///  * [GlassButtonGroup], a row of actions as one surface, cheaper than
+///    several [GlassButton]s on a bar.
+///  * [GlassScaffold], which lays a bar out over a scrolling body.
+///  * [Bar on the site](https://g1455.plugfox.dev/components/bar).
+///
+/// {@category Panels and controls}
 class GlassBar extends StatelessWidget {
+  /// A bar around [child]: a capsule with 16 x 8 of padding, in the theme's
+  /// finish unless [finish] names one.
   const GlassBar({
     required this.child,
     this.borderRadius = kGlassCapsule,
@@ -121,6 +164,7 @@ class GlassBar extends StatelessWidget {
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
 
+  /// The bar's items, laid out inside [padding] and drawn in the label colour.
   final Widget child;
 
   @override
@@ -147,7 +191,35 @@ class GlassBar extends StatelessWidget {
 /// list of glass cards walks up the only large lever the package has left. The
 /// register says so — `GlassLedger.read` returns the count, the area and a
 /// verdict — and a screen of these is what it is for.
+///
+/// ```dart
+/// GlassCard(
+///   child: Column(
+///     crossAxisAlignment: CrossAxisAlignment.start,
+///     mainAxisSize: MainAxisSize.min,
+///     children: <Widget>[
+///       Text('Now playing', style: TextStyle(fontWeight: FontWeight.w600)),
+///       SizedBox(height: 8),
+///       Text('Side A, track 3'),
+///     ],
+///   ),
+/// )
+/// ```
+///
+/// {@macro g1455.glass_label_colour}
+///
+/// See also:
+///
+///  * [GlassBar], the same panel as a capsule, for the navigation layer.
+///  * [GlassSurface], the primitive underneath, for a shape the presets do
+///    not cover.
+///  * [GlassLedger], which counts what a screen of cards costs.
+///  * [Card on the site](https://g1455.plugfox.dev/components/card).
+///
+/// {@category Panels and controls}
 class GlassCard extends StatelessWidget {
+  /// A card around [child]: corners of 24 and 16 of padding, in the theme's
+  /// finish unless [finish] names one.
   const GlassCard({
     required this.child,
     this.borderRadius = const BorderRadius.all(Radius.circular(24)),
@@ -167,6 +239,8 @@ class GlassCard extends StatelessWidget {
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
 
+  /// The card's content, laid out inside [padding] and drawn in the label
+  /// colour.
   final Widget child;
 
   @override
@@ -208,7 +282,31 @@ class GlassCard extends StatelessWidget {
 /// takes the tap rather than only where the label is: the gesture handler is
 /// outside the surface and opaque, because a [GlassSurface] is a
 /// `RenderProxyBox` and hit-tests only its child.
+///
+/// ```dart
+/// GlassButton(
+///   onPressed: () => Navigator.of(context).maybePop(),
+///   semanticLabel: 'Back',
+///   child: const Icon(Icons.arrow_back),
+/// )
+/// ```
+///
+/// {@macro g1455.glass_label_colour}
+///
+/// Disabled ([onPressed] null), the glass is left as it is and the label dims
+/// to [kGlassDisabledDarkLabel] or [kGlassDisabledLightLabel].
+///
+/// See also:
+///
+///  * [GlassButtonGroup], several actions in one capsule and one surface.
+///  * [GlassBar] and [GlassCard], the same panel without a press.
+///  * [kGlassMinTapTarget], the smallest the button is laid out.
+///  * [Button on the site](https://g1455.plugfox.dev/components/button).
+///
+/// {@category Panels and controls}
 class GlassButton extends StatefulWidget {
+  /// A button around [child], which is centred in a capsule at least
+  /// [minSize] large. Disabled until [onPressed] is given.
   const GlassButton({
     required this.child,
     this.onPressed,
@@ -250,6 +348,8 @@ class GlassButton extends StatefulWidget {
   /// only an icon, which says nothing. Null lets [child]'s own semantics speak.
   final String? semanticLabel;
 
+  /// The label — a [Text], an [Icon], or both in a row — centred in the
+  /// capsule and drawn in the label colour.
   final Widget child;
 
   @override

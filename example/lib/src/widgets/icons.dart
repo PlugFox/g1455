@@ -45,6 +45,8 @@ const Map<String, IconData> _kIcons = <String, IconData>{
   'brightness_6': SFIcons.sf_circle_lefthalf_filled,
   'water_drop': SFIcons.sf_drop,
   'space_dashboard': SFIcons.sf_rectangle_3_group,
+  'capture': SFIcons.sf_camera_viewfinder,
+  'auto_awesome': SFIcons.sf_sparkles,
 };
 
 /// The icon named [name], or a neutral one for a name the map lacks.

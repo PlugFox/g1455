@@ -26,10 +26,47 @@ import 'glass_surface.dart';
 import 'glass_theme.dart';
 
 /// The field's height (spike 33: the standalone search field, 44 pt).
+///
+/// {@category Panels and controls}
 const double kGlassFieldHeight = 44;
 
 /// A single line of text in a glass capsule.
+///
+/// An [EditableText] in a capsule [kGlassFieldHeight] tall, with an optional
+/// [leading] and [trailing] widget and a [placeholder] while it is empty. The
+/// text is 17 px in the label colour that reads over the glass
+/// ([GlassThemeData.legibility]), the placeholder at 0.3 of it and the icons at
+/// 0.6. A tap anywhere on the capsule focuses the field.
+///
+/// Glass is for the search field a bar carries: most of iOS 26's fields are
+/// not glass, and a field on a glass card is better an ordinary one.
+///
+/// ```dart
+/// GlassBar(
+///   padding: const EdgeInsets.all(4),
+///   child: GlassTextField.search(
+///     controller: query,
+///     onSubmitted: (String text) => runSearch(text),
+///   ),
+/// )
+/// ```
+///
+/// > **Note:** the blinking caret and the typed text are inside the
+/// > surface's own subtree, so neither is a capture: a focused field over a
+/// > still screen records nothing.
+///
+/// See also:
+///
+///  * [GlassTextField.search], the bar's search field.
+///  * [GlassBar], which usually carries it.
+///  * [Text field on the site](https://g1455.plugfox.dev/components/text-field).
+///
+/// {@category Panels and controls}
 class GlassTextField extends StatefulWidget {
+  /// A field with nothing ahead of the text and no placeholder unless given.
+  ///
+  /// [controller] and [focusNode] are made and disposed by the field when
+  /// null; pass your own to read or set the text or the focus.
   const GlassTextField({
     this.controller,
     this.focusNode,
@@ -65,7 +102,10 @@ class GlassTextField extends StatefulWidget {
        textInputAction = TextInputAction.search,
        obscureText = false;
 
+  /// The text being edited. Null makes one the field owns and disposes.
   final TextEditingController? controller;
+
+  /// The field's focus. Null makes one the field owns and disposes.
   final FocusNode? focusNode;
 
   /// Shown, dimmed, while the field is empty.
@@ -73,18 +113,33 @@ class GlassTextField extends StatefulWidget {
 
   /// Ahead of the text and after it — an icon, a clear button.
   final Widget? leading;
+
+  /// After the text — a clear button, a microphone. See [leading].
   final Widget? trailing;
 
+  /// Called with the whole text on every edit.
   final ValueChanged<String>? onChanged;
+
+  /// Called with the whole text when the keyboard's action is pressed.
   final ValueChanged<String>? onSubmitted;
+
+  /// Which keyboard to ask for. Null leaves it to [EditableText].
   final TextInputType? keyboardType;
+
+  /// The keyboard's action button. [GlassTextField.search] asks for
+  /// [TextInputAction.search].
   final TextInputAction? textInputAction;
+
+  /// Whether the field takes the focus as soon as it is built.
   final bool autofocus;
+
+  /// Whether the text is hidden, as a password's is.
   final bool obscureText;
 
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
 
+  /// The caret, and the selection at 0.3 of it. iOS's blue by default.
   final Color cursorColor;
 
   @override

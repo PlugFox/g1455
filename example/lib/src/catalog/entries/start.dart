@@ -260,6 +260,23 @@ Measured costs, each on its own platform, because the platforms are not comparab
 | Android, Impeller/Vulkan, Adreno 830 (GPU cycles) | ×0.99…1.08 | ×1.78…3.15 |
 | iPad, Impeller/Metal (GPU ms, scrolling screen) | ×1.93…2.02, or ×1.46…1.54 with thermal throttling | — |
 
+## Where the numbers come from
+
+Every number on this site was measured in a profile build, on the device named, before the package's first release:
+the code that became 0.1.0 on 2026-10-03, on Flutter **3.47.1** stable (framework `6655482ec0`, engine `5d53178869`,
+Dart 3.13.1). The raw digests are in
+[`provenance/`](https://github.com/PlugFox/g1455/tree/master/provenance) in the repository.
+
+| device | GPU | system | renderer | metric | dates |
+|---|---|---|---|---|---|
+| Samsung Galaxy S25 Ultra (SM-S938B) | Snapdragon 8 Elite, Adreno 830 | Android 16 | Impeller, Vulkan; 1080×2340 at 3×, 120 Hz | GPU cycles a frame (kgsl `busy × freq`), windows of 30 s × 3 | 2026-08-24 to 2026-09-23 |
+| iPad Pro 11″, 4th generation (iPad14,3) | Apple M2 | iPadOS 26.6.1 | Impeller, Metal; 1668×2388 at 2×, 120 Hz | GPU ms a frame (the engine's `GPUTracer`), after a reboot, windows of 4 s × 3 | 2026-09-08 to 2026-09-26 |
+| Samsung Galaxy S22 Ultra (SM-S908B) | Exynos 2200, Xclipse 920 | Android 16 | Impeller, Vulkan; 720×1544 | GPU `busy × freq`, which does not see the capture: a cross-check only | 2026-09-08 to 2026-09-26 |
+| MacBook Pro | Apple M3 Max | macOS 26.4.1 | Impeller, Metal; 1600×1200 at 2× | raster ms a frame | 2026-09-15 |
+
+The ratios compare scenes on one device, run in one binary in a shuffled order. They do not carry from one device to
+another, and they are not frame times.
+
 ## What this means for your app
 
 - A still screen with glass costs almost nothing beyond drawing the glass itself.
@@ -418,6 +435,12 @@ There is nothing to switch on per platform: the same `GlassHost` and the same su
 The glass works on Flutter web with both renderers, **CanvasKit** and **Skwasm**. This very site is a Flutter web app:
 every demo on it is the package running in your browser, under one `GlassHost` in the app's `builder:`.
 
+CanvasKit is the slow one. Every capture goes through `Picture.toImageSync`, which on CanvasKit reads the pixels back
+from the GPU and waits for them: on a MacBook Pro with an M3 Max (macOS 26.4.1), a frame of full glass on this site took
+15 to 30 ms on CanvasKit and 4 to 10 ms on Skwasm, in WebKit and in Chromium alike (g1455 0.1.1 on Flutter 3.47.1,
+2026-10-04). Flutter picks Skwasm only in Chromium browsers unless the app allows WebKit too; where an app still runs
+on CanvasKit, a [cheaper tier](/foundations/tiers) captures nothing and the two renderers are level there.
+
 > [!NOTE]
 > Browsers do not tell an app about Reduce Transparency, increased contrast or thermal state. Declare what you know,
 > as on any platform: see [What the app declares](/start/declarations).
@@ -430,9 +453,85 @@ own test suite, so a shader that one of the compilers would reject fails the pac
 ## Hardware and cost
 
 What the glass costs differs between GPU families, and the package's measurements come from two of them: an Adreno 830
-on Vulkan and Apple GPUs on Metal. On other hardware the glass works the same; only the reported prices are missing.
+on Vulkan and Apple GPUs on Metal; the devices, systems and dates are in
+[Where the numbers come from](/start/how-it-works). On other hardware the glass works the same; only the reported prices are missing.
 See [What the app declares](/start/declarations) for `GlassHost.hardware`, and [Performance](/foundations/performance)
 for keeping the cost down on any device.
+''',
+  ),
+  Entry(
+    section: Section.start,
+    id: 'agents',
+    title: 'AI agents',
+    icon: 'auto_awesome',
+    summary:
+        'An agent skill for Claude Code, Codex, Cursor, Antigravity, Gemini CLI and Copilot: the rules for writing '
+        'glass, and every page of this site, installed with one command.',
+    guide: r'''
+g1455 ships an [agent skill](https://agentskills.io): a `SKILL.md` that tells a coding agent how to write glass that
+works the first time (one host above the navigator, what the app declares, what costs a capture, which widget fits),
+with every page of this site beside it as a reference file. The agent loads it on its own when a project uses g1455 or
+you ask for liquid glass, and reads a component's page before it writes one.
+
+## Any agent
+
+```bash
+npx skills add PlugFox/g1455
+```
+
+The installer ([skills.sh](https://skills.sh)) asks which agents to install for and puts the skill where each one looks.
+`-a claude-code -a codex` picks agents without asking, `-g` installs for your user instead of the project, `-y` skips
+the questions. `npx skills update` brings it up to date.
+
+The same works from this site's address, which publishes the skill at
+`/.well-known/agent-skills/index.json`:
+
+```bash
+npx skills add https://g1455.plugfox.dev
+```
+
+## Claude Code
+
+The repository is a plugin marketplace with the skill as its one plugin. In Claude Code:
+
+```text
+/plugin marketplace add PlugFox/g1455
+/plugin install g1455@g1455
+```
+
+`/plugin marketplace update g1455` fetches a newer one.
+
+## Without Node
+
+The skill is one archive. Unpack it where your agent looks for skills:
+
+```bash
+mkdir -p .agents/skills/g1455
+curl -fsSL https://g1455.plugfox.dev/.well-known/agent-skills/g1455.tar.gz | tar -xz -C .agents/skills/g1455
+```
+
+| Agent | In the project | For your user |
+|---|---|---|
+| Claude Code | `.claude/skills/g1455` | `~/.claude/skills/g1455` |
+| Codex, Cursor, Antigravity, Gemini CLI, GitHub Copilot | `.agents/skills/g1455` | `~/.agents/skills/g1455` |
+
+Commit the project's copy and everyone working on the app gets it.
+
+## Without installing
+
+Tell the agent to read the skill from the site, and it follows the links it needs:
+
+```text
+Read https://g1455.plugfox.dev/SKILL.md and follow it.
+```
+
+Every page of the site is also markdown at its address plus `.md`, such as
+[/components/slider.md](https://g1455.plugfox.dev/components/slider.md). [llms.txt](https://g1455.plugfox.dev/llms.txt)
+lists them all, and [llms-full.txt](https://g1455.plugfox.dev/llms-full.txt) is every page in one file.
+
+> [!NOTE]
+> The skill describes the package's current version, and the API is 0.x. Update the skill when you update the package;
+> it tells the agent to check the changelog when the versions differ.
 ''',
   ),
 ];

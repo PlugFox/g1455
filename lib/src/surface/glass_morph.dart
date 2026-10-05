@@ -48,6 +48,8 @@ import 'glass_travel.dart';
 /// blend radius of 32: a neck of a few dozen pixels between a 44-pt button and
 /// the panel it opens, thick enough to read as liquid and short of the swell a
 /// wider fold puts on every edge (`k / 4` where two edges coincide).
+///
+/// {@category Composition}
 const double kGlassMorphSpacing = 16;
 
 /// How a [GlassMorph] moves: a spring, by its perceptual duration and bounce.
@@ -56,8 +58,18 @@ const double kGlassMorphSpacing = 16;
 /// [SpringDescription.withDurationAndBounce], which is the same arithmetic.
 /// The spring drives the body's size; the cross-fade and the bud are timed
 /// off the same progress, so a slower spring slows all of it together.
+///
+/// ```dart
+/// GlassMorph(
+///   motion: const GlassMorphMotion(duration: Duration(milliseconds: 350), bounce: 0.1),
+///   child: child,
+/// )
+/// ```
+///
+/// {@category Composition}
 @immutable
 class GlassMorphMotion {
+  /// A spring that takes roughly [duration], overshooting by [bounce].
   const GlassMorphMotion({required this.duration, this.bounce = 0})
     : assert(bounce > -1 && bounce < 1, 'A bounce of ±1 never settles.');
 
@@ -96,12 +108,19 @@ class GlassMorphMotion {
 /// iOS 26:
 ///
 /// ```dart
-/// GlassMorph(
-///   alignment: Alignment.topRight,
-///   borderRadius: open ? const BorderRadius.all(Radius.circular(24)) : kGlassCapsule,
-///   child: open
-///       ? MenuPanel(key: const ValueKey<String>('menu'), onClose: close)
-///       : IconButton(key: const ValueKey<String>('button'), onPressed: open, icon: icon),
+/// Align(
+///   alignment: Alignment.topRight, // holds the corner the morph holds
+///   child: GlassMorph(
+///     alignment: Alignment.topRight,
+///     borderRadius: isOpen ? const BorderRadius.all(Radius.circular(24)) : kGlassCapsule,
+///     child: isOpen
+///         ? MenuPanel(key: const ValueKey<String>('menu'), onClose: () => setState(() => isOpen = false))
+///         : IconButton(
+///             key: const ValueKey<String>('button'),
+///             onPressed: () => setState(() => isOpen = true),
+///             icon: const Icon(Icons.more_horiz),
+///           ),
+///   ),
 /// )
 /// ```
 ///
@@ -221,7 +240,18 @@ class GlassMorphMotion {
 /// survive (D185) — the content is meant to be labels and icons. Hit testing
 /// follows the body: mid-morph only the new child is hit, and only where the
 /// body has reached.
+///
+/// See also:
+///
+///  * [GlassMorphMotion], the spring.
+///  * [GlassGroup], the fused draw it borrows while it moves.
+///  * [GlassMenuAnchor], a menu that grows out of its button in the overlay
+///    rather than in place.
+///  * [The morph on the site](https://g1455.plugfox.dev/components/morph).
+///
+/// {@category Composition}
 class GlassMorph extends StatefulWidget {
+  /// Glass that holds [child] and flows to the size of each new one.
   const GlassMorph({
     required this.child,
     this.alignment = Alignment.center,

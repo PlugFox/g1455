@@ -92,13 +92,13 @@ sealed class Pubspec {
   static const PubspecVersion version = (
     /// Non-canonical string representation of the version as provided
     /// in the pubspec.yaml file.
-    representation: r'0.1.3',
+    representation: r'0.1.4',
 
     /// Returns a 'canonicalized' representation
     /// of the application version.
     /// This represents the version string in accordance with
     /// Semantic Versioning (SemVer) standards.
-    canonical: r'0.1.3',
+    canonical: r'0.1.4',
 
     /// MAJOR version when you make incompatible API changes.
     /// The major version number: 1 in "1.2.3".
@@ -111,7 +111,7 @@ sealed class Pubspec {
 
     /// PATCH version when you make backward compatible bug fixes.
     /// The patch version number: 3 in "1.2.3".
-    patch: 3,
+    patch: 4,
 
     /// The pre-release identifier: "foo" in "1.2.3-foo".
     preRelease: <String>[],
@@ -302,10 +302,10 @@ sealed class Pubspec {
   /// Pub.dev generates the package’s thumbnail image from the first screenshot.
   /// If this screenshot uses animation, pub.dev uses its first frame.
   static const List<Object> screenshots = <Object>[
+    r'{description: The g1455 icon: a disc of clear glass refracting a grid and a yellow disc behind it., path: doc/screenshots/g1455.png}',
     r'{description: GlassGroup: three clear glass blobs orbit and fuse into one silhouette where they meet., path: doc/screenshots/group.webp}',
     r'{description: GlassFinish: regular, clear and frosted glass side by side over the same backdrop., path: doc/screenshots/finishes.webp}',
     r'{description: GlassRipple: taps and a drag send viscous waves across a clear glass panel., path: doc/screenshots/ripple.webp}',
-    r'{description: GlassSurface.materialize: a bar and two buttons arrive, blur first and tint last, and leave., path: doc/screenshots/materialize.webp}',
     r'{description: GlassSwitch: switches on a glass card, the knob turning into a clear drop while held., path: doc/screenshots/switch.webp}',
     r'{description: GlassSlider: two sliders dragged, the knob a clear drop while held., path: doc/screenshots/slider.webp}',
     r'{description: GlassTabBar: the selection lifts into a drop that magnifies the bar and is dragged between tabs., path: doc/screenshots/tab_bar.webp}',

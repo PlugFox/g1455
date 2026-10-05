@@ -49,6 +49,8 @@ import 'glass_travel.dart';
 /// screenshots under a finger (D217). macOS 27 differs per control — 1.4x the
 /// slider, 1.6x the switch (D210) — which is why the controls take it as
 /// `dropScale`.
+///
+/// {@category Panels and controls}
 const double kGlassDropScale = 1.57;
 
 /// How far past its own box the held switch's drop shows, logical px — the
@@ -56,6 +58,8 @@ const double kGlassDropScale = 1.57;
 /// 58 × 38 pt drop), which is this one margin rather than one zoom (D218). The
 /// slider's drop, read the same way, does not minify, and its default is 0.
 /// See [GlassOptics.widen].
+///
+/// {@category Panels and controls}
 const double kGlassSwitchDropWiden = 5;
 
 /// The optics of a held drop, which are not the material's.
@@ -67,9 +71,21 @@ const double kGlassSwitchDropWiden = 5;
 /// under it came out as an hourglass. So: a reach of 10, and the amplitude
 /// that puts 1.15 pt at 3 pt in on the material's own curve shape (whose
 /// exponents two readings cannot identify, and are borrowed).
+///
+/// Shared by every drop in the package — the switch's, the slider's, the
+/// segmented control's and the tab bar's — each of which adds its own
+/// [GlassOptics.widen] or [GlassOptics.zoom] to it.
+///
+/// {@category Panels and controls}
 const GlassOptics kGlassDropOptics = GlassOptics(thickness: 10, strength: -4.1);
 
-/// How long the drop takes to lift or settle.
+/// How long the drop of a [GlassSwitch] or a [GlassSlider] takes to lift or
+/// settle.
+///
+/// A feel rather than a reading. The segmented control and the tab bar lift
+/// theirs on a spring instead.
+///
+/// {@category Panels and controls}
 const Duration kGlassDropDuration = Duration(milliseconds: 180);
 
 /// How opaque a disabled switch or slider is, drawn as one group.
@@ -80,9 +96,16 @@ const Duration kGlassDropDuration = Duration(milliseconds: 180);
 /// that alpha, so the track under it does not show through. macOS does
 /// something else per part (the switch's accent ×0.69, the slider's fill
 /// gone); these controls are iOS's, as their sizes are.
+///
+/// {@category Panels and controls}
 const double kGlassDisabledOpacity = 0.5;
 
-/// The iOS 26 switch's track and knob, logical px.
+/// The iOS 26 switch's track, logical px. Its resting knob is 38 x 24.
+///
+/// The track is laid out in a box [kGlassMinTapTarget] tall, so the switch
+/// takes taps above and below what it draws.
+///
+/// {@category Panels and controls}
 const Size kGlassSwitchSize = Size(64, 28);
 const Size _kSwitchKnob = Size(38, 24);
 
@@ -223,7 +246,49 @@ _Drop _drop({
 );
 
 /// A switch whose knob becomes a clear glass drop while it is held.
+///
+/// At rest it is iOS's switch: a track of [kGlassSwitchSize] in [trackColor]
+/// or [activeColor], and an opaque white knob that is not glass at all. A tap
+/// toggles it; a horizontal drag carries the knob and commits on release,
+/// on whichever side of the middle it was let go. While a finger is down the
+/// knob is a clear drop [dropScale] times its size that minifies the track
+/// under it by [dropWiden].
+///
+/// The switch holds no value of its own: [onChanged] is told the new one and
+/// the caller passes it back as [value].
+///
+/// ```dart
+/// MergeSemantics(
+///   child: Row(
+///     children: <Widget>[
+///       const Expanded(child: Text('Wi-Fi')),
+///       GlassSwitch(
+///         value: wifi,
+///         onChanged: (bool on) => setState(() => wifi = on),
+///       ),
+///     ],
+///   ),
+/// )
+/// ```
+///
+/// > **Note:** what a held switch costs is one capture when the drop appears
+/// > and none while it moves: the drop moves inside a [GlassTravel] region of
+/// > its own, and the track changes colour only when the value commits.
+///
+/// See also:
+///
+///  * [GlassSlider], the same drop on a continuous value.
+///  * [GlassDropMotion], how the held drop stretches and squashes.
+///  * [kGlassDisabledOpacity], how a disabled switch is drawn.
+///  * [Switch on the site](https://g1455.plugfox.dev/components/switch).
+///
+/// {@category Panels and controls}
 class GlassSwitch extends StatefulWidget {
+  /// A switch showing [value], reporting a change through [onChanged] — null
+  /// to disable it.
+  ///
+  /// [dropScale] must be at least 1: a held drop is never smaller than the
+  /// knob it replaces.
   const GlassSwitch({
     required this.value,
     required this.onChanged,
@@ -249,6 +314,8 @@ class GlassSwitch extends StatefulWidget {
   /// Off under reduced motion either way.
   final GlassDropMotion? dropMotion;
 
+  /// Whether the switch is on. The knob slides to it when it changes, unless
+  /// a finger is dragging it.
   final bool value;
 
   /// Null disables the switch, which is also what the semantics say; it is
@@ -463,7 +530,39 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
 ///
 /// Every frame of a drag changes the fill under the drop, so every frame of a
 /// drag is a capture — see the file comment. The knob moving is not.
+///
+/// The value runs from 0 to 1 and is the caller's: [onChanged] is told each
+/// new one while a finger is down — a tap places the knob, a drag carries it —
+/// and the caller passes it back as [value]. [onChangeStart] and
+/// [onChangeEnd] bracket the gesture. A screen reader's increase and decrease
+/// move it by [semanticStep].
+///
+/// ```dart
+/// GlassSlider(
+///   value: volume,
+///   semanticLabel: 'Volume',
+///   onChanged: (double v) => setState(() => volume = v),
+///   onChangeEnd: (double v) => player.setVolume(v),
+/// )
+/// ```
+///
+/// > **Note:** the fill ends under the drop and follows it, so every frame of
+/// > a drag is a real change under glass and is retaken. A screen of sliders
+/// > at rest costs nothing; a held one costs a capture a frame.
+///
+/// See also:
+///
+///  * [GlassSwitch], the same drop on a boolean.
+///  * [SliderGeometry.fillEnd], where the fill ends for a value.
+///  * [GlassDropMotion], how the held drop stretches and squashes.
+///  * [Slider on the site](https://g1455.plugfox.dev/components/slider).
+///
+/// {@category Panels and controls}
 class GlassSlider extends StatefulWidget {
+  /// A slider showing [value], reporting a change through [onChanged] — null
+  /// to disable it.
+  ///
+  /// [dropScale] must be at least 1, and [semanticStep] above 0 and at most 1.
   const GlassSlider({
     required this.value,
     required this.onChanged,
@@ -496,9 +595,19 @@ class GlassSlider extends StatefulWidget {
 
   /// Null disables the slider; it is then drawn at [kGlassDisabledOpacity].
   final ValueChanged<double>? onChanged;
+
+  /// Called with the value before the gesture, as a finger comes down or a
+  /// screen reader steps the value.
   final ValueChanged<double>? onChangeStart;
+
+  /// Called with the value at the end of the gesture, as the finger lifts or
+  /// a screen reader's step lands.
   final ValueChanged<double>? onChangeEnd;
+
+  /// The fill from 0 to [value]. iOS's blue by default.
   final Color activeColor;
+
+  /// The track behind the fill.
   final Color trackColor;
 
   /// What a screen reader says the slider is for. Null leaves it to a
@@ -723,8 +832,17 @@ class _SliderTrack extends CustomPainter {
       oldDelegate.value != value || oldDelegate.track != track || oldDelegate.active != active;
 }
 
-/// Where the slider's fill ends for a value, on a slider [width] wide.
+/// Where the slider's fill ends for a value, on a slider `width` wide.
+///
+/// Public so that a test, or a widget drawn alongside a [GlassSlider], can
+/// put something exactly where the fill ends — which is also the centre of
+/// the resting knob.
+///
+/// {@category Panels and controls}
 abstract final class SliderGeometry {
+  /// The x of the fill's end, logical px from the slider's left edge, for
+  /// [value] (0 to 1) on a slider [width] wide: half the resting knob in from
+  /// the left at 0, and half the knob in from the right at 1.
   static double fillEnd(double value, double width) =>
       _kSliderKnob.width / 2 + value * math.max(0, width - _kSliderKnob.width);
 }

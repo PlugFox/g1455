@@ -11,6 +11,7 @@ on:
       - 'lib/**'
       - 'pubspec.yaml'
       - 'example/**'
+      - 'skills/**'
       - '.github/workflows/site.yml'
   pull_request:
     branches: [master]
@@ -18,6 +19,7 @@ on:
       - 'lib/**'
       - 'pubspec.yaml'
       - 'example/**'
+      - 'skills/**'
       - '.github/workflows/site.yml'
   workflow_dispatch:
 

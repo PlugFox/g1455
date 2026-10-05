@@ -13,11 +13,20 @@
 // Firebase Hosting serves `components/slider.html` at `/components/slider`
 // (`cleanUrls`), and an address with no page gets `404.html` with a real 404
 // status — which is the app too, and draws its own "not found".
+//
+// For agents rather than browsers: every page again as markdown at its address
+// plus `.md`, `llms.txt` and `llms-full.txt` (llmstxt.org), and the agent skill
+// from `skills/g1455/` at `/.well-known/agent-skills/` with the discovery index
+// `npx skills add https://g1455.plugfox.dev` reads. Firebase serves the
+// markdown as plain text, so a browser shows it rather than downloads it.
 
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
 import 'package:g1455_example/src/catalog/catalog.dart';
+import 'package:g1455_example/src/catalog/markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 
 // ignore_for_file: avoid_print
@@ -44,6 +53,13 @@ void main(List<String> args) {
   _write(out, 'robots.txt', _robots());
   _write(out, 'manifest.json', _manifest());
   _write(out, 'version.json', '${jsonEncode(<String, String>{'version': version})}\n');
+
+  for (final Entry entry in documentedEntries) {
+    _write(out, '${entry.path.substring(1)}.md', entryMarkdown(entry, link: siteLink));
+  }
+  _write(out, 'llms.txt', _llms());
+  _write(out, 'llms-full.txt', _llmsFull());
+  _skill(out);
 }
 
 void _write(Directory out, String path, String content) {
@@ -82,6 +98,7 @@ String _page({
   required List<Map<String, Object?>> jsonLd,
   String type = 'website',
   bool index = true,
+  String? markdown,
 }) {
   final String url = '${Site.origin}${path == '/' ? '/' : path}';
   final String ld = const JsonEncoder.withIndent('  ').convert(jsonLd.length == 1 ? jsonLd.single : jsonLd);
@@ -107,6 +124,7 @@ String _page({
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
+  ${markdown == null ? '<link rel="help" type="text/plain" href="/llms.txt" title="For AI agents">' : '<link rel="alternate" type="text/markdown" href="${_attr(markdown)}" title="Markdown">'}
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <meta property="og:type" content="$type">
@@ -276,6 +294,8 @@ String _home() => _page(
       <pre><code class="language-bash">flutter pub add g1455</code></pre>
       <p><a href="${kEntries.first.path}">Get started</a> · <a href="${_first(Section.components)}">Components</a> ·
       <a href="${Site.repository}">GitHub</a> · <a href="${Site.pub}">pub.dev</a></p>
+      <p>For AI agents: the <a href="$kAgentsPage">agent skill</a> (<code>npx skills add PlugFox/g1455</code>),
+      <a href="/llms.txt">llms.txt</a>, and every page as markdown at its address plus <code>.md</code>.</p>
 ${_index()}''',
 );
 
@@ -325,6 +345,7 @@ String _entry(Entry e) {
     og: _og('${e.section.id}-${e.id}'),
     ogAlt: 'g1455 · ${e.title}: ${e.summary}',
     type: 'article',
+    markdown: e.section == Section.demos ? null : '${e.path}.md',
     jsonLd: <Map<String, Object?>>[
       <String, Object?>{
         '@context': 'https://schema.org',
@@ -423,6 +444,121 @@ String _manifest() =>
         <String, String>{'name': 'Installation', 'url': kEntries.first.path},
       ],
     })}\n';
+
+/// Where the skill lives in the repository, from `example/`.
+const String _kSkillSource = '../skills/g1455';
+
+/// The skill's files, by their path inside the skill: `SKILL.md`,
+/// `references/components/slider.md`.
+Map<String, List<int>> _skillFiles() {
+  final root = Directory(_kSkillSource);
+  final files = <String, List<int>>{
+    for (final FileSystemEntity f in root.listSync(recursive: true))
+      if (f is File) f.path.substring(root.path.length + 1).replaceAll(r'\', '/'): f.readAsBytesSync(),
+  };
+  return Map<String, List<int>>.fromEntries(
+    files.entries.toList()
+      ..sort((MapEntry<String, List<int>> a, MapEntry<String, List<int>> b) => a.key.compareTo(b.key)),
+  );
+}
+
+/// The `description` of the skill's front matter, folded to one line.
+String _skillDescription(String skill) {
+  final Match? m = RegExp(r'^description: >-\n((?:  .*\n)+)', multiLine: true).firstMatch(skill);
+  if (m == null) {
+    stderr.writeln('$_kSkillSource/SKILL.md: no folded `description: >-` in the front matter');
+    exit(65);
+  }
+  return m.group(1)!.split('\n').map((String l) => l.trim()).where((String l) => l.isNotEmpty).join(' ');
+}
+
+/// The skill at `/.well-known/agent-skills/`: its files as they are, so
+/// `SKILL.md`'s relative links resolve on the site; the same files as one
+/// archive, `SKILL.md` at its root; and the index of the Agent Skills
+/// discovery RFC (v0.2.0), which names the archive by its digest.
+void _skill(Directory out) {
+  final Map<String, List<int>> files = _skillFiles();
+  for (final MapEntry<String, List<int>> f in files.entries) {
+    final file = File('${out.path}/.well-known/agent-skills/g1455/${f.key}')..createSync(recursive: true);
+    file.writeAsBytesSync(f.value);
+  }
+  // A fixed time on every entry: the same files make the same archive.
+  final archive = Archive();
+  for (final MapEntry<String, List<int>> f in files.entries) {
+    archive.add(ArchiveFile.bytes(f.key, f.value)..lastModTime = 0);
+  }
+  final List<int> tgz = const GZipEncoder().encodeBytes(TarEncoder().encodeBytes(archive));
+  final tar = File('${out.path}/.well-known/agent-skills/g1455.tar.gz')..writeAsBytesSync(tgz);
+  print('${tar.path}  ${tgz.length} B, ${files.length} files');
+  _write(
+    out,
+    '.well-known/agent-skills/index.json',
+    '${const JsonEncoder.withIndent('  ').convert(<String, Object?>{
+      r'$schema': 'https://schemas.agentskills.io/discovery/0.2.0/schema.json',
+      'skills': <Map<String, String>>[
+        <String, String>{
+          'name': 'g1455',
+          'type': 'archive',
+          'description': _skillDescription(utf8.decode(files['SKILL.md']!)),
+          'url': 'g1455.tar.gz',
+          'digest': 'sha256:${sha256.convert(tgz)}',
+        },
+      ],
+    })}\n',
+  );
+}
+
+/// The site for a language model (llmstxt.org): what the package is, how to
+/// get the skill, and every page as markdown.
+String _llms() {
+  final b = StringBuffer()
+    ..writeln('# g1455')
+    ..writeln()
+    ..writeln('> Liquid Glass for Flutter: refraction, blur, tint and a rim over the live backdrop. One GlassHost')
+    ..writeln('> captures what is under all of its glass, only when something there changed; every surface samples')
+    ..writeln('> that capture. Package `g1455` on pub.dev, version ${Site.version}, Flutter 3.47 or later.')
+    ..writeln()
+    ..writeln('Writing code with g1455? Install the agent skill, or read its SKILL.md first: it has the rules that')
+    ..writeln('make glass work (one host above the navigator, what the app declares, what costs a capture) and')
+    ..writeln('links to every page below.')
+    ..writeln()
+    ..writeln('## Agent skill')
+    ..writeln()
+    ..writeln('- [SKILL.md](${Site.origin}/.well-known/agent-skills/g1455/SKILL.md): the skill itself')
+    ..writeln('- [Install](${Site.origin}$kAgentsPage.md): `npx skills add PlugFox/g1455`, or in Claude Code')
+    ..writeln('  `/plugin marketplace add PlugFox/g1455` then `/plugin install g1455@g1455`')
+    ..writeln(
+      '- [Discovery index](${Site.origin}/.well-known/agent-skills/index.json): `npx skills add ${Site.origin}`',
+    );
+  for (final Section s in Section.values) {
+    final Iterable<Entry> pages = documentedEntries.where((Entry e) => e.section == s);
+    if (pages.isEmpty) {
+      continue;
+    }
+    b
+      ..writeln()
+      ..writeln('## ${s.title}')
+      ..writeln();
+    for (final Entry e in pages) {
+      b.writeln('- [${e.title}](${Site.origin}${e.path}.md): ${e.summary}');
+    }
+  }
+  b
+    ..writeln()
+    ..writeln('## Optional')
+    ..writeln()
+    ..writeln('- [Every page in one file](${Site.origin}/llms-full.txt)')
+    ..writeln('- [API reference](${Site.pubApi})')
+    ..writeln('- [Changelog](${Site.changelog})')
+    ..writeln('- [Source](${Site.repository})');
+  return b.toString();
+}
+
+/// Every page in one file, in the order of the navigation.
+String _llmsFull() => <String>[
+  '# g1455: Liquid Glass for Flutter\n\nEvery page of ${Site.origin}, version ${Site.version} of the package.\n',
+  for (final Entry e in documentedEntries) entryMarkdown(e, link: siteLink),
+].join('\n---\n\n');
 
 /// The outline's style: readable, dark like the app, and gone once the app is
 /// up.

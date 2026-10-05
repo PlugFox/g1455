@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
@@ -11,6 +12,7 @@ import 'package:g1455_example/src/pages/home_page.dart';
 import 'package:g1455_example/src/pages/home_showcase.dart';
 import 'package:g1455_example/src/pages/not_found_page.dart';
 import 'package:g1455_example/src/widgets/icons.dart';
+import 'package:g1455_example/src/widgets/side_scroller.dart';
 import 'package:squid/squid.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
 
@@ -129,6 +131,46 @@ void main() {
         expect(onPage(find.text(kShowcases.first.title)), findsNothing);
       });
     }
+
+    testWidgets('a row that scrolls sideways: a button at the end that has more, and a mouse drags it', (
+      WidgetTester tester,
+    ) async {
+      _size(tester, const Size(1024, 900));
+      await tester.pumpWidget(const GlassExampleApp(initialLocation: '/'));
+      await _frames(tester, 10);
+      // The test font is wider than any real one: the hero above the row is
+      // taller than the window.
+      final Finder page = find.descendant(of: find.byType(HomePage), matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(find.byType(SideScroller), 200, scrollable: page);
+      // Out from under the site's bar, which floats over the top of the page.
+      await tester.drag(page, const Offset(0, 300));
+      await _frames(tester, 10);
+      final Finder row = find.byType(SideScroller).first;
+      ScrollPosition position() =>
+          tester.state<ScrollableState>(find.descendant(of: row, matching: find.byType(Scrollable))).position;
+      double opacity(String tooltip) => tester
+          .widget<AnimatedOpacity>(find.ancestor(of: find.byTooltip(tooltip), matching: find.byType(AnimatedOpacity)))
+          .opacity;
+      expect(position().maxScrollExtent, greaterThan(0), reason: 'the row fits: nothing to test');
+      expect(opacity('More'), 1);
+      expect(opacity('Back'), 0);
+
+      await tester.tap(find.byTooltip('More'));
+      await _frames(tester, 40);
+      expect(position().pixels, greaterThan(0));
+      expect(opacity('Back'), 1);
+
+      final double before = position().pixels;
+      final TestGesture mouse = await tester.startGesture(
+        tester.getCenter(row) + const Offset(-200, -20),
+        kind: PointerDeviceKind.mouse,
+      );
+      await mouse.moveBy(const Offset(40, 0));
+      await mouse.moveBy(const Offset(120, 0));
+      await mouse.up();
+      await _frames(tester, 40);
+      expect(position().pixels, lessThan(before), reason: 'a mouse did not drag the row');
+    });
 
     testWidgets('a deep link opens its page and its tab, and a tab is an address', (WidgetTester tester) async {
       _size(tester, const Size(1280, 900));

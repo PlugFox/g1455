@@ -107,12 +107,25 @@ import 'package:flutter/foundation.dart';
 
 /// How the hardware charges for a capture — which decides whether resolution is
 /// a lever at all.
+///
+/// Normally read off the declared hardware with
+/// [GlassHardware.captureCostModel] rather than named. Since D135 it decides
+/// only what a divisor is *priced* at, never which divisor is chosen.
+///
+/// See also:
+///
+///  * [ProxyResolution.captureCostFactor] and
+///    [ProxyResolution.routeCostFactor], the two tables it keys.
+///  * <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 enum ProxyCostModel {
   /// `C_pass·n + k·area`, fitted on Adreno 830 (M2, M10). The only model in
   /// which lowering the resolution saves anything.
   areaCharged,
 
-  /// `C_frame + C_pass·n`, with no area term — Metal (D56). A capture costs
+  /// `C_frame + C_pass·n`, with no area term — Metal, fitted on the M2 iPad Pro
+  /// (D56). A capture costs
   /// about one more frame, once, whatever its size.
   frameCharged,
 
@@ -125,7 +138,7 @@ enum ProxyCostModel {
   /// quality loss against an unmeasured saving is not a trade (D121, D130) —
   /// and the one unmeasured device anybody then ran got the worst hand
   /// available: 37 fps at full resolution against 115 at a quarter, where the
-  /// stock Material holds 120 (D134). The saving's *size* is still unpriced
+  /// stock Material holds 120 (D134, Galaxy S22 Ultra, Xclipse 920). The saving's *size* is still unpriced
   /// here; its *sign* is now measured on every family that has been run —
   /// Adreno's capture (D28), Metal's route (D128) and Xclipse's route (D136,
   /// [ProxyResolution.xclipseRouteSources]) — and a policy that waits for a
@@ -135,19 +148,35 @@ enum ProxyCostModel {
 
 /// A damage figure, and whether it is a reading or a bound.
 ///
-/// [measured] is false when the texel scale asked for is off the table's own
+/// `measured` is false when the texel scale asked for is off the table's own
 /// rungs: interpolated between two of them, or coarser than the top one, where
 /// monotonicity says "at most this" and nothing says more. A caller that needs
 /// a value and is handed a bound is being told to measure, not to round.
+///
+/// `deltaE` is mean ΔE against the same finish at full resolution; divide it by
+/// [ProxyResolution.kMaterialScaleDeltaE] to compare across finishes.
+///
+/// See also:
+///
+///  * [ProxyResolution.damageAtTexelScale], which returns it.
+///  * [ProxyResolutionChoice.damage], where the chooser reports it.
+///
+/// {@category Cost and policy}
 typedef ProxyDamage = ({double deltaE, bool measured});
 
 /// What the whole route costs at a divisor, relative to the same route at full
 /// resolution — and whether that point was measured or interpolated between two
 /// that were.
 ///
-/// [measured] is false at the divisor the decomposition predicts and nobody has
+/// `measured` is false at the divisor the decomposition predicts and nobody has
 /// run. Two points define a two-parameter model exactly, so its middle point has
 /// no residual to be judged by: it is arithmetic, and it is labelled as such.
+///
+/// See also:
+///
+///  * [ProxyResolution.routeCostFactor], which returns it.
+///
+/// {@category Cost and policy}
 typedef ProxyRouteCost = ({double factor, bool measured});
 
 /// The proxy's recording resolution, as an integer divisor of the device pixel
@@ -157,17 +186,46 @@ typedef ProxyRouteCost = ({double factor, bool measured});
 /// keeps the ratio comparable between devices; on a device whose own ratio is
 /// integral it also keeps one texel a whole number of device pixels, so the
 /// source grid and the texel grid share a phase.
+///
+/// The policy picks one per frame; a host pins one through
+/// [GlassHost.resolution], which is how an unpriced divisor gets priced (see
+/// [ProxyDivisorReason.pinnedByHost]). Its tables can also be read directly:
+///
+/// ```dart
+/// const ProxyResolution quarter = ProxyResolution.quarter();
+/// final ProxyDamage? damage = ProxyResolution.damageAtTexelScale(
+///   'regularDark',
+///   quarter.ratioFor(3), // a dpr-3 phone: 0.75 texels per logical pixel
+/// );
+/// final double? capture = quarter.captureCostFactor(ProxyCostModel.areaCharged);
+/// ```
+///
+/// See also:
+///
+///  * [ProxyResolutionPolicy], which chooses it.
+///  * [ProxyResolutionChoice], the choice with its damage and price.
+///  * <https://g1455.plugfox.dev/foundations/performance> and
+///    <https://g1455.plugfox.dev/start/how-it-works>.
+///
+/// {@category Cost and policy}
 @immutable
 class ProxyResolution {
+  /// Recording at `1/divisor` of the device pixel ratio. [divisor] is at least
+  /// 1.
   const ProxyResolution.divisor(this.divisor) : assert(divisor >= 1, 'the proxy is never larger than the screen');
 
   /// Recording at the screen's own resolution. What every capture measured
   /// before M10 was taken at.
   const ProxyResolution.full() : divisor = 1;
 
+  /// Recording at half the device pixel ratio, a quarter of the texels.
   const ProxyResolution.half() : divisor = 2;
+
+  /// Recording at a quarter of the device pixel ratio — what the policy picks
+  /// for `regular` on a dpr-2 screen at the default budget.
   const ProxyResolution.quarter() : divisor = 4;
 
+  /// How many times coarser than the screen the proxy is recorded, per axis.
   final int divisor;
 
   /// Texels per logical pixel.
@@ -205,7 +263,7 @@ class ProxyResolution {
   /// surfaces, 224 440 logical px² of glass over a photographic backdrop — the
   /// frame-relative figure is 0.604 at a divisor of 4.
   ///
-  /// **Measured on Metal and nowhere else (D128).** Two blocks of the M7
+  /// **Measured on Metal (M2 iPad Pro) and nowhere else (D128).** Two blocks of the M7
   /// ladder, one either side of a reboot, differing in one input: the divisor
   /// the policy chose. Five of the six steps reproduced between the blocks to
   /// 0.5…1.7% and only `glass` moved, which is what makes the pair a comparison
@@ -315,7 +373,7 @@ class ProxyResolution {
   /// 0.5818 is what a two-point fit of `A·f + C` over divisors 1 and 4 returned
   /// with `f = 1/k²`, and it was quoted as "a divisor can never buy back more
   /// than 58.2%". D138 measured the middle point and refuted the family that
-  /// number belongs to: re-fitted over all three, `f = 1/k²` leaves a worst
+  /// number belongs to (M2 iPad Pro): re-fitted over all three, `f = 1/k²` leaves a worst
   /// residual of 6.4% while `f = 1/k` leaves 2.2% and `f = (1/k)^0.9` — D28's
   /// exponent, measured on Adreno's *capture* in a different experiment — leaves
   /// **1.6%**. Under the last of those the area-following share is 76.6%, not
@@ -378,7 +436,8 @@ class ProxyResolution {
   /// The run that says what a divisor actually buys, by turning the residual
   /// blur pass off and measuring the same two divisors again (D140).
   ///
-  /// The answer is that it buys that pass and nothing else. With the blur on,
+  /// The answer, on the M2 iPad Pro, is that it buys that pass and nothing
+  /// else. With the blur on,
   /// an eighth is 1.69 ms cheaper than full resolution; with it off, an eighth
   /// is 0.25 ms **dearer** — so the pass's own fall is 115% of the route's. What
   /// is left when it is gone costs 0.731 of the floor frame at a divisor of 1
@@ -399,7 +458,8 @@ class ProxyResolution {
   /// The discriminating cell was a divisor of 2 and the two candidate answers
   /// were written down before the run: a power law through D140's two points
   /// predicts 0.814 ms for the pass there, and the knee hypothesis needs about
-  /// 1.06 to reconstruct D139's total. The device returned **1.108** — the power
+  /// 1.06 to reconstruct D139's total. The device (the M2 iPad Pro) returned
+  /// **1.108** — the power
   /// law missed by 36%, the knee by 4.5%.
   ///
   /// So the pass's own price is not a power of the proxy's size either: 1.964 /
@@ -445,7 +505,7 @@ class ProxyResolution {
   /// `glass_hardware: detect`) beside the two ends it could have landed on,
   /// pinned 1 and pinned 4, in one binary under one shuffle.
   ///
-  /// It landed on the quarter: 8.339 ms against the pinned quarter's 8.341 and
+  /// On the Galaxy S22 Ultra (Xclipse 920) it landed on the quarter: 8.339 ms against the pinned quarter's 8.341 and
   /// the floor's 8.354, at 119.9 fps, with the proxy recorded every frame —
   /// and the pinned full resolution at 25.5 ms and 39 fps in the same run. Not
   /// in [xclipseRouteSources], because it is not the same measurement: those
@@ -620,6 +680,9 @@ class ProxyResolution {
   /// the session's two findings were split into a number each, and a report is
   /// kept as it came off the rig rather than renamed to match the prose.
   static const String damageSource = 'provenance/quality/d186-uncorrected-2026-09-14T20-16-32.json';
+
+  /// The same ladder as [damageSource] under the blur-corrected recipe — the
+  /// source of `meanDamage(..., blurCorrected: true)`.
   static const String damageSourceCorrected = 'provenance/quality/d186-corrected-2026-09-14T20-18-05.json';
 
   /// Where `regularLight`'s rows came from (D230): the same ladder, both
@@ -627,6 +690,8 @@ class ProxyResolution {
   /// the control, reproducing [damageSource] and [damageSourceCorrected] to
   /// 0.0006 ΔE, which is what lets a row from another run sit in this table.
   static const String lightDamageSource = 'provenance/quality/d230-light-uncorrected-2026-10-03T00-39-20.json';
+
+  /// [lightDamageSource] under the blur-corrected recipe.
   static const String lightDamageSourceCorrected = 'provenance/quality/d230-light-corrected-2026-10-03T00-40-09.json';
 
   /// The run that says the table's key survives a magnification that is not a
@@ -759,6 +824,13 @@ class ProxyResolution {
 /// different conversation with whoever asked: "your hardware has no lever",
 /// "your finish cannot take one" and "the next step was never priced" all look
 /// identical from the divisor alone.
+///
+/// See also:
+///
+///  * [ProxyResolutionChoice.reason], where it is carried.
+///  * <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 enum ProxyDivisorReason {
   // Two reasons have been deleted from here, and both were the hardware
   // stopping the walk.
@@ -818,7 +890,7 @@ enum ProxyDivisorReason {
   /// The one reason here that is not a statement about quality, and the only
   /// one that can **overrule** the budget: the alternative is not a worse
   /// picture but a wrong one, because the engine rescales an oversized snapshot
-  /// without telling anybody ([AtlasLayout.fitsTexture]). The damage reported
+  /// without telling anybody (`AtlasLayout.fitsTexture`). The damage reported
   /// beside it is the real damage at the divisor that was forced, which may be
   /// past the budget and may be null — off the measured end of the table
   /// entirely. A host seeing this is being told to expect a visibly softer
@@ -831,12 +903,13 @@ enum ProxyDivisorReason {
   ///
   /// It exists because the tables above are not a law yet and cannot become one
   /// without it. The route's price against its own floor is known at exactly two
-  /// divisors on one platform (1 and 4, D128), and two points fit a
+  /// divisors on one platform (1 and 4 on the M2 iPad Pro, D128), and two points fit a
   /// two-parameter model exactly — so the residual that would turn the
   /// decomposition into a law can only come from a *third* divisor, which the
   /// policy will never return because its job is to pick the best one rather
   /// than an interesting one. A pin is how a divisor gets priced at all; the
-  /// alternative was reaching it sideways through [damageBudgetDeltaE], which
+  /// alternative was reaching it sideways through the budget
+  /// ([ProxyResolutionPolicy.choose]'s `damageBudgetDeltaE`), which
   /// moves the retake ceiling in the same breath (D131) and would have made the
   /// third point differ from the first two along two axes instead of one.
   ///
@@ -847,8 +920,30 @@ enum ProxyDivisorReason {
 }
 
 /// What the chooser decided, and enough to argue with it.
+///
+/// Returned by [ProxyResolutionPolicy.choose], [ProxyResolutionPolicy.pin]
+/// and [ProxyResolutionPolicy.read]. Its [toString] is the line a report
+/// quotes.
+///
+/// ```dart
+/// final ProxyResolutionChoice choice = ProxyResolutionPolicy.choose(
+///   finish: 'regularDark',
+///   finishSigmaLogical: 2.6,
+///   devicePixelRatio: 2,
+///   costModel: ProxyCostModel.frameCharged,
+/// );
+/// // ProxyResolutionChoice(1/4, damageBudget, dE 0.221, capture 1.06, route 0.44)
+/// ```
+///
+/// See also:
+///
+///  * [ProxyDivisorReason], what [reason] can say.
+///  * <https://g1455.plugfox.dev/foundations/performance>.
+///
+/// {@category Cost and policy}
 @immutable
 class ProxyResolutionChoice {
+  /// A choice with every column filled in by the caller.
   const ProxyResolutionChoice({
     required this.resolution,
     required this.reason,
@@ -857,6 +952,7 @@ class ProxyResolutionChoice {
     required this.routeCostFactor,
   });
 
+  /// The divisor chosen, pinned or forced.
   final ProxyResolution resolution;
 
   /// What stopped it going deeper.
@@ -917,6 +1013,30 @@ class ProxyResolutionChoice {
 /// the divisor's sign is the same on every family measured and the unmeasured
 /// one is the one that shipped at 37 fps (D134, D136). A silent host gets the
 /// same quality walk as a declared one and a null where the price would be.
+///
+/// [GlassHost] runs it on every recorded frame; calling it directly is for a
+/// report or a test that wants the same answer without a frame:
+///
+/// ```dart
+/// final ProxyResolutionChoice choice = ProxyResolutionPolicy.choose(
+///   finish: 'regularDark',
+///   finishSigmaLogical: 2.6,
+///   devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+///   costModel: GlassHardware.detect().captureCostModel,
+/// );
+/// ```
+///
+/// A host spends a different allowance through [GlassHost.budgetDeltaE], which
+/// the retake oracle draws on as well.
+///
+/// See also:
+///
+///  * [ProxyResolution], the tables it reads.
+///  * [ProxyResolutionChoice], what it returns.
+///  * <https://g1455.plugfox.dev/foundations/performance> and
+///    <https://g1455.plugfox.dev/start/how-it-works>.
+///
+/// {@category Cost and policy}
 abstract final class ProxyResolutionPolicy {
   /// The default quality budget: **1% of the distance between two of Apple's
   /// own shipping materials** ([ProxyResolution.kMaterialScaleDeltaE]).
@@ -926,7 +1046,8 @@ abstract final class ProxyResolutionPolicy {
   /// project (S4's rule). What it buys is a check nobody arranged: on a dpr-2
   /// screen it picks a **quarter**-resolution proxy for the Apple-calibrated
   /// finish, from the quality side alone — and that is the point the device
-  /// then measured at ×2.14 Material against ×3.56 at full resolution (D128),
+  /// then measured at ×2.14 Material against ×3.56 at full resolution on the M2
+  /// iPad Pro (D128),
   /// which is the same working point D63's estimate assumed for a reason that
   /// turned out not to hold.
   static const double defaultDamageBudgetDeltaE = 0.01 * ProxyResolution.kMaterialScaleDeltaE;
@@ -974,13 +1095,6 @@ abstract final class ProxyResolutionPolicy {
     ...ProxyResolution.measuredDivisors,
   ]);
 
-  /// The deepest divisor whose quality *and* price are both known, given the
-  /// finish, the screen and the hardware.
-  ///
-  /// [finish] is a key into the measured damage table
-  /// ([ProxyResolution.measuredFinishes]); an unknown one refuses the same way
-  /// an unmeasured texel scale does, which is to say it comes back at full
-  /// resolution rather than at a guess.
   /// The choice a host makes for itself, with the tables read at that divisor
   /// rather than used to pick it.
   ///
@@ -1033,6 +1147,17 @@ abstract final class ProxyResolutionPolicy {
     routeCostFactor: resolution.routeCostFactor(costModel),
   );
 
+  /// The deepest divisor whose damage is inside [damageBudgetDeltaE] and below
+  /// the optics ceiling, given the finish, the screen and the hardware.
+  ///
+  /// [finish] is a key into the measured damage table
+  /// ([ProxyResolution.measuredFinishes]); an unknown one refuses the same way
+  /// an unmeasured texel scale does, which is to say it comes back at full
+  /// resolution rather than at a guess. [finishSigmaLogical] is the finish's
+  /// own blur, which sets [ProxyResolution.maxDivisorFor] where it is above
+  /// zero. [costModel] prices the result and does not enter the choice.
+  /// [blurCorrected] picks which damage table is read (see
+  /// [ProxyResolution.meanDamage]).
   static ProxyResolutionChoice choose({
     required String finish,
     required double finishSigmaLogical,

@@ -3,7 +3,7 @@ description: >-
   Liquid Glass for Flutter: refraction, blur and finishes; bars, tabs,
   switches, sliders, menus, sheets, dialogs and fusing groups, all sampling one
   shared capture.
-version: 0.1.3
+version: 0.1.4
 homepage: https://github.com/PlugFox/g1455
 repository: https://github.com/PlugFox/g1455
 issue_tracker: https://github.com/PlugFox/g1455/issues
@@ -20,15 +20,24 @@ topics:
 
 # Half-size loops shot by `tool/showcase.sh` (SHOWCASE_DPR=1): pub ships every
 # file listed here, and the README's full-size ones stay in the repository.
+#
+# The first is the package's picture in pub.dev's search results, which shows
+# one still frame of the first screenshot: so a square, still image leads, the
+# site's 512-px icon (`example/web/icons/Icon-512.png`, drawn by the package
+# itself in `example/tool/brand_test.dart`).
+#
+# Ten at most: pub.dev processes no more, and pana takes the example's ten
+# points for an eleventh. The materialize loop is the one left out; the alert's
+# shows the same arrival, blur first and tint last.
 screenshots:
+  - description: 'The g1455 icon: a disc of clear glass refracting a grid and a yellow disc behind it.'
+    path: doc/screenshots/g1455.png
   - description: 'GlassGroup: three clear glass blobs orbit and fuse into one silhouette where they meet.'
     path: doc/screenshots/group.webp
   - description: 'GlassFinish: regular, clear and frosted glass side by side over the same backdrop.'
     path: doc/screenshots/finishes.webp
   - description: 'GlassRipple: taps and a drag send viscous waves across a clear glass panel.'
     path: doc/screenshots/ripple.webp
-  - description: 'GlassSurface.materialize: a bar and two buttons arrive, blur first and tint last, and leave.'
-    path: doc/screenshots/materialize.webp
   - description: 'GlassSwitch: switches on a glass card, the knob turning into a clear drop while held.'
     path: doc/screenshots/switch.webp
   - description: 'GlassSlider: two sliders dragged, the knob a clear drop while held.'

@@ -58,16 +58,31 @@ import 'glass_travel.dart';
 
 /// The track's fill: iOS's `tertiarySystemFill`, read off the simulator as
 /// (116–127) at 0.12 (spike 32).
+///
+/// Not glass: a flat fill, under which what is behind the control stays
+/// sharp. [GlassSegmentedControl.trackColor]'s default.
+///
+/// {@category Panels and controls}
 const Color kGlassSegmentTrack = Color.fromRGBO(118, 118, 128, 0.12);
 
 /// How far past the resting capsule the held drop reaches, across and down,
 /// logical px (spike 32: 86 x 28 -> 110 x 44).
+///
+/// 12 across on each side and 8 above and below, so the held drop stands out
+/// of the 32 px track.
+///
+/// {@category Panels and controls}
 const Size kGlassSegmentDropGrow = Size(_kGrowX, _kGrowY);
 const double _kGrowX = 12;
 const double _kGrowY = 8;
 
 /// How much of the backdrop past its box the held drop shows (spike 32: a
 /// margin of 2.9 pt is the better of two poor fits).
+///
+/// The held drop's [GlassOptics.widen], which slightly minifies the segments
+/// under it, as the switch's drop does with [kGlassSwitchDropWiden].
+///
+/// {@category Panels and controls}
 const double kGlassSegmentDropWiden = 2.9;
 
 const double _kHeight = 32;
@@ -119,7 +134,36 @@ Size _marginFor(GlassDropMotion motion) =>
 /// given an ink that reads on the capsule through the same two, so a segment
 /// that is not an [Icon] or a [Text] reads `IconTheme.of(context).color` to
 /// match.
+///
+/// The track is 32 px tall and takes the whole width it is given, split
+/// evenly between the segments; the control is laid out [kGlassMinTapTarget]
+/// tall so it takes taps above and below the track. A tap selects the segment
+/// pressed; a drag carries the drop and selects where it is let go.
+///
+/// ```dart
+/// GlassSegmentedControl(
+///   segments: const <Widget>[Text('Day'), Text('Week'), Text('Month')],
+///   selectedIndex: range,
+///   onSelected: (int i) => setState(() => range = i),
+/// )
+/// ```
+///
+/// > **Note:** at rest it costs nothing — the track and the capsule are paint.
+/// > Held, the drop is one clear glass over a track that is not glass: the
+/// > frames where it lifts and settles are captures, and a slide is drawn from
+/// > the proxy already held.
+///
+/// See also:
+///
+///  * [GlassTabBar], the same drop on a glass bar.
+///  * [GlassSwitch], a two-way choice as a switch.
+///  * [GlassDropMotion], how the held drop stretches and squashes.
+///  * [Segmented control on the site](https://g1455.plugfox.dev/components/segmented-control).
+///
+/// {@category Panels and controls}
 class GlassSegmentedControl extends StatefulWidget {
+  /// A control of [segments] — at least two — with [selectedIndex] on the
+  /// capsule. [onSelected] null disables it.
   const GlassSegmentedControl({
     required this.segments,
     required this.selectedIndex,
@@ -132,11 +176,17 @@ class GlassSegmentedControl extends StatefulWidget {
 
   /// One widget per segment — a `Text`, an `Icon`.
   final List<Widget> segments;
+
+  /// The selected segment's index into [segments]. The capsule slides to it
+  /// when it changes, unless a finger is down on the control.
   final int selectedIndex;
 
-  /// Null disables the control; it is then drawn at half opacity.
+  /// Called with the segment a tap or a drag settles on, when it is not
+  /// [selectedIndex]. Null disables the control; it is then drawn at half
+  /// opacity.
   final ValueChanged<int>? onSelected;
 
+  /// The track's fill. [kGlassSegmentTrack], iOS's, by default.
   final Color trackColor;
 
   /// The resting capsule under the selected segment.

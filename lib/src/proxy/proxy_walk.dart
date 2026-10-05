@@ -50,6 +50,8 @@ enum WalkAction {
   substitute,
 }
 
+/// Decides, per child, whether the walk paints it, skips it or substitutes a
+/// placeholder.
 typedef WalkPolicy = WalkAction Function(RenderObject child);
 
 /// The control policy: draw everything, subtract nothing.
@@ -61,7 +63,10 @@ WalkAction paintEverything(RenderObject child) => WalkAction.paint;
 /// Everything one pass observed. A fresh instance per pass on purpose: two
 /// passes over the same tree are two measurements, not one accumulated.
 class WalkLog {
+  /// Render objects the pass reached.
   int visited = 0;
+
+  /// Repaint boundaries the pass walked through instead of compositing.
   int boundariesCrossed = 0;
 
   /// Effects recovered from `updateCompositedLayer` — the ones a direct
@@ -82,7 +87,10 @@ class WalkLog {
   /// Reached through `addLayer`, i.e. content that never goes through a canvas.
   final List<String> addedLayers = <String>[];
 
+  /// Nodes the policy replaced with a placeholder, by type.
   final List<String> substituted = <String>[];
+
+  /// Nodes the policy skipped, by type.
   final List<String> skipped = <String>[];
 
   /// [GlassProxy] markers the pass actually reached, by role.
@@ -109,6 +117,7 @@ class WalkLog {
   /// have asked for one is overridden to stay on this context's canvas.
   final List<String> childContextsRequested = <String>[];
 
+  /// Every counter, keyed for a report.
   Map<String, Object> summary() => <String, Object>{
     'visited': visited,
     'boundaries_crossed': boundariesCrossed,
@@ -147,6 +156,8 @@ class WalkLog {
 ///   lied to — and the reentrancy assert is skipped, which is why this belongs
 ///   in a post-frame callback rather than inside our own `paint`.
 class ProxyWalkContext extends PaintingContext {
+  /// A context that records into [containerLayer] under [policy], logging to
+  /// [log] (a fresh one when null).
   ProxyWalkContext(
     super.containerLayer,
     super.estimatedBounds, {
@@ -156,8 +167,13 @@ class ProxyWalkContext extends PaintingContext {
     this.shadowFilter,
   }) : log = log ?? WalkLog();
 
+  /// What this pass observed.
   final WalkLog log;
+
+  /// What to do with each child the walk reaches.
   final WalkPolicy policy;
+
+  /// The fill of a [WalkAction.substitute] placeholder.
   final ui.Color placeholderColor;
 
   /// The one policy step M11 left alive, and it does not fit [WalkPolicy].

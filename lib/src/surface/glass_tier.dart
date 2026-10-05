@@ -51,6 +51,26 @@ import 'package:flutter/foundation.dart';
 
 /// What a surface paints. The rungs of phase D's ladder, in order of what they
 /// draw rather than of what they cost.
+///
+/// A whole host is on one rung, chosen by a [GlassTierPolicy] and handed to
+/// [GlassHost.tier] as a [GlassTierChoice]. A single surface can still be
+/// read at its own rung through [GlassSurfaceRecord.tier].
+///
+/// ```dart
+/// final GlassTierChoice choice = const GlassTierPolicy(
+///   ceiling: GlassTier.cheap,
+/// ).choose();
+/// assert(!choice.tier.readsBackdrop); // nothing on this screen is captured
+/// ```
+///
+/// See also:
+///
+///  * [GlassTierPolicy], which turns the application's signals into a rung.
+///  * [GlassLoad.capturedSurfaceCount], which counts only the [full] surfaces.
+///  * <https://g1455.plugfox.dev/foundations/tiers>, for the three rungs side
+///    by side.
+///
+/// {@category Cost and policy}
 enum GlassTier {
   /// The route: proxy, atlas, residual blur, refraction, rim.
   full,
@@ -103,6 +123,13 @@ enum GlassTier {
 /// [ProxyDivisorReason] and [RetakeReason] exist: a screen that came out
 /// [GlassTier.cheap] because the user asked for it and one that came out cheap
 /// because a host pinned it look identical on a screenshot and in a report.
+///
+/// See also:
+///
+///  * [GlassTierChoice.reason], where it is carried.
+///  * <https://g1455.plugfox.dev/foundations/tiers>.
+///
+/// {@category Cost and policy}
 enum GlassTierReason {
   /// Nothing asked for anything else.
   byDefault,
@@ -140,8 +167,30 @@ enum GlassTierReason {
 }
 
 /// One rung and the reason it holds.
+///
+/// What [GlassHost.tier] takes. Usually produced by [GlassTierPolicy.choose]
+/// rather than built by hand, so that the reason is the one the policy
+/// resolved; constructing one directly is for a host that already knows both.
+///
+/// ```dart
+/// // A benchmark arm that pins the cheap rung, and says so in its report.
+/// const GlassTierChoice choice = GlassTierChoice(
+///   GlassTier.cheap,
+///   GlassTierReason.pinnedByHost,
+/// );
+/// GlassHost(tier: choice, child: const MyScreen());
+/// ```
+///
+/// See also:
+///
+///  * [GlassTierPolicy], which produces it.
+///  * [GlassTierChoice.byDefault], what a host gets when nobody says anything.
+///  * <https://g1455.plugfox.dev/foundations/tiers>.
+///
+/// {@category Cost and policy}
 @immutable
 class GlassTierChoice {
+  /// A rung and the reason given for it, as they are.
   const GlassTierChoice(this.tier, this.reason);
 
   /// What every surface under this configuration paints.
@@ -173,8 +222,43 @@ class GlassTierChoice {
 /// arrive from three unrelated places and the order they resolve in is a
 /// decision — see [GlassTierReason.pinnedByHost] for the one that is not
 /// obvious.
+///
+/// The order is [pinned], then [reduceTransparency], then [ceiling], then the
+/// default:
+///
+/// | inputs | [choose] returns |
+/// |---|---|
+/// | nothing | [GlassTier.full], [GlassTierReason.byDefault] |
+/// | `ceiling: GlassTier.cheap` | [GlassTier.cheap], [GlassTierReason.deviceCeiling] |
+/// | `reduceTransparency: true` | [GlassTier.opaque], [GlassTierReason.reduceTransparency] |
+/// | `pinned: GlassTier.full`, `reduceTransparency: true` | [GlassTier.full], [GlassTierReason.pinnedByHost] |
+///
+/// The reduce-transparency flag is the application's to read: Flutter does
+/// not carry it (see [GlassTierReason.reduceTransparency]).
+///
+/// ```dart
+/// GlassHost(
+///   tier: GlassTierPolicy(
+///     reduceTransparency: platformSaysReduceTransparency,
+///     ceiling: isLowEndDevice ? GlassTier.cheap : null,
+///   ).choose(),
+///   child: const MyScreen(),
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [GlassTier], the rungs.
+///  * [GlassTierChoice], what [choose] returns and [GlassHost.tier] takes.
+///  * <https://g1455.plugfox.dev/foundations/tiers>, and
+///    <https://g1455.plugfox.dev/start/declarations> for the other things an
+///    application declares.
+///
+/// {@category Cost and policy}
 @immutable
 class GlassTierPolicy {
+  /// A policy from whatever the application knows. With no arguments it
+  /// chooses [GlassTierChoice.byDefault].
   const GlassTierPolicy({this.pinned, this.reduceTransparency = false, this.ceiling});
 
   /// The rung the host named. Overrides everything below it.
@@ -196,7 +280,7 @@ class GlassTierPolicy {
   /// visible loss, and whether a screen can afford the top one is a question
   /// about the application's frame, which the package does not see.
   ///
-  /// What the saving is, on Adreno 830 (D193, two seeds): [GlassTier.cheap]
+  /// What the saving is, on Adreno 830 (Galaxy S25 Ultra, D193, two seeds): [GlassTier.cheap]
   /// keeps 15…24% of the full rung's addition over an opaque floor on
   /// two-surface screens, 41…42% on fifteen surfaces and 69…71% on twelve small ones
   /// — ×0.79…0.86 Material against ×0.93…1.09 for the full rung, and ×1.09
@@ -219,6 +303,11 @@ class GlassTierPolicy {
   /// permits `cheap` and `opaque` and forbids `full`.
   final GlassTier? ceiling;
 
+  /// Resolves the three inputs into one rung, in the order [pinned],
+  /// [reduceTransparency], [ceiling].
+  ///
+  /// A [ceiling] of [GlassTier.full] binds nothing and comes back as
+  /// [GlassTierChoice.byDefault], not as [GlassTierReason.deviceCeiling].
   GlassTierChoice choose() {
     final GlassTier? pin = pinned;
     if (pin != null) {

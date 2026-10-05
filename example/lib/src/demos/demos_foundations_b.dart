@@ -1,4 +1,5 @@
 import 'above_demo.dart';
+import 'capture_demo.dart';
 import 'demos.dart';
 import 'drop_motion_demo.dart';
 import 'groups_demo.dart';
@@ -14,6 +15,7 @@ final Map<String, DemoBuilder> kDemosFoundationsB = <String, DemoBuilder>{
   'groups': () => const GroupsDemo(),
   'travel': () => const TravelDemo(),
   'above': () => const AboveDemo(),
+  'capture': () => const CaptureDemo(),
   'scroll-edge': () => const ScrollEdgeDemo(),
   'performance': () => const PerformanceDemo(),
 };

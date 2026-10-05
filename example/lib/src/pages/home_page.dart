@@ -10,10 +10,12 @@ import '../app/theme.dart';
 import '../backdrops.dart';
 import '../catalog/catalog.dart';
 import '../shell/shell.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/code_view.dart';
+import '../widgets/doc_view.dart';
 import '../widgets/icons.dart';
 import '../widgets/links.dart';
-import 'entry_page.dart' show Pill;
+import '../widgets/side_scroller.dart';
 import 'home_showcase.dart';
 import '../widgets/site_icon.dart';
 
@@ -62,6 +64,10 @@ class HomePage extends StatelessWidget {
             SliverPadding(
               padding: band(56),
               sliver: SliverToBoxAdapter(child: _Principles(width: column)),
+            ),
+            SliverPadding(
+              padding: band(56),
+              sliver: SliverToBoxAdapter(child: _Agents(width: column)),
             ),
             for (final Section section in Section.values) ...<Widget>[
               SliverPadding(
@@ -123,9 +129,32 @@ class _Hero extends StatelessWidget {
     final Widget copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          'g1455 · DESIGN SYSTEM · v${Site.version}',
-          style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
+        // The version is the changelog's link: one line, where a pill of its
+        // own made the row of buttons under it wrap.
+        Row(
+          children: <Widget>[
+            const Flexible(
+              child: Text(
+                'g1455 · DESIGN SYSTEM · ',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
+              ),
+            ),
+            Tooltip(
+              message: 'What is new: the changelog',
+              child: LinkText(
+                text: 'v${Site.version}',
+                url: Site.changelog,
+                style: const TextStyle(
+                  color: kSiteAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.6,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         Semantics(
@@ -147,38 +176,47 @@ class _Hero extends StatelessWidget {
           style: text.bodyLarge?.copyWith(color: kSiteTextMuted, fontSize: 18),
         ),
         const SizedBox(height: 24),
+        // Two words and two icons: one line on a phone of 360 points. The
+        // links out are icons the reader knows, named by their tooltips.
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: width < 600 ? 6 : 8,
+          runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             GlassButton(
+              padding: EdgeInsets.symmetric(horizontal: width < 600 ? 14 : 20, vertical: 10),
               onPressed: () => openEntry(context, kEntries.first),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Text('Get started'),
-                  SizedBox(width: 8),
-                  SiteIcon(SFIcons.sf_chevron_right, size: 18),
+                  SizedBox(width: 6),
+                  SiteIcon(SFIcons.sf_chevron_right, size: 16),
                 ],
               ),
             ),
             GlassButton(
+              padding: EdgeInsets.symmetric(horizontal: width < 600 ? 14 : 20, vertical: 10),
               onPressed: () => openEntry(context, entriesOf(Section.components).first),
               child: const Text('Components'),
             ),
-            Pill(
-              label: 'GitHub',
-              icon: SFIcons.sf_chevron_left_forwardslash_chevron_right,
-              onTap: () => openLink(context, Site.repository),
+            Tooltip(
+              message: 'GitHub: the source',
+              child: GlassButton(
+                semanticLabel: 'GitHub',
+                padding: const EdgeInsets.all(10),
+                onPressed: () => openLink(context, Site.repository),
+                child: const SiteIcon(SFIcons.sf_chevron_left_forwardslash_chevron_right, size: 18),
+              ),
             ),
-            Pill(label: 'pub.dev', icon: SFIcons.sf_shippingbox, onTap: () => openLink(context, Site.pub)),
-            Pill(
-              label: 'v${Site.version}',
-              icon: SFIcons.sf_clock_arrow_trianglehead_counterclockwise_rotate_90,
-              monospace: true,
-              tooltip: 'Changelog',
-              onTap: () => openLink(context, Site.changelog),
+            Tooltip(
+              message: 'pub.dev: the package',
+              child: GlassButton(
+                semanticLabel: 'pub.dev',
+                padding: const EdgeInsets.all(10),
+                onPressed: () => openLink(context, Site.pub),
+                child: const SiteIcon(SFIcons.sf_shippingbox, size: 18),
+              ),
             ),
           ],
         ),
@@ -405,19 +443,14 @@ class _WhatsNew extends StatelessWidget {
           style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
         ),
         const SizedBox(height: 12),
-        SizedBox(
+        SideScroller(
           height: 36 + 72 * scale,
-          // A builder: the cards past the edge are not built until scrolled to.
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (BuildContext context, int i) {
-              final (Entry entry, String line, IconData icon, List<Color> colours) = items[i];
-              return _NewCard(entry: entry, line: line, icon: icon, colours: colours);
-            },
-          ),
+          arrows: MediaQuery.sizeOf(context).width >= 600,
+          itemCount: items.length,
+          itemBuilder: (BuildContext context, int i) {
+            final (Entry entry, String line, IconData icon, List<Color> colours) = items[i];
+            return _NewCard(entry: entry, line: line, icon: icon, colours: colours);
+          },
         ),
       ],
     );
@@ -726,6 +759,280 @@ class _Principles extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The agent skill: what it gives an agent, the agents that read it, and how
+/// to install it, one way per tab — each a few lines of markdown whose code
+/// copies.
+class _Agents extends StatefulWidget {
+  const _Agents({required this.width});
+
+  final double width;
+
+  /// Each way in: its tab, and what it says, in markdown.
+  static const List<(String, String)> ways = <(String, String)>[
+    (
+      'Any agent',
+      '''
+One command for every agent. The installer asks which ones you use and puts the skill where each looks.
+
+```bash
+npx skills add PlugFox/g1455
+```
+
+Or straight from this site, which publishes it at `/.well-known/agent-skills/`:
+
+```bash
+npx skills add https://g1455.plugfox.dev
+```
+
+`-g` installs it for your user, `-a claude-code -a codex` skips the question, `npx skills update` keeps it fresh.
+''',
+    ),
+    (
+      'Claude Code',
+      '''
+The repository is a plugin marketplace. In Claude Code:
+
+```bash
+/plugin marketplace add PlugFox/g1455
+/plugin install g1455@g1455
+```
+
+Later, `/plugin marketplace update g1455` brings the newer skill.
+''',
+    ),
+    (
+      'curl',
+      r'''
+No Node needed: the skill is one archive. For Codex, Cursor, Antigravity, Gemini CLI and Copilot:
+
+```bash
+mkdir -p .agents/skills/g1455
+curl -fsSL https://g1455.plugfox.dev/.well-known/agent-skills/g1455.tar.gz \
+  | tar -xz -C .agents/skills/g1455
+```
+
+For Claude Code, unpack it into `.claude/skills/g1455` instead. Commit it, and the whole team has it.
+''',
+    ),
+    (
+      'Prompt',
+      '''
+Nothing to install: tell the agent where to read, and it follows the links it needs.
+
+```text
+Read https://g1455.plugfox.dev/SKILL.md and follow it.
+```
+
+Every page of this site is markdown too, at its address plus `.md`; `llms.txt` lists them all.
+''',
+    ),
+  ];
+
+  /// The agents, each with its mark (null: a sparkle instead) and its colour.
+  static const List<(String, String?, Color)> agents = <(String, String?, Color)>[
+    ('Claude Code', 'claude', Color(0xFFD97757)),
+    ('Codex', 'openai', Color(0xFFFFFFFF)),
+    ('Cursor', 'cursor', Color(0xFFFFFFFF)),
+    ('Gemini CLI', 'gemini', Color(0xFF8E75FF)),
+    ('Antigravity', null, Color(0xFF4F8BFF)),
+    ('GitHub Copilot', 'copilot', Color(0xFFFFFFFF)),
+    ('Windsurf', 'windsurf', Color(0xFF34E8BB)),
+  ];
+
+  @override
+  State<_Agents> createState() => _AgentsState();
+}
+
+class _AgentsState extends State<_Agents> {
+  int _way = 0;
+
+  static const List<Color> _colours = <Color>[Color(0xFFBF5AF2), Color(0xFF0A84FF)];
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    final bool narrow = widget.width < 900;
+    final Entry? page = findEntry('start', 'agents');
+    final Widget copy = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(colors: _colours),
+                boxShadow: <BoxShadow>[BoxShadow(color: _colours.first.withValues(alpha: 0.45), blurRadius: 18)],
+              ),
+              child: const SiteIcon(SFIcons.sf_sparkles, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 14),
+            const Flexible(
+              child: Text(
+                'AGENT SKILL',
+                style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Semantics(
+          header: true,
+          child: ShaderMask(
+            blendMode: BlendMode.srcIn,
+            shaderCallback: (Rect r) => const LinearGradient(
+              colors: <Color>[Color(0xFFFFFFFF), Color(0xFFD9C2FF), Color(0xFF9CC3FF)],
+            ).createShader(r),
+            child: Text(
+              'Your agent writes glass too',
+              style: (widget.width < 600 ? text.headlineMedium : text.displaySmall)?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.8,
+                height: 1.1,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'One skill gives a coding agent the rules that make glass work: one host above the navigator, what the app '
+          'declares, what costs a capture, which widget fits. Every page of this site comes with it, and the agent '
+          "reads a component's page before it writes one.",
+          style: text.bodyLarge?.copyWith(color: kSiteTextMuted, height: 1.5),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'WORKS WITH',
+          style: TextStyle(color: kSiteTextMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.4),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            for (final (String agent, String? logo, Color colour) in _Agents.agents)
+              Container(
+                padding: const EdgeInsets.fromLTRB(8, 6, 12, 6),
+                decoration: BoxDecoration(
+                  color: colour.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: colour.withValues(alpha: 0.28)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (logo case final String logo)
+                      BrandLogo(logo, color: colour, size: 16)
+                    else
+                      SiteIcon(SFIcons.sf_sparkles, color: colour, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      agent,
+                      style: const TextStyle(color: kSiteText, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            if (page != null)
+              GlassButton(
+                onPressed: () => openEntry(context, page),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text('Install guide'),
+                    SizedBox(width: 6),
+                    SiteIcon(SFIcons.sf_chevron_right, size: 16),
+                  ],
+                ),
+              ),
+            Tooltip(
+              message: 'The skill itself',
+              child: GlassButton(
+                onPressed: () => openLink(context, '${Site.origin}/.well-known/agent-skills/g1455/SKILL.md'),
+                child: const Text('SKILL.md'),
+              ),
+            ),
+            Tooltip(
+              message: 'Every page, for a language model',
+              child: GlassButton(
+                onPressed: () => openLink(context, '${Site.origin}/llms.txt'),
+                child: const Text('llms.txt'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    final Widget install = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        GlassSegmentedControl(
+          segments: <Widget>[
+            for (final (String tab, String _) in _Agents.ways) Text(tab, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+          selectedIndex: _way,
+          onSelected: (int i) => setState(() => _way = i),
+        ),
+        const SizedBox(height: 16),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            layoutBuilder: (Widget? current, List<Widget> previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: <Widget>[...previous, ?current],
+            ),
+            child: DocView(key: ValueKey<int>(_way), markdown: _Agents.ways[_way].$2),
+          ),
+        ),
+      ],
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _colours.first.withValues(alpha: 0.45)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            _colours.first.withValues(alpha: 0.18),
+            kSiteBackground.withValues(alpha: 0),
+            _colours.last.withValues(alpha: 0.16),
+          ],
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(widget.width < 600 ? 20 : 36),
+        child: narrow
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[copy, const SizedBox(height: 28), install],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(flex: 5, child: copy),
+                  const SizedBox(width: 44),
+                  Expanded(flex: 6, child: install),
+                ],
+              ),
+      ),
     );
   }
 }

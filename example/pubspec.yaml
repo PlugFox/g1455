@@ -17,6 +17,8 @@ dependencies:
   squid: ^0.1.1
   url_launcher: ^6.3.2
   flutter_sficon: ^1.3.0
+  qr: ^4.0.0
+  path_parsing: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -26,6 +28,10 @@ dev_dependencies:
   # markdown the app draws, rendered to HTML.
   markdown: ^7.3.0
   pubspec_generator: ^5.0.2
+  # `tool/site.dart` only: the agent skill as one archive, and the digest the
+  # discovery index names it by.
+  archive: ^4.3.0
+  crypto: ^3.0.7
 
 flutter:
   uses-material-design: true

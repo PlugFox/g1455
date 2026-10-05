@@ -66,9 +66,20 @@ import 'glass_surface.dart';
 import 'glass_theme.dart';
 
 /// Which side of the scroll view the effect is on.
-enum GlassScrollEdgeSide { top, bottom }
+///
+/// {@category Panels and controls}
+enum GlassScrollEdgeSide {
+  /// Under a navigation bar: a blur and a tint, the blur a glass strip.
+  top,
+
+  /// Over a toolbar or a tab bar: a tint alone, which was measured with no
+  /// blur under it.
+  bottom,
+}
 
 /// Apple's two styles of scroll edge effect.
+///
+/// {@category Panels and controls}
 enum GlassScrollEdgeStyle {
   /// iOS's default: content blurs and fades as it goes under the bar.
   soft,
@@ -79,19 +90,52 @@ enum GlassScrollEdgeStyle {
 
 /// Which way a soft edge tints: toward white over light content, toward black
 /// over dark. Apple picks it from the content; see [GlassScrollEdge.appearance].
-enum GlassScrollEdgeAppearance { light, dark }
+///
+/// {@category Panels and controls}
+enum GlassScrollEdgeAppearance {
+  /// A white tint, [kGlassScrollEdgeLightTint]: over light content.
+  light,
+
+  /// A black tint, [kGlassScrollEdgeDarkTint]: over dark content.
+  dark,
+}
 
 /// The soft edge's blur, logical px (spike 31: 1.55–1.67).
+///
+/// [GlassScrollEdge.blurSigma]'s default.
+///
+/// {@category Panels and controls}
 const double kGlassScrollEdgeSigma = 1.6;
 
 /// The hard edge's blur: a bound, not a reading — see the file comment.
+///
+/// Under a band of 0.9 white the lines of the fixture were at one code value,
+/// which says only that the blur is at least this.
+///
+/// {@category Panels and controls}
 const double kGlassScrollEdgeHardSigma = 2.15;
 
-/// The soft edge's tint at the edge, by appearance.
+/// The soft edge's tint at the edge over light content: white at 0.85
+/// (spike 31).
+///
+/// [GlassScrollEdgeAppearance.light]'s. It falls off as an erf away from the
+/// screen edge.
+///
+/// {@category Panels and controls}
 const Color kGlassScrollEdgeLightTint = Color.fromRGBO(255, 255, 255, 0.85);
+
+/// The soft edge's tint at the edge over dark content: black at 0.25, read
+/// over content whose mean was a mid grey (spike 31).
+///
+/// [GlassScrollEdgeAppearance.dark]'s.
+///
+/// {@category Panels and controls}
 const Color kGlassScrollEdgeDarkTint = Color.fromRGBO(0, 0, 0, 0.25);
 
-/// The hard edge's band.
+/// The hard edge's band: a near-opaque white, 0.90 over both a dark and a
+/// light field (spike 31). A dark appearance was not photographed.
+///
+/// {@category Panels and controls}
 const Color kGlassScrollEdgeHardFill = Color.fromRGBO(255, 255, 255, 0.90);
 
 /// Where the soft top's tint is centred and how wide its erf is, against the
@@ -133,7 +177,33 @@ const double _kHardBottom = -5;
 ///
 /// It takes no touches outside [child]: the effect reaches past the bar and
 /// what is under it is still the list.
+///
+/// ## Styles and sides
+///
+/// | | [GlassScrollEdgeSide.top] | [GlassScrollEdgeSide.bottom] |
+/// |---|---|---|
+/// | [GlassScrollEdgeStyle.soft] | a glass strip of [blurSigma] under an erf tint | an erf tint, no glass |
+/// | [GlassScrollEdgeStyle.hard] | a band of [kGlassScrollEdgeHardFill] | the same band |
+///
+/// The soft tint is [kGlassScrollEdgeLightTint] or [kGlassScrollEdgeDarkTint],
+/// by [appearanceFor].
+///
+/// > **Note:** the soft top is one glass surface of the screen's width — a
+/// > slot in the atlas, captured whenever what is under it changes, which
+/// > under a scrolling list is every frame of the scroll. The soft bottom is a
+/// > gradient and costs no capture.
+///
+/// See also:
+///
+///  * [GlassScaffold], which puts one under its top bar.
+///  * [GlassAbove], which lifts the effect and its bar over glass scrolling
+///    under them.
+///  * [Scroll edge on the site](https://g1455.plugfox.dev/foundations/scroll-edge).
+///
+/// {@category Panels and controls}
 class GlassScrollEdge extends StatelessWidget {
+  /// An effect on [side], for a bar [extent] in from that edge, with [child]
+  /// as the bar. [extent] must not be negative.
   const GlassScrollEdge({
     required this.side,
     required this.extent,
@@ -148,11 +218,13 @@ class GlassScrollEdge extends StatelessWidget {
   /// see the file comment for what a sigma other than the host's costs.
   final double blurSigma;
 
+  /// Which edge of the screen the effect is against.
   final GlassScrollEdgeSide side;
 
   /// From the screen edge to the bar's inner edge, logical px.
   final double extent;
 
+  /// Soft, iOS's, by default; hard is macOS's.
   final GlassScrollEdgeStyle style;
 
   /// Which way a soft edge tints. Null reads the theme's declared backdrop —
@@ -174,7 +246,8 @@ class GlassScrollEdge extends StatelessWidget {
     (GlassScrollEdgeSide.bottom, GlassScrollEdgeStyle.hard) => extent + _kHardBottom,
   };
 
-  /// The appearance in force for [theme].
+  /// The appearance in force for [theme]: [appearance] when given, and
+  /// otherwise read off [GlassThemeData.backdrop].
   GlassScrollEdgeAppearance appearanceFor(GlassThemeData theme) {
     if (appearance case final GlassScrollEdgeAppearance chosen) {
       return chosen;

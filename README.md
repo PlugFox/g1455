@@ -70,6 +70,7 @@ on the site.
 - [How it works](#how-it-works)
 - [Install](#install)
 - [Quick start](#quick-start)
+- [AI agents](#ai-agents)
 - [What is in the box](#what-is-in-the-box)
 - [Finishes](#finishes)
 - [Common patterns](#common-patterns)
@@ -110,6 +111,25 @@ comparable:
 |---|---|---|
 | Android, Impeller/Vulkan, Adreno 830 (GPU cycles) | ×0.99…1.08 | ×1.78…3.15 |
 | iPad, Impeller/Metal (GPU ms, scrolling screen) | ×1.93…2.02, or ×1.46…1.54 with thermal throttling | — |
+
+#### Where the numbers come from
+
+Every number in this README and on the site was measured in a profile build,
+on the device named, before the package's first release: the code that became
+0.1.0 on 2026-10-03, on Flutter **3.47.1** stable (framework `6655482ec0`,
+engine `5d53178869`, Dart 3.13.1). The raw digests are in
+[`provenance/`](https://github.com/PlugFox/g1455/tree/master/provenance).
+
+| device | GPU | system | renderer | metric | dates |
+|---|---|---|---|---|---|
+| Samsung Galaxy S25 Ultra (SM-S938B) | Snapdragon 8 Elite, Adreno 830 | Android 16 (`BP4A.251205.006`) | Impeller, Vulkan · 1080×2340 @3×, 120 Hz | GPU cycles a frame (kgsl `busy × freq`), windows of 30 s × 3 | 2026-08-24 … 2026-09-23 |
+| iPad Pro 11″, 4th gen. (iPad14,3) | Apple M2 | iPadOS 26.6.1 (`23G83`) | Impeller, Metal · 1668×2388 @2×, 120 Hz | GPU ms a frame (engine `GPUTracer`), after a reboot, windows of 4 s × 3 | 2026-09-08 … 2026-09-26 |
+| Samsung Galaxy S22 Ultra (SM-S908B) | Exynos 2200, Xclipse 920 | Android 16 (`BP2A.250605.031`) | Impeller, Vulkan · 720×1544 | GPU `busy × freq`; blind to the capture, so used only to cross-check | 2026-09-08 … 2026-09-26 |
+| MacBook Pro (M3 Max) | Apple M3 Max | macOS 26.4.1 (`25E253`) | Impeller, Metal · 1600×1200 @2× | raster ms a frame | 2026-09-15 |
+
+The ratios above compare scenes on the same device, run in one binary in a
+shuffled order. They do not carry from one device to another, and they
+are not a frame time.
 
 ## Install
 
@@ -215,6 +235,39 @@ app built for the web: one host, every component on its own page, the original
 full-screen demos, and a settings menu that switches the finish, the tint, the
 rung and the ripple.
 
+## AI agents
+
+The package ships an [agent skill](https://agentskills.io) for Claude Code,
+Codex, Cursor, Antigravity, Gemini CLI, GitHub Copilot and the rest: the
+rules an agent needs to write glass that works (one host above the
+navigator, what the app declares, what costs a capture), with every page of
+the site as a reference it reads before it writes a component.
+
+```bash
+npx skills add PlugFox/g1455
+```
+
+In Claude Code, the repository is a plugin marketplace:
+
+```text
+/plugin marketplace add PlugFox/g1455
+/plugin install g1455@g1455
+```
+
+Without Node, unpack it where the agent looks for skills
+(`.claude/skills/` for Claude Code, `.agents/skills/` for the others):
+
+```bash
+mkdir -p .agents/skills/g1455
+curl -fsSL https://g1455.plugfox.dev/.well-known/agent-skills/g1455.tar.gz | tar -xz -C .agents/skills/g1455
+```
+
+Or point any agent at `https://g1455.plugfox.dev/SKILL.md`. The site also
+serves [`llms.txt`](https://g1455.plugfox.dev/llms.txt), and every page as
+markdown at its address plus `.md`. The skill is in
+[`skills/g1455/`](skills/g1455/); more on
+[the site](https://g1455.plugfox.dev/start/agents).
+
 ## What is in the box
 
 Every name links to its page in the API reference.
@@ -263,6 +316,7 @@ budding inside a `GlassGroup`; on a lone panel it narrows to a line.
 | [`GlassTravel`][GlassTravel] | Declares the region a moving glass travels in, so the motion does not trigger a capture. |
 | [`GlassMorph`][GlassMorph] | Swap the child and the glass flows to its size, the way a button becomes its menu. A neck forms while it grows; at rest it is one plain surface. |
 | [`GlassAbove`][GlassAbove] | Raises the glass below it a level above the glass beside it: a bar over glass cards sees the cards. |
+| [`GlassProxy`][GlassProxy] | Tells the capture what a subtree is: a stand-in for a video or a platform view ([`GlassProxyPainter`][GlassProxyPainter], [`SolidProxyPainter`][SolidProxyPainter], [`GradientProxyPainter`][GradientProxyPainter]), a subtree to leave out, an opaque cover, or a blur to keep. The frame the user sees does not change. |
 
 ### Policy and accounting
 
@@ -492,6 +546,52 @@ class NotesBar extends StatelessWidget {
 }
 ```
 
+### A video, a map or a platform view under glass
+
+The host captures what is under its glass by painting that part of the tree a
+second time. A platform view, a `Texture`, a video or a camera preview paints
+outside Flutter's pictures and records nothing, so the glass over it shows a
+hole. [`GlassProxy.replace`][GlassProxy] paints a stand-in in its place, for
+the capture only:
+
+```dart
+class Player extends StatelessWidget {
+  const Player({super.key, required this.video});
+
+  /// A platform view, a `Texture`, anything that paints outside Flutter's own
+  /// pictures.
+  final Widget video;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: <Widget>[
+      GlassProxy.replace(
+        // A gradient of the poster's colours. Write a GlassProxyPainter of your
+        // own for anything else: the last frame as an image, the map's tiles.
+        painter: const GradientProxyPainter(
+          LinearGradient(colors: <Color>[Color(0xFF1B1F2A), Color(0xFFFF9F0A)]),
+        ),
+        child: video,
+      ),
+      const Positioned(left: 16, right: 16, bottom: 16, child: GlassBar(child: Text('Live'))),
+    ],
+  );
+}
+```
+
+Three more declarations do the rest of what the capture cannot know:
+
+| | The capture… | For |
+|---|---|---|
+| `GlassProxy.hidden` | leaves the subtree out and does not run its `paint` | a subtree the glass should not show, or one whose `paint` counts something |
+| `GlassProxy.opaque` | takes the subtree as covering its box, and looks no further under it | a full-bleed image or panel |
+| `GlassProxy.verbatim` | exempts the subtree from the shadow filter | a highlight blurred through a `MaskFilter` on purpose |
+
+A stand-in changes what the glass sees, not when the host captures: a video
+that composites a new frame is still a change. Live, with each declaration:
+[Capture control](https://g1455.plugfox.dev/foundations/capture).
+
 ### The cheap rung
 
 `GlassTier.cheap` draws the tint over the backdrop and captures nothing. The
@@ -554,6 +654,10 @@ application declares them:
   pass it on.
 - **The hardware family**, if it is not an Apple device: `GlassHost.hardware`.
   Undeclared hardware gets the same behaviour with no price attached.
+- **What the capture cannot read**: a platform view, a `Texture` or a video
+  records nothing, and the glass over it shows a hole. Wrap it in
+  `GlassProxy.replace` with a stand-in; see
+  [the pattern above](#a-video-a-map-or-a-platform-view-under-glass).
 
 ## Platforms
 
@@ -573,9 +677,11 @@ shader that SkSL would reject fails the tests rather than a user's app.
 > [!WARNING]
 > **On the web, outside Chromium, the glass is slow.** Every capture of the
 > backdrop goes through `Picture.toImageSync`. On CanvasKit that call reads
-> the pixels back from the GPU and waits for them. On the same machine, an
-> M3 Max, a frame of full glass took 15 to 30 ms on CanvasKit and 4 to 10 ms on
-> Skwasm. On a phone CanvasKit is well past a 60 Hz frame.
+> the pixels back from the GPU and waits for them. On the same machine, a
+> MacBook Pro with an M3 Max (macOS 26.4.1), a frame of full glass took 15 to
+> 30 ms on CanvasKit and 4 to 10 ms on Skwasm, in WebKit and in Chromium alike
+> (the example site, g1455 0.1.1 on Flutter 3.47.1, 2026-10-04). On a phone
+> CanvasKit is well past a 60 Hz frame.
 >
 > Flutter's loader picks Skwasm only in Chromium browsers (Chrome, Edge,
 > Opera, Brave and others) unless the app allows more. Safari, Firefox and
@@ -610,6 +716,11 @@ flutter test --coverage
 
 `dart format` takes its width (120) and its trailing-comma rule from
 `analysis_options.yaml`, and CI fails on a file it would change.
+
+The skill's `SKILL.md` is written by hand; its `references/` are the site's
+pages, generated from the catalog in `example/lib/src/catalog/` by
+`(cd example && dart run tool/skill.dart)`. The example's tests fail when they
+are stale.
 
 Some tests check a constant baked into `lib/` against the measurement it came
 from. Those measurements are copied into `provenance/`, unchanged and under
@@ -693,6 +804,10 @@ from the tables beside them; change both together.
 [GlassUnion]: https://pub.dev/documentation/g1455/latest/g1455/GlassUnion-class.html
 [GlassTravel]: https://pub.dev/documentation/g1455/latest/g1455/GlassTravel-class.html
 [GlassAbove]: https://pub.dev/documentation/g1455/latest/g1455/GlassAbove-class.html
+[GlassProxy]: https://pub.dev/documentation/g1455/latest/g1455/GlassProxy-class.html
+[GlassProxyPainter]: https://pub.dev/documentation/g1455/latest/g1455/GlassProxyPainter-class.html
+[SolidProxyPainter]: https://pub.dev/documentation/g1455/latest/g1455/SolidProxyPainter-class.html
+[GradientProxyPainter]: https://pub.dev/documentation/g1455/latest/g1455/GradientProxyPainter-class.html
 [GlassTier]: https://pub.dev/documentation/g1455/latest/g1455/GlassTier.html
 [GlassTierPolicy]: https://pub.dev/documentation/g1455/latest/g1455/GlassTierPolicy-class.html
 [GlassLedger]: https://pub.dev/documentation/g1455/latest/g1455/GlassLedger-class.html

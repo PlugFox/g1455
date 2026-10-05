@@ -51,6 +51,7 @@ enum RetentionOutcome {
 
 /// An atlas layout that survives frames.
 class RetainedAtlas {
+  /// An empty retention: the first [update] always packs.
   RetainedAtlas({
     required this.pixelRatio,
     required this.bleed,
@@ -60,8 +61,13 @@ class RetainedAtlas {
     this.maxTextureSide,
   });
 
+  /// Texels per logical pixel every layout is packed at.
   final double pixelRatio;
+
+  /// Logical pixels of context captured around each surface, for the blur.
   final double bleed;
+
+  /// Device-pixel grid every slot is aligned to.
   final int align;
 
   /// Logical pixels of headroom given to every slot when it is packed, on top
@@ -103,7 +109,10 @@ class RetainedAtlas {
   /// wrong on the next frame for the reason a changed blend group is.
   List<int>? _classes;
 
+  /// Calls to [update].
   int updates = 0;
+
+  /// Updates that packed a new layout rather than keeping the held one.
   int repacks = 0;
 
   /// Slots whose rectangle moved between one update and the next.
@@ -112,8 +121,11 @@ class RetainedAtlas {
   /// uniforms and its texels, and a repack usually moves all of them.
   int slotsMoved = 0;
 
+  /// The held layout, or null before the first [update].
   AtlasLayout? get layout => _layout;
 
+  /// The layout for this frame's [surfaces], kept when the held one still
+  /// covers them and repacked otherwise, with the reason.
   ({AtlasLayout layout, RetentionOutcome outcome}) update(
     List<Rect> surfaces, {
     List<List<int>>? fused,

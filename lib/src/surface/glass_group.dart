@@ -45,6 +45,8 @@ import 'glass_tier.dart';
 
 /// Where the group's shader lives. See [kGlassShaderAsset] for why the key has
 /// a package prefix.
+///
+/// {@category Diagnostics}
 const String kGlassGroupShaderAsset = 'packages/g1455/shaders/glass_group.frag';
 
 /// Shapes one fused draw can carry.
@@ -56,6 +58,8 @@ const String kGlassGroupShaderAsset = 'packages/g1455/shaders/glass_group.frag';
 /// **refused** — its members go back to drawing themselves, which loses the
 /// bridges and says so in a counter — rather than truncated, because a
 /// truncated group would draw a picture with shapes missing and no sign of it.
+///
+/// {@category Composition}
 const int kMaxFusedShapes = 12;
 
 /// Where `glass_group.frag`'s uniforms resume after `uBox` and `uRadius`.
@@ -66,17 +70,31 @@ const int _kTail = 11 + kMaxFusedShapes * 5;
 /// Owned by [GlassGroup]'s state rather than by its render object, because the
 /// surfaces below have to find it while they are being built and a render
 /// object is not reachable from its own subtree's `build`.
+///
+/// Made by [GlassGroup] and [GlassUnion] and found through
+/// [GlassGroupScope.maybeOf]; an application does not make one.
+///
+/// {@category Composition}
 class GlassBlendGroup implements GlassSurfaceCluster {
   final List<RenderGlassSurface> _members = <RenderGlassSurface>[];
 
   RenderGlassGroup? _owner;
 
+  /// The surfaces that have joined, in the order they joined — the fold's
+  /// order, which is why it is never sorted.
   @override
   Iterable<GlassSurfaceGeometry> get members => _members;
 
+  /// The group's own layer, inside which every member's is, or null before
+  /// the group has a render object that has painted.
+  ///
+  /// The host's layer watch skips it: the group draws glass, so a watch that
+  /// looked at it would see the pipeline's own output and record for ever.
   @override
   Layer? get compositedLayer => _owner?.compositedLayer;
 
+  /// The layer the fused glass is drawn into, or null when the group draws
+  /// none. See [GlassSurfaceCluster.drawLayer].
   @override
   Layer? get drawLayer => _owner?.drawLayer;
 
@@ -158,6 +176,8 @@ class GlassBlendGroup implements GlassSurfaceCluster {
   /// behaviour rather than two.
   bool get fuses => _members.isNotEmpty && _members.length <= kMaxFusedShapes && _tier == GlassTier.full;
 
+  /// Adds [surface] at the end of the fold. Called by a surface as it
+  /// attaches under a [GlassGroupScope]; a second call is ignored.
   void join(RenderGlassSurface surface) {
     if (_members.contains(surface)) {
       return;
@@ -166,6 +186,8 @@ class GlassBlendGroup implements GlassSurfaceCluster {
     _changed();
   }
 
+  /// Removes [surface], keeping the order of the rest. Called by a surface as
+  /// it detaches.
   void leave(RenderGlassSurface surface) {
     if (_members.remove(surface)) {
       _changed();
@@ -188,11 +210,19 @@ class GlassBlendGroup implements GlassSurfaceCluster {
 /// An [InheritedWidget] holding an object whose identity never changes, so it
 /// never notifies: geometry moves every frame and must not rebuild anybody's
 /// subtree, which is the same rule [GlassScope] follows.
+///
+/// Put in the tree by [GlassGroup] and [GlassUnion]; the nearest one wins.
+///
+/// {@category Composition}
 class GlassGroupScope extends InheritedWidget {
+  /// Makes [group] the blend group of the surfaces in [child].
   const GlassGroupScope({required this.group, required super.child, super.key});
 
+  /// The group the surfaces below join.
   final GlassBlendGroup group;
 
+  /// The group of the nearest [GlassGroup] or [GlassUnion] above [context],
+  /// or null when there is none.
   static GlassBlendGroup? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<GlassGroupScope>()?.group;
 
@@ -227,7 +257,10 @@ double _foldDepression(int count) {
 /// to [fusedDrawTiles] — every shape left out of a tile is one whose every
 /// contribution inside that tile is exactly zero, so the tiles together are the
 /// single quad **pixel for pixel** and not merely to the eye.
+///
+/// {@category Diagnostics}
 class GlassFusedTile {
+  /// A tile covering [rect] that folds the boxes indexed by [shapes].
   const GlassFusedTile(this.rect, this.shapes);
 
   /// The rectangle to draw, in the group's paint space.
@@ -256,6 +289,8 @@ class GlassFusedTile {
 /// rather than an optimum — and [RenderGlassGroup.fusedTileRefusals] counts the
 /// frames that hit it, because a screen that lives on the wrong side of a
 /// number nobody measured should be visible rather than mysteriously slow.
+///
+/// {@category Diagnostics}
 const int kMaxFusedTiles = 24;
 
 /// Splits a fused draw into disjoint rectangles, each carrying only the shapes
@@ -266,7 +301,7 @@ const int kMaxFusedTiles = 24;
 /// nothing to draw.
 ///
 /// **Why the area can shrink at all.** The fold is bounded below by
-/// `min_i d_i - delta(n) * k` ([_foldDepression]), so the silhouette lies
+/// `min_i d_i - delta(n) * k` (`_foldDepression`), so the silhouette lies
 /// inside the union of the members' own boxes each grown by [reach] — not
 /// inside the bounding box of all of them grown by the same. On a clustered
 /// layout the two are nearly the same rectangle; on a scattered one the second
@@ -294,6 +329,8 @@ const int kMaxFusedTiles = 24;
 /// — vertical slabs at every box edge, disjoint y-intervals inside each — and
 /// the draws go out with antialiasing off, so the rasterizer's own rule gives
 /// each device pixel to exactly one of two tiles that share an edge.
+///
+/// {@category Diagnostics}
 List<GlassFusedTile>? fusedDrawTiles({
   required List<Rect> boxes,
   required double reach,
@@ -459,6 +496,11 @@ bool _within(Rect box, double margin, Rect rect) =>
 /// Zero when the members overlap or touch, and that is not a special case —
 /// they are already connected, so a union of overlapping shapes is a plain
 /// union and costs what one costs.
+///
+/// [boxes] and [radii] are parallel: each box's corner radius, in the same
+/// logical pixels.
+///
+/// {@category Composition}
 double unionBlendRadius(List<Rect> boxes, List<double> radii) => boxes.length < 2
     ? 0
     : 2 * _bottleneck(boxes.length, (int i, int j) => _shapeGap(boxes[i], radii[i], boxes[j], radii[j]));
@@ -588,6 +630,8 @@ const double _kNoCull = 1e9;
 /// convenience: the switch changes no pixel, so a group that kept its retained
 /// layer would go on culling with the switch off and the run would report the
 /// branch as free. The first arm written against this found exactly that.
+///
+/// {@category Diagnostics}
 bool get debugGlassFoldCull => _foldCull;
 
 set debugGlassFoldCull(bool value) {
@@ -634,7 +678,7 @@ bool _foldCull = true;
 /// flutter/flutter#192994). The tiles asked for `isAntiAlias = false`, which
 /// keeps a draw off that path, and the flag never arrived: it opened the
 /// picture, where the recorder does not write a `false` it already holds and
-/// Impeller starts from `true` ([primeAliasedDraw]). Primed, a tile is one
+/// Impeller starts from `true` (`primeAliasedDraw`). Primed, a tile is one
 /// draw on macOS as well, and the split costs 0.94-0.95x the quad's frame on
 /// the cluster and 0.70-0.75x on the scatter, two seeds (D200). So it ships on
 /// every platform again, and nothing keys it.
@@ -649,6 +693,8 @@ bool _foldCull = true;
 /// repaints every group already mounted, for the reason the cull's setter
 /// does: a retained layer would go on drawing the old way and the run would
 /// report the split as free.
+///
+/// {@category Diagnostics}
 bool get debugGlassFusedSplit => _fusedSplit ?? debugGlassFusedSplitDefault;
 
 set debugGlassFusedSplit(bool? value) {
@@ -670,6 +716,8 @@ bool? _fusedSplit;
 /// resolved to, and by then an earlier arm may have imposed a value; and a
 /// getter rather than a constant because this default has moved three times
 /// (D190, D194, D199, D200), and a harness that copied it was wrong after each.
+///
+/// {@category Diagnostics}
 bool get debugGlassFusedSplitDefault => true;
 
 /// Draws every [GlassSurface] below it as one fused shape.
@@ -745,7 +793,19 @@ bool get debugGlassFusedSplitDefault => true;
 /// area and nothing else: the fragment costs the same to within 0.4% either
 /// way, and what a non-zero spacing buys is a quad reaching further out. The
 /// cheap thing is not grouping.
+///
+/// See also:
+///
+///  * [GlassUnion], which solves for the spacing that makes one piece.
+///  * [GlassMorph], a lone glass that borrows a group while it moves.
+///  * [GlassAbove], for glass that stands on other glass rather than beside it.
+///  * [kMaxFusedShapes], the most one draw carries.
+///  * [Groups on the site](https://g1455.plugfox.dev/foundations/groups).
+///
+/// {@category Composition}
 class GlassGroup extends StatefulWidget {
+  /// Fuses the [GlassSurface]s in [child] that come within [spacing] of each
+  /// other.
   const GlassGroup({
     required this.child,
     this.spacing = 0,
@@ -769,6 +829,7 @@ class GlassGroup extends StatefulWidget {
   /// drops, which then keep their finish. See [GlassSurface.labelled].
   final bool labelled;
 
+  /// The subtree whose surfaces are the members. Painted over the fused glass.
   final Widget child;
 
   @override
@@ -835,7 +896,28 @@ class _GlassGroupState extends State<GlassGroup> {
 /// here since D209 is the half that needs no identity: a member that appears or
 /// leaves inside a group buds out of its neighbours through
 /// `GlassSurface.presence`, which is a field offset and exact at zero.
+///
+/// ```dart
+/// GlassUnion(
+///   child: Row(
+///     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+///     children: <Widget>[
+///       GlassButton(onPressed: back, child: const Icon(Icons.arrow_back)),
+///       GlassButton(onPressed: share, child: const Icon(Icons.ios_share)),
+///     ],
+///   ),
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [GlassGroup], which takes a spacing and leaves far members apart.
+///  * [unionBlendRadius], the blend radius it solves for.
+///  * [Groups on the site](https://g1455.plugfox.dev/foundations/groups).
+///
+/// {@category Composition}
 class GlassUnion extends StatefulWidget {
+  /// Draws every [GlassSurface] in [child] as one connected piece of glass.
   const GlassUnion({required this.child, this.finish, this.labelled = true, super.key});
 
   /// The optics for the whole union. Null takes the host's.
@@ -844,6 +926,7 @@ class GlassUnion extends StatefulWidget {
   /// See [GlassGroup.labelled].
   final bool labelled;
 
+  /// The subtree whose surfaces are the members. Painted over the fused glass.
   final Widget child;
 
   @override
@@ -904,8 +987,15 @@ class _GlassGroupRenderWidget extends SingleChildRenderObjectWidget {
       MediaQuery.maybeDevicePixelRatioOf(context) ?? View.maybeOf(context)?.devicePixelRatio ?? 1;
 }
 
-/// The render object behind [GlassGroup].
+/// The render object behind [GlassGroup] and [GlassUnion].
+///
+/// Its counters are what a report reads to say whether a group fused, and
+/// what it shaded doing so; [resetCounters] zeroes them between runs.
+///
+/// {@category Composition}
 class RenderGlassGroup extends RenderProxyBox {
+  /// The render object drawing a blend group, counted in a ledger while
+  /// attached.
   RenderGlassGroup(this._group, this._ledger) {
     _group._owner = this;
   }
@@ -922,11 +1012,15 @@ class RenderGlassGroup extends RenderProxyBox {
   @override
   bool get isRepaintBoundary => true;
 
+  /// This group's own layer, or null before it has painted. See
+  /// [GlassBlendGroup.compositedLayer].
   // Reachable because this is the class that owns it: `RenderObject.layer` is
   // `@protected`, and `debugLayer` returns null in profile.
   Layer? get compositedLayer => layer;
 
   GlassLedger? _ledger;
+
+  /// The register the group is counted in, from the nearest [GlassScope].
   set ledger(GlassLedger? value) {
     if (identical(value, _ledger)) {
       return;
@@ -942,6 +1036,8 @@ class RenderGlassGroup extends RenderProxyBox {
   /// is a [GlassUnion] and the blend radius is solved from where the members
   /// are.
   double? _spacing;
+
+  /// [GlassGroup.spacing], or null for a [GlassUnion]. A change repaints.
   set spacing(double? value) {
     if (value == _spacing) {
       return;
@@ -951,6 +1047,9 @@ class RenderGlassGroup extends RenderProxyBox {
   }
 
   GlassFinish? _finish;
+
+  /// The group's declared optics; null takes the host's. See
+  /// [effectiveFinish] for the one in force.
   set finish(GlassFinish? value) {
     if (value == _finish) {
       return;
@@ -961,6 +1060,9 @@ class RenderGlassGroup extends RenderProxyBox {
   }
 
   double _devicePixelRatio = 1;
+
+  /// Device pixels per logical pixel, for the half-pixel slack the fused quad
+  /// is grown by.
   set devicePixelRatio(double value) {
     if (value == _devicePixelRatio) {
       return;
@@ -970,6 +1072,9 @@ class RenderGlassGroup extends RenderProxyBox {
   }
 
   GlassProxyHandle? _proxy;
+
+  /// The host's published proxy, which the fused draw samples. The group
+  /// repaints on every publish while its tier reads the backdrop.
   set proxy(GlassProxyHandle? value) {
     if (identical(value, _proxy)) {
       return;
@@ -995,6 +1100,8 @@ class RenderGlassGroup extends RenderProxyBox {
   GlassLegibility? _legibilityMemo;
 
   bool _labelled = true;
+
+  /// [GlassGroup.labelled].
   set labelled(bool value) {
     if (value == _labelled) {
       return;
@@ -1013,6 +1120,9 @@ class RenderGlassGroup extends RenderProxyBox {
   }
 
   GlassThemeData _theme = const GlassThemeData();
+
+  /// The theme above the group: its tier decides whether the group fuses, and
+  /// its legibility rules the finish.
   set theme(GlassThemeData value) {
     if (value == _theme) {
       return;
@@ -1063,8 +1173,10 @@ class RenderGlassGroup extends RenderProxyBox {
   /// Frames it had members and declined to fuse them.
   ///
   /// Non-zero means a group past [kMaxFusedShapes]: its members drew themselves,
-  /// so the screen is a correct picture of the wrong declaration. See
-  /// [_reportOverflow] for why this is a counter and not a throw.
+  /// so the screen is a correct picture of the wrong declaration. A counter and
+  /// not a throw because the number of surfaces is the application's data: a
+  /// list one item too long must not take the app down. Debug builds also
+  /// report it, once per group.
   int refusedPaints = 0;
 
   /// Frames it painted with nothing to sample.
@@ -1095,7 +1207,8 @@ class RenderGlassGroup extends RenderProxyBox {
   double lastBlendRadius = 0;
 
   /// The cull distance the last fused draw handed the shader, in logical
-  /// pixels: `k`, or [_kNoCull] when [debugGlassFoldCull] is off.
+  /// pixels: `k`, or 1e9 — a distance no screen reaches — when
+  /// [debugGlassFoldCull] is off.
   ///
   /// Recorded because the switch it reflects changes no pixel by construction,
   /// and an axis with no observable trace is not an axis — a run of the `off`
@@ -1135,6 +1248,9 @@ class RenderGlassGroup extends RenderProxyBox {
   /// split on, the first is the tiles' area rather than the quad's — it is what
   /// was shaded either way.
   double fusedQuadArea = 0;
+
+  /// The member boxes inside [fusedQuadArea]'s quads, summed over
+  /// [fusedPaints], in logical px^2 — the shaded area that is not dead.
   double fusedShapeArea = 0;
 
   /// Shaded area weighted by the shapes folded over it, in logical px^2 per
@@ -1146,6 +1262,8 @@ class RenderGlassGroup extends RenderProxyBox {
   /// [fusedQuadArea] by two. Area alone would have called those the same run.
   double fusedFoldArea = 0;
 
+  /// Zeroes every counter and the last recorded blend and cull radii, for the
+  /// start of a measured run. [lastFusedQuad] and [lastFusedTiles] are kept.
   void resetCounters() {
     fusedPaints = 0;
     paintsIntoProxy = 0;
@@ -1304,6 +1422,9 @@ class RenderGlassGroup extends RenderProxyBox {
   /// which a moving glass that happened to be repainted anyway would pass every
   /// pixel arm.
   int get drawRecords => _drawLayer.layer?.records ?? 0;
+
+  /// Of [drawRecords], those recorded because the glass had moved since it
+  /// was painted.
   int get drawRecordsOnMove => _drawLayer.layer?.recordsOnMove ?? 0;
 
   List<Object?> _drawProbe() => <Object?>[

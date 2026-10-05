@@ -13,6 +13,7 @@ import '../widgets/doc_view.dart';
 import '../widgets/icons.dart';
 import '../widgets/links.dart';
 import '../widgets/selection.dart';
+import '../widgets/side_scroller.dart';
 import '../widgets/site_icon.dart';
 
 /// A page of the reference: what the thing is, the thing itself, live, and
@@ -111,18 +112,24 @@ class _Header extends StatelessWidget {
                 children: <Widget>[
                   SiteIcon(iconFor(entry.icon), size: 18, color: kSiteAccent),
                   const SizedBox(width: 8),
-                  Flexible(
-                    child: LinkText(
-                      text: entry.section.title.toUpperCase(),
-                      url: '/${entry.section.id}',
-                      style: const TextStyle(
-                        color: kSiteAccent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.4,
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: LinkText(
+                        text: entry.section.title.toUpperCase(),
+                        url: '/${entry.section.id}',
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: kSiteAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.4,
+                        ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  SelectionContainer.disabled(child: _Actions(entry: entry)),
                 ],
               ),
               const SizedBox(height: 10),
@@ -141,50 +148,97 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            // The rest are in the API tab: on a phone, four names are a screen.
-            for (final String symbol in entry.api.take(narrow ? 2 : 4))
-              Pill(
-                label: symbol,
-                icon: SFIcons.sf_book,
-                monospace: true,
-                tooltip: 'API reference on pub.dev',
-                onTap: () => openLink(context, Site.api(symbol)),
+        if (entry.api.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 18),
+          // Every name the page covers, on one line that scrolls: they are what
+          // a reader looks up, and wrapped they took two or three lines.
+          SizedBox(
+            width: double.infinity,
+            child: SideScroller(
+              height: 34 * MediaQuery.textScalerOf(context).scale(1) + 2,
+              spacing: 8,
+              arrows: !narrow,
+              itemCount: entry.api.length,
+              itemBuilder: (BuildContext context, int i) => Center(
+                child: Pill(
+                  label: entry.api[i],
+                  icon: SFIcons.sf_book,
+                  monospace: true,
+                  tooltip: 'API reference on pub.dev',
+                  onTap: () => openLink(context, Site.api(entry.api[i])),
+                ),
               ),
-            if (entry.source case final String source)
-              Pill(
-                label: 'Source',
-                icon: SFIcons.sf_chevron_left_forwardslash_chevron_right,
-                tooltip: source,
-                onTap: () => openLink(context, Site.source(source)),
-              ),
-            if (hasDemo(entry))
-              Pill(
-                label: 'Demo source',
-                icon: SFIcons.sf_play_circle,
-                tooltip: entry.demoSource,
-                onTap: () => openLink(context, Site.source(entry.demoSource)),
-              ),
-            Pill(label: 'Copy link', icon: SFIcons.sf_link, onTap: () => copyLink(context, entry.path)),
-          ],
-        ),
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
+/// The page's own actions, an icon each: the source, the demo's source, and
+/// the page's link.
+class _Actions extends StatelessWidget {
+  const _Actions({required this.entry});
+
+  final Entry entry;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      if (entry.source case final String source) ...<Widget>[
+        Pill(
+          label: 'Source',
+          icon: SFIcons.sf_chevron_left_forwardslash_chevron_right,
+          iconOnly: true,
+          tooltip: 'Source: $source',
+          onTap: () => openLink(context, Site.source(source)),
+        ),
+        const SizedBox(width: 6),
+      ],
+      if (hasDemo(entry)) ...<Widget>[
+        Pill(
+          label: 'Demo source',
+          icon: SFIcons.sf_play_circle,
+          iconOnly: true,
+          tooltip: 'Demo source: ${entry.demoSource}',
+          onTap: () => openLink(context, Site.source(entry.demoSource)),
+        ),
+        const SizedBox(width: 6),
+      ],
+      Pill(
+        label: 'Copy link',
+        icon: SFIcons.sf_link,
+        iconOnly: true,
+        tooltip: 'Copy a link to this page',
+        onTap: () => copyLink(context, entry.path),
+      ),
+    ],
+  );
+}
+
 /// A small outlined button: a link out, or a page action.
+///
+/// [iconOnly] draws [icon] alone in a round button, for an action whose icon
+/// says it; [label] is then what a screen reader says, and the tooltip
+/// ([tooltip], or [label] without one).
 class Pill extends StatefulWidget {
-  const Pill({required this.label, required this.onTap, this.icon, this.tooltip, this.monospace = false, super.key});
+  const Pill({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.tooltip,
+    this.monospace = false,
+    this.iconOnly = false,
+    super.key,
+  }) : assert(!iconOnly || icon != null, 'an icon-only pill needs its icon');
 
   final String label;
   final IconData? icon;
   final String? tooltip;
   final bool monospace;
+  final bool iconOnly;
   final VoidCallback onTap;
 
   @override
@@ -209,40 +263,45 @@ class _PillState extends State<Pill> {
             onTap: widget.onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 140),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: widget.iconOnly
+                  ? const EdgeInsets.all(9)
+                  : const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: _hover ? const Color(0x1F8AB4FF) : kSiteFill,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: _hover ? const Color(0x668AB4FF) : kSiteLine),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  if (widget.icon != null) ...<Widget>[
-                    SiteIcon(widget.icon, size: 16, color: kSiteAccent),
-                    const SizedBox(width: 8),
-                  ],
-                  Flexible(
-                    child: Text(
-                      widget.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: kSiteText,
-                        fontSize: 13,
-                        fontFamily: widget.monospace ? 'monospace' : null,
-                        fontWeight: FontWeight.w500,
-                      ),
+              child: widget.iconOnly
+                  ? SiteIcon(widget.icon, size: 16, color: kSiteAccent)
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        if (widget.icon != null) ...<Widget>[
+                          SiteIcon(widget.icon, size: 16, color: kSiteAccent),
+                          const SizedBox(width: 8),
+                        ],
+                        Flexible(
+                          child: Text(
+                            widget.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: kSiteText,
+                              fontSize: 13,
+                              fontFamily: widget.monospace ? 'monospace' : null,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
       ),
     );
-    return widget.tooltip == null ? pill : Tooltip(message: widget.tooltip, child: pill);
+    final String? tip = widget.tooltip ?? (widget.iconOnly ? widget.label : null);
+    return tip == null ? pill : Tooltip(message: tip, child: pill);
   }
 }
 

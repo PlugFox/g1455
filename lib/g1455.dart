@@ -1,9 +1,49 @@
-/// Liquid Glass for Flutter.
+/// Liquid Glass for Flutter: refraction, blur, tint and a rim over the live
+/// backdrop, in the shape the engine already draws.
 ///
-/// Nothing here is stable yet. What is exported is what an application has to
-/// *declare*, because the render tree does not carry it — plus the two ledgers
-/// that turn those declarations into numbers somebody measured. The seams a
-/// benchmark turns are in `glass_diagnostics.dart`, not here.
+/// One [GlassHost] captures what is under all of its glass, once, and only
+/// when something there changed; every surface below it samples that capture.
+/// Every name here is live on the site, with a guide and a demo:
+/// [g1455.plugfox.dev](https://g1455.plugfox.dev).
+///
+/// ```dart
+/// MaterialApp(
+///   // Above the navigator: dialogs, sheets and menus are under it too.
+///   builder: (BuildContext context, Widget? navigator) => GlassHost(
+///     richBackdrop: true,
+///     minLabelContrast: kTextContrastAA,
+///     child: navigator!,
+///   ),
+///   home: const Scaffold(
+///     body: Center(child: GlassBar(child: Text('Hello, glass'))),
+///   ),
+/// )
+/// ```
+///
+/// ## The parts
+///
+/// | Topic | What is in it |
+/// |---|---|
+/// | Foundations | [GlassHost], [GlassSurface], [GlassFinish], [GlassTheme], [GlassRipple], [GlassAdaptive] |
+/// | Panels and controls | [GlassBar], [GlassButton], [GlassCard], [GlassSwitch], [GlassSlider], [GlassTabBar], [GlassSegmentedControl], [GlassButtonGroup], [GlassTextField], [GlassScrollEdge], [GlassScaffold] |
+/// | Modals | [showGlassDialog], [GlassAlert], [showGlassSheet], [GlassMenuAnchor], [GlassPopoverAnchor] |
+/// | Composition | [GlassGroup], [GlassTravel], [GlassMorph], [GlassAbove] |
+/// | Capture control | [GlassProxy], [GlassProxyPainter] |
+/// | Cost and policy | [GlassTierPolicy], [GlassLedger], [GlassHardware], [GlassThermalState] |
+///
+/// Each topic has a page of its own in the sidebar, with an overview and
+/// examples.
+///
+/// ## What is exported, and what is not
+///
+/// Nothing here is stable yet: the API is 0.x and every change is in the
+/// [changelog](https://pub.dev/packages/g1455/changelog). What is exported is
+/// what an application has to *declare*, because the render tree does not
+/// carry it — plus the two ledgers that turn those declarations into numbers
+/// somebody measured. The seams a benchmark turns are in
+/// `package:g1455/glass_diagnostics.dart`, not here.
+///
+/// {@category Getting started}
 library;
 
 export 'src/hardware.dart' show GlassHardware;

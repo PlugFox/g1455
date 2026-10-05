@@ -97,8 +97,33 @@ import 'glass_ledger.dart';
 /// Skwasm reads on its own thread and pays less. One read a second is the
 /// default on both; raise [interval] further on CanvasKit if the screen
 /// scrolls a lot.
+///
+/// ## What a reading replaces
+///
+/// A finish a surface, a component, the host or an inner [GlassTheme] names is
+/// held: no reading re-picks it, and only the label over it follows the
+/// reading. Otherwise the finish is `.regular` and its branch is the
+/// reading's, picked by [GlassFinish.regular] against the appearance's
+/// threshold. Under [GlassThemeData.richBackdrop] the reading moves only the
+/// branch, and the label stays chosen against every backdrop.
+///
+/// > **Note:** a raw [GlassSurface] does not adapt on its own. [GlassBar],
+/// > [GlassCard] and [GlassButton] do; a custom component installs
+/// > [GlassThemeData.adaptedTo] around its glass with the reading the host
+/// > publishes.
+///
+/// See also:
+///
+///  * [GlassHost.adaptive], where it is turned on.
+///  * [GlassBackdropReading], what one glass read.
+///  * [GlassFinish.regular], the branch a reading picks.
+///  * [Adaptive glass](https://g1455.plugfox.dev/foundations/adaptive) on the
+///    site.
+///
+/// {@category Foundations}
 @immutable
 class GlassAdaptive {
+  /// Reads the backdrop with the default band, hold, interval and duration.
   const GlassAdaptive({
     this.band = kDefaultBand,
     this.hold = kDefaultHold,
@@ -171,8 +196,18 @@ class GlassAdaptive {
 /// Inside a component that reads its backdrop, `GlassTheme.of(context).reading`
 /// is this, so content on the glass can follow it — an icon that is not a
 /// label, a custom painter.
+///
+/// ```dart
+/// final GlassBackdropReading? reading = GlassTheme.of(context).reading;
+/// final Color icon = reading?.brightness == Brightness.light
+///     ? const Color(0xFF000000)
+///     : const Color(0xFFFFFFFF);
+/// ```
+///
+/// {@category Foundations}
 @immutable
 class GlassBackdropReading {
+  /// A reading whose mean is [mean].
   const GlassBackdropReading(this.mean);
 
   /// The mean encoded colour of the backdrop under the glass, opaque.
@@ -223,7 +258,10 @@ class GlassBackdropReading {
 ///
 /// Times are whatever monotonic clock the caller uses; the host's is the frame
 /// timestamp, so a test's fake clock drives it.
+///
+/// {@category Diagnostics}
 class GlassBackdropVerdict {
+  /// A verdict with no reading yet, kept by [adaptive]'s band and hold.
   GlassBackdropVerdict(this.adaptive);
 
   /// The band and the hold. May be replaced; the next offer uses the new one.
@@ -273,6 +311,11 @@ class GlassBackdropVerdict {
 ///
 /// Notifies when some glass's verdict moves and at no other time — which, by
 /// the band and the hold, is a handful of times a session rather than a frame.
+///
+/// Reached through `GlassProxyHandle.readings`, which is null on a host
+/// without [GlassHost.adaptive].
+///
+/// {@category Diagnostics}
 class GlassBackdropReadings extends ChangeNotifier {
   final Map<Object, GlassBackdropReading> _of = <Object, GlassBackdropReading>{};
 
@@ -305,8 +348,11 @@ class GlassBackdropReadings extends ChangeNotifier {
 /// Exists only while `GlassHost.adaptive` is set, so a host without it carries
 /// none of this — no picture, no timer, no counter moving.
 class GlassBackdropReader {
+  /// A reader for [handle]'s frames, by the rules of the given [GlassAdaptive].
   GlassBackdropReader(this._adaptive, this.handle);
 
+  /// The band, the hold and the interval in force. Replacing it hands the new
+  /// one to every verdict already kept.
   GlassAdaptive get adaptive => _adaptive;
   GlassAdaptive _adaptive;
   set adaptive(GlassAdaptive value) {
@@ -338,6 +384,8 @@ class GlassBackdropReader {
   /// Read-backs started and landed. [started] is mirrored to
   /// [GlassProxyHandle.readBacks].
   int started = 0;
+
+  /// Read-backs whose answer has arrived, whether or not it moved a verdict.
   int landed = 0;
 
   /// Whether nothing has been handed to [captured] yet. The host hands a held
@@ -523,6 +571,8 @@ class GlassBackdropReader {
     _callbacks.add(id);
   }
 
+  /// Cancels every pending wake and frame callback and disposes [readings].
+  /// A read still in flight lands on nothing.
   void dispose() {
     _disposed = true;
     _wake?.cancel();

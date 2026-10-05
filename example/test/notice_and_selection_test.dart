@@ -70,16 +70,36 @@ void main() {
       expect(_barLabel(GlassPreset.medium.label), findsOneWidget);
     });
 
-    testWidgets('copies the address and says so', (WidgetTester tester) async {
+    testWidgets('copies the address, says so, and stays open with no close kept', (WidgetTester tester) async {
       _size(tester, const Size(1280, 800));
       final List<String> copied = _clipboard(tester);
-      await _open(tester);
-      await tester.tap(find.text('Copy link'));
+      final closes = <DateTime>[];
+      await tester.pumpWidget(
+        GlassExampleApp(initialLocation: '/', opensReduced: true, noticeClosed: () => null, onNoticeClosed: closes.add),
+      );
+      await _frames(tester, 20);
+      expect(find.text('Copy link'), findsNothing, reason: 'the link button is an icon');
+      await tester.tap(find.bySemanticsLabel('Copy link'));
       await _frames(tester, 30);
       expect(copied, <String>[Uri.base.toString()]);
-      expect(find.text(_title), findsNothing);
       expect(find.text('Link copied: paste it into Chrome'), findsOneWidget);
+      expect(find.text(_title), findsOneWidget, reason: 'copying the link closed the notice');
+      expect(closes, isEmpty, reason: 'copying the link kept a close');
       await _settle(tester);
+    });
+
+    testWidgets('stays on a tap outside, Escape and the back button', (WidgetTester tester) async {
+      _size(tester, const Size(1280, 800));
+      await _open(tester);
+      await tester.tapAt(const Offset(20, 20));
+      await _frames(tester, 30);
+      expect(find.text(_title), findsOneWidget, reason: 'a tap on the dim closed it');
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await _frames(tester, 30);
+      expect(find.text(_title), findsOneWidget, reason: 'Escape closed it');
+      await tester.binding.handlePopRoute();
+      await _frames(tester, 30);
+      expect(find.text(_title), findsOneWidget, reason: 'the back button closed it');
     });
 
     testWidgets('scrolls to its buttons on a short window with large text', (WidgetTester tester) async {
@@ -120,10 +140,40 @@ void main() {
     testWidgets('on a phone recommends a desktop, and closes', (WidgetTester tester) async {
       await open(tester, const WebClient(blink: true, mobile: true));
       expect(find.text('Best on a desktop'), findsOneWidget);
-      expect(find.textContaining('In a native app'), findsOneWidget);
+      expect(find.textContaining('a native app'), findsOneWidget);
       await tester.tap(find.text('Continue anyway'));
       await _frames(tester, 30);
       expect(find.text('Best on a desktop'), findsNothing);
+    });
+
+    testWidgets('shows a QR code of the page in place of the message, and goes back', (WidgetTester tester) async {
+      _size(tester, const Size(360, 740));
+      await tester.pumpWidget(
+        GlassExampleApp(
+          initialLocation: '/',
+          opensReduced: true,
+          webClient: () => const WebClient(blink: false, mobile: true),
+        ),
+      );
+      await _frames(tester, 20);
+      expect(find.text('Best on a desktop'), findsOneWidget);
+      expect(find.byTooltip('A QR code of this page, to open it on another device'), findsOneWidget);
+      // The test font is wider than any real one: the buttons may be below.
+      await tester.ensureVisible(find.bySemanticsLabel('Show a QR code'));
+      await _frames(tester, 4);
+      await tester.tap(find.bySemanticsLabel('Show a QR code'));
+      await _frames(tester, 30);
+      expect(find.bySemanticsLabel('QR code for this page'), findsOneWidget);
+      expect(find.text(Uri.base.toString()), findsOneWidget);
+      expect(find.textContaining('a native app'), findsNothing, reason: 'the message stayed beside the code');
+      expect(find.text('Best on a desktop'), findsOneWidget, reason: 'the QR code closed the notice');
+
+      await tester.ensureVisible(find.bySemanticsLabel('Show the message'));
+      await _frames(tester, 4);
+      await tester.tap(find.bySemanticsLabel('Show the message'));
+      await _frames(tester, 30);
+      expect(find.bySemanticsLabel('QR code for this page'), findsNothing);
+      expect(find.textContaining('a native app'), findsOneWidget);
     });
 
     testWidgets('closed, keeps the date and stays closed for a day', (WidgetTester tester) async {
@@ -171,7 +221,7 @@ void main() {
       await open(tester, const WebClient(blink: false, mobile: false), reduced: true);
       expect(find.text('Best in a Chromium browser'), findsOneWidget);
       expect(find.text(_title), findsNothing);
-      expect(find.textContaining('without WebAssembly'), findsOneWidget);
+      expect(find.textContaining('WebAssembly'), findsOneWidget);
       await tester.tap(find.text('Turn the glass on'));
       await _frames(tester, 30);
       expect(_barLabel(GlassPreset.high.label), findsOneWidget);

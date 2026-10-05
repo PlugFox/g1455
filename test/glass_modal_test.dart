@@ -28,6 +28,7 @@
 //    `!semantics.parentDataDirty` in the grow arm, which holds semantics on.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart';
@@ -90,6 +91,65 @@ void main() {
     await tester.drag(find.text('sheet body'), const Offset(0, 300));
     await tester.pumpAndSettle();
     expect(find.text('sheet body'), findsNothing);
+  });
+
+  testWidgets('a sheet that is not barrier-dismissible stays on a tap, Escape, a drag and a flick', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _App(
+        home: Builder(
+          builder: (BuildContext context) => Center(
+            child: GestureDetector(
+              onTap: () => showGlassSheet<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext sheet) => SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: GestureDetector(onTap: () => Navigator.of(sheet).pop(), child: const Text('close')),
+                  ),
+                ),
+              ),
+              child: const Text('open modal sheet'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open modal sheet'));
+    await tester.pumpAndSettle();
+    final double bottom = tester.getBottomLeft(find.text('close')).dy;
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.text('close'), findsOneWidget, reason: 'a tap on the dim closed it');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('close'), findsOneWidget, reason: 'Escape closed it');
+
+    // A quarter of the way, up to half the sheet's height: felt, not a hair.
+    final double height = _surfaceAbove(tester, find.text('close')).globalRect.height;
+    final TestGesture pull = await tester.startGesture(tester.getCenter(find.text('close')));
+    await pull.moveBy(const Offset(0, 20));
+    await pull.moveBy(const Offset(0, 200));
+    await tester.pump();
+    expect(tester.getBottomLeft(find.text('close')).dy - bottom, closeTo(200 / 4, 1), reason: 'a pull is not felt');
+    await pull.moveBy(const Offset(0, 2000));
+    await tester.pump();
+    expect(tester.getBottomLeft(find.text('close')).dy - bottom, closeTo(height / 2, 1), reason: 'past half');
+    await pull.up();
+    await tester.pumpAndSettle();
+    expect(tester.getBottomLeft(find.text('close')).dy, closeTo(bottom, 0.01), reason: 'it did not spring back');
+
+    await tester.fling(find.text('close'), const Offset(0, 400), 3000);
+    await tester.pumpAndSettle();
+    expect(find.text('close'), findsOneWidget, reason: 'a flick closed it');
+
+    await tester.tap(find.text('close'));
+    await tester.pumpAndSettle();
+    expect(find.text('close'), findsNothing);
   });
 
   testWidgets('a sheet with a max width is that wide, centred over the bottom', (WidgetTester tester) async {

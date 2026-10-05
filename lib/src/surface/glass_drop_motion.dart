@@ -43,8 +43,44 @@ import 'glass_theme.dart';
 /// Read by [GlassSwitch], [GlassSlider], [GlassSegmentedControl] and
 /// [GlassTabBar] from [GlassThemeData.dropMotion], unless the widget names its
 /// own. [none] turns it off, and so does the platform's reduced-motion switch.
+///
+/// A feel rather than a measurement: Apple's held drops lean into a fast slide
+/// and bulge as they stop, and what is taken here is the shape of that, not
+/// its numbers. The deformation keeps the drop's area and follows its target
+/// through a spring, so it wobbles back rather than snapping.
+///
+/// It costs no capture — the drop changes size inside the travel region it
+/// already moves in — and a repaint of the drop's own layer on the frames the
+/// stretch changes.
+///
+/// ```dart
+/// // Softer for the whole screen, and none at all on one switch.
+/// GlassHost(
+///   dropMotion: const GlassDropMotion(maxStretch: 0.06),
+///   child: navigator!,
+/// )
+///
+/// GlassSwitch(
+///   value: on,
+///   onChanged: (bool value) => setState(() => on = value),
+///   dropMotion: GlassDropMotion.none,
+/// )
+/// ```
+///
+/// See also:
+///
+///  * [GlassHost.dropMotion] and [GlassThemeData.dropMotion], where it is set
+///    for a screen or a subtree.
+///  * [GlassDropStretch], the model, for a custom control that feeds it itself.
+///  * [GlassDropStretchDriver], the ticker the package's controls run it on.
+///  * [Drop motion](https://g1455.plugfox.dev/foundations/drop-motion) on the
+///    site.
+///
+/// {@category Foundations}
 @immutable
 class GlassDropMotion {
+  /// A drop motion with the package's defaults: up to 12% of stretch, on a
+  /// spring with a damping ratio of 0.5.
   const GlassDropMotion({
     this.maxStretch = 0.12,
     this.saturation = 10000,
@@ -82,6 +118,8 @@ class GlassDropMotion {
   /// makes it wobble back rather than snap. 900 and 30 is a damping ratio of
   /// 0.5 — a little jelly, back in about half a second.
   final double stiffness;
+
+  /// The spring's damping, at unit mass. See [stiffness].
   final double damping;
 
   /// Whether this deforms nothing.
@@ -102,6 +140,7 @@ class GlassDropMotion {
   Size reach(Size size) =>
       isNone ? Size.zero : Size(size.width * maxStretch / 2, size.height * (1 / (1 - maxStretch) - 1) / 2);
 
+  /// This motion with the named fields replaced.
   GlassDropMotion copyWith({
     double? maxStretch,
     double? saturation,
@@ -140,7 +179,17 @@ class GlassDropMotion {
 ///
 /// Pure: no ticker, no widget. [value] is signed — positive stretched along
 /// the travel, negative squashed — and [apply] turns it into a size.
+///
+/// ```dart
+/// final GlassDropStretch stretch = GlassDropStretch();
+/// // Once a frame, with the seconds since the last one and where the drop is.
+/// final double s = stretch.step(1 / 60, dropX);
+/// final Size drawn = GlassDropStretch.apply(dropSize, s);
+/// ```
+///
+/// {@category Foundations}
 class GlassDropStretch {
+  /// A round, still drop deformed by [motion].
   GlassDropStretch([this.motion = const GlassDropMotion()]);
 
   /// The spec. Changing it keeps the state; [GlassDropMotion.none] makes the
@@ -169,6 +218,9 @@ class GlassDropStretch {
   /// The smoothed velocity and acceleration along the travel, logical px/s
   /// and px/s².
   double get velocity => _v;
+
+  /// The smoothed acceleration along the travel, logical px/s². See
+  /// [velocity].
   double get acceleration => _a;
 
   /// The position last fed to [step] or [jump].
@@ -256,7 +308,13 @@ class GlassDropStretch {
 /// Woken by the owner when the drop's position changes; stops itself once the
 /// drop is still and the stretch has sprung back. A finger holding a drop
 /// still therefore costs no frames.
+///
+/// It starts with [GlassDropMotion.none]: set [motion] from the control's
+/// build, usually through [GlassDropMotion.resolve].
+///
+/// {@category Foundations}
 class GlassDropStretchDriver extends ChangeNotifier {
+  /// A driver that reads the drop through [position] on [vsync]'s ticker.
   GlassDropStretchDriver({required TickerProvider vsync, required this.position}) {
     _ticker = vsync.createTicker(_tick);
   }
@@ -275,6 +333,8 @@ class GlassDropStretchDriver extends ChangeNotifier {
   /// Whether the ticker is running.
   bool get isActive => _ticker.isActive;
 
+  /// The spec the stretch follows. Setting [GlassDropMotion.none] stops the
+  /// ticker and puts the drop back to round at once.
   GlassDropMotion get motion => _model.motion;
 
   /// Never notifies: set from a build's dependencies, which rebuild anyway.

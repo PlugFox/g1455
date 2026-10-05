@@ -138,6 +138,9 @@ class GlassDrawLayer extends Layer {
   /// the pixels passes as well on a surface that happened to be repainted by
   /// something else on the frame it moved.
   int records = 0;
+
+  /// Of [records], the ones forced by the owner moving: the probe returned a
+  /// different geometry and nothing had invalidated the picture.
   int recordsOnMove = 0;
 
   /// The paint changed what is drawn: the next composite records afresh.
