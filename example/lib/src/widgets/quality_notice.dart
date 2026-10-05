@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +7,7 @@ import 'package:g1455/g1455.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../platform/web_client.dart';
+import 'qr_view.dart';
 import 'toast.dart';
 import 'site_icon.dart';
 
@@ -55,15 +58,30 @@ Future<void> showSiteNotice(
 const Color _kWarning = Color(0xFFFF9F0A);
 const Color _kDestructive = Color(0xFFFF3B30);
 
-class _Notice extends StatelessWidget {
+class _Notice extends StatefulWidget {
   const _Notice({required this.reduced, required this.client, required this.onFullGlass});
 
   final bool reduced;
   final WebClient? client;
   final VoidCallback onFullGlass;
 
+  @override
+  State<_Notice> createState() => _NoticeState();
+}
+
+class _NoticeState extends State<_Notice> {
+  /// The QR code of the page in place of the message.
+  bool _qr = false;
+
+  bool get reduced => widget.reduced;
+  WebClient? get client => widget.client;
+  VoidCallback get onFullGlass => widget.onFullGlass;
+
   /// Off the recommended setup: a phone, a tablet or a browser not on Blink.
   bool get _elsewhere => !(client?.recommended ?? true);
+
+  /// The page the sheet is over, as the copy and the QR code give it.
+  String get _address => Uri.base.toString();
 
   @override
   Widget build(BuildContext context) {
@@ -91,9 +109,33 @@ class _Notice extends StatelessWidget {
               children: <Widget>[
                 _header(text, label),
                 const SizedBox(height: 14),
-                Text.rich(_lead(), style: body),
-                const SizedBox(height: 12),
-                ..._tips(body, label),
+                // The message and the code swap in place: the sheet grows or
+                // shrinks to the one shown, and no second modal opens over it.
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    // Both at the top and the sheet's width: centred, the
+                    // outgoing one drifted under the incoming one.
+                    layoutBuilder: (Widget? current, List<Widget> previous) => Stack(
+                      alignment: Alignment.topCenter,
+                      children: <Widget>[...previous, ?current],
+                    ),
+                    child: _qr
+                        ? SizedBox(key: const ValueKey<bool>(true), width: double.infinity, child: _code(body))
+                        : Column(
+                            key: const ValueKey<bool>(false),
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text.rich(_lead(), style: body),
+                              const SizedBox(height: 12),
+                              ..._tips(body, label),
+                            ],
+                          ),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 _buttons(context, label),
               ],
@@ -218,17 +260,40 @@ class _Notice extends StatelessWidget {
     ];
   }
 
+  /// The page's address as a QR code, to open it on another device: a phone
+  /// held up to a desktop's screen, or the other way round.
+  Widget _code(TextStyle? body) => LayoutBuilder(
+    builder: (BuildContext context, BoxConstraints constraints) => Column(
+      children: <Widget>[
+        QrView(data: _address, size: math.min(220, constraints.maxWidth), semanticLabel: 'QR code for this page'),
+        const SizedBox(height: 12),
+        Text(
+          'Scan it to open this page on another device.',
+          textAlign: TextAlign.center,
+          style: body,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _address,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: body?.copyWith(fontFamily: 'monospace', fontSize: 12),
+        ),
+      ],
+    ),
+  );
+
   Widget _buttons(BuildContext context, Color label) {
     void close() => Navigator.of(context).pop();
     final TextScaler scaler = MediaQuery.textScalerOf(context);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        // The link button's label goes first when the row runs short, and the
-        // buttons draw in closer: about what the labels take at this text
-        // size, with the link's.
-        final bool compact = constraints.maxWidth < scaler.scale(reduced ? 450 : 320);
+        // The buttons draw in when the row runs short: about what the labels
+        // take at this text size, with the two icons.
+        final bool compact = constraints.maxWidth < scaler.scale(reduced ? 420 : 300);
         final EdgeInsets pad = EdgeInsets.symmetric(horizontal: compact ? 14 : 20, vertical: 10);
-        // Each closes the sheet; the link button does not. Off the recommended
+        // Each closes the sheet; the two icons do not. Off the recommended
         // setup the one that closes and stays is red: it is the choice the
         // sheet advises against.
         final List<Widget> actions = <Widget>[
@@ -263,7 +328,27 @@ class _Notice extends StatelessWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _copyButton(context, compact: compact),
+            _iconButton(
+              icon: SFIcons.sf_link,
+              label: 'Copy link',
+              tooltip: 'Copy the address, to paste it into Chrome',
+              // Copies and stays: the sheet is still open, unanswered, and
+              // comes back on the next load if this browser is kept. The toast
+              // is in the root overlay, over the sheet.
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: _address));
+                if (context.mounted) {
+                  showGlassToast(context, 'Link copied: paste it into Chrome', icon: SFIcons.sf_link);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+            _iconButton(
+              icon: _qr ? SFIcons.sf_text_alignleft : SFIcons.sf_qrcode,
+              label: _qr ? 'Show the message' : 'Show a QR code',
+              tooltip: _qr ? 'Back to the message' : 'A QR code of this page, to open it on another device',
+              onPressed: () => setState(() => _qr = !_qr),
+            ),
             const SizedBox(width: 8),
             // Wraps: text larger still than that allows for puts the actions
             // on two lines rather than under an overflow stripe.
@@ -276,32 +361,20 @@ class _Notice extends StatelessWidget {
     );
   }
 
-  Widget _copyButton(BuildContext context, {required bool compact}) {
-    const String tip = 'Copy the address, to open it in Chrome on a desktop';
-    const SiteIcon icon = SiteIcon(SFIcons.sf_link, size: 18);
-    return Tooltip(
-      message: tip,
-      child: GlassButton(
-        semanticLabel: compact ? 'Copy link' : null,
-        padding: compact ? const EdgeInsets.all(10) : const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        // Copies and stays: the sheet is still open, unanswered, and comes
-        // back on the next load if this browser is kept. The toast is in the
-        // root overlay, over the sheet.
-        onPressed: () async {
-          await Clipboard.setData(ClipboardData(text: Uri.base.toString()));
-          if (context.mounted) {
-            showGlassToast(context, 'Link copied: paste it into Chrome', icon: SFIcons.sf_link);
-          }
-        },
-        child: compact
-            ? icon
-            : const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[icon, SizedBox(width: 8), Text('Copy link')],
-              ),
-      ),
-    );
-  }
+  Widget _iconButton({
+    required IconData icon,
+    required String label,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) => Tooltip(
+    message: tooltip,
+    child: GlassButton(
+      semanticLabel: label,
+      padding: const EdgeInsets.all(10),
+      onPressed: onPressed,
+      child: SiteIcon(icon, size: 18),
+    ),
+  );
 
   Widget _closeButton(
     String text, {

@@ -78,7 +78,8 @@ void main() {
         GlassExampleApp(initialLocation: '/', opensReduced: true, noticeClosed: () => null, onNoticeClosed: closes.add),
       );
       await _frames(tester, 20);
-      await tester.tap(find.text('Copy link'));
+      expect(find.text('Copy link'), findsNothing, reason: 'the link button is an icon');
+      await tester.tap(find.bySemanticsLabel('Copy link'));
       await _frames(tester, 30);
       expect(copied, <String>[Uri.base.toString()]);
       expect(find.text('Link copied: paste it into Chrome'), findsOneWidget);
@@ -145,9 +146,8 @@ void main() {
       expect(find.text('Best on a desktop'), findsNothing);
     });
 
-    testWidgets('on a phone, the link is an icon that says what it does', (WidgetTester tester) async {
+    testWidgets('shows a QR code of the page in place of the message, and goes back', (WidgetTester tester) async {
       _size(tester, const Size(360, 740));
-      final List<String> copied = _clipboard(tester);
       await tester.pumpWidget(
         GlassExampleApp(
           initialLocation: '/',
@@ -157,16 +157,23 @@ void main() {
       );
       await _frames(tester, 20);
       expect(find.text('Best on a desktop'), findsOneWidget);
-      expect(find.text('Copy link'), findsNothing, reason: 'the link button kept its label on a phone');
-      expect(find.byTooltip('Copy the address, to open it in Chrome on a desktop'), findsOneWidget);
+      expect(find.byTooltip('A QR code of this page, to open it on another device'), findsOneWidget);
       // The test font is wider than any real one: the buttons may be below.
-      await tester.ensureVisible(find.bySemanticsLabel('Copy link'));
+      await tester.ensureVisible(find.bySemanticsLabel('Show a QR code'));
       await _frames(tester, 4);
-      await tester.tap(find.bySemanticsLabel('Copy link'));
+      await tester.tap(find.bySemanticsLabel('Show a QR code'));
       await _frames(tester, 30);
-      expect(copied, hasLength(1));
-      expect(find.text('Best on a desktop'), findsOneWidget);
-      await _settle(tester);
+      expect(find.bySemanticsLabel('QR code for this page'), findsOneWidget);
+      expect(find.text(Uri.base.toString()), findsOneWidget);
+      expect(find.textContaining('a native app'), findsNothing, reason: 'the message stayed beside the code');
+      expect(find.text('Best on a desktop'), findsOneWidget, reason: 'the QR code closed the notice');
+
+      await tester.ensureVisible(find.bySemanticsLabel('Show the message'));
+      await _frames(tester, 4);
+      await tester.tap(find.bySemanticsLabel('Show the message'));
+      await _frames(tester, 30);
+      expect(find.bySemanticsLabel('QR code for this page'), findsNothing);
+      expect(find.textContaining('a native app'), findsOneWidget);
     });
 
     testWidgets('closed, keeps the date and stays closed for a day', (WidgetTester tester) async {
