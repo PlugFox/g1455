@@ -1,0 +1,21 @@
+{
+  "name": "g1455",
+  "description": "g1455, Liquid Glass for Flutter: the agent skill for writing glass with the package.",
+  "owner": {
+    "name": "Mike Matiunin (PlugFox)",
+    "url": "https://github.com/PlugFox"
+  },
+  "plugins": [
+    {
+      "name": "g1455",
+      "source": "./",
+      "description": "How to build Flutter UI with g1455: the rules for GlassHost, finishes, captures and every component, with the site's pages as references.",
+      "homepage": "https://g1455.plugfox.dev/start/agents",
+      "repository": "https://github.com/PlugFox/g1455",
+      "license": "MIT",
+      "keywords": ["flutter", "dart", "liquid-glass", "glassmorphism", "ui"],
+      "category": "development",
+      "skills": ["./skills/g1455"]
+    }
+  ]
+}

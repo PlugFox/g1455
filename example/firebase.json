@@ -2,14 +2,16 @@
   "hosting": {
     "target": "g1455",
     "public": "build/web",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/*.map", "**/*.symbols"],
+    "ignore": ["firebase.json", "**/.DS_Store", "**/.last_build_id", "**/node_modules/**", "**/*.map", "**/*.symbols"],
     "cleanUrls": true,
     "trailingSlash": false,
     "redirects": [
       { "source": "/start", "destination": "/start/installation", "type": 301 },
       { "source": "/foundations", "destination": "/foundations/host", "type": 301 },
       { "source": "/components", "destination": "/components/bar", "type": 301 },
-      { "source": "/demos", "destination": "/demos/scroll", "type": 301 }
+      { "source": "/demos", "destination": "/demos/scroll", "type": 301 },
+      { "source": "/SKILL.md", "destination": "/.well-known/agent-skills/g1455/SKILL.md", "type": 302 },
+      { "source": "/skill.md", "destination": "/.well-known/agent-skills/g1455/SKILL.md", "type": 302 }
     ],
     "headers": [
       {
@@ -23,6 +25,21 @@
       {
         "regex": "^/(?:og|icons)/.*$|^/favicon\\.(?:ico|png|svg)$",
         "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+      },
+      {
+        "regex": "^/(?:.*\\.md|llms(?:-full)?\\.txt)$",
+        "headers": [
+          { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+          { "key": "Cache-Control", "value": "no-cache" },
+          { "key": "Access-Control-Allow-Origin", "value": "*" }
+        ]
+      },
+      {
+        "regex": "^/\\.well-known/agent-skills/.*$",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" },
+          { "key": "Access-Control-Allow-Origin", "value": "*" }
+        ]
       },
       {
         "source": "**/*.@(ttf|otf|woff|woff2)",

@@ -459,4 +459,79 @@ See [What the app declares](/start/declarations) for `GlassHost.hardware`, and [
 for keeping the cost down on any device.
 ''',
   ),
+  Entry(
+    section: Section.start,
+    id: 'agents',
+    title: 'AI agents',
+    icon: 'auto_awesome',
+    summary:
+        'An agent skill for Claude Code, Codex, Cursor, Antigravity, Gemini CLI and Copilot: the rules for writing '
+        'glass, and every page of this site, installed with one command.',
+    guide: r'''
+g1455 ships an [agent skill](https://agentskills.io): a `SKILL.md` that tells a coding agent how to write glass that
+works the first time (one host above the navigator, what the app declares, what costs a capture, which widget fits),
+with every page of this site beside it as a reference file. The agent loads it on its own when a project uses g1455 or
+you ask for liquid glass, and reads a component's page before it writes one.
+
+## Any agent
+
+```bash
+npx skills add PlugFox/g1455
+```
+
+The installer ([skills.sh](https://skills.sh)) asks which agents to install for and puts the skill where each one looks.
+`-a claude-code -a codex` picks agents without asking, `-g` installs for your user instead of the project, `-y` skips
+the questions. `npx skills update` brings it up to date.
+
+The same works from this site's address, which publishes the skill at
+`/.well-known/agent-skills/index.json`:
+
+```bash
+npx skills add https://g1455.plugfox.dev
+```
+
+## Claude Code
+
+The repository is a plugin marketplace with the skill as its one plugin. In Claude Code:
+
+```text
+/plugin marketplace add PlugFox/g1455
+/plugin install g1455@g1455
+```
+
+`/plugin marketplace update g1455` fetches a newer one.
+
+## Without Node
+
+The skill is one archive. Unpack it where your agent looks for skills:
+
+```bash
+mkdir -p .agents/skills/g1455
+curl -fsSL https://g1455.plugfox.dev/.well-known/agent-skills/g1455.tar.gz | tar -xz -C .agents/skills/g1455
+```
+
+| Agent | In the project | For your user |
+|---|---|---|
+| Claude Code | `.claude/skills/g1455` | `~/.claude/skills/g1455` |
+| Codex, Cursor, Antigravity, Gemini CLI, GitHub Copilot | `.agents/skills/g1455` | `~/.agents/skills/g1455` |
+
+Commit the project's copy and everyone working on the app gets it.
+
+## Without installing
+
+Tell the agent to read the skill from the site, and it follows the links it needs:
+
+```text
+Read https://g1455.plugfox.dev/SKILL.md and follow it.
+```
+
+Every page of the site is also markdown at its address plus `.md`, such as
+[/components/slider.md](https://g1455.plugfox.dev/components/slider.md). [llms.txt](https://g1455.plugfox.dev/llms.txt)
+lists them all, and [llms-full.txt](https://g1455.plugfox.dev/llms-full.txt) is every page in one file.
+
+> [!NOTE]
+> The skill describes the package's current version, and the API is 0.x. Update the skill when you update the package;
+> it tells the agent to check the changelog when the versions differ.
+''',
+  ),
 ];

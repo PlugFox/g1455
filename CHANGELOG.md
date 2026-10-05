@@ -21,6 +21,13 @@ Documentation:
 - Every measured number now says where it comes from: the devices, their
   systems, the renderer, the metric, the dates, and the Flutter and engine
   revisions, in the README and on the site's How it works.
+- An agent skill for Claude Code, Codex, Cursor, Antigravity, Gemini CLI and
+  Copilot, in `skills/g1455/`: the rules for writing glass that works, with
+  every page of the site as a reference. `npx skills add PlugFox/g1455`, or
+  `/plugin marketplace add PlugFox/g1455` in Claude Code. The site publishes
+  it at `/.well-known/agent-skills/` (`npx skills add
+  https://g1455.plugfox.dev`), with `llms.txt`, `llms-full.txt` and every
+  page as markdown at its address plus `.md`.
 - pub.dev shows a square, still picture of the package: its icon leads the
   screenshots, ahead of the loops, which it showed as one frame. pub.dev takes
   ten, so the materialize loop makes room; the alert's shows the same arrival.

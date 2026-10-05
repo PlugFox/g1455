@@ -70,6 +70,7 @@ on the site.
 - [How it works](#how-it-works)
 - [Install](#install)
 - [Quick start](#quick-start)
+- [AI agents](#ai-agents)
 - [What is in the box](#what-is-in-the-box)
 - [Finishes](#finishes)
 - [Common patterns](#common-patterns)
@@ -233,6 +234,39 @@ with its guide, its code and its API. The site is the [`example/`](example/)
 app built for the web: one host, every component on its own page, the original
 full-screen demos, and a settings menu that switches the finish, the tint, the
 rung and the ripple.
+
+## AI agents
+
+The package ships an [agent skill](https://agentskills.io) for Claude Code,
+Codex, Cursor, Antigravity, Gemini CLI, GitHub Copilot and the rest: the
+rules an agent needs to write glass that works (one host above the
+navigator, what the app declares, what costs a capture), with every page of
+the site as a reference it reads before it writes a component.
+
+```bash
+npx skills add PlugFox/g1455
+```
+
+In Claude Code, the repository is a plugin marketplace:
+
+```text
+/plugin marketplace add PlugFox/g1455
+/plugin install g1455@g1455
+```
+
+Without Node, unpack it where the agent looks for skills
+(`.claude/skills/` for Claude Code, `.agents/skills/` for the others):
+
+```bash
+mkdir -p .agents/skills/g1455
+curl -fsSL https://g1455.plugfox.dev/.well-known/agent-skills/g1455.tar.gz | tar -xz -C .agents/skills/g1455
+```
+
+Or point any agent at `https://g1455.plugfox.dev/SKILL.md`. The site also
+serves [`llms.txt`](https://g1455.plugfox.dev/llms.txt), and every page as
+markdown at its address plus `.md`. The skill is in
+[`skills/g1455/`](skills/g1455/); more on
+[the site](https://g1455.plugfox.dev/start/agents).
 
 ## What is in the box
 
@@ -682,6 +716,11 @@ flutter test --coverage
 
 `dart format` takes its width (120) and its trailing-comma rule from
 `analysis_options.yaml`, and CI fails on a file it would change.
+
+The skill's `SKILL.md` is written by hand; its `references/` are the site's
+pages, generated from the catalog in `example/lib/src/catalog/` by
+`(cd example && dart run tool/skill.dart)`. The example's tests fail when they
+are stale.
 
 Some tests check a constant baked into `lib/` against the measurement it came
 from. Those measurements are copied into `provenance/`, unchanged and under
