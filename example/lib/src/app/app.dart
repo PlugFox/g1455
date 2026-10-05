@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
 import 'package:squid/squid.dart';
 
+import '../platform/web_client.dart';
 import '../style.dart';
 import '../widgets/quality_notice.dart';
 import '../widgets/update_banner.dart';
@@ -21,7 +24,14 @@ final ValueNotifier<GlassAdaptive?> siteAdaptive = ValueNotifier<GlassAdaptive?>
 /// (`builder:`), so that a dialog, a sheet or a menu — all built in the
 /// navigator's overlay — is captured by it like any other glass.
 class GlassExampleApp extends StatefulWidget {
-  const GlassExampleApp({this.initialLocation, this.opensReduced = kOpensReduced, super.key});
+  const GlassExampleApp({
+    this.initialLocation,
+    this.opensReduced = kOpensReduced,
+    this.webClient = readWebClient,
+    this.noticeClosed = readNoticeClosed,
+    this.onNoticeClosed = writeNoticeClosed,
+    super.key,
+  });
 
   /// The address to open at; null for the one the platform was opened at.
   final String? initialLocation;
@@ -29,6 +39,15 @@ class GlassExampleApp extends StatefulWidget {
   /// Whether to open on Medium and say why — [kOpensReduced], which a test
   /// cannot reach otherwise: it is a constant, and false off the web.
   final bool opensReduced;
+
+  /// Reads the browser and the device the site is open in — [readWebClient],
+  /// which a test cannot steer: it answers null off the web.
+  final WebClient? Function() webClient;
+
+  /// When the site's notice was last closed, and how a close is kept —
+  /// [readNoticeClosed] and [writeNoticeClosed], `localStorage` on the web.
+  final DateTime? Function() noticeClosed;
+  final ValueChanged<DateTime> onNoticeClosed;
 
   @override
   State<GlassExampleApp> createState() => _GlassExampleAppState();
@@ -55,20 +74,30 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
   @override
   void initState() {
     super.initState();
-    if (widget.opensReduced) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _noticeReduced());
+    final WebClient? client = widget.webClient();
+    // Once a day at most: closed less than [kNoticeQuiet] ago, it stays closed.
+    // Only a close counts — a reload with the sheet still open shows it again.
+    final DateTime? closed = widget.noticeClosed();
+    final bool quiet = closed != null && DateTime.now().difference(closed) < kNoticeQuiet;
+    if (!quiet && needsSiteNotice(reduced: widget.opensReduced, client: client)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_notice(client)));
     }
   }
 
-  void _noticeReduced() {
+  Future<void> _notice(WebClient? client) async {
     final BuildContext? context = _navigator.navigator?.context;
     if (context == null || !mounted) {
       return;
     }
-    showReducedQualityNotice(
+    // Closed by any of its buttons, the barrier or a drag: the sheet's route
+    // completes only when it is popped.
+    await showSiteNotice(
       context,
-      onFullGlass: () => setState(() => _settings = GlassPreset.high.settings),
+      reduced: widget.opensReduced,
+      client: client,
+      onFullGlass: () => setState(() => _settings = _settings.withPreset(GlassPreset.high)),
     );
+    widget.onNoticeClosed(DateTime.now());
   }
 
   late final RouterConfig<Uri> _router = appRouterConfig(_delegate, initial: widget.initialLocation);
@@ -87,31 +116,38 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
     theme: buildSiteTheme(),
     color: kSiteBackground,
     routerConfig: _router,
-    builder: (BuildContext context, Widget? child) => SettingsScope(
-      settings: _settings,
-      onChanged: (GlassSettings s) => setState(() => _settings = s),
-      child: ValueListenableBuilder<GlassAdaptive?>(
-        valueListenable: siteAdaptive,
-        builder: (BuildContext context, GlassAdaptive? adaptive, Widget? _) => GlassHost(
-          adaptive: adaptive,
-          finish: _settings.finishIn(MediaQuery.platformBrightnessOf(context)),
-          tier: _settings.tierChoice,
-          highContrast: _settings.highContrast,
-          // The opaque rung fills with the level over this, and reads nothing
-          // that could tell it otherwise.
-          backdrop: kExampleBackdrop,
-          // What scrolls under the glass is an image as far as legibility goes:
-          // there is no one colour behind a label, so the finish is dimmed until
-          // the worst case still reads. Without these, `clear` over this list
-          // reaches a contrast of 1.76 and the package says so in debug.
-          richBackdrop: true,
-          minLabelContrast: kTextContrastAA,
-          // Not Apple's: iOS answers a touch with light and a springy scale and
-          // never deforms the glass. On in the Ultra preset only, which is where
-          // the example opens.
-          ripple: _settings.glassRipple,
-          // Over every route: a deploy since this tab loaded is offered here.
-          child: SiteUpdateBanner(child: child!),
+    // The appearance in the settings stands in for the platform's below here:
+    // the host's `.regular` and every demo that picks a branch of it read it.
+    builder: (BuildContext context, Widget? child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        platformBrightness: _settings.appearance.brightness ?? MediaQuery.platformBrightnessOf(context),
+      ),
+      child: SettingsScope(
+        settings: _settings,
+        onChanged: (GlassSettings s) => setState(() => _settings = s),
+        child: ValueListenableBuilder<GlassAdaptive?>(
+          valueListenable: siteAdaptive,
+          builder: (BuildContext context, GlassAdaptive? adaptive, Widget? _) => GlassHost(
+            adaptive: adaptive,
+            finish: _settings.finishIn(MediaQuery.platformBrightnessOf(context)),
+            tier: _settings.tierChoice,
+            highContrast: _settings.highContrast,
+            // The opaque rung fills with the level over this, and reads nothing
+            // that could tell it otherwise.
+            backdrop: kExampleBackdrop,
+            // What scrolls under the glass is an image as far as legibility goes:
+            // there is no one colour behind a label, so the finish is dimmed until
+            // the worst case still reads. Without these, `clear` over this list
+            // reaches a contrast of 1.76 and the package says so in debug.
+            richBackdrop: true,
+            minLabelContrast: kTextContrastAA,
+            // Not Apple's: iOS answers a touch with light and a springy scale and
+            // never deforms the glass. On in the Ultra preset only, which is where
+            // the example opens.
+            ripple: _settings.glassRipple,
+            // Over every route: a deploy since this tab loaded is offered here.
+            child: SiteUpdateBanner(child: child!),
+          ),
         ),
       ),
     ),

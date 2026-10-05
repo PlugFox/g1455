@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455_example/main.dart';
 import 'package:g1455_example/src/catalog/catalog.dart';
+import 'package:g1455_example/src/platform/web_client.dart';
 import 'package:g1455_example/src/widgets/selection.dart';
 
 Future<void> _frames(WidgetTester tester, [int n = 30]) async {
@@ -98,6 +99,78 @@ void main() {
       await tester.tap(keep);
       await _frames(tester, 30);
       expect(find.text(_title), findsNothing);
+    });
+  });
+
+  group('the browser notice', () {
+    Future<void> open(WidgetTester tester, WebClient client, {bool reduced = false}) async {
+      _size(tester, const Size(1280, 800));
+      await tester.pumpWidget(
+        GlassExampleApp(initialLocation: '/', opensReduced: reduced, webClient: () => client),
+      );
+      await _frames(tester, 20);
+    }
+
+    testWidgets('is not shown on a desktop Chromium', (WidgetTester tester) async {
+      await open(tester, const WebClient(blink: true, mobile: false));
+      expect(find.text('Continue anyway'), findsNothing);
+      expect(find.text(_title), findsNothing);
+    });
+
+    testWidgets('on a phone recommends a desktop, and closes', (WidgetTester tester) async {
+      await open(tester, const WebClient(blink: true, mobile: true));
+      expect(find.text('Best on a desktop'), findsOneWidget);
+      expect(find.textContaining('In a native app'), findsOneWidget);
+      await tester.tap(find.text('Continue anyway'));
+      await _frames(tester, 30);
+      expect(find.text('Best on a desktop'), findsNothing);
+    });
+
+    testWidgets('closed, keeps the date and stays closed for a day', (WidgetTester tester) async {
+      _size(tester, const Size(1280, 800));
+      final closes = <DateTime>[];
+      Widget app(DateTime? closed) => GlassExampleApp(
+        key: UniqueKey(),
+        initialLocation: '/',
+        opensReduced: false,
+        webClient: () => const WebClient(blink: false, mobile: false),
+        noticeClosed: () => closed,
+        onNoticeClosed: closes.add,
+      );
+      const String title = 'Best in a Chromium browser';
+
+      // Not closed, then reloaded: shown again, and nothing kept.
+      await tester.pumpWidget(app(null));
+      await _frames(tester, 20);
+      expect(find.text(title), findsOneWidget);
+      await tester.pumpWidget(app(null));
+      await _frames(tester, 20);
+      expect(find.text(title), findsOneWidget);
+      expect(closes, isEmpty);
+
+      final DateTime before = DateTime.now();
+      await tester.tap(find.text('Continue anyway'));
+      await _frames(tester, 30);
+      expect(closes, hasLength(1));
+      expect(closes.single.isBefore(before), isFalse);
+
+      await tester.pumpWidget(app(DateTime.now().subtract(const Duration(hours: 23))));
+      await _frames(tester, 20);
+      expect(find.text(title), findsNothing, reason: 'closed less than a day ago');
+
+      await tester.pumpWidget(app(DateTime.now().subtract(const Duration(hours: 25))));
+      await _frames(tester, 20);
+      expect(find.text(title), findsOneWidget, reason: 'closed more than a day ago');
+    });
+
+    testWidgets('outside Blink, on Medium, says both in one sheet', (WidgetTester tester) async {
+      await open(tester, const WebClient(blink: false, mobile: false), reduced: true);
+      expect(find.text('Best in a Chromium browser'), findsOneWidget);
+      expect(find.text(_title), findsNothing);
+      expect(find.textContaining('without WebAssembly'), findsOneWidget);
+      await tester.tap(find.text('Turn the glass on'));
+      await _frames(tester, 30);
+      expect(_barLabel(GlassPreset.high.label), findsOneWidget);
     });
   });
 

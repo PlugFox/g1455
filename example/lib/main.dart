@@ -11,7 +11,15 @@ import 'src/app/app.dart';
 export 'src/app/app.dart' show GlassExampleApp, SettingsScope;
 export 'src/shell/settings_button.dart' show kSettingsButtonKey;
 export 'src/style.dart'
-    show ContrastChoice, GlassPreset, GlassSettings, MaterialChoice, RenderingChoice, RippleChoice, TintChoice;
+    show
+        AppearanceChoice,
+        ContrastChoice,
+        GlassPreset,
+        GlassSettings,
+        MaterialChoice,
+        RenderingChoice,
+        RippleChoice,
+        TintChoice;
 
 /// The g1455 design system: every component live, with its guide, its code
 /// and its API — the package's example app, and the site at

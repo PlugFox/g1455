@@ -38,7 +38,7 @@ class GlassSettingsMenu extends StatelessWidget {
             selected: preset,
             label: (GlassPreset? p) => p?.label ?? 'Custom',
             enabled: (GlassPreset? p) => p != null,
-            onSelected: (GlassPreset? p) => onChanged(p!.settings),
+            onSelected: (GlassPreset? p) => onChanged(settings.withPreset(p!)),
             colour: label,
           ),
           const SizedBox(height: 6),
@@ -47,6 +47,14 @@ class GlassSettingsMenu extends StatelessWidget {
             style: text.bodySmall?.copyWith(color: label.withValues(alpha: 0.7)),
           ),
           const SizedBox(height: 10),
+          _Heading('Appearance', text: text, colour: label),
+          _Choices<AppearanceChoice>(
+            values: AppearanceChoice.values,
+            selected: settings.appearance,
+            label: (AppearanceChoice c) => c.label,
+            onSelected: (AppearanceChoice c) => onChanged(settings.copyWith(appearance: c)),
+            colour: label,
+          ),
           _Heading('Material', text: text, colour: label),
           _Choices<MaterialChoice>(
             values: MaterialChoice.values,

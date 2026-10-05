@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:g1455/g1455.dart';
 
+import '../platform/web_client.dart';
 import 'toast.dart';
 
 /// Whether the site opens on the Medium preset rather than Ultra.
@@ -16,20 +17,37 @@ import 'toast.dart';
 /// and on it the two renderers are level.
 const bool kOpensReduced = kIsWeb && !kIsWasm;
 
-/// Says the site opened on reduced settings, why, and what to do about it.
+/// Whether the site has something to say about where it is open: reduced
+/// settings ([reduced]), or a browser or a device it is not tuned for
+/// ([client], null off the web).
+bool needsSiteNotice({required bool reduced, required WebClient? client}) => reduced || !(client?.recommended ?? true);
+
+/// Says where the site is not drawn as it is meant to be, why, and what to do
+/// about it: a phone or a tablet, a browser that is not Blink, and the reduced
+/// settings the site opened on where Flutter has no WebAssembly — in one
+/// sheet, whichever of them apply.
 ///
 /// [onFullGlass] puts the glass back; the sheet closes either way.
-Future<void> showReducedQualityNotice(BuildContext context, {required VoidCallback onFullGlass}) =>
-    showGlassSheet<void>(
-      context: context,
-      constraints: const BoxConstraints(maxWidth: 560),
-      builder: (BuildContext sheet) => _Notice(onFullGlass: onFullGlass),
-    );
+Future<void> showSiteNotice(
+  BuildContext context, {
+  required bool reduced,
+  required WebClient? client,
+  required VoidCallback onFullGlass,
+}) => showGlassSheet<void>(
+  context: context,
+  constraints: const BoxConstraints(maxWidth: 560),
+  builder: (BuildContext sheet) => _Notice(reduced: reduced, client: client, onFullGlass: onFullGlass),
+);
 
 class _Notice extends StatelessWidget {
-  const _Notice({required this.onFullGlass});
+  const _Notice({required this.reduced, required this.client, required this.onFullGlass});
 
+  final bool reduced;
+  final WebClient? client;
   final VoidCallback onFullGlass;
+
+  /// Off the recommended setup: a phone, a tablet or a browser not on Blink.
+  bool get _elsewhere => !(client?.recommended ?? true);
 
   @override
   Widget build(BuildContext context) {
@@ -64,13 +82,17 @@ class _Notice extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.speed, color: label),
+              Icon(_elsewhere ? Icons.desktop_windows_outlined : Icons.speed, color: label),
               const SizedBox(width: 10),
               Expanded(
                 child: Semantics(
                   header: true,
                   child: Text(
-                    'Opened on Medium settings',
+                    switch (client) {
+                      WebClient(mobile: true) => 'Best on a desktop',
+                      WebClient(blink: false) => 'Best in a Chromium browser',
+                      _ => 'Opened on Medium settings',
+                    },
                     style: text.titleLarge?.copyWith(color: label, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -78,17 +100,39 @@ class _Notice extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            'This browser runs Flutter without WebAssembly, and there every capture of what is under the glass '
-            'stalls the GPU. So the site shows a tint over the page instead of refraction and blur.',
-            style: body,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'For the glass as an app draws it on a phone or a desktop, open this page in Chrome on a desktop. '
-            'The settings menu in the corner turns the glass back on here.',
-            style: body,
-          ),
+          if (_elsewhere) ...<Widget>[
+            Text(
+              client!.mobile
+                  ? 'This site is tuned for a Chromium-based browser on a desktop. In a browser on a phone or a '
+                        'tablet the glass can draw slower, stutter or look different from what the package draws.'
+                  : 'This site is tuned for Blink, the engine of Chrome, Edge, Brave, Opera and Arc. In this browser '
+                        'the glass can draw slower, stutter or look different from what the package draws.',
+              style: body,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'For the site as it is meant to be seen, open it in a Chromium-based browser on a desktop. '
+              'In a native app, on a phone or a desktop, the glass is faster still: no browser stands between '
+              'it and the GPU.',
+              style: body,
+            ),
+            if (reduced) const SizedBox(height: 10),
+          ],
+          if (reduced) ...<Widget>[
+            Text(
+              'This browser runs Flutter without WebAssembly, and there every capture of what is under the glass '
+              'stalls the GPU. So the site opened on Medium: a tint over the page instead of refraction and blur.',
+              style: body,
+            ),
+            if (!_elsewhere) ...<Widget>[
+              const SizedBox(height: 10),
+              Text(
+                'For the glass as an app draws it on a phone or a desktop, open this page in Chrome on a desktop. '
+                'The settings menu in the corner turns the glass back on here.',
+                style: body,
+              ),
+            ],
+          ],
           const SizedBox(height: 20),
           Wrap(
             spacing: 10,
@@ -104,14 +148,17 @@ class _Notice extends StatelessWidget {
                 },
                 child: const Text('Copy link'),
               ),
-              GlassButton(
-                onPressed: () {
-                  onFullGlass();
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Turn the glass on'),
-              ),
-              GlassButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Keep Medium')),
+              if (reduced) ...<Widget>[
+                GlassButton(
+                  onPressed: () {
+                    onFullGlass();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Turn the glass on'),
+                ),
+                GlassButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Keep Medium')),
+              ] else
+                GlassButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Continue anyway')),
             ],
           ),
         ],

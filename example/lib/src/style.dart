@@ -70,6 +70,24 @@ enum ContrastChoice {
   final String label;
 }
 
+/// The appearance the site is shown in: what `MediaQuery.platformBrightness`
+/// says under the host, so `.regular` and every demo that picks a branch of it
+/// follow the choice rather than the operating system.
+///
+/// Dark by default: the site's pages are dark, and the glass is made for them.
+enum AppearanceChoice {
+  dark('Dark', Brightness.dark),
+  light('Light', Brightness.light),
+  system('System', null);
+
+  const AppearanceChoice(this.label, this.brightness);
+
+  final String label;
+
+  /// Null keeps the platform's own.
+  final Brightness? brightness;
+}
+
 /// Everything the settings menu sets: what the host is given.
 ///
 /// Every field is a declaration the host takes — nothing is drawn by the
@@ -82,6 +100,7 @@ class GlassSettings {
     this.rendering = RenderingChoice.glass,
     this.ripple = RippleChoice.off,
     this.contrast = ContrastChoice.system,
+    this.appearance = AppearanceChoice.dark,
   });
 
   final MaterialChoice material;
@@ -89,6 +108,10 @@ class GlassSettings {
   final RenderingChoice rendering;
   final RippleChoice ripple;
   final ContrastChoice contrast;
+
+  /// Not part of a preset: a preset is how much glass is drawn, and the
+  /// appearance is kept across a change of it.
+  final AppearanceChoice appearance;
 
   /// The material in the chosen tint, in [appearance] — or null for the
   /// host's own choice of `.regular`'s branch, when nothing is tinted.
@@ -117,10 +140,12 @@ class GlassSettings {
   /// For the host: null reads the platform's switch.
   bool? get highContrast => contrast == ContrastChoice.increased ? true : null;
 
-  /// The preset these settings are, or null for custom ones.
+  /// The preset these settings are, or null for custom ones — whatever the
+  /// appearance.
   GlassPreset? get preset {
+    final GlassSettings graphics = copyWith(appearance: AppearanceChoice.dark);
     for (final GlassPreset p in GlassPreset.values) {
-      if (p.settings == this) {
+      if (p.settings == graphics) {
         return p;
       }
     }
@@ -133,13 +158,18 @@ class GlassSettings {
     RenderingChoice? rendering,
     RippleChoice? ripple,
     ContrastChoice? contrast,
+    AppearanceChoice? appearance,
   }) => GlassSettings(
     material: material ?? this.material,
     tint: tint ?? this.tint,
     rendering: rendering ?? this.rendering,
     ripple: ripple ?? this.ripple,
     contrast: contrast ?? this.contrast,
+    appearance: appearance ?? this.appearance,
   );
+
+  /// [preset]'s settings, in this appearance.
+  GlassSettings withPreset(GlassPreset preset) => preset.settings.copyWith(appearance: appearance);
 
   @override
   bool operator ==(Object other) =>
@@ -148,10 +178,11 @@ class GlassSettings {
       other.tint == tint &&
       other.rendering == rendering &&
       other.ripple == ripple &&
-      other.contrast == contrast;
+      other.contrast == contrast &&
+      other.appearance == appearance;
 
   @override
-  int get hashCode => Object.hash(material, tint, rendering, ripple, contrast);
+  int get hashCode => Object.hash(material, tint, rendering, ripple, contrast, appearance);
 }
 
 /// Named settings, the way a game names its graphics settings: from the most

@@ -93,6 +93,28 @@ void main() {
     expect(_barLabel('Custom'), findsOneWidget);
   });
 
+  testWidgets('the site opens dark whatever the platform says, and the menu changes it', (WidgetTester tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    await tester.pumpWidget(const GlassExampleApp(initialLocation: '/demos/scroll'));
+    await _frames(tester, 4);
+    Brightness appearance() => MediaQuery.platformBrightnessOf(tester.element(find.byType(GlassHost)));
+    expect(appearance(), Brightness.dark);
+
+    await _openMenu(tester);
+    // The first "System" is the appearance's; the second the contrast's.
+    await tester.tap(_inMenu('System').first);
+    await _frames(tester, 6);
+    expect(appearance(), Brightness.light);
+    expect(_barLabel(GlassPreset.ultra.label), findsOneWidget, reason: 'the appearance is not part of a preset');
+
+    // A preset keeps the appearance.
+    await tester.tap(_inMenu(GlassPreset.medium.label));
+    await _frames(tester, 6);
+    expect(appearance(), Brightness.light);
+    expect(_barLabel(GlassPreset.medium.label), findsOneWidget);
+  });
+
   testWidgets('a ripple from the menu, and a touch on the glass makes a wave', (WidgetTester tester) async {
     await tester.pumpWidget(const GlassExampleApp(initialLocation: '/demos/scroll'));
     await _frames(tester, 4);
