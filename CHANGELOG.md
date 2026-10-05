@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.4
 
 - `showGlassSheet(barrierDismissible: false)` is a sheet only its content
   closes, as UIKit's `isModalInPresentation`: a drag or a flick used to close
