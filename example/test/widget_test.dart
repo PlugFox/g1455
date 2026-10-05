@@ -45,7 +45,7 @@ void main() {
       await _frames(tester, 6);
       final GlassHost host = tester.widget(find.byType(GlassHost));
       final GlassSettings s = preset.settings;
-      expect(host.finish, s.finishIn(Brightness.light), reason: preset.label);
+      expect(host.finish, s.finishIn(Brightness.dark), reason: preset.label);
       expect(host.tier.tier, s.rendering.tier, reason: preset.label);
       expect(host.ripple?.viscosity, s.ripple.viscosity, reason: preset.label);
       expect(_barLabel(preset.label), findsOneWidget, reason: preset.label);
@@ -99,7 +99,18 @@ void main() {
     await tester.pumpWidget(const GlassExampleApp(initialLocation: '/demos/scroll'));
     await _frames(tester, 4);
     Brightness appearance() => MediaQuery.platformBrightnessOf(tester.element(find.byType(GlassHost)));
+    GlassFinish? finish() => tester.widget<GlassHost>(find.byType(GlassHost)).finish;
     expect(appearance(), Brightness.dark);
+    expect(finish(), GlassFinish.regularDark);
+
+    await _openMenu(tester);
+    // The first "Light" is the appearance's; the second the material's.
+    await tester.tap(_inMenu('Light').first);
+    await _frames(tester, 6);
+    expect(appearance(), Brightness.light);
+    expect(finish(), GlassFinish.regularLight, reason: 'the appearance picks the branch of .regular');
+    await tester.tapAt(const Offset(40, 500));
+    await _frames(tester, 20);
 
     await _openMenu(tester);
     // The first "System" is the appearance's; the second the contrast's.

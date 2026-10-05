@@ -132,7 +132,7 @@ class _GlassExampleAppState extends State<GlassExampleApp> {
           valueListenable: siteAdaptive,
           builder: (BuildContext context, GlassAdaptive? adaptive, Widget? _) => GlassHost(
             adaptive: adaptive,
-            finish: _settings.finishIn(MediaQuery.platformBrightnessOf(context)),
+            finish: _settings.finishIn(MediaQuery.platformBrightnessOf(context), adaptive: adaptive != null),
             tier: _settings.tierChoice,
             highContrast: _settings.highContrast,
             // The opaque rung fills with the level over this, and reads nothing
