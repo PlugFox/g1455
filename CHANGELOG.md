@@ -17,7 +17,8 @@ Documentation:
   systems, the renderer, the metric, the dates, and the Flutter and engine
   revisions, in the README and on the site's How it works.
 - pub.dev shows a square, still picture of the package: its icon leads the
-  screenshots, ahead of the loops, which it showed as one frame.
+  screenshots, ahead of the loops, which it showed as one frame. pub.dev takes
+  ten, so the materialize loop makes room; the alert's shows the same arrival.
 
 ## 0.1.3
 
