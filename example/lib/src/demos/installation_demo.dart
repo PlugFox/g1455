@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// Hello, glass: a bar floating over a list that scrolls under it, and a
 /// floating button to add as the second piece of glass.
@@ -46,12 +48,12 @@ class _InstallationDemoState extends State<InstallationDemo> {
             child: GlassBar(
               child: Row(
                 children: <Widget>[
-                  Icon(Icons.photo_library_outlined),
+                  SiteIcon(SFIcons.sf_photo_on_rectangle),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text('Library', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                   ),
-                  Icon(Icons.search),
+                  SiteIcon(SFIcons.sf_magnifyingglass),
                 ],
               ),
             ),
@@ -65,7 +67,7 @@ class _InstallationDemoState extends State<InstallationDemo> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  const Icon(Icons.add, size: 20),
+                  const SiteIcon(SFIcons.sf_plus, size: 20),
                   const SizedBox(width: 6),
                   Text(_added == 0 ? 'New album' : 'Added $_added'),
                 ],

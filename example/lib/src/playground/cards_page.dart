@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
+import '../widgets/site_icon.dart';
 
 /// A grid of photographs with glass captions.
 ///
@@ -75,7 +77,7 @@ class _Photo extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Row(
               children: <Widget>[
-                const Icon(Icons.place, size: 16),
+                const SiteIcon(SFIcons.sf_mappin_and_ellipse, size: 16),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(

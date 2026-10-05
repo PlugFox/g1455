@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
 import 'package:squid/squid.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/routes.dart';
 import '../app/theme.dart';
@@ -12,6 +13,7 @@ import '../widgets/doc_view.dart';
 import '../widgets/icons.dart';
 import '../widgets/links.dart';
 import '../widgets/selection.dart';
+import '../widgets/site_icon.dart';
 
 /// A page of the reference: what the thing is, the thing itself, live, and
 /// then the guide, the code and the API — one tab each, the tab in the
@@ -107,7 +109,7 @@ class _Header extends StatelessWidget {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Icon(iconFor(entry.icon), size: 18, color: kSiteAccent),
+                  SiteIcon(iconFor(entry.icon), size: 18, color: kSiteAccent),
                   const SizedBox(width: 8),
                   Flexible(
                     child: LinkText(
@@ -148,7 +150,7 @@ class _Header extends StatelessWidget {
             for (final String symbol in entry.api.take(narrow ? 2 : 4))
               Pill(
                 label: symbol,
-                icon: Icons.menu_book_outlined,
+                icon: SFIcons.sf_book,
                 monospace: true,
                 tooltip: 'API reference on pub.dev',
                 onTap: () => openLink(context, Site.api(symbol)),
@@ -156,18 +158,18 @@ class _Header extends StatelessWidget {
             if (entry.source case final String source)
               Pill(
                 label: 'Source',
-                icon: Icons.code,
+                icon: SFIcons.sf_chevron_left_forwardslash_chevron_right,
                 tooltip: source,
                 onTap: () => openLink(context, Site.source(source)),
               ),
             if (hasDemo(entry))
               Pill(
                 label: 'Demo source',
-                icon: Icons.play_circle_outline,
+                icon: SFIcons.sf_play_circle,
                 tooltip: entry.demoSource,
                 onTap: () => openLink(context, Site.source(entry.demoSource)),
               ),
-            Pill(label: 'Copy link', icon: Icons.link, onTap: () => copyLink(context, entry.path)),
+            Pill(label: 'Copy link', icon: SFIcons.sf_link, onTap: () => copyLink(context, entry.path)),
           ],
         ),
       ],
@@ -217,7 +219,7 @@ class _PillState extends State<Pill> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (widget.icon != null) ...<Widget>[
-                    Icon(widget.icon, size: 16, color: kSiteAccent),
+                    SiteIcon(widget.icon, size: 16, color: kSiteAccent),
                     const SizedBox(width: 8),
                   ],
                   Flexible(
@@ -261,7 +263,7 @@ class _CodeTab extends StatelessWidget {
           child: LinkText(
             text: 'The demo above, in full: ${entry.demoSource}',
             url: Site.source(entry.demoSource),
-            icon: Icons.open_in_new,
+            icon: SFIcons.sf_arrow_up_right_square,
             style: const TextStyle(fontSize: 14),
           ),
         ),
@@ -377,7 +379,7 @@ class _NeighbourCardState extends State<_NeighbourCard> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      if (!forward) const Icon(Icons.arrow_back, size: 18, color: kSiteAccent),
+                      if (!forward) const SiteIcon(SFIcons.sf_chevron_left, size: 18, color: kSiteAccent),
                       if (!forward) const SizedBox(width: 8),
                       Flexible(
                         child: Text(
@@ -387,7 +389,7 @@ class _NeighbourCardState extends State<_NeighbourCard> {
                         ),
                       ),
                       if (forward) const SizedBox(width: 8),
-                      if (forward) const Icon(Icons.arrow_forward, size: 18, color: kSiteAccent),
+                      if (forward) const SiteIcon(SFIcons.sf_chevron_right, size: 18, color: kSiteAccent),
                     ],
                   ),
                 ],

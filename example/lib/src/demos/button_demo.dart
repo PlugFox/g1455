@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// Text, icon and icon-only buttons with a tap counter, and a disabled one.
 class ButtonDemo extends StatefulWidget {
@@ -62,7 +64,11 @@ class _ButtonDemoState extends State<ButtonDemo> {
                     borderRadius: _radius,
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[Icon(Icons.ios_share, size: 18), SizedBox(width: 6), Text('Share')],
+                      children: <Widget>[
+                        SiteIcon(SFIcons.sf_square_and_arrow_up, size: 18),
+                        SizedBox(width: 6),
+                        Text('Share'),
+                      ],
                     ),
                   ),
                   GlassButton(
@@ -70,14 +76,14 @@ class _ButtonDemoState extends State<ButtonDemo> {
                     borderRadius: _radius,
                     padding: EdgeInsets.zero,
                     semanticLabel: _liked ? 'Unlike' : 'Like',
-                    child: Icon(_liked ? Icons.favorite : Icons.favorite_border),
+                    child: SiteIcon(_liked ? SFIcons.sf_heart_fill : SFIcons.sf_heart),
                   ),
                   GlassButton(
                     onPressed: tap,
                     borderRadius: _radius,
                     padding: EdgeInsets.zero,
                     semanticLabel: 'Add',
-                    child: const Icon(Icons.add),
+                    child: const SiteIcon(SFIcons.sf_plus),
                   ),
                 ],
               ),

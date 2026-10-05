@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/app.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A bar over a bright sky, a card on the horizon and buttons over a dark
 /// ground. With "Adaptive" on, the site's own host reads the backdrop under
@@ -94,12 +96,12 @@ class _AdaptiveDemoState extends State<AdaptiveDemo> {
             child: GlassBar(
               child: Row(
                 children: <Widget>[
-                  Icon(Icons.arrow_back_ios_new, size: 18),
+                  SiteIcon(SFIcons.sf_chevron_left, size: 18),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text('Lake Tekapo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                   ),
-                  Icon(Icons.ios_share, size: 20),
+                  SiteIcon(SFIcons.sf_square_and_arrow_up, size: 20),
                 ],
               ),
             ),
@@ -118,14 +120,14 @@ class _AdaptiveDemoState extends State<AdaptiveDemo> {
                   onPressed: () {},
                   semanticLabel: 'Favourite',
                   padding: const EdgeInsets.all(12),
-                  child: const Icon(Icons.favorite_border, size: 20),
+                  child: const SiteIcon(SFIcons.sf_heart, size: 20),
                 ),
                 GlassButton(onPressed: () {}, child: const Text('Directions')),
                 GlassButton(
                   onPressed: () {},
                   semanticLabel: 'More',
                   padding: const EdgeInsets.all(12),
-                  child: const Icon(Icons.more_horiz, size: 20),
+                  child: const SiteIcon(SFIcons.sf_ellipsis, size: 20),
                 ),
               ],
             ),

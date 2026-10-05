@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/theme.dart';
 import '../platform/site_update.dart';
+import 'site_icon.dart';
 
 /// Says that a newer build of the site is live, and reloads into it.
 ///
@@ -116,7 +118,7 @@ class _SiteUpdateBannerState extends State<SiteUpdateBanner> with SingleTickerPr
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Icon(Icons.system_update_alt, size: 18, color: label),
+                  SiteIcon(SFIcons.sf_arrow_down_app, size: 18, color: label),
                   const SizedBox(width: 10),
                   Flexible(
                     child: Text('A new version of the site is out', maxLines: 2, style: text),
@@ -186,7 +188,7 @@ class _Close extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Icon(Icons.close, size: 18, color: colour.withValues(alpha: 0.75)),
+          child: SiteIcon(SFIcons.sf_xmark, size: 18, color: colour.withValues(alpha: 0.75)),
         ),
       ),
     ),

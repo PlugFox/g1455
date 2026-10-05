@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_md/flutter_md.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import 'toast.dart';
 
@@ -36,7 +37,7 @@ class SiteSelectionArea extends StatelessWidget {
               region
                 ..hideToolbar()
                 ..clearSelection();
-              showGlassToast(context, 'Copied', icon: Icons.content_copy);
+              showGlassToast(context, 'Copied', icon: SFIcons.sf_document_on_document);
             },
           )
         else
@@ -57,7 +58,7 @@ Widget markdownSelectionMenu(BuildContext context, MarkdownSelectionScopeState s
                 await scope.copySelection();
                 scope.clearSelection();
                 if (context.mounted) {
-                  showGlassToast(context, 'Copied', icon: Icons.content_copy);
+                  showGlassToast(context, 'Copied', icon: SFIcons.sf_document_on_document);
                 }
               },
             )

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
@@ -14,10 +15,10 @@ class DropMotionDemo extends StatefulWidget {
 }
 
 const List<GlassTabItem> _kTabs = <GlassTabItem>[
-  GlassTabItem(icon: Icons.home_rounded, label: 'Home'),
-  GlassTabItem(icon: Icons.search_rounded, label: 'Search'),
-  GlassTabItem(icon: Icons.library_music_rounded, label: 'Library'),
-  GlassTabItem(icon: Icons.person_rounded, label: 'Profile'),
+  GlassTabItem(icon: SFIcons.sf_house_fill, label: 'Home'),
+  GlassTabItem(icon: SFIcons.sf_magnifyingglass, label: 'Search'),
+  GlassTabItem(icon: SFIcons.sf_music_note_list, label: 'Library'),
+  GlassTabItem(icon: SFIcons.sf_person_fill, label: 'Profile'),
 ];
 
 class _DropMotionDemoState extends State<DropMotionDemo> {

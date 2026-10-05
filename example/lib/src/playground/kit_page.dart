@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
+import '../widgets/site_icon.dart';
 
 /// The rest of the kit, on glass cards that scroll under the bars: a
 /// segmented control, a search field, a toolbar's group, and the modal layer —
@@ -98,7 +100,7 @@ class _KitPageState extends State<KitPage> {
                     GlassButtonGroup(
                       items: <GlassToolbarItem>[
                         GlassToolbarItem(
-                          icon: const Icon(Icons.ios_share),
+                          icon: const SiteIcon(SFIcons.sf_square_and_arrow_up),
                           label: 'Share',
                           onPressed: () => _say('share'),
                         ),
@@ -108,17 +110,17 @@ class _KitPageState extends State<KitPage> {
                     GlassButtonGroup(
                       items: <GlassToolbarItem>[
                         GlassToolbarItem(
-                          icon: const Icon(Icons.favorite_border),
+                          icon: const SiteIcon(SFIcons.sf_heart),
                           label: 'Like',
                           onPressed: () => _say('like'),
                         ),
                         GlassToolbarItem(
-                          icon: const Icon(Icons.bookmark_border),
+                          icon: const SiteIcon(SFIcons.sf_bookmark),
                           label: 'Save',
                           onPressed: () => _say('save'),
                         ),
                         GlassToolbarItem(
-                          icon: const Icon(Icons.delete_outline),
+                          icon: const SiteIcon(SFIcons.sf_trash),
                           label: 'Delete',
                           onPressed: () => _say('delete'),
                         ),
@@ -189,17 +191,17 @@ class _KitPageState extends State<KitPage> {
                       items: <GlassMenuItem>[
                         GlassMenuItem(
                           label: 'Rename',
-                          icon: const Icon(Icons.edit, size: 18),
+                          icon: const SiteIcon(SFIcons.sf_pencil, size: 18),
                           onPressed: () => _say('rename'),
                         ),
                         GlassMenuItem(
                           label: 'Duplicate',
-                          icon: const Icon(Icons.copy, size: 18),
+                          icon: const SiteIcon(SFIcons.sf_document_on_document, size: 18),
                           onPressed: () => _say('duplicate'),
                         ),
                         GlassMenuItem(
                           label: 'Delete',
-                          icon: const Icon(Icons.delete_outline, size: 18),
+                          icon: const SiteIcon(SFIcons.sf_trash, size: 18),
                           isDestructive: true,
                           onPressed: () => _say('delete'),
                         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/routes.dart';
 import '../app/theme.dart';
@@ -8,6 +9,7 @@ import '../widgets/icons.dart';
 import '../widgets/links.dart';
 import 'aurora.dart';
 import 'settings_button.dart';
+import '../widgets/site_icon.dart';
 
 /// Every page of the reference: the ground, a glass side panel with the
 /// navigation on a wide window, a glass top bar, and the page scrolling under
@@ -117,7 +119,11 @@ class _TopBar extends StatelessWidget {
             return Row(
               children: <Widget>[
                 if (!wide) ...<Widget>[
-                  _BarIcon(icon: Icons.menu, tooltip: 'Navigation', onTap: () => _openNavigation(context)),
+                  _BarIcon(
+                    icon: SFIcons.sf_line_3_horizontal,
+                    tooltip: 'Navigation',
+                    onTap: () => _openNavigation(context),
+                  ),
                   _HomeMark(colour: label),
                 ] else
                   const SizedBox(width: 14),
@@ -130,12 +136,12 @@ class _TopBar extends StatelessWidget {
                 ),
                 if (size(context) >= 560) ...<Widget>[
                   _BarIcon(
-                    icon: Icons.code,
+                    icon: SFIcons.sf_chevron_left_forwardslash_chevron_right,
                     tooltip: 'Source on GitHub',
                     onTap: () => openLink(context, Site.repository),
                   ),
                   _BarIcon(
-                    icon: Icons.inventory_2_outlined,
+                    icon: SFIcons.sf_shippingbox,
                     tooltip: 'Package on pub.dev',
                     onTap: () => openLink(context, Site.pub),
                   ),
@@ -249,7 +255,7 @@ class _BarIcon extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: Icon(icon, size: 22),
+            child: SiteIcon(icon, size: 22),
           ),
         ),
       ),
@@ -432,7 +438,7 @@ class _NavigationListState extends State<_NavigationList> {
         _NavItem(
           key: current == null ? _selected : null,
           title: 'Overview',
-          icon: Icons.home_outlined,
+          icon: SFIcons.sf_house,
           selected: current == null,
           colour: label,
           onTap: () => _open(() => openHome(context)),
@@ -520,7 +526,7 @@ class _NavItemState extends State<_NavItem> {
             ),
             child: Row(
               children: <Widget>[
-                Icon(widget.icon, size: 19, color: colour.withValues(alpha: widget.selected ? 1 : 0.75)),
+                SiteIcon(widget.icon, size: 19, color: colour.withValues(alpha: widget.selected ? 1 : 0.75)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

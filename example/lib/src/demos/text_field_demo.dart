@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A search field filtering a few places over a photograph, and a plain field
 /// under it; what was submitted is read out underneath.
@@ -89,7 +91,10 @@ class _TextFieldDemoState extends State<TextFieldDemo> {
                       ? Semantics(
                           button: true,
                           label: 'Clear',
-                          child: GestureDetector(onTap: _query.clear, child: const Icon(Icons.cancel)),
+                          child: GestureDetector(
+                            onTap: _query.clear,
+                            child: const SiteIcon(SFIcons.sf_xmark_circle_fill),
+                          ),
                         )
                       : null,
                 ),
@@ -114,7 +119,7 @@ class _TextFieldDemoState extends State<TextFieldDemo> {
                   key: ValueKey<bool>(_obscure),
                   finish: _glass,
                   placeholder: _obscure ? 'Password' : 'Add a caption',
-                  leading: Icon(_obscure ? Icons.lock_outline : Icons.edit_outlined),
+                  leading: SiteIcon(_obscure ? SFIcons.sf_lock : SFIcons.sf_pencil),
                   obscureText: _obscure,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (String v) =>

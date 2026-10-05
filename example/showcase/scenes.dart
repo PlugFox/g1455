@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import 'backdrop.dart';
 import 'harness.dart';
+
+import 'package:g1455_example/src/widgets/site_icon.dart';
 
 /// The README's grid, left to right and top to bottom, [kGridColumns] to a
 /// row: each scene is cut from the backdrop at its own index, so reordering
@@ -235,7 +238,7 @@ Widget _materialize(BuildContext context, ValueListenable<double> phase) => Valu
             const Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(Icons.photo_library_outlined, size: 20),
+                SiteIcon(SFIcons.sf_photo_on_rectangle, size: 20),
                 SizedBox(width: 8),
                 Text('Library', style: label),
               ],
@@ -272,9 +275,9 @@ class _SwitchesState extends State<_Switches> {
   final List<bool> _on = <bool>[true, false, true];
 
   static const List<(IconData, String)> _rows = <(IconData, String)>[
-    (Icons.wifi, 'Wi-Fi'),
-    (Icons.bluetooth, 'Bluetooth'),
-    (Icons.dark_mode, 'Dark mode'),
+    (SFIcons.sf_wifi, 'Wi-Fi'),
+    (SFIcons.sf_wave_3_right, 'Bluetooth'),
+    (SFIcons.sf_moon_fill, 'Dark mode'),
   ];
 
   @override
@@ -289,7 +292,7 @@ class _SwitchesState extends State<_Switches> {
             for (var i = 0; i < _rows.length; i++)
               Row(
                 children: <Widget>[
-                  Icon(_rows[i].$1, size: 20),
+                  SiteIcon(_rows[i].$1, size: 20),
                   const SizedBox(width: 12),
                   Expanded(child: Text(_rows[i].$2, style: const TextStyle(fontSize: 15))),
                   GlassSwitch(
@@ -335,8 +338,8 @@ class _SlidersState extends State<_Sliders> {
   final List<double> _value = <double>[0.25, 0.65];
 
   static const List<(IconData, IconData, Color)> _rows = <(IconData, IconData, Color)>[
-    (Icons.volume_mute, Icons.volume_up, Color(0xFF0A84FF)),
-    (Icons.brightness_low, Icons.brightness_high, Color(0xFFFF9F0A)),
+    (SFIcons.sf_speaker_fill, SFIcons.sf_speaker_wave_2_fill, Color(0xFF0A84FF)),
+    (SFIcons.sf_sun_min, SFIcons.sf_sun_max_fill, Color(0xFFFF9F0A)),
   ];
 
   @override
@@ -351,7 +354,7 @@ class _SlidersState extends State<_Sliders> {
             for (var i = 0; i < _rows.length; i++)
               Row(
                 children: <Widget>[
-                  Icon(_rows[i].$1, size: 20),
+                  SiteIcon(_rows[i].$1, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: GlassSlider(
@@ -362,7 +365,7 @@ class _SlidersState extends State<_Sliders> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Icon(_rows[i].$2, size: 20),
+                  SiteIcon(_rows[i].$2, size: 20),
                 ],
               ),
           ],
@@ -398,10 +401,10 @@ class _TabsState extends State<_Tabs> {
       width: 340,
       child: GlassTabBar(
         items: const <GlassTabItem>[
-          GlassTabItem(icon: Icons.home_rounded, label: 'Home'),
-          GlassTabItem(icon: Icons.explore, label: 'Explore'),
-          GlassTabItem(icon: Icons.favorite, label: 'Saved'),
-          GlassTabItem(icon: Icons.person, label: 'Profile'),
+          GlassTabItem(icon: SFIcons.sf_house_fill, label: 'Home'),
+          GlassTabItem(icon: SFIcons.sf_safari, label: 'Explore'),
+          GlassTabItem(icon: SFIcons.sf_heart_fill, label: 'Saved'),
+          GlassTabItem(icon: SFIcons.sf_person_fill, label: 'Profile'),
         ],
         selectedIndex: _selected,
         onSelected: (int i) => setState(() => _selected = i),
@@ -455,16 +458,16 @@ class _MenuDemo extends StatelessWidget {
       children: <Widget>[
         GlassMenuAnchor(
           items: <GlassMenuItem>[
-            GlassMenuItem(label: 'Name', icon: const Icon(Icons.sort_by_alpha, size: 20), onPressed: () {}),
-            GlassMenuItem(label: 'Date', icon: const Icon(Icons.schedule, size: 20), onPressed: () {}),
-            GlassMenuItem(label: 'Size', icon: const Icon(Icons.straighten, size: 20), onPressed: () {}),
+            GlassMenuItem(label: 'Name', icon: const SiteIcon(SFIcons.sf_textformat, size: 20), onPressed: () {}),
+            GlassMenuItem(label: 'Date', icon: const SiteIcon(SFIcons.sf_clock, size: 20), onPressed: () {}),
+            GlassMenuItem(label: 'Size', icon: const SiteIcon(SFIcons.sf_ruler, size: 20), onPressed: () {}),
           ],
           builder: (BuildContext context, GlassMenuController menu) => GlassButton(
             key: _menuButton,
             onPressed: menu.open,
             child: const Row(
               mainAxisSize: MainAxisSize.min,
-              children: <Widget>[Icon(Icons.swap_vert, size: 20), SizedBox(width: 6), Text('Sort')],
+              children: <Widget>[SiteIcon(SFIcons.sf_arrow_up_arrow_down, size: 20), SizedBox(width: 6), Text('Sort')],
             ),
           ),
         ),
@@ -472,9 +475,9 @@ class _MenuDemo extends StatelessWidget {
         GlassButtonGroup(
           key: _toolbar,
           items: <GlassToolbarItem>[
-            GlassToolbarItem(icon: const Icon(Icons.ios_share), label: 'Share', onPressed: () {}),
-            GlassToolbarItem(icon: const Icon(Icons.favorite_border), label: 'Like', onPressed: () {}),
-            GlassToolbarItem(icon: const Icon(Icons.delete_outline), label: 'Delete', onPressed: () {}),
+            GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_square_and_arrow_up), label: 'Share', onPressed: () {}),
+            GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_heart), label: 'Like', onPressed: () {}),
+            GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_trash), label: 'Delete', onPressed: () {}),
           ],
         ),
       ],
@@ -510,7 +513,7 @@ class _AlertDemo extends StatelessWidget {
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
-        children: <Widget>[Icon(Icons.delete_outline, size: 20), SizedBox(width: 8), Text('Delete')],
+        children: <Widget>[SiteIcon(SFIcons.sf_trash, size: 20), SizedBox(width: 8), Text('Delete')],
       ),
     ),
   );

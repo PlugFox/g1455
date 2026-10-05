@@ -2,8 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A list of places, and a glass button whose popover sorts and filters it:
 /// the popover stays open while the list behind it follows every change.
@@ -120,7 +122,11 @@ class _PopoverDemoState extends State<PopoverDemo> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[Icon(Icons.tune, size: 20), SizedBox(width: 6), Text('Sort & filter')],
+                      children: <Widget>[
+                        SiteIcon(SFIcons.sf_slider_horizontal_3, size: 20),
+                        SizedBox(width: 6),
+                        Text('Sort & filter'),
+                      ],
                     ),
                   ),
                 ),
@@ -234,7 +240,7 @@ class _Row extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: <Widget>[
-            Icon(place.favourite ? Icons.favorite : Icons.place_outlined, color: Colors.white, size: 20),
+            SiteIcon(place.favourite ? SFIcons.sf_heart_fill : SFIcons.sf_mappin, color: Colors.white, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(

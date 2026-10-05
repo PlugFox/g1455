@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../platform/web_client.dart';
 import 'toast.dart';
+import 'site_icon.dart';
 
 /// Whether the site opens on the Medium preset rather than Ultra.
 ///
@@ -82,7 +84,10 @@ class _Notice extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(_elsewhere ? Icons.desktop_windows_outlined : Icons.speed, color: label),
+              SiteIcon(
+                _elsewhere ? SFIcons.sf_desktopcomputer : SFIcons.sf_gauge_with_dots_needle_67percent,
+                color: label,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Semantics(
@@ -142,7 +147,7 @@ class _Notice extends StatelessWidget {
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: Uri.base.toString()));
                   if (context.mounted) {
-                    showGlassToast(context, 'Link copied: paste it into Chrome', icon: Icons.link);
+                    showGlassToast(context, 'Link copied: paste it into Chrome', icon: SFIcons.sf_link);
                     Navigator.of(context).pop();
                   }
                 },

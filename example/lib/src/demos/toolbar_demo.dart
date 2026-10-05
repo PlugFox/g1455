@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A photo viewer: a group of two at the top, and a toolbar at the bottom of
 /// a circle, a group and a circle — each group one glass surface.
@@ -34,16 +36,20 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
   Widget build(BuildContext context) {
     final List<GlassToolbarItem> middle = <GlassToolbarItem>[
       GlassToolbarItem(
-        icon: Icon(_liked ? Icons.favorite : Icons.favorite_border),
+        icon: SiteIcon(_liked ? SFIcons.sf_heart_fill : SFIcons.sf_heart),
         label: _liked ? 'Unlike' : 'Like',
         onPressed: () => setState(() {
           _liked = !_liked;
           _last = _liked ? 'liked' : 'unliked';
         }),
       ),
-      GlassToolbarItem(icon: const Icon(Icons.info_outline), label: 'Info', onPressed: () => _say('info')),
-      GlassToolbarItem(icon: const Icon(Icons.tune), label: 'Edit', onPressed: () => _say('edit')),
-      GlassToolbarItem(icon: const Icon(Icons.crop), label: 'Crop', onPressed: () => _say('crop')),
+      GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_info_circle), label: 'Info', onPressed: () => _say('info')),
+      GlassToolbarItem(
+        icon: const SiteIcon(SFIcons.sf_slider_horizontal_3),
+        label: 'Edit',
+        onPressed: () => _say('edit'),
+      ),
+      GlassToolbarItem(icon: const SiteIcon(SFIcons.sf_crop), label: 'Crop', onPressed: () => _say('crop')),
     ].sublist(0, _middle);
     return DemoStage(
       height: 360,
@@ -80,12 +86,12 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
                     GlassButtonGroup(
                       items: <GlassToolbarItem>[
                         GlassToolbarItem(
-                          icon: const Icon(Icons.chevron_left),
+                          icon: const SiteIcon(SFIcons.sf_chevron_left),
                           label: 'Previous photo',
                           onPressed: () => _go(_kPhotos - 1),
                         ),
                         GlassToolbarItem(
-                          icon: const Icon(Icons.chevron_right),
+                          icon: const SiteIcon(SFIcons.sf_chevron_right),
                           label: 'Next photo',
                           onPressed: () => _go(1),
                         ),
@@ -104,7 +110,7 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
                       GlassButtonGroup(
                         items: <GlassToolbarItem>[
                           GlassToolbarItem(
-                            icon: const Icon(Icons.ios_share),
+                            icon: const SiteIcon(SFIcons.sf_square_and_arrow_up),
                             label: 'Share',
                             onPressed: () => _say('share'),
                           ),
@@ -117,7 +123,7 @@ class _ToolbarDemoState extends State<ToolbarDemo> {
                       GlassButtonGroup(
                         items: <GlassToolbarItem>[
                           GlassToolbarItem(
-                            icon: const Icon(Icons.delete_outline),
+                            icon: const SiteIcon(SFIcons.sf_trash),
                             label: 'Delete',
                             onPressed: _deleteEnabled ? () => _say('delete') : null,
                           ),

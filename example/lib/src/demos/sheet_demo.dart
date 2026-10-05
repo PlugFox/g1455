@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A photo with a share button, opening a share sheet on glass; what the
 /// sheet returned is read out underneath.
@@ -65,7 +67,11 @@ class _SheetDemoState extends State<SheetDemo> {
             onPressed: _share,
             child: const Row(
               mainAxisSize: MainAxisSize.min,
-              children: <Widget>[Icon(Icons.ios_share, size: 20), SizedBox(width: 8), Text('Share photo')],
+              children: <Widget>[
+                SiteIcon(SFIcons.sf_square_and_arrow_up, size: 20),
+                SizedBox(width: 8),
+                Text('Share photo'),
+              ],
             ),
           ),
           const SizedBox(height: 18),
@@ -132,7 +138,7 @@ class _ShareSheet extends StatelessWidget {
                       child: CircleAvatar(
                         radius: 15,
                         backgroundColor: label.withValues(alpha: 0.12),
-                        child: Icon(Icons.close, size: 18, color: secondary),
+                        child: SiteIcon(SFIcons.sf_xmark, size: 18, color: secondary),
                       ),
                     ),
                   ),
@@ -167,10 +173,10 @@ class _ShareSheet extends StatelessWidget {
               Row(
                 children: <Widget>[
                   for (final (String name, IconData icon, Color colour) in const <(String, IconData, Color)>[
-                    ('Messages', Icons.chat_bubble, Color(0xFF34C759)),
-                    ('Mail', Icons.mail, Color(0xFF0A84FF)),
-                    ('Notes', Icons.sticky_note_2, Color(0xFFFFCC00)),
-                    ('More', Icons.more_horiz, Color(0xFF8E8E93)),
+                    ('Messages', SFIcons.sf_bubble_left_fill, Color(0xFF34C759)),
+                    ('Mail', SFIcons.sf_envelope_fill, Color(0xFF0A84FF)),
+                    ('Notes', SFIcons.sf_list_bullet_rectangle, Color(0xFFFFCC00)),
+                    ('More', SFIcons.sf_ellipsis, Color(0xFF8E8E93)),
                   ])
                     Expanded(
                       child: _Target(
@@ -184,7 +190,7 @@ class _ShareSheet extends StatelessWidget {
                           child: SizedBox(
                             width: 52,
                             height: 52,
-                            child: Icon(icon, color: Colors.white, size: 26),
+                            child: SiteIcon(icon, color: Colors.white, size: 26),
                           ),
                         ),
                       ),
@@ -200,9 +206,9 @@ class _ShareSheet extends StatelessWidget {
                 child: Column(
                   children: <Widget>[
                     for (final (String name, IconData icon) in const <(String, IconData)>[
-                      ('Copy', Icons.copy),
-                      ('Add to Album', Icons.photo_library_outlined),
-                      ('Save to Files', Icons.folder_outlined),
+                      ('Copy', SFIcons.sf_document_on_document),
+                      ('Add to Album', SFIcons.sf_photo_on_rectangle),
+                      ('Save to Files', SFIcons.sf_folder),
                     ])
                       // No Material in a sheet's route: a plain detector.
                       GestureDetector(
@@ -217,7 +223,7 @@ class _ShareSheet extends StatelessWidget {
                               child: Row(
                                 children: <Widget>[
                                   Expanded(child: Text(name, style: const TextStyle(fontSize: 17))),
-                                  Icon(icon, size: 22),
+                                  SiteIcon(icon, size: 22),
                                 ],
                               ),
                             ),

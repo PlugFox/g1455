@@ -4,10 +4,12 @@ import 'package:flutter_md/highlight.dart';
 import 'package:flutter_md/highlight/bash.dart';
 import 'package:flutter_md/highlight/dart.dart';
 import 'package:flutter_md/highlight/yaml.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/theme.dart';
 import 'selection.dart';
 import 'toast.dart';
+import 'site_icon.dart';
 
 /// The site's code colours: a dark editor theme whose background lets the
 /// page show through a little.
@@ -118,7 +120,7 @@ class _CopyButtonState extends State<_CopyButton> {
     if (!mounted) {
       return;
     }
-    showGlassToast(context, 'Code copied', icon: Icons.content_copy);
+    showGlassToast(context, 'Code copied', icon: SFIcons.sf_document_on_document);
     setState(() => _copied = true);
     await Future<void>.delayed(const Duration(seconds: 2));
     if (mounted) {
@@ -132,6 +134,6 @@ class _CopyButtonState extends State<_CopyButton> {
     onPressed: _copy,
     iconSize: 18,
     color: _copied ? const Color(0xFFC3E88D) : kSiteTextMuted,
-    icon: Icon(_copied ? Icons.check : Icons.content_copy),
+    icon: SiteIcon(_copied ? SFIcons.sf_checkmark : SFIcons.sf_document_on_document),
   );
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// The four calibrated finishes side by side over one backdrop, in a tint
 /// of the visitor's choice.
@@ -130,7 +132,7 @@ class _FinishesDemoState extends State<FinishesDemo> {
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(Icons.wb_sunny_outlined, size: 22),
+          SiteIcon(SFIcons.sf_sun_max, size: 22),
           Spacer(),
           Text('21°', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
           Text('Sunny', style: TextStyle(fontSize: 13)),

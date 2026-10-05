@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// The ladder: what the app knows goes into a [GlassTierPolicy], and the
 /// rung it chooses is applied to the stage alone, through a [GlassTheme]
@@ -84,7 +86,7 @@ class _TiersDemoState extends State<TiersDemo> with SingleTickerProviderStateMix
               child: GlassBar(
                 child: Row(
                   children: <Widget>[
-                    const Icon(Icons.stairs_outlined, size: 20),
+                    const SiteIcon(SFIcons.sf_stairs, size: 20),
                     const SizedBox(width: 10),
                     Text(
                       'GlassTier.${choice.tier.name}',
@@ -125,7 +127,7 @@ class _TiersDemoState extends State<TiersDemo> with SingleTickerProviderStateMix
                                     colors: <Color>[Color(0xFFFF7A59), Color(0xFF8E44FF)],
                                   ),
                                 ),
-                                child: const Icon(Icons.music_note, color: Colors.white),
+                                child: const SiteIcon(SFIcons.sf_music_note, color: Colors.white),
                               ),
                               const SizedBox(width: 12),
                               const Expanded(
@@ -148,16 +150,20 @@ class _TiersDemoState extends State<TiersDemo> with SingleTickerProviderStateMix
                             child: GlassButtonGroup(
                               items: <GlassToolbarItem>[
                                 GlassToolbarItem(
-                                  icon: const Icon(Icons.skip_previous),
+                                  icon: const SiteIcon(SFIcons.sf_backward_end_fill),
                                   label: 'Previous',
                                   onPressed: () {},
                                 ),
                                 GlassToolbarItem(
-                                  icon: Icon(_playing ? Icons.pause : Icons.play_arrow),
+                                  icon: SiteIcon(_playing ? SFIcons.sf_pause_fill : SFIcons.sf_play_fill),
                                   label: _playing ? 'Pause' : 'Play',
                                   onPressed: () => setState(() => _playing = !_playing),
                                 ),
-                                GlassToolbarItem(icon: const Icon(Icons.skip_next), label: 'Next', onPressed: () {}),
+                                GlassToolbarItem(
+                                  icon: const SiteIcon(SFIcons.sf_forward_end_fill),
+                                  label: 'Next',
+                                  onPressed: () {},
+                                ),
                               ],
                             ),
                           ),

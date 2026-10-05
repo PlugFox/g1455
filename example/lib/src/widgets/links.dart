@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:squid/squid.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/routes.dart';
 import '../app/theme.dart';
 import '../catalog/catalog.dart';
 import 'toast.dart';
+import 'site_icon.dart';
 
 /// Follows [url]: a path of the site is navigated to, anything else opens in
 /// a new tab (or the platform's browser).
@@ -26,7 +28,7 @@ Future<void> openLink(BuildContext context, String url) async {
 Future<void> copyLink(BuildContext context, String path) async {
   await Clipboard.setData(ClipboardData(text: '${Site.origin}$path'));
   if (context.mounted) {
-    showGlassToast(context, 'Link copied', icon: Icons.link);
+    showGlassToast(context, 'Link copied', icon: SFIcons.sf_link);
   }
 }
 
@@ -81,7 +83,7 @@ class _LinkTextState extends State<LinkText> {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               if (widget.icon != null) ...<Widget>[
-                Icon(widget.icon, size: (style.fontSize ?? 14) + 2, color: style.color),
+                SiteIcon(widget.icon, size: (style.fontSize ?? 14) + 2, color: style.color),
                 const SizedBox(width: 6),
               ],
               Flexible(

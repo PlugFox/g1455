@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A settings group on a glass card: four switches, the last one always
 /// disabled.
@@ -53,27 +55,27 @@ class _SwitchDemoState extends State<SwitchDemo> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   _Row(
-                    icon: Icons.wifi_rounded,
+                    icon: SFIcons.sf_wifi,
                     label: 'Wi-Fi',
                     value: _wifi,
                     color: accent,
                     onChanged: when((bool v) => _wifi = v),
                   ),
                   _Row(
-                    icon: Icons.bluetooth_rounded,
+                    icon: SFIcons.sf_wave_3_right,
                     label: 'Bluetooth',
                     value: _bluetooth,
                     color: accent,
                     onChanged: when((bool v) => _bluetooth = v),
                   ),
                   _Row(
-                    icon: Icons.flight_rounded,
+                    icon: SFIcons.sf_airplane,
                     label: 'Airplane mode',
                     value: _airplane,
                     color: accent,
                     onChanged: when((bool v) => _airplane = v),
                   ),
-                  _Row(icon: Icons.lock_outline_rounded, label: 'Managed by your admin', value: true, color: accent),
+                  _Row(icon: SFIcons.sf_lock, label: 'Managed by your admin', value: true, color: accent),
                 ],
               ),
             ),
@@ -102,7 +104,7 @@ class _Row extends StatelessWidget {
         height: 52,
         child: Row(
           children: <Widget>[
-            Icon(icon, size: 22),
+            SiteIcon(icon, size: 22),
             const SizedBox(width: 12),
             Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
             GlassSwitch(value: value, activeColor: color, onChanged: onChanged),

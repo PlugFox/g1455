@@ -150,7 +150,7 @@ void main() {
 }
 
 Future<void> _openMenu(WidgetTester tester) async {
-  await tester.tap(find.byIcon(Icons.tune));
+  await tester.tap(find.byKey(kSettingsButtonKey));
   await _frames(tester, 20);
 }
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A list scrolling under a bar held by a [GlassScrollEdge], its style, side,
 /// appearance and extent live.
@@ -38,7 +40,7 @@ class _ScrollEdgeDemoState extends State<ScrollEdgeDemo> {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           child: Row(
             children: <Widget>[
-              Icon(_top ? Icons.arrow_back_ios_new : Icons.home, size: 18),
+              SiteIcon(_top ? SFIcons.sf_chevron_left : SFIcons.sf_house_fill, size: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -46,7 +48,7 @@ class _ScrollEdgeDemoState extends State<ScrollEdgeDemo> {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
-              Icon(_top ? Icons.search : Icons.person, size: 20),
+              SiteIcon(_top ? SFIcons.sf_magnifyingglass : SFIcons.sf_person_fill, size: 20),
             ],
           ),
         ),

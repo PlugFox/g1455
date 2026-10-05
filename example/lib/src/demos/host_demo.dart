@@ -6,10 +6,12 @@ import 'package:g1455/g1455.dart';
 // The host's counters: read here to show when it captures. An application has
 // no reason to import this library.
 import 'package:g1455/glass_diagnostics.dart' show GlassProxyHandle, GlassProxyScope;
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/theme.dart';
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// What the host does: three cards and a lens share one capture of the
 /// backdrop, and the host takes a new one only when something under the glass
@@ -69,11 +71,11 @@ class _HostDemoState extends State<HostDemo> with TickerProviderStateMixin {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  _Tile(width: cardWidth, icon: Icons.wb_sunny_outlined, value: '21°', label: 'Sunny'),
+                  _Tile(width: cardWidth, icon: SFIcons.sf_sun_max, value: '21°', label: 'Sunny'),
                   const SizedBox(width: 12),
-                  _Tile(width: cardWidth, icon: Icons.directions_walk, value: '8.2k', label: 'Steps'),
+                  _Tile(width: cardWidth, icon: SFIcons.sf_figure_walk, value: '8.2k', label: 'Steps'),
                   const SizedBox(width: 12),
-                  _Tile(width: cardWidth, icon: Icons.battery_5_bar, value: '82%', label: 'Battery'),
+                  _Tile(width: cardWidth, icon: SFIcons.sf_battery_75percent, value: '82%', label: 'Battery'),
                 ],
               ),
             ),
@@ -129,7 +131,7 @@ class _Tile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(icon, size: 22),
+          SiteIcon(icon, size: 22),
           const Spacer(),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -200,7 +202,7 @@ class _CaptureMeterState extends State<_CaptureMeter> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.camera_outlined, size: 16, color: _perSecond > 0 ? kSiteAccent : kSiteTextMuted),
+            SiteIcon(SFIcons.sf_camera, size: 16, color: _perSecond > 0 ? kSiteAccent : kSiteTextMuted),
             const SizedBox(width: 6),
             Flexible(
               child: Text(

@@ -2,8 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A big clear panel that answers a touch with a wave, its viscosity live.
 class RippleDemo extends StatefulWidget {
@@ -93,7 +95,7 @@ class _RippleDemoState extends State<RippleDemo> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      const Icon(Icons.waves, color: Colors.white, size: 36, shadows: _kShadow),
+                      const SiteIcon(SFIcons.sf_water_waves, color: Colors.white, size: 36, shadows: _kShadow),
                       const SizedBox(height: 8),
                       Text(
                         preset?.label ?? 'Viscosity ${_viscosity.toStringAsFixed(2)}',

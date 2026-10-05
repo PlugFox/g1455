@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A calendar range picker: two to five segments on a glass card, the
 /// selection tinting the backdrop.
@@ -81,7 +83,7 @@ class _SegmentedControlDemoState extends State<SegmentedControlDemo> {
                   const SizedBox(height: 16),
                   Row(
                     children: <Widget>[
-                      const Icon(Icons.calendar_month_rounded, size: 28),
+                      const SiteIcon(SFIcons.sf_calendar, size: 28),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(

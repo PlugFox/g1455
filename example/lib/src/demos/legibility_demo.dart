@@ -2,8 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A card over a flat backdrop whose level the visitor sets, under a
 /// [GlassTheme] of its own that declares that level: the label colour, the
@@ -94,7 +96,7 @@ class _LegibilityDemoState extends State<LegibilityDemo> {
                   children: <Widget>[
                     Row(
                       children: <Widget>[
-                        const Icon(Icons.notifications_none, size: 22),
+                        const SiteIcon(SFIcons.sf_bell, size: 22),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(

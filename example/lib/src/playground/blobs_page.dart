@@ -2,8 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
+import '../widgets/site_icon.dart';
 
 /// Metaballs: glass blobs that fuse into one silhouette when they come close.
 ///
@@ -167,12 +169,12 @@ class _BlobsPageState extends State<BlobsPage> with SingleTickerProviderStateMix
             Expanded(child: Text('Blobs  $_count')),
             GlassButton(
               onPressed: _count > 1 ? () => setState(() => _count--) : null,
-              child: const Icon(Icons.remove),
+              child: const SiteIcon(SFIcons.sf_minus),
             ),
             const SizedBox(width: 8),
             GlassButton(
               onPressed: _count < _kMaxBlobs ? () => setState(() => _count++) : null,
-              child: const Icon(Icons.add),
+              child: const SiteIcon(SFIcons.sf_plus),
             ),
           ],
         ),

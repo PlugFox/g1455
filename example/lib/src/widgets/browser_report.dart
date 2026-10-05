@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/theme.dart';
 import '../platform/browser_info.dart';
+import 'site_icon.dart';
 
 /// Read once per visit: a WebGL2 context is not free, and the answers do not
 /// change while the page is open.
@@ -40,7 +42,7 @@ class BrowserReport extends StatelessWidget {
             children: <Widget>[
               const Row(
                 children: <Widget>[
-                  Icon(Icons.memory, size: 18, color: kSiteAccent),
+                  SiteIcon(SFIcons.sf_cpu, size: 18, color: kSiteAccent),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(

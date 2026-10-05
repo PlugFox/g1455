@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../widgets/stage.dart';
+import '../widgets/site_icon.dart';
 
 /// A note's "…" button opening a glass menu, a second button opening the same
 /// menu through its controller, and the row last chosen.
@@ -21,7 +23,7 @@ class _MenuDemoState extends State<MenuDemo> {
 
   void _say(String what) => setState(() => _last = what);
 
-  Widget? _icon(IconData icon) => _icons ? Icon(icon, size: 20) : null;
+  Widget? _icon(IconData icon) => _icons ? SiteIcon(icon, size: 20) : null;
 
   @override
   Widget build(BuildContext context) => DemoStage(
@@ -64,18 +66,26 @@ class _MenuDemoState extends State<MenuDemo> {
                 controller: _menu,
                 width: _width,
                 items: <GlassMenuItem>[
-                  GlassMenuItem(label: 'Rename', icon: _icon(Icons.edit_outlined), onPressed: () => _say('rename')),
-                  GlassMenuItem(label: 'Duplicate', icon: _icon(Icons.copy), onPressed: () => _say('duplicate')),
+                  GlassMenuItem(label: 'Rename', icon: _icon(SFIcons.sf_pencil), onPressed: () => _say('rename')),
+                  GlassMenuItem(
+                    label: 'Duplicate',
+                    icon: _icon(SFIcons.sf_document_on_document),
+                    onPressed: () => _say('duplicate'),
+                  ),
                   GlassMenuItem(
                     label: 'Pin',
-                    icon: _icon(Icons.push_pin_outlined),
+                    icon: _icon(SFIcons.sf_pin),
                     // Null disables the row.
                     onPressed: _pinEnabled ? () => _say('pin') : null,
                   ),
-                  GlassMenuItem(label: 'Share', icon: _icon(Icons.ios_share), onPressed: () => _say('share')),
+                  GlassMenuItem(
+                    label: 'Share',
+                    icon: _icon(SFIcons.sf_square_and_arrow_up),
+                    onPressed: () => _say('share'),
+                  ),
                   GlassMenuItem(
                     label: 'Delete',
-                    icon: _icon(Icons.delete_outline),
+                    icon: _icon(SFIcons.sf_trash),
                     isDestructive: true,
                     onPressed: () => _say('delete'),
                   ),
@@ -84,7 +94,7 @@ class _MenuDemoState extends State<MenuDemo> {
                   onPressed: menu.open,
                   semanticLabel: 'More actions',
                   padding: EdgeInsets.zero,
-                  child: const Icon(Icons.more_horiz),
+                  child: const SiteIcon(SFIcons.sf_ellipsis),
                 ),
               ),
             ],

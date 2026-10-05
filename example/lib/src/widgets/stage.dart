@@ -2,9 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../app/theme.dart';
 import '../backdrops.dart';
+import 'site_icon.dart';
 
 /// Where a demo is shown: a rounded window onto something with colour and
 /// edges — what glass needs to be seen at all — with the glass on top and
@@ -81,7 +83,7 @@ class DemoStage extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20, knobs.isEmpty ? 6 : 0, 20, 14),
               child: Row(
                 children: <Widget>[
-                  const Icon(Icons.touch_app_outlined, size: 16, color: kSiteTextMuted),
+                  const SiteIcon(SFIcons.sf_hand_tap, size: 16, color: kSiteTextMuted),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(hint, style: const TextStyle(color: kSiteTextMuted, fontSize: 13)),
