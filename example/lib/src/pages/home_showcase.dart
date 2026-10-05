@@ -8,6 +8,7 @@ import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
 import '../widgets/site_icon.dart';
+import 'home_scenes.dart';
 
 /// One scene of the home page's gallery: glass in something that looks like
 /// an app, over something worth refracting.
@@ -94,6 +95,39 @@ final List<Showcase> kShowcases = <Showcase>[
     page: 'button',
     semantics: 'A painted map with a glass search bar and a glass card for a café.',
     builder: (_) => const _MapScene(),
+  ),
+  Showcase(
+    title: 'Calculator',
+    blurb: 'Glass keys over a wallpaper, the operators orange glass. It counts.',
+    section: 'components',
+    page: 'button',
+    semantics: 'A working calculator: a display and four columns of glass keys, the operators in orange glass.',
+    builder: (_) => const CalculatorScene(),
+  ),
+  Showcase(
+    title: 'Notifications',
+    blurb: 'A lock screen of glass cards. Swipe them away, and bring them back.',
+    section: 'components',
+    page: 'card',
+    semantics: 'A lock screen: the time over a photograph and glass notification cards that can be swiped away.',
+    builder: (_) => const NotificationsScene(),
+  ),
+  Showcase(
+    title: 'Pond',
+    blurb: 'Clear glass that ripples where it is touched: water rings, honey oozes.',
+    section: 'foundations',
+    page: 'ripple',
+    semantics:
+        'A pane of clear glass that sends a wave from where it is tapped; a control picks water, jelly or honey.',
+    builder: (_) => const PondScene(),
+  ),
+  Showcase(
+    title: 'Lens',
+    blurb: 'Drag a drop of glass over a magazine page, and pick its finish.',
+    section: 'foundations',
+    page: 'finishes',
+    semantics: 'A glass lens over a page of text; drag it, and choose regular, clear or frosted glass.',
+    builder: (_) => const LensScene(),
   ),
   Showcase(
     title: 'Tabs with badges',
@@ -1155,40 +1189,71 @@ class _MapSceneState extends State<_MapScene> {
         right: 14,
         bottom: 14,
         child: GlassCard(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
           child: Builder(
             builder: (BuildContext context) {
               final Color label = _label(context);
-              return Row(
-                children: <Widget>[
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(color: Color(0xFFFF9F0A), shape: BoxShape.circle),
-                    child: const SiteIcon(SFIcons.sf_cup_and_saucer_fill, color: Colors.white, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Café Lumen',
-                          style: TextStyle(color: label, fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
-                        Text(
-                          _going ? 'Route · 6 min walk' : '★ 4.8 · Open until 22:00',
-                          style: TextStyle(color: label.withValues(alpha: 0.7), fontSize: 13),
-                        ),
-                      ],
+              // A fixed height: nothing in the row can change the card's.
+              return SizedBox(
+                height: 48 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
+                child: Row(
+                  children: <Widget>[
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(color: Color(0xFFFF9F0A), shape: BoxShape.circle),
+                      child: const SiteIcon(SFIcons.sf_cup_and_saucer_fill, color: Colors.white, size: 20),
                     ),
-                  ),
-                  GlassButton(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    onPressed: () => setState(() => _going = !_going),
-                    child: Text(_going ? 'End' : 'Go', style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            'Café Lumen',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: label, fontSize: 16, fontWeight: FontWeight.w700, height: 1.25),
+                          ),
+                          const SizedBox(height: 2),
+                          // An icon, not a "★" in the text: the star came from a
+                          // fallback font with its own line height, and the card
+                          // grew and shrank as the line changed.
+                          Row(
+                            children: <Widget>[
+                              SiteIcon(
+                                _going ? SFIcons.sf_figure_walk : SFIcons.sf_star_fill,
+                                size: 13,
+                                color: _going ? const Color(0xFF0A84FF) : const Color(0xFFFFD60A),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  _going ? '6 min · 450 m' : '4.8 · Open till 22',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: label.withValues(alpha: 0.7), fontSize: 13, height: 1.3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // One width for both words: the button does not resize the
+                    // row when "Go" turns into "End".
+                    SizedBox(
+                      width: 72,
+                      child: GlassButton(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        onPressed: () => setState(() => _going = !_going),
+                        child: Text(_going ? 'End' : 'Go', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           ),

@@ -74,7 +74,7 @@ void _splitProse(String source, List<_Block> blocks) {
   final prose = <String>[];
   final table = <String>[];
   void flush() {
-    if (prose.join('\n').trim() case final String text when text.isNotEmpty) {
+    if (unwrapMarkdown(prose.join('\n')).trim() case final String text when text.isNotEmpty) {
       blocks.add(_Prose(text));
     }
     prose.clear();
@@ -100,6 +100,78 @@ void _splitProse(String source, List<_Block> blocks) {
     }
   }
   flush();
+}
+
+final RegExp _kBlockStart = RegExp(r'^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||```|<|!\[|---|\*\*\*|___)');
+final RegExp _kCodeLink = RegExp(r'\[`([^`\]]+)`\]\(');
+final RegExp _kListItem = RegExp(r'^\s*([-*+]|\d+[.)])\s');
+
+/// [source] with each paragraph, list item and quote on one line, and a
+/// link's text out of code spans.
+///
+/// The guides are written wrapped at 120 columns, and a newline inside a
+/// paragraph is a soft break: a space. flutter_md keeps it as a line break,
+/// so on a column narrower than the source the text broke twice — where the
+/// column ended and again where the source line did, a short line in the
+/// middle of every paragraph on a phone. A line is joined to the one before
+/// when both are prose: neither blank, the new one starts no block of its
+/// own (a heading, a list item, a quote, a table, a fence, a rule, HTML), and
+/// the one before does not end in a hard break (two spaces or a backslash). A
+/// list item's indented continuation joins its item; a quote's next `>` line
+/// joins the quote, unless either is an alert's `[!NOTE]` marker.
+String unwrapMarkdown(String source) {
+  // flutter_md does not read code inside a link's text: "[`GlassHost`](…)"
+  // drew its backticks. The name links on its own.
+  source = source.replaceAllMapped(_kCodeLink, (Match m) => '[${m[1]}](');
+  final out = <String>[];
+  var fenced = false;
+  for (final String line in source.split('\n')) {
+    final String trimmed = line.trimLeft();
+    if (trimmed.startsWith('```')) {
+      fenced = !fenced;
+      out.add(line);
+      continue;
+    }
+    if (fenced || out.isEmpty || trimmed.isEmpty) {
+      out.add(line);
+      continue;
+    }
+    final String previous = out.last;
+    final String before = previous.trimLeft();
+    final bool hardBreak = previous.endsWith('  ') || previous.endsWith(r'\');
+    if (before.isEmpty || hardBreak || before.startsWith('#') || before.startsWith('|') || before.startsWith('<')) {
+      out.add(line);
+      continue;
+    }
+    if (trimmed.startsWith('>')) {
+      // A quote's next line: joined, unless either is an alert's marker.
+      final String body = trimmed.substring(1).trimLeft();
+      final bool marker = body.startsWith('[!') || before.replaceFirst('>', '').trimLeft().startsWith('[!');
+      if (before.startsWith('>') && !marker && body.isNotEmpty && !_kBlockStart.hasMatch(body)) {
+        out.last = '$previous $body';
+      } else {
+        out.add(line);
+      }
+      continue;
+    }
+    if (before.startsWith('>')) {
+      out.add(line);
+      continue;
+    }
+    // An indented line under a list item continues it; one that starts a
+    // nested item does not.
+    final bool indented = line.startsWith(' ') || line.startsWith('\t');
+    if (indented && _kListItem.hasMatch(line)) {
+      out.add(line);
+      continue;
+    }
+    if (!indented && _kBlockStart.hasMatch(trimmed)) {
+      out.add(line);
+      continue;
+    }
+    out.last = '$previous $trimmed';
+  }
+  return out.join('\n');
 }
 
 class _DocViewState extends State<DocView> {

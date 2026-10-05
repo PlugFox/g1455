@@ -13,7 +13,7 @@ import '../shell/shell.dart';
 import '../widgets/code_view.dart';
 import '../widgets/icons.dart';
 import '../widgets/links.dart';
-import 'entry_page.dart' show Pill;
+import '../widgets/side_scroller.dart';
 import 'home_showcase.dart';
 import '../widgets/site_icon.dart';
 
@@ -123,9 +123,32 @@ class _Hero extends StatelessWidget {
     final Widget copy = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          'g1455 · DESIGN SYSTEM · v${Site.version}',
-          style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
+        // The version is the changelog's link: one line, where a pill of its
+        // own made the row of buttons under it wrap.
+        Row(
+          children: <Widget>[
+            const Flexible(
+              child: Text(
+                'g1455 · DESIGN SYSTEM · ',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
+              ),
+            ),
+            Tooltip(
+              message: 'What is new: the changelog',
+              child: LinkText(
+                text: 'v${Site.version}',
+                url: Site.changelog,
+                style: const TextStyle(
+                  color: kSiteAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.6,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         Semantics(
@@ -147,38 +170,47 @@ class _Hero extends StatelessWidget {
           style: text.bodyLarge?.copyWith(color: kSiteTextMuted, fontSize: 18),
         ),
         const SizedBox(height: 24),
+        // Two words and two icons: one line on a phone of 360 points. The
+        // links out are icons the reader knows, named by their tooltips.
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: width < 600 ? 6 : 8,
+          runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             GlassButton(
+              padding: EdgeInsets.symmetric(horizontal: width < 600 ? 14 : 20, vertical: 10),
               onPressed: () => openEntry(context, kEntries.first),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Text('Get started'),
-                  SizedBox(width: 8),
-                  SiteIcon(SFIcons.sf_chevron_right, size: 18),
+                  SizedBox(width: 6),
+                  SiteIcon(SFIcons.sf_chevron_right, size: 16),
                 ],
               ),
             ),
             GlassButton(
+              padding: EdgeInsets.symmetric(horizontal: width < 600 ? 14 : 20, vertical: 10),
               onPressed: () => openEntry(context, entriesOf(Section.components).first),
               child: const Text('Components'),
             ),
-            Pill(
-              label: 'GitHub',
-              icon: SFIcons.sf_chevron_left_forwardslash_chevron_right,
-              onTap: () => openLink(context, Site.repository),
+            Tooltip(
+              message: 'GitHub: the source',
+              child: GlassButton(
+                semanticLabel: 'GitHub',
+                padding: const EdgeInsets.all(10),
+                onPressed: () => openLink(context, Site.repository),
+                child: const SiteIcon(SFIcons.sf_chevron_left_forwardslash_chevron_right, size: 18),
+              ),
             ),
-            Pill(label: 'pub.dev', icon: SFIcons.sf_shippingbox, onTap: () => openLink(context, Site.pub)),
-            Pill(
-              label: 'v${Site.version}',
-              icon: SFIcons.sf_clock_arrow_trianglehead_counterclockwise_rotate_90,
-              monospace: true,
-              tooltip: 'Changelog',
-              onTap: () => openLink(context, Site.changelog),
+            Tooltip(
+              message: 'pub.dev: the package',
+              child: GlassButton(
+                semanticLabel: 'pub.dev',
+                padding: const EdgeInsets.all(10),
+                onPressed: () => openLink(context, Site.pub),
+                child: const SiteIcon(SFIcons.sf_shippingbox, size: 18),
+              ),
             ),
           ],
         ),
@@ -405,19 +437,14 @@ class _WhatsNew extends StatelessWidget {
           style: TextStyle(color: kSiteAccent, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.6),
         ),
         const SizedBox(height: 12),
-        SizedBox(
+        SideScroller(
           height: 36 + 72 * scale,
-          // A builder: the cards past the edge are not built until scrolled to.
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (BuildContext context, int i) {
-              final (Entry entry, String line, IconData icon, List<Color> colours) = items[i];
-              return _NewCard(entry: entry, line: line, icon: icon, colours: colours);
-            },
-          ),
+          arrows: MediaQuery.sizeOf(context).width >= 600,
+          itemCount: items.length,
+          itemBuilder: (BuildContext context, int i) {
+            final (Entry entry, String line, IconData icon, List<Color> colours) = items[i];
+            return _NewCard(entry: entry, line: line, icon: icon, colours: colours);
+          },
         ),
       ],
     );
