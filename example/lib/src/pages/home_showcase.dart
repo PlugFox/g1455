@@ -65,6 +65,14 @@ final List<Showcase> kShowcases = <Showcase>[
     builder: (_) => const _MessagesScene(),
   ),
   Showcase(
+    title: 'Shop',
+    blurb: 'Step the quantity: the badge on the bag counts it. The backdrop is declared, so nothing is captured.',
+    section: 'components',
+    page: 'stepper',
+    semantics: 'A product page for headphones: a glass stepper sets how many are in the bag, and a badge on the bag counts them.',
+    builder: (_) => const ShopScene(),
+  ),
+  Showcase(
     title: 'Smart home',
     blurb: 'Switch the lamp and slide its brightness: the room behind the glass lights up.',
     section: 'components',
@@ -81,12 +89,30 @@ final List<Showcase> kShowcases = <Showcase>[
     builder: (_) => const _PhotoScene(),
   ),
   Showcase(
+    title: 'Onboarding',
+    blurb: 'Swipe the pages and the dots follow; tap the dots, or Next, and they turn the page.',
+    section: 'components',
+    page: 'page-control',
+    semantics: 'Onboarding pages that swipe sideways, with a glass page control and Skip and Next buttons.',
+    builder: (_) => const OnboardingScene(),
+  ),
+  Showcase(
     title: 'Morph',
     blurb: 'Tap “+”: one piece of glass flows from a button into a menu, with a liquid neck.',
     section: 'components',
     page: 'morph',
     semantics: 'A plus button that flows into a glass menu of actions.',
     builder: (_) => const _MorphScene(),
+  ),
+  Showcase(
+    title: 'Library',
+    blurb: 'Search the songs; scroll down and the tab bar folds into a circle beside what is playing.',
+    section: 'components',
+    page: 'tab-bar',
+    semantics:
+        'A music library under a glass search bar and a glass tab bar that collapses on a scroll down, '
+        'with the playing song above it.',
+    builder: (_) => const LibraryScene(),
   ),
   Showcase(
     title: 'Maps',
@@ -1427,31 +1453,10 @@ class _TabsSceneState extends State<_TabsScene> {
                   // Any widget for the icon: here a badge, in the colour the
                   // bar chose for the item.
                   iconBuilder: label == 'Inbox' && _unread > 0
-                      ? (BuildContext context, GlassTabItemLook look) => Stack(
-                          clipBehavior: Clip.none,
-                          children: <Widget>[
-                            SiteIcon(icon, size: look.iconSize, color: look.color),
-                            Positioned(
-                              // Clear of the label beside the icon on a wide bar.
-                              right: look.inline ? -4 : -8,
-                              top: -6,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFF3B30),
-                                  borderRadius: BorderRadius.circular(9),
-                                ),
-                                child: Text(
-                                  '$_unread',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                      ? (BuildContext context, GlassTabItemLook look) => GlassBadge(
+                          count: _unread,
+                          semanticLabel: '$_unread unread',
+                          child: SiteIcon(icon, size: look.iconSize, color: look.color),
                         )
                       : null,
                   icon: icon,
