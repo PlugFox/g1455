@@ -1,6 +1,6 @@
-// Phase A, step 7 — what the register adds up to, and against what.
+// What the register adds up to, and against what.
 //
-// `flutter test test/glass/glass_ledger_test.dart`
+// `flutter test test/glass_ledger_test.dart`
 //
 // Three separate things are checked here and they fail in different ways.
 //
@@ -14,9 +14,9 @@
 //     differ from it by more than the tolerance. Without that, a `contains`
 //     secretly answering for a rounded rect would pass.
 //  2. **The cost constants**, re-derived from the two device runs they came
-//     from. Those reports are 15 MB each and are not in git; `bench/tool/
-//     digest.py` distils them to the cells a constant is read from, and the
-//     digests are tracked. So the numbers in `lib/` have a source in the
+//     from. Those reports are 15 MB each and are not in git; their digests,
+//     the cells a constant is read from, are tracked under `provenance/`.
+//     So the numbers in `lib/` have a source in the
 //     repository, which is the rule that already caught one wrong table.
 //  3. **The refusals**, which are most of the value. Two platforms were
 //     measured, their laws have different *shapes* rather than different
@@ -267,7 +267,7 @@ void main() {
     expect(fixedCount, hasLength(3), reason: 'the area axis is not three points');
     double tax(AreaPoint p) => p.fake - p.plain;
 
-    // Proportional fit through the origin, which is the model D21 claims.
+    // Proportional fit through the origin, which is the model the tax claims.
     final double k =
         fixedCount.fold<double>(0, (double a, AreaPoint p) => a + p.area * tax(p)) /
         fixedCount.fold<double>(0, (double a, AreaPoint p) => a + p.area * p.area);
@@ -464,17 +464,15 @@ void main() {
 
     // The reason it is one declaration: the same device decides both, and the
     // two questions do not answer each other. On Metal the proxy's resolution
-    // is the largest lever the route has (D128) while the glass *area* is the
-    // thing that will eventually stop it (D71) — a host that declared them
+    // is the largest lever the route has while the glass *area* is the
+    // thing that will eventually stop it — a host that declared them
     // separately could get half of that.
     //
-    // This arm has been wrong about the divisor twice, both times by encoding
-    // a derivation: first "the chooser returns full resolution on Metal"
-    // (D119, refuted by D128), then "a device nobody priced keeps the whole
+    // Two derivations that sound right are wrong here: "the chooser returns
+    // full resolution on Metal", and "a device nobody priced keeps the whole
     // picture, because a measured quality loss against an unmeasured saving is
-    // not a trade" — which was this arm's negative control until the one
-    // unpriced device anybody ran showed 37 fps under it (D134, D136). Every
-    // family now reaches the same divisor at the same budget; what the
+    // not a trade" — an unpriced device ran at 37 fps under that. Every
+    // family reaches the same divisor at the same budget; what the
     // declaration separates is whether that divisor comes with a price.
     for (final GlassHardware hardware in GlassHardware.values) {
       final ProxyResolutionChoice choice = ProxyResolutionPolicy.choose(

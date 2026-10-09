@@ -1,10 +1,10 @@
 // What the declaration promises, and what an application can actually keep.
 //
-// `flutter test test/glass/glass_declaration_test.dart`
+// `flutter test test/glass_declaration_test.dart`
 //
-// D146 measured that holding the proxy removes 97.8% of what this package adds
-// to a frame, which makes `GlassContentDeclaration.declared` the largest lever
-// the route has — and D147 turned the largest hole in it (a scroll) into an
+// Holding the proxy removes 97.8% of what this package adds to a frame
+// (measured on Adreno), which makes `GlassContentDeclaration.declared` the
+// largest lever the route has — and the largest hole in it, a scroll, is an
 // observation the host makes for itself. This file is the inventory that
 // question deserves: for every ordinary way the pixels under the glass change,
 // does the oracle see it, or is the application expected to say so?
@@ -21,20 +21,17 @@
 // records. A scene that stopped changing for an unrelated reason would hold in
 // both.
 //
-// **Which of the two is the default flipped on 2026-09-12 (D163),** and the
-// rows are mounted the way they now ship: no `content:` at all, so each row is
-// a claim about what an application gets without asking for anything. The
-// control beside it names `undeclared`, which is what that value now means —
-// the escape hatch, not the floor.
+// **Holding is the default,** and the rows are mounted the way they ship: no
+// `content:` at all, so each row is a claim about what an application gets
+// without asking for anything. The control beside it names `undeclared`, which
+// is what that value now means — the escape hatch, not the floor.
 //
-// **Six of these rows read "not seen" when the census was first taken, and read
-// "seen" now (D152).** The observations the host makes for itself all stop at a
-// nested repaint boundary, and the corpus says a realistic screen crosses 8 to
-// 15 of them; what closed them is `ProxyLayerWatch`, which asks the composited
-// layer tree instead of the render tree. The comments keep both halves, because
-// which mechanism sees a row is the whole content of the table — and the break
-// that turns the watch off is in the script that runs the deliberate breaks,
-// which fails exactly those six.
+// **Six of these rows are seen only by `ProxyLayerWatch`.** The observations
+// the host makes for itself all stop at a nested repaint boundary, and a
+// realistic screen crosses 8 to 15 of them; the watch asks the composited layer
+// tree instead of the render tree. The comments name which mechanism sees each
+// row, because that is the whole content of the table — and a break that turns
+// the watch off fails exactly those six.
 
 import 'dart:convert';
 import 'dart:io';
@@ -109,9 +106,8 @@ void main() {
   ) async {
     // A repaint boundary absorbs the dirt: its child repaints into its own layer
     // and the host is never painted, so nothing above it can observe the change.
-    // Same mechanism as the sliver children of D147, and there is no
-    // notification to lean on. For one day this row read "not seen" and the
-    // answer was `noteChange`; what sees it now is the layer the boundary
+    // Same mechanism as the sliver children of a scroll, and there is no
+    // notification to lean on. What sees it is the layer the boundary
     // repainted into, which carries a new `ui.Picture` whatever the render tree
     // did.
     final _Rig rig = await _mount(
@@ -250,17 +246,18 @@ void main() {
   testWidgets('a backdrop group that re-keys is seen, and it paints nothing at all', (
     WidgetTester tester,
   ) async {
-    // The fourth member of D151's class, found by auditing the watch's table
-    // against `layer.dart` rather than by any scene (D162). `BackdropGroup` is
-    // an `InheritedWidget` that mints a fresh `BackdropKey` on every build it is
-    // not handed one for, so the commonest use of grouped backdrop filters
-    // changes `BackdropFilterLayer.backdropKey` — which reaches the engine as
-    // `pushBackdropFilter(backdropId:)` and decides which snapshot the filter
-    // reads — and changes nothing else at all. `RenderBackdropFilter` keeps its
-    // layer (`layer ??= BackdropFilterLayer()`) and assigns the property, and
-    // the repaint that `markNeedsPaint` schedules stops at a boundary that
-    // records no picture, so before the property was in the signature this
-    // frame read as "nothing happened".
+    // A layer property that changes with no new picture, found by auditing
+    // the watch's table against `layer.dart` rather than by any scene.
+    // `BackdropGroup` is an `InheritedWidget` that mints a fresh `BackdropKey`
+    // on every build it is not handed one for, so the commonest use of grouped
+    // backdrop filters changes `BackdropFilterLayer.backdropKey` — which
+    // reaches the engine as `pushBackdropFilter(backdropId:)` and decides which
+    // snapshot the filter reads — and changes nothing else at all.
+    // `RenderBackdropFilter` keeps its layer (`layer ??=
+    // BackdropFilterLayer()`) and assigns the property, and the repaint that
+    // `markNeedsPaint` schedules stops at a boundary that records no picture,
+    // so before the property was in the signature this frame read as "nothing
+    // happened".
     //
     // The row is stronger than the three above it in one way: the filter's own
     // widget is never rebuilt by anything in the scene. It is notified because
@@ -328,9 +325,9 @@ void main() {
     // possible. `RenderGlassSurface` listens to the proxy handle with
     // `markNeedsPaint`, and `markNeedsPaint` walks up to the nearest repaint
     // boundary — which, if the surface is not one itself, is the host's own.
-    // A host told to distrust the watch publishes a proxy on every frame — the
-    // default until D163, and still what this arm mounts, because the claim is
-    // about what a publish costs the screen under it. Without the fix, the whole
+    // A host told to distrust the watch publishes a proxy on every frame, and
+    // that is what this arm mounts, because the claim is about what a publish
+    // costs the screen under it. Without the fix, the whole
     // screen under the host is repainted on every frame, and the host's
     // observation of that repaint would be an observation of itself.
     //
@@ -362,7 +359,7 @@ void main() {
     WidgetTester tester,
   ) async {
     // The outer host records every frame — it is mounted `undeclared` for
-    // exactly that, since D163 made holding the default — and every one of those
+    // exactly that, since holding is the default — and every one of those
     // captures walks through the inner host. The inner host is left at the
     // default, its own screen never changes, and it must therefore record once.
     final innerKey = GlobalKey();
@@ -422,7 +419,8 @@ void main() {
       expect(aside.captures, 1);
       // As a ratio rather than as `frames - 1`: the two counters are read off
       // different objects and one of them can be a frame ahead, which is the
-      // hazard D155 cost a day to. Nothing here turns on the last frame.
+      // hazard of counters with different reset points. Nothing here turns on
+      // the last frame.
       expect(aside.missed / aside.frames, greaterThan(0.99));
       expect(behind.captures, behind.frames);
       expect(behind.missed, 0);
@@ -674,14 +672,10 @@ class _Scene extends StatelessWidget {
           Positioned(left: 0, top: 300, width: 400, height: 200, child: changing),
           // **Over the changing content, and that is load-bearing.** Every row
           // in this file asks whether a change *under the glass* is seen, and
-          // for as long as the oracle answered with a bit rather than a region
-          // the surface could sit anywhere and the rows read the same. D174
-          // gave the answer a place, and three rows immediately went green for
-          // the wrong reason: the change was real, the watch saw it, and the
-          // host correctly held a proxy the change could not reach — because
-          // the surface was at the top of the screen and the content was 300
-          // logical pixels below it. The fixture was a function of the axis it
-          // was measuring on the day the axis appeared.
+          // the oracle answers with a region: with the surface at the top of
+          // the screen and the content 300 logical pixels below it, the host
+          // would correctly hold a proxy the change could not reach, and three
+          // rows would pass for the wrong reason.
           const Positioned(left: 0, top: 320, width: 320, height: 64, child: GlassSurface()),
         ],
       ),

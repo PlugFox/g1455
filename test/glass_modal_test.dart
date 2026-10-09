@@ -16,7 +16,7 @@
 //  - the menu's items not reversed when it opens upward
 //    (`down ? widget.items : widget.items.reversed.toList()` -> `widget.items`),
 //    and the anchor left visible under it (`visible: !_open` -> `true`): each
-//    fails the menu arm (D228);
+//    fails the menu arm;
 //  - `themes.wrap(` dropped from either `showGlassDialog`'s page or the
 //    sheet's: the theme arm finds that modal's text in the app's error style;
 //  - `Size.lerp(_from, full, _progress)` -> `full` in `_RenderGrow`: the menu
@@ -181,7 +181,7 @@ void main() {
   testWidgets('a menu stands over its anchor, as Apple places one, and closes on a choice', (
     WidgetTester tester,
   ) async {
-    // Spike 34's two anchors: one on the right with room below, which opens
+    // The iOS reference's two anchors: one on the right with room below, which opens
     // down with its top-right corner on the anchor's; one on the left near the
     // bottom, which opens up with its bottom-left corner on the anchor's and
     // its items reversed. 250 wide, rows of 42, 10 above and below.
@@ -268,7 +268,7 @@ void main() {
       final RenderGlassSurface panel = _surfaceAbove(tester, find.text(inside));
       final Rect first = panel.globalRect;
       // On its first frame it is the anchor, give or take the few points the
-      // corners are set off by (spike 34) and one frame's growth.
+      // corners are set off by and one frame's growth.
       expect(first.width, closeTo(anchor.width, 4), reason: '$name: whole on its first frame');
       expect(first.height, closeTo(anchor.height, 4), reason: '$name: whole on its first frame');
       await tester.pumpAndSettle();

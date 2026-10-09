@@ -1,9 +1,9 @@
-// Phase A, step 9 — the pipeline, assembled and run on a real tree.
+// The pipeline, assembled and run on a real tree.
 //
-// `flutter test test/glass/proxy_pipeline_test.dart`
+// `flutter test test/proxy_pipeline_test.dart`
 //
-// Every piece has been measured on its own since M12 and none of them had ever
-// run in the same frame. This is the first time the register decides the
+// Every piece is tested on its own elsewhere; here they run in the same
+// frame: the register decides the
 // geometry, the policy decides the texel scale, the atlas decides the layout,
 // the walk does the drawing and retention keeps all four from being recomputed
 // — and the arms below are the questions that only exist once they are joined.
@@ -52,7 +52,7 @@ void main() {
 
     // The policy ran: on hardware that charges for area, `regular` at a device
     // pixel ratio of 2 is a quarter — which is where the cost budget assumed it
-    // was (D63) and where the quality side puts it (D120).
+    // was and where the quality side puts it.
     expect(frame.resolution.resolution, const ProxyResolution.quarter());
     expect(frame.layout.pixelRatio, 0.5);
 
@@ -76,7 +76,7 @@ void main() {
   testWidgets('the region is asked against the strip the atlas really holds', (
     WidgetTester tester,
   ) async {
-    // D174's arithmetic, and the one place it can be checked exactly. The hold
+    // The damage hold's arithmetic, and the one place it can be checked exactly. The hold
     // asks whether a change reached any slot's `source`, and the answer has to
     // be about what `AtlasLayout.record` really copies: it clips in
     // *destination* space to `slot.rect`, whose size is
@@ -119,7 +119,7 @@ void main() {
   testWidgets('one budget, two axes: a capture tells the oracle what it spent', (
     WidgetTester tester,
   ) async {
-    // D124: damage on two axes composes rather than adds, so the divisor and the
+    // Damage on two axes composes rather than adds, so the divisor and the
     // staleness ceiling are drawing on one allowance. The oracle had a
     // `spentDeltaE` parameter for exactly this and **no caller** — it cannot
     // have one, because what the divisor costs depends on the screen's density
@@ -133,11 +133,11 @@ void main() {
     );
     // A budget chosen so the composition is observable: `regular` tolerates two
     // stale frames at 0.675 ΔE, and 0.70 allows that — until the proxy has taken
-    // its share of the same allowance. Which share moved with D137: a budget
-    // this generous now reaches the **eighth** rather than the quarter (0.25
+    // its share of the same allowance. A budget
+    // this generous reaches the **eighth** rather than the quarter (0.25
     // texels at dpr 2, 0.374 ΔE as the pipeline reads it), leaving
     // sqrt(0.70² − 0.374²) = 0.592. The
-    // conclusion is the one this arm is about and it is unchanged — one stale
+    // conclusion is the one this arm is about — one stale
     // frame costs 0.443 and fits, two cost 0.675 and do not — which is the point
     // of writing the budget rather than the divisor into the fixture.
     final oracle = RetakeOracle(finish: 'regularDark', budgetDeltaE: 0.70);
@@ -165,12 +165,11 @@ void main() {
     // it "the ceiling fell" is equally consistent with a ceiling that fell for
     // any reason at all.
     //
-    // It was `clear` until D164, and the change took it away: at a budget of
-    // 0.70 the policy now buys `clear` the first rung for 0.646 ΔE, so the
-    // "untouched" arm spent almost the whole budget and the control became a
-    // second copy of the arm it was controlling. `identity` replaces it and is
-    // the better control anyway — nobody graded it, so the refusal comes from
-    // the absent table rather than from a ceiling that D164 might move again.
+    // Not `clear`: at a budget of 0.70 the policy buys `clear` the first rung
+    // for 0.646 ΔE, so that arm would spend almost the whole budget and the
+    // control would be a second copy of the arm it controls. `identity` is
+    // ungraded, so its refusal comes from the absent table rather than from a
+    // ceiling the policy might move.
     final untouched = GlassProxyPipeline(
       finishSigmaLogical: 0,
       finish: 'identity',
@@ -199,24 +198,19 @@ void main() {
     WidgetTester tester,
   ) async {
     // At full resolution, so the comparison is a comparison of content and not
-    // of a resampling filter — the divisor's own cost in pixels is D117's
-    // subject and is measured there, with an instrument built for it.
+    // of a resampling filter — the divisor's own cost in pixels is measured
+    // elsewhere, with an instrument built for it.
     final ledger = GlassLedger();
     await _mount(tester, ledger, _twoPanels());
     final pipeline = GlassProxyPipeline(
       finishSigmaLogical: 2.6,
-      // Pinned to 1:1 by the host, because no hardware gets it from the policy
-      // any more. This arm has named two families for that effect and lost
-      // both: Metal, on the reading that a divisor buys nothing there (D119,
-      // refuted by D128), and then `unmeasured`, on the reading that an
-      // unpriced saving is not a trade (D121, refuted by D134 — the family
-      // that got full resolution by default was the one at 37 fps). The pin is
-      // the honest spelling: the arm wants full resolution for its own reason,
-      // and says so instead of borrowing a refusal.
+      // Pinned to 1:1 by the host, because no hardware family gets full
+      // resolution from the policy. The arm wants it for its own reason and
+      // says so instead of borrowing a refusal.
       hardware: GlassHardware.unmeasured,
       pinnedResolution: const ProxyResolution.full(),
       // And unblurred, because this arm is about the *map*. The finish's blur
-      // is measured elsewhere, with an instrument built for it (D117); here it
+      // is measured elsewhere, with an instrument built for it; here it
       // would only stand between the comparison and the thing compared.
       blurPass: ProxyBlurPass.none,
     );
@@ -357,10 +351,10 @@ void main() {
     dense.dispose();
     coarse.dispose();
 
-    // The negative half, and since D137 it is dpr **4** that provides it: the
+    // The negative half, and it is dpr **4** that provides it: the
     // policy reaches the eighth there and lands back on 0.5 texels per logical
     // pixel, which is the working point dpr 2 settled on at a quarter. Two
-    // densities, two divisors, one scale — D120's claim seen from inside the
+    // densities, two divisors, one scale — the policy's claim seen from inside the
     // assembled pipeline rather than from the chooser's unit test.
     final GlassProxyFrame same = pipeline.capture(
       _root(),
@@ -395,7 +389,7 @@ void main() {
   testWidgets('the roles reach the pass, and a hidden subtree is not in the proxy', (
     WidgetTester tester,
   ) async {
-    // The declarations of D115 running inside the assembled pipeline rather
+    // The role declarations running inside the assembled pipeline rather
     // than in a bare walk: the pass has to see the marker, and what it drew has
     // to differ from what it draws without it.
     final ledger = GlassLedger();
@@ -430,7 +424,7 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // 7. A pinned divisor, which is how a third point of D128 gets taken at all.
+  // 7. A pinned divisor, which is how a divisor the policy would not pick gets measured.
   // -------------------------------------------------------------------------
 
   testWidgets('a pinned divisor reaches the texels, not just the report', (
@@ -450,11 +444,9 @@ void main() {
       finishSigmaLogical: 2.6,
       // A divisor the chooser never returns on this screen: at dpr 2 `regular`
       // fits inside the budget all the way to a quarter, on every family
-      // including `unmeasured` (D136). So an ignored pin reads the chooser's
-      // 0.5 texels per logical pixel and a respected one reads 1.0. This arm
-      // used to lean on `unmeasured` returning full resolution for the same
-      // separation; that refusal is gone, and the separation now comes from
-      // pinning a rung the quality walk skips over.
+      // including `unmeasured`. So an ignored pin reads the chooser's
+      // 0.5 texels per logical pixel and a respected one reads 1.0: the
+      // separation comes from pinning a rung the quality walk skips over.
       hardware: GlassHardware.unmeasured,
       pinnedResolution: const ProxyResolution.half(),
     );
@@ -489,7 +481,7 @@ void main() {
   testWidgets('the folded blur draws the split blur, and takes one snapshot instead of two', (
     WidgetTester tester,
   ) async {
-    // Spike #21 compared the two spellings on a picture; this is the same
+    // The two spellings agree on a single picture; this is the same
     // comparison on the route, where the atlas is packed, the slots are clipped
     // and the sigma comes from the divisor rather than from a table. Both
     // halves are needed: the pixels say the fold is the same material, and the

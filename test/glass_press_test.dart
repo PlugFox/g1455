@@ -6,7 +6,7 @@
 // The claim is about the capture and the content, because that is what a
 // press could cost everyone else: the glass changes its size on every frame of
 // the spring, and a glass whose box changes is retaken unless it moves inside
-// a declared region (D208) — and a relayout that climbed past the glass would
+// a declared region — and a relayout that climbed past the glass would
 // repaint the boundary the screen's content is in, which the layer watch
 // calls a change under the glass.
 //

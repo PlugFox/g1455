@@ -7,7 +7,7 @@
 //
 // All three are debug-only reads (`debugLayer`, `debugNeedsPaint`), which is
 // why this is a headless test and not a device one. In profile the assertions
-// that would explain a violation are gone — see CLAUDE.md — so the guard has to
+// that would explain a violation are gone, so the guard has to
 // be here or nowhere.
 
 import 'package:flutter/rendering.dart';

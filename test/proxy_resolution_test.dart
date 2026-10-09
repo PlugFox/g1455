@@ -1,12 +1,10 @@
-// Phase A, step 6 — the one who chooses the divisor, and the key its table has.
+// The one who chooses the divisor, and the key its table has.
 //
-// `flutter test test/glass/proxy_resolution_test.dart`
+// `flutter test test/proxy_resolution_test.dart`
 //
-// Steps 2 to 5 built the resolution lever and priced both of its sides: what a
-// divisor saves (D28 on Adreno, nothing at all on Metal — D119) and what it
-// costs (the M11 ladder, D117 and D118). What none of them did was *choose*,
-// and the moment something has to, the table turns out to have been read by the
-// wrong key all along.
+// A divisor saves capture work (on Adreno; nothing at all on Metal) and costs
+// image quality (the ΔE ladder). This file is about *choosing* one, and about
+// the key the quality table must be read by.
 //
 // **The table's rungs are texel scales wearing divisor labels.** The ladder runs
 // at a device pixel ratio of 2, so its `res4` rung is half a texel per logical
@@ -15,7 +13,7 @@
 // the damage actually follows is not decidable from one density, and it is
 // decidable from three: the same 84 arms at dpr 1, 2 and 4.
 //
-// So this file has three parts, in the order the answer was built:
+// So this file has five parts:
 //
 //  1. the transport, re-derived from the five reports on disk rather than
 //     restated — including the control that made one third of the residual go
@@ -26,16 +24,13 @@
 //     declines — each with a negative control in the same arm, because a chooser
 //     that always answered "full resolution" would pass every arm about safety
 //     and none about usefulness;
-//  4. the route's own price, re-derived from the two device runs on disk — added
-//     after those runs said the chooser had been reading the wrong table (D128).
-//     The capture's price and the route's are two different numbers on Metal,
-//     and for one release the package spent the first as though it were the
-//     second;
-//  5. the family no model fits, re-derived from the two Xclipse runs on disk —
-//     added after those runs said the fourth refusal, "unmeasured hardware gets
-//     full resolution", had handed the default Android host the worst arm the
-//     ladder had (D134, D136). The lever's sign is measured there and its size
-//     is not, and the two arms below assert exactly that much.
+//  4. the route's own price, re-derived from the two device runs on disk. The
+//     capture's price and the route's are two different numbers on Metal, and
+//     the chooser must read the second;
+//  5. the family no model fits, re-derived from the two Xclipse runs on disk:
+//     "unmeasured hardware gets full resolution" would hand the default Android
+//     host the worst arm the ladder has. The lever's sign is measured there and
+//     its size is not, and the two arms below assert exactly that much.
 
 import 'dart:convert';
 import 'dart:io';
@@ -51,7 +46,7 @@ import 'package:g1455/src/surface/glass_finish.dart';
 /// One resolution arm of a ladder report.
 typedef Arm = ({String scene, String finish, int divisor, double deltaE});
 
-/// One step of the M7 ladder, out of a digested benchmark report.
+/// One step of the cost ladder, out of a digested benchmark report.
 typedef Step = ({double frameMs, double spread, int? divisor});
 
 /// Least squares of `value = a·f + c`, with the worst residual as a fraction of
@@ -84,7 +79,7 @@ typedef Step = ({double frameMs, double spread, int? divisor});
   return (a: a, c: c, worst: worst / scale);
 }
 
-/// The M7 ladder of one device run, distilled to `variant -> step`.
+/// The cost ladder of one device run, distilled to `variant -> step`.
 ///
 /// `digest.py` is what makes this checkable at all: a report is 15 MB and is not
 /// in the repository, its digest is 6 KB and is.
@@ -156,7 +151,7 @@ class Ladder {
   Set<String> get scenes => <String>{for (final Arm a in arms) a.scene};
 }
 
-/// Scenes the corpus draws entirely in logical units — no baked photograph
+/// Ladder scenes drawn entirely in logical units — no baked photograph
 /// anywhere in them, and no page of text either.
 ///
 /// The known-answer group: content whose spectrum is fixed in logical space
@@ -182,12 +177,12 @@ double _median(List<double> xs) {
   return n.isOdd ? s[n ~/ 2] : (s[n ~/ 2 - 1] + s[n ~/ 2]) / 2;
 }
 
-/// The package's name for a finish the ladder graded: the ladder has called
-/// the dark branch of `.regular` `regular` since before D230, and every
-/// report keeps the name it was taken under.
+/// The package's name for a finish the ladder graded: the ladder calls the
+/// dark branch of `.regular` `regular`, and every report keeps the name it was
+/// taken under.
 String packageName(String ladder) => ladder == 'regular' ? 'regularDark' : ladder;
 
-/// The finishes every ladder run before D230 graded, by the package's names:
+/// The finishes every ladder run before the light branch's graded, by the package's names:
 /// the cross-run claims below are claims about these four. The light branch
 /// has a run of its own, and its own arm.
 const List<String> kRecordedFinishes = <String>['clear', 'thinLight', 'frosted', 'regularDark'];
@@ -252,7 +247,7 @@ void main() {
   });
 
   test('the light branch\'s rows are its own run, and that run is the recorded ladder', () {
-    // D230. A row from another afternoon belongs in this table only if the
+    // A row from another afternoon belongs in this table only if the
     // ladder it came from is the same ladder: its `regular` arms have to be
     // [damageSource]'s, arm for arm, before its `regularLight` arms mean
     // anything here.
@@ -264,10 +259,10 @@ void main() {
       final was = Ladder(recorded);
       expect(run.view['blur_corrected_for_resolution'], corrected);
       expect(run.optics, was.optics, reason: 'the two runs are on different optics');
-      // Not bit for bit, unlike D187's: 84 of 85 arms moved, by up to 0.36%,
-      // and every one of the worst is a scene with text in it — the SDK's
-      // glyph rasterization moved between the afternoons, not the ladder. A
-      // thirty-fifth of [ProxyResolution.transportSpreadMedian].
+      // Not bit for bit, unlike the dpr-2 ladder above: 84 of 85 arms moved, by
+      // up to 0.36%, and every one of the worst is a scene with text in it —
+      // the SDK's glyph rasterization moved between the afternoons, not the
+      // ladder. A thirty-fifth of [ProxyResolution.transportSpreadMedian].
       var compared = 0;
       for (final Arm a in run.arms.where((Arm a) => a.finish == 'regularDark')) {
         final double recordedArm = was.at(a.scene, a.finish, a.divisor)!;
@@ -438,12 +433,12 @@ void main() {
   });
 
   test('a magnification that is not a power of two costs what the texel scale says', () {
-    // D187's discriminating run, re-derived from the report rather than
+    // The discriminating run, re-derived from the report rather than
     // restated. The 3 and 6 rungs are the first the ladder has taken where one
     // texel is an odd number of device pixels — a texel is `divisor` device
     // pixels wide, so magnifying it back has three sub-texel phases instead of
-    // two or four, one of them exactly on a texel centre. D120's transport
-    // finding cannot speak to that: every arm it compared at a matched texel
+    // two or four, one of them exactly on a texel centre. The transport
+    // arms above cannot speak to that: every arm it compared at a matched texel
     // scale magnified by a power of two (0.5 texels is divisor 2 at dpr 1, 4 at
     // dpr 2 and 8 at dpr 4), so "damage follows the texel" was established
     // only where the reconstruction was symmetric.
@@ -538,7 +533,7 @@ void main() {
     for (final String finish in kRecordedFinishes) {
       final ProxyDamage bound = ProxyResolution.damageAtTexelScale(finish, 2.0)!;
       expect(bound.measured, isFalse, reason: 'a bound was reported as a reading');
-      // Compared like with like: the table is a mean over the seven corpus
+      // Compared like with like: the table is a mean over the ladder's seven
       // scenes, so the bound is a claim about that mean and is checked against
       // the dpr-4 run's mean at the same texel scale.
       final List<double> atTwoTexels = <double>[
@@ -559,7 +554,7 @@ void main() {
   test('monotone is a statement about the corpus mean, and the cells say how much', () {
     // What the reading assumes and what the arms actually support are not the
     // same claim, and the difference is the instrument's own floor. Over 168
-    // steps at three densities the corpus mean is strictly monotone every time;
+    // steps at three densities the scene mean is strictly monotone every time;
     // **five individual cells invert**, by up to 9.4% — `scroll_under_bar` at
     // `regular`, whose whole damage is 0.09 ΔE, and `over_photo` at dpr 4,
     // where a proxy at a quarter and one at an eighth of a texel have the same
@@ -600,15 +595,14 @@ void main() {
   });
 
   test('the reading is not monotone, and the inversions are small and real', () {
-    // **This arm asserted monotonicity until D187 and the measurement refuted
-    // it.** Two rungs between the old ones — 0.667 and 0.333 texels — invert
-    // against their deeper neighbours on three of the eight finish-by-recipe
-    // columns: `regular` costs 0.235 at 0.667 and 0.221 at 0.5, `frosted`
-    // (corrected) 0.623 at 0.333 and 0.565 at 0.25. A coarser recording costing
-    // *less* is not what a low-pass does, and nothing here explains it; what is
-    // established is that it is not the magnification factor, which was the
-    // obvious guess and which `magnificationSource` refutes at matched texel
-    // scales.
+    // **Monotonicity is refuted by measurement.** Two rungs between the old
+    // ones — 0.667 and 0.333 texels — invert against their deeper neighbours on
+    // three of the eight finish-by-recipe columns: `regular` costs 0.235 at
+    // 0.667 and 0.221 at 0.5, `frosted` (corrected) 0.623 at 0.333 and 0.565 at
+    // 0.25. A coarser recording costing *less* is not what a low-pass does, and
+    // nothing here explains it; what is established is that it is not the
+    // magnification factor, which was the obvious guess and which
+    // `magnificationSource` refutes at matched texel scales.
     //
     // It is recorded rather than smoothed because two things downstream depend
     // on it: `ProxyResolutionPolicy.choose` may not stop its walk at the first
@@ -633,7 +627,7 @@ void main() {
         }
       }
     }
-    // Nine of them, and they have a shape: **every one is a D187 rung against
+    // Nine of them, and they have a shape: **every one is a 3 or 6 rung against
     // the next power of two** — 1/3 against 1/4, 1/6 against 1/8 — and none is
     // between two of the rungs that were there before. Worst 9.3%
     // (`frosted` corrected, 0.623 at 1/6 against 0.565 at 1/8).
@@ -646,7 +640,7 @@ void main() {
     // and 2.0 arms land too. So this is measured, reproduced arm for arm
     // against the recorded ladder, and unexplained.
     //
-    // Twelve since D230: the light branch's row adds three, of the same shape —
+    // Twelve in all: the light branch's row adds three, of the same shape —
     // 1/3 against 1/4 on both recipes, 1/6 against 1/8 uncorrected.
     expect(inversions, 12, reason: 'the table changed shape: $inversions inversions, worst $worst');
     expect(worst, closeTo(0.093, 0.002));
@@ -662,8 +656,8 @@ void main() {
   });
 
   test('the log-log interpolation is biased low, which is why the rungs were run', () {
-    // D187's own reason for existing, re-derived from the two reports rather
-    // than restated: rebuild the table without its 3 and 6 rungs, interpolate
+    // The reason the 3 and 6 rungs exist, re-derived from the two reports
+    // rather than restated: rebuild the table without its 3 and 6 rungs, interpolate
     // where they are, and compare against what the ladder measured there. Every
     // one of the eight points comes out **under** the measurement, by 3…29%.
     //
@@ -820,17 +814,13 @@ void main() {
   // -------------------------------------------------------------------------
 
   test('every family gets the same divisor, and only the price knows the hardware', () {
-    // This arm has encoded a derivation twice and been wrong twice, in the
-    // same shape. First for Metal, on D119: the capture is frame-charged
-    // there, so a divisor was said to save nothing — it saves 40% of what our
-    // glass costs (D128). Then for `unmeasured`: no model fitted, so "a
-    // measured loss against an unmeasured gain is not a trade" and the
-    // chooser returned full resolution — and the one unmeasured device anybody
-    // ran got 37 fps from that where a quarter gets 115 (D134). Both arms were
-    // right about the code and wrong about the device, because both encoded a
-    // conclusion that held exactly until somebody measured its subject.
+    // Two tempting derivations are wrong on the device. On Metal the capture
+    // is frame-charged, so a divisor looks like it saves nothing — it saves 40%
+    // of what the glass costs. With no fitted model, "a measured loss against
+    // an unmeasured gain is not a trade" returns full resolution — and on the
+    // unmeasured Xclipse device that is 37 fps where a quarter gets 115.
     //
-    // What survives is the part that was never a derivation: the divisor is
+    // What holds is the part that is not a derivation: the divisor is
     // chosen on quality, and quality does not know the hardware. So all three
     // families agree at every density, and the only thing the cost model is
     // allowed to change is whether the choice comes with a price.
@@ -860,7 +850,7 @@ void main() {
     }
     // The point that matters on a phone: at dpr 2 with the Apple-calibrated
     // finish a silent host now records at a quarter, which is the arm the
-    // device measured at 115 fps against 37 (D134), and it gets there for the
+    // device measured at 115 fps against 37, and it gets there for the
     // quality reason and not a hardware one.
     final ProxyResolutionChoice silent = ProxyResolutionPolicy.choose(
       finish: 'regularDark',
@@ -869,11 +859,10 @@ void main() {
       costModel: ProxyCostModel.unmeasured,
     );
     expect(silent.resolution, const ProxyResolution.quarter());
-    // `damageBudget`, not `offTheLadder`: since D137 the walk carries on to
-    // the eighth and is turned back there by the budget (0.25 texels costs
-    // 0.372 against 0.348). Same answer, and now for the reason the policy
-    // claims to decide on — the old reason was the list running out, which is
-    // what hid the defect at dpr 4 for a release.
+    // `damageBudget`, not `offTheLadder`: the walk carries on to the eighth
+    // and is turned back there by the budget (0.25 texels costs 0.372 against
+    // 0.348) — the reason the policy claims to decide on, rather than the list
+    // running out, which would hide a defect at dpr 4.
     expect(silent.reason, ProxyDivisorReason.damageBudget);
     expect(silent.damage!.deltaE, lessThan(ProxyResolutionPolicy.defaultDamageBudgetDeltaE));
     // The negative control the fix needs, and it is the defect stated as a
@@ -897,13 +886,13 @@ void main() {
     expect(const ProxyResolution.full().routeCostFactor(metal)!.factor, 1.0);
     expect(const ProxyResolution.full().routeCostFactor(metal)!.measured, isTrue);
     expect(const ProxyResolution.quarter().routeCostFactor(metal)!.measured, isTrue);
-    // Taken since D138, and the reason it had to be: two points defined it
-    // exactly, so it had no residual, and when it was measured it came back
-    // 18.6% off. Every row of this table is a reading now.
+    // Measured rather than interpolated: two points defined it exactly, so it
+    // had no residual, and the measurement came back 18.6% off the
+    // interpolation. Every row of this table is a reading.
     expect(const ProxyResolution.half().routeCostFactor(metal)!.measured, isTrue);
-    // Taken since D139, and the reason that one had to be taken is the reason
-    // this table has no formula in it: fitted on the first three points, every
-    // family predicted this row and every one missed, from -10% to +20%.
+    // Measured too, and this row is the reason the table has no formula in it:
+    // fitted on the first three points, every family predicted this row and
+    // every one missed, from -10% to +20%.
     expect(const ProxyResolution.divisor(8).routeCostFactor(metal)!.measured, isTrue);
     // Three is inside the span and is still refused: interpolating between
     // families that disagree by 4x is not a reading either.
@@ -926,11 +915,11 @@ void main() {
   });
 
   test('the default budget lands on the working point the cost budget assumed', () {
-    // D63 estimated our glass at ×1.2…2.1 Material *with the proxy at a quarter
-    // resolution*, which was an assumption nobody had checked from the quality
-    // side. The default budget — 1% of the distance between two of Apple's own
-    // materials — returns exactly that for the finish calibrated to one of
-    // them, on the density the ladder was taken at.
+    // The cost budget estimated the glass at ×1.2…2.1 Material *with the proxy
+    // at a quarter resolution*, an assumption made on the cost side only. The
+    // default budget — 1% of the distance between two of Apple's own materials
+    // — returns exactly that for the finish calibrated to one of them, on the
+    // density the ladder was taken at.
     final ProxyResolutionChoice choice = ProxyResolutionPolicy.choose(
       finish: 'regularDark',
       finishSigmaLogical: 2.6,
@@ -947,14 +936,13 @@ void main() {
   });
 
   test('a clear finish gets no divisor at the default budget, and the budget is why', () {
-    // Two criteria used to say so and the optics answered first, which made the
-    // answer look robust and made it unmovable: the ceiling is 1 at sigma 0 on
-    // every screen at every budget, so the policy could never divide a
-    // transparent finish however much quality the host was willing to spend.
-    // B13 measured what that cost on a device — full resolution is the only arm
-    // on SM-S938B that misses vsync, ×2.15 of an opaque fill (D158) — and D164
-    // took the ceiling out of the sigma-0 case. The divisor here does not move;
-    // the *reason* does, and it is the reason a host reads.
+    // The optics ceiling is 1 at sigma 0 on every screen at every budget, so if
+    // it were consulted the policy could never divide a transparent finish
+    // however much quality the host was willing to spend — and on SM-S938B
+    // full resolution is the only arm that misses vsync, ×2.15 of an opaque
+    // fill. So the ceiling is not consulted at sigma 0: the divisor here is
+    // still full, and the *reason* is the budget, which is the reason a host
+    // reads.
     final ProxyResolutionChoice choice = ProxyResolutionPolicy.choose(
       finish: 'clear',
       finishSigmaLogical: 0,
@@ -975,7 +963,7 @@ void main() {
   });
 
   test('and a host that pays for it gets the divisor, which is what D164 changed', () {
-    // The lever B13 asked for, and the arm is keyed on the quantity that moves
+    // The lever a host needs, and the arm is keyed on the quantity that moves
     // rather than on the knob: 0.646 ΔE is the first rung's own price, so a
     // budget just above it buys exactly that rung and a budget just below it
     // buys nothing. Both sides are asserted, because "a budget of 0.7 divides"
@@ -1005,9 +993,9 @@ void main() {
   });
 
   test('the identity finish never divides, whatever the budget says', () {
-    // The control finish reproduces the backdrop byte for byte (D64), which is
+    // The control finish reproduces the backdrop byte for byte, which is
     // what every pixel comparison in this repository is read against, and it
-    // also has sigma 0 — so the exemption D164 added must not reach it. What
+    // also has sigma 0 — so the sigma-0 exemption must not reach it. What
     // stops it is that nobody graded `identity`: no damage table, so the walk
     // refuses to extrapolate at the first rung and says so.
     final ProxyResolutionChoice choice = ProxyResolutionPolicy.choose(
@@ -1063,7 +1051,7 @@ void main() {
     // before the picture noticed. `maxDivisorFor` is the gate, and the arm is
     // built so the budget is not: it is set high enough to allow anything.
     //
-    // This is also what the sigma-0 exemption (D164) is *not*: above zero the
+    // This is also what the sigma-0 exemption is *not*: above zero the
     // ceiling keeps its work, and it is not the damage table saying the same
     // thing twice — the table is keyed by the finish's name, so it reads
     // `regular`'s numbers here while the sigma handed in is a fifth of
@@ -1078,11 +1066,9 @@ void main() {
       costModel: ProxyCostModel.areaCharged,
       damageBudgetDeltaE: 100,
     );
-    // **Exactly the ceiling, which it could not reach before D187**: the
-    // candidate list was the powers of two, so a ceiling of 3 stopped the walk
-    // at 2 and the arm read that as the ceiling binding. It was the list
-    // binding at a number the ceiling had nothing to do with; now the two
-    // coincide because 3 is a rung.
+    // **Exactly the ceiling**, because 3 is a rung. With a candidate list of
+    // powers of two a ceiling of 3 would stop the walk at 2, and this arm would
+    // mistake the list binding for the ceiling binding.
     expect(choice.resolution, const ProxyResolution.divisor(3));
     expect(choice.reason, ProxyDivisorReason.opticsCeiling);
   });
@@ -1173,8 +1159,8 @@ void main() {
     );
     expect(const ProxyResolution.full().routeCostFactor(ProxyCostModel.frameCharged)!.factor, 1.0);
 
-    // The one number here that is a check rather than a fit. D56 measured, on
-    // the capture grid and on a different content family, that a capture costs
+    // The one number here that is a check rather than a fit. The capture grid
+    // measured, on iOS / Metal, and on a different content family, that a capture costs
     // about one more frame once: `C_frame` / baseline of 0.73…1.01 over four
     // blocks. Our route's area-independent term is 1.10 of its floor frame —
     // 8.8% above the top of that band rather than inside it, which is why it is
@@ -1190,8 +1176,7 @@ void main() {
     // over the floor, and the device added 1.8587.
     //
     // Two points fit two parameters exactly, so the middle had no residual to be
-    // judged by — which was said here at the time and is the whole reason the
-    // third point was worth a reboot.
+    // judged by — which is the whole reason the third point was worth taking.
     final Map<String, Step> full = readLadder(ProxyResolution.metalRouteSources[1]!);
     final Map<String, Step> quarter = readLadder(ProxyResolution.metalRouteSources[4]!);
     final double floor = full['plain']!.frameMs;
@@ -1231,8 +1216,8 @@ void main() {
     // What the miss says, and what it does not. Re-fitted over all three points
     // the area family leaves a worst residual of 6.4% of the largest addition,
     // and `f = 1/k` leaves 2.2% — so the points prefer the proxy's *linear* size
-    // to its texel count, which is D28's finding about Adreno's capture arriving
-    // on Metal for the whole route. It is one degree of freedom (three points,
+    // to its texel count — the shape Adreno's capture has (`(1/k)^0.9`),
+    // here on Metal for the whole route. It is one degree of freedom (three points,
     // two parameters), so it ranks families and does not resolve an exponent.
     final List<(int, double)> arms = <(int, double)>[
       (1, three['glass_d1']!.frameMs - measuredFloor),
@@ -1273,7 +1258,7 @@ void main() {
   });
 
   test('the fourth divisor refuted the shape, not the exponent (D139)', () {
-    // D138 ended with "a fourth divisor would settle it". It was taken, and it
+    // Three points could not resolve an exponent, so a fourth was taken. It
     // did not settle the exponent — it removed the question: no `A·k^-p + C` at
     // any exponent describes the four points.
     final Map<String, Step> four = readLadder(ProxyResolution.metalRouteCostSource);
@@ -1288,7 +1273,8 @@ void main() {
       expect(four['glass_d$k']!.divisor, k, reason: 'the pin did not reach the recorder');
     }
 
-    // The comparison is licensed by the three arms this run shares with D138's,
+    // The comparison is licensed by the three arms this run shares with the
+    // three-point run's,
     // across a reboot and a different shuffle seed. As *ratios* — which is what
     // the table stores — the two runs agree to about a percent; a run-wide
     // offset cancels out of a ratio and does not cancel out of an absolute.
@@ -1305,7 +1291,7 @@ void main() {
       );
     }
 
-    // What D138's own fits predicted for the point nobody had run. Re-fitted
+    // What the three-point run's own fits predicted for the point nobody had run. Re-fitted
     // here from that run's digest rather than copied, so the prediction stays a
     // prediction rather than a number somebody typed.
     double predictEighth(double Function(int) of) {
@@ -1378,10 +1364,10 @@ void main() {
   });
 
   test('what the divisor buys is the blur pass and nothing else (D140)', () {
-    // D139 left one hypothesis for its knee and it was arithmetic over the
-    // source rather than a measurement. This is the measurement: the same two
-    // divisors with the residual blur pass switched off, in the same binary
-    // under the same shuffle.
+    // The knee above had one hypothesis, the residual blur pass, and it was
+    // arithmetic over the source rather than a measurement. This is the
+    // measurement: the same two divisors with the residual blur pass switched
+    // off, in the same binary under the same shuffle.
     final Map<String, Step> split = readLadder(ProxyResolution.metalBlurSplitSource);
     final double floor = split['plain']!.frameMs;
     double add(String arm) => split[arm]!.frameMs - floor;
@@ -1421,12 +1407,11 @@ void main() {
       reason: 'the pass does not account for the whole fall',
     );
 
-    // What is left reproduces D56's band with no fit in it. That band was
-    // measured on the capture grid, on another content family, in another
-    // experiment: `C_frame` / baseline of 0.73…1.01, i.e. a capture costs about
-    // one more frame, once. Three fitted decompositions had been trying to land
-    // on it — D128 got 1.10 and called it agreement to within a tenth, D138's
-    // re-fit got 0.63…0.75, D139 showed there was no fit to have.
+    // What is left reproduces the capture grid's band with no fit in it. That
+    // band was measured on another content family, in another experiment:
+    // `C_frame` / baseline of 0.73…1.01, i.e. a capture costs about one more
+    // frame, once. The fitted decompositions above could not land on it (1.10,
+    // then 0.63…0.75, then no fit at all).
     expect(add('glass_d1_noblur') / floor, closeTo(0.731, 0.005));
     expect(add('glass_d8_noblur') / floor, closeTo(0.967, 0.005));
     for (final String arm in const <String>['glass_d1_noblur', 'glass_d8_noblur']) {
@@ -1451,7 +1436,7 @@ void main() {
     // And the consequence with a shipping edge: a finish with no sigma is the
     // `noblur` arm by construction (`_blurred` returns the atlas untouched), so
     // a divisor buys it nothing but damage — and the damage is what refuses it,
-    // since D164 took the optics ceiling out of the sigma-0 case. Which
+    // since the optics ceiling is not consulted at sigma 0. Which
     // criterion answers matters here rather than elsewhere: this arm reads the
     // ladder, and the ladder's `clear` rungs were measured on exactly this path,
     // with no residual blur to correct them.
@@ -1467,18 +1452,19 @@ void main() {
   });
 
   test('the knee belongs to the blur pass, against a prediction (D141)', () {
-    // D140 had two points and therefore a ratio rather than a law. The middle
+    // The blur split had two points and therefore a ratio rather than a law. The middle
     // was the discriminating cell and both answers were written down before the
     // run: a power law through those two points gives 0.814 ms for the pass at a
     // divisor of 2, and the knee hypothesis needs about 1.06 to reconstruct
-    // D139's total there. Taking it was a comparison, not a fresh derivation.
+    // the four-point run's total there. Taking it was a comparison, not a fresh
+    // derivation.
     final Map<String, Step> curve = readLadder(ProxyResolution.metalBlurCurveSource);
     final double floor = curve['plain']!.frameMs;
     double add(String arm) => curve[arm]!.frameMs - floor;
     double blurAt(int k) => add('glass_d$k') - add('glass_d${k}_noblur');
 
     expect(blurAt(2), closeTo(1.108, 0.01));
-    // The power law's prediction, re-derived from D140's own digest rather than
+    // The power law's prediction, re-derived from the blur split's digest rather than
     // copied, so it stays a prediction after this file stops quoting it.
     final Map<String, Step> split = readLadder(ProxyResolution.metalBlurSplitSource);
     final double splitFloor = split['plain']!.frameMs;
@@ -1510,8 +1496,8 @@ void main() {
       reason: 'one exponent describes both intervals, so the pass has no knee to report',
     );
 
-    // The half that is not the blur, over four divisors now and all of it inside
-    // D56's band. Flat to a divisor of 2 and rising after — which is the same
+    // The half that is not the blur, over four divisors and all of it inside
+    // the capture grid's band. Flat to a divisor of 2 and rising after — which is the same
     // boundary the blur collapses across, and neither has a mechanism.
     expect(add('glass_d1_noblur') / floor, closeTo(0.763, 0.005));
     expect(add('glass_d2_noblur') / floor, closeTo(0.764, 0.005));
@@ -1522,7 +1508,7 @@ void main() {
       expect(share, lessThanOrEqualTo(1.01));
     }
 
-    // The number a budget should carry, which is not D140's headline: at the
+    // The number a budget should carry, which is not the blur split's headline: at the
     // divisor the policy picks on a dpr-2 screen the pass is under a quarter of
     // the addition, not three quarters.
     expect(blurAt(1) / add('glass_d1'), closeTo(0.709, 0.005));
@@ -1546,7 +1532,7 @@ void main() {
     // The pin exists so the prediction above can be *taken*. The chooser will
     // never return a divisor of 2 — at dpr 2 `regular` fits inside the budget
     // all the way to 4 — so without this the third point is unreachable except
-    // through the quality budget, which moves the retake ceiling with it (D131)
+    // through the quality budget, which moves the retake ceiling with it
     // and would have made the new point differ along two axes.
     const ProxyCostModel metal = ProxyCostModel.frameCharged;
     final ProxyResolutionChoice pinned = ProxyResolutionPolicy.pin(
@@ -1579,10 +1565,9 @@ void main() {
     // the chooser would not have returned there either, so the two can be
     // told apart. That is the case the benchmark runs in on Android, and it
     // is the difference between "the policy was overridden" and "the policy
-    // was consulted twice". Until D136 this half of the arm used the pin to
-    // reach a *quarter* on `unmeasured`, because the chooser refused it; now
-    // the chooser returns the quarter itself, and the pin's job on that
-    // family is the same as on Metal — the rung the walk skips.
+    // was consulted twice". The chooser returns the quarter on `unmeasured`
+    // itself, so the pin's job on that family is the same as on Metal — the
+    // rung the walk skips.
     expect(
       ProxyResolutionPolicy.choose(
         finish: 'regularDark',
@@ -1635,13 +1620,11 @@ void main() {
   });
 
   test('every divisor the chooser can return is one the quality table answers for', () {
-    // This arm used to require the opposite half — that the divisor have a
-    // measured *price* — and it passed for a year because on a dpr-2 screen the
-    // priced ladder and the quality ladder happen to stop in the same place. It
-    // was the derivation "no price, therefore no candidate" written down as a
-    // test, and D137 measured the thing the derivation was about: at dpr 4 the
-    // walk ran out one rung short of a **measured** quality point that the same
-    // budget accepts. What the chooser owes its caller is a damage figure for
+    // Not that the divisor have a measured *price*: on a dpr-2 screen the
+    // priced ladder and the quality ladder happen to stop in the same place,
+    // but "no price, therefore no candidate" at dpr 4 stops the walk one rung
+    // short of a **measured** quality point that the same budget accepts.
+    // What the chooser owes its caller is a damage figure for
     // what it picked, because damage is the only quantity it decides on; the
     // price is reported, and at divisor 8 there is not one yet.
     for (final double dpr in const <double>[1, 2, 2.625, 3, 4]) {
@@ -1724,14 +1707,14 @@ void main() {
     // Adreno priced the capture at three divisors and never the eighth, so the
     // capture column is still a refusal here.
     expect(three.resolution.captureCostFactor(ProxyCostModel.areaCharged), isNull);
-    // The route column stopped being one on 2026-09-09 (D139), and what it
-    // reports is worth reading rather than only having: 0.4258 against the
-    // quarter's 0.4439 is a saving of 4% of the addition, at the deepest rung
-    // the quality ladder has. Measured at dpr 2, so at a texel scale of 0.25 —
-    // and this row is dpr 3, where a divisor of 8 is 0.375 and therefore still
-    // on the falling side of the knee. That is the whole reason the ladder
-    // reaching 8 is not a defect: the price is keyed by texel scale, not by the
-    // knob (D120), and the two coincide only at dpr 2.
+    // The route column is not a refusal, and what it reports is worth reading
+    // rather than only having: 0.4258 against the quarter's 0.4439 is a saving
+    // of 4% of the addition, at the deepest rung the quality ladder has.
+    // Measured at dpr 2, so at a texel scale of 0.25 — and this row is dpr 3,
+    // where a divisor of 8 is 0.375 and therefore still on the falling side of
+    // the knee. That is the whole reason the ladder reaching 8 is not a defect:
+    // the price is keyed by texel scale, not by the knob, and the two coincide
+    // only at dpr 2.
     expect(
       three.resolution.routeCostFactor(ProxyCostModel.frameCharged)!.factor,
       closeTo(0.4258, 0.0005),

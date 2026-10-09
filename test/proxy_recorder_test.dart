@@ -1,9 +1,9 @@
-// Phase A, step 2 — recording a proxy at a chosen resolution, and the map back.
+// Recording a proxy at a chosen resolution, and the map back.
 //
-// `flutter test test/glass/proxy_recorder_test.dart`
+// `flutter test test/proxy_recorder_test.dart`
 //
 // The capture is the biggest single line of the budget (40% of the addition over
-// the floor, D63) and resolution is the one knob on it whose quality cost has
+// the floor) and resolution is the one knob on it whose quality cost has
 // already been measured. What this file checks is not that knob's price — that
 // belongs to a device — but the four ways an implementation of it is silently
 // wrong:
@@ -120,7 +120,7 @@ void main() {
       expect(rec.image.height, rec.expectedSize.height, reason: 'divisor $divisor height');
       expect(rec.image.width, (200 * 3 / divisor).ceil(), reason: 'divisor $divisor is not the ratio');
 
-      // The control that separates a downscale from a crop: this corpus is
+      // The control that separates a downscale from a crop: this fixture is
       // asymmetric, so a crop of any corner has a different mean.
       final _Rgb mean = await _meanColour(tester, rec.image);
       debugPrint('divisor $divisor: ${rec.image.width}x${rec.image.height} mean $mean');
@@ -245,8 +245,8 @@ void main() {
         corrected,
         reason: '$path is the other recipe',
       );
-      // And the optics, because the first version of this table quoted a report
-      // taken before M13 recalibrated them and was wrong for that reason alone.
+      // And the optics, because a report taken before the optics were
+      // recalibrated grades a different glass.
       final optics = report['optics']! as Map<String, Object?>;
       expect(optics['shoulder'], isNotNull, reason: '$path predates the M13 optics');
 
@@ -254,7 +254,7 @@ void main() {
       // The four these runs graded; the light branch's rows come from their
       // own run and are checked against it in `proxy_resolution_test.dart`.
       for (final String finish in const <String>['clear', 'thinLight', 'frosted', 'regularDark']) {
-        // The ladder called the dark branch `regular` until D230.
+        // The ladder calls the dark branch `regular`.
         final String ladderName = finish == 'regularDark' ? 'regular' : finish;
         for (final int divisor in ProxyResolution.measuredDivisors) {
           final List<double> mean = <double>[
@@ -308,19 +308,19 @@ void main() {
   });
 
   test('an unmeasured point refuses instead of interpolating', () {
-    // The eighth was graded but never priced: M10 fitted the cost law at 1, 1/2
+    // The eighth was graded but never priced: the cost law was fitted at 1, 1/2
     // and 1/4. `pow(1/8, 0.9)` would look like an answer.
     expect(const ProxyResolution.divisor(8).captureCostFactor(ProxyCostModel.areaCharged), isNull);
     expect(const ProxyResolution.divisor(3).captureCostFactor(ProxyCostModel.areaCharged), isNull);
-    // 5 rather than 3: the ladder ran 3 and 6 in D187, so the divisors it has
-    // never run are now the ones that are not 2, 3, 4, 6 or 8.
+    // 5 rather than 3: the ladder ran 3 and 6 too, so the divisors it has
+    // never run are the ones that are not 2, 3, 4, 6 or 8.
     expect(const ProxyResolution.divisor(5).meanDamage('regularDark'), isNull);
     expect(const ProxyResolution.quarter().meanDamage('nosuchfinish'), isNull);
     expect(const ProxyResolution.quarter().captureCostFactor(ProxyCostModel.unmeasured), isNull);
   });
 
   test('on a frame-charged capture the divisor costs a little instead of saving', () {
-    // D119, measured on the scale axis on Metal: not "a saving that rounds to
+    // Measured on the scale axis on Metal: not "a saving that rounds to
     // one" but a small loss, consistent in sign across four cells, two
     // instruments and two running orders. The quality is spent for less than
     // nothing.

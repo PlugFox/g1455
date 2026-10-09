@@ -1,10 +1,10 @@
-// Phase A — the roles an application declares over its own subtrees, and the
+// The roles an application declares over its own subtrees, and the
 // controls that make each of them a claim rather than a hope.
 //
-// `flutter test test/glass/proxy_role_test.dart`
+// `flutter test test/proxy_role_test.dart`
 //
-// The delivery mechanism is the thing under test here, not the pass: M12
-// already established that the pass reproduces `toImageSync`. What is new is a
+// The delivery mechanism is the thing under test here, not the pass: that the
+// pass reproduces `toImageSync` is established elsewhere. What is new is a
 // marker in somebody's widget tree, and every way it can be wrong is silent —
 // a stub drawn at the wrong offset, a subtraction that leaves a hole, a
 // declaration that never reached the pass, a `shouldRepaint` nobody calls.
@@ -25,7 +25,7 @@
 //  4. **`hidden` is a subtraction, not a hole.** Equal to the tree with that
 //     subtree absent; different from the tree with it present.
 //  5. **`verbatim` keeps exactly what the canvas policy would have dropped.**
-//  6. **`opaque` becomes a cover where a `ColoredBox` cannot (D42)** — and the
+//  6. **`opaque` becomes a cover where a `ColoredBox` cannot** — and the
 //     cut it licenses is invisible.
 //  7. **`shouldRepaint` has an observable trace.** An axis with no consequence
 //     is not an axis, and this one's consequence is `proxyChanges`.
@@ -287,7 +287,7 @@ void main() {
     declared.dispose();
     cut.dispose();
 
-    // D42: `ColoredBox` lowers to a private render object, so nothing public
+    // `ColoredBox` lowers to a private render object, so nothing public
     // can read its colour. That is the whole reason the declaration exists.
     expect(without.hasCover, isFalse, reason: 'a ColoredBox became readable — check D42');
     expect(with_.hasCover, isTrue, reason: 'the declaration did not reach the planner');
@@ -775,7 +775,7 @@ _Pass _passOver(
 }
 
 // ---------------------------------------------------------------------------
-// Pixel comparison. Same shape as M12's, because the numbers have to compare.
+// Pixel comparison, in the same shape as the pass's own, so the numbers compare.
 // ---------------------------------------------------------------------------
 
 class _Diff {

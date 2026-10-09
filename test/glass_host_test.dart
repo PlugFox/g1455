@@ -1,14 +1,14 @@
-// Phase A, step 11 — the host, and the first thing the package draws.
+// The host, and the first thing the package draws.
 //
-// `flutter test test/glass/glass_host_test.dart`
+// `flutter test test/glass_host_test.dart`
 //
-// Every step so far produced a texture and a map and stopped there. This one
+// The pipeline produces a texture and a map. The host
 // puts them on the screen, and what it draws is an **identity glass**: sample
 // the captured backdrop at the fragment's own place in it and output that. If
 // the register's coordinate space, the resolution policy's scale, the atlas's
 // map and the recording's clip all line up, the frame with a surface is the
 // frame without it — byte for byte. One number for four mechanisms, and it is
-// the control the roadmap asks for by name.
+// the control this whole route rests on.
 //
 // The arm it cannot do without displaces the *sample*: a surface that painted
 // nothing at all would pass the invisibility check perfectly, and so would one
@@ -47,8 +47,7 @@ void main() {
     WidgetTester tester,
   ) async {
     // Full resolution, so the proxy carries one texel per device pixel and the
-    // identity is exact rather than approximate — the same condition M8's
-    // backend arm ran under, and for the same reason.
+    // identity is exact rather than approximate.
     final ui.Image bare = await _shot(tester, const _Scene(surface: false));
     final ui.Image glass = await _shot(tester, const _Scene(surface: true));
     final _Diff diff = await _compare(tester, bare, glass);
@@ -63,7 +62,7 @@ void main() {
     // other side of the screen is another passing arm rather than a failing
     // one. Twelve logical pixels of shift is small enough to stay inside the
     // slot — the bleed is seven — and large enough that nothing about this
-    // corpus could match by accident.
+    // scene could match by accident.
     await _pump(tester, const _Scene(surface: true), frames: 4);
     tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface)).debugSampleShift = const Offset(12, 0);
     tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface)).markNeedsPaint();
@@ -190,10 +189,10 @@ void main() {
     WidgetTester tester,
   ) async {
     // `GlassHost.budgetDeltaE` says it is the whole quality allowance and both
-    // axes draw on it (D124). For one release it reached the retake oracle and
-    // not the resolution policy, which used its own default — so a host that
-    // halved its budget held the proxy for fewer frames and went on recording it
-    // just as small. Half an effect, and nothing said so.
+    // axes draw on it. If it reached the retake oracle and not the resolution
+    // policy, a host that halved its budget would hold the proxy for fewer
+    // frames and go on recording it just as small. Half an effect, and nothing
+    // would say so.
     Future<ProxyResolution> divisorAt(double budget) async {
       await tester.pumpWidget(_budgeted(budget));
       await tester.pump();
@@ -243,7 +242,7 @@ void main() {
   });
 
   testWidgets('a capture limit stops the recording and nothing else', (WidgetTester tester) async {
-    // The arm behind the D133 diagnostic. What it has to prove is not that the
+    // The arm behind the capture-limit diagnostic. What it has to prove is not that the
     // count stops — that is one `if` — but that everything *downstream* of the
     // recording carries on: the surface still samples, still through the
     // shader, still from a texture of exactly the same size. An arm that
@@ -266,7 +265,7 @@ void main() {
       // stops changing, so on a still tree it is served from its retained layer
       // and `paint` is never called again. That is correct engine behaviour and
       // it is also why the counters below need the paint asked for: on a device
-      // every scene in the corpus moves, and the surface repaints because the
+      // a real screen moves, and the surface repaints because the
       // content under it does.
       tester.renderObject<RenderObject>(find.byType(GlassSurface)).markNeedsPaint();
       tester.binding.scheduleFrame();
@@ -287,8 +286,8 @@ void main() {
 
     // The pair. Same tree, same frames, no limit — and it records every one of
     // them, so the arm is a difference in exactly one thing rather than a tree
-    // that never captured. `undeclared` is what "no limit" has to mean since
-    // D163: the default holds a still screen on its own, and then the limit and
+    // that never captured. `undeclared` is what "no limit" has to mean:
+    // the default holds a still screen on its own, and then the limit and
     // the default would be indistinguishable here.
     final free = GlobalKey();
     await _pump(
@@ -309,11 +308,10 @@ void main() {
   testWidgets('the oracle now watches the markers the application declared', (
     WidgetTester tester,
   ) async {
-    // The mechanism has existed since phase A and had no caller: `RenderGlassProxy`
-    // publishes `proxyChanges`, `RetakeOracle.watch` subscribes to it, both are
-    // tested in isolation — and the host built an oracle, handed it to the
-    // pipeline every frame, and never called `watch`. Every marker in every
-    // application was inert.
+    // `RenderGlassProxy` publishes `proxyChanges` and `RetakeOracle.watch`
+    // subscribes to it, both tested in isolation. What only this arm sees is
+    // the host calling `watch` on the oracle it hands the pipeline; without
+    // that, every marker in every application is inert.
     final hostKey = GlobalKey();
     await _pump(tester, const _Scene(surface: true, markers: 2), frames: 4, hostKey: hostKey);
     expect(
@@ -330,7 +328,7 @@ void main() {
     expect((bareKey.currentState! as dynamic).watchedMarkers, 0);
 
     // And the subscription survives the tree changing under it. The walk costs
-    // 24 us (M12) so it does not run every frame; the ledger is the signal, and
+    // 24 us so it does not run every frame; the ledger is the signal, and
     // it notifies exactly when a surface arrives or leaves.
     final growKey = GlobalKey();
     await _pump(tester, const _Scene(surface: true, markers: 1), frames: 4, hostKey: growKey);
@@ -362,7 +360,7 @@ void main() {
     // this table.
     //
     // It is not a defect in the table. The default budget is 1% of the scale
-    // between two of Apple's own materials (D64), and every finish's *first*
+    // between two of Apple's own materials, and every finish's *first*
     // stale frame already costs more than that.
     const double budget = ProxyResolutionPolicy.defaultDamageBudgetDeltaE;
     expect(budget, closeTo(0.348, 0.001));
@@ -376,7 +374,7 @@ void main() {
       );
       expect(ProxyStaleness.maxStaleFrames(finish, budget), 0);
     }
-    // Every finish but the light branch of `.regular`, which D230 added: its
+    // Every finish but the light branch of `.regular`: its
     // first stale frame is 82% of the budget, so a still light screen may be
     // held one frame — the arithmetic, not an exception made for it.
     expect(ProxyStaleness.damageAt('regularLight', 1)! / budget, closeTo(0.82, 0.01));
@@ -385,7 +383,7 @@ void main() {
     expect(ProxyStaleness.damageAt('regularDark', 1)! / budget, closeTo(1.10, 0.01));
     // Spending twice the budget on staleness alone buys two frames on
     // `regular`, one on `frosted` and none on `clear` — the ordering follows how
-    // little of the backdrop each finish lets through (D70), which is what makes
+    // little of the backdrop each finish lets through, which is what makes
     // it a property of the material rather than of the number. That is the
     // decision the ceiling represents, and it is the host's to make rather than
     // this table's.
@@ -429,9 +427,9 @@ void main() {
     // explicitly. It is not sampled on a real screen, and that is the finding
     // rather than a caveat: `GlassSurface` is a repaint boundary, an unchanging
     // proxy does not dirty it, and on the device the held arms paint 4 times per
-    // window against 6770 (D145). So the declaration is a lever over the whole
-    // route at steady state and not only over the capture, and the arm that was
-    // read as "the write pays, not the sampling" (D134) removed both.
+    // window against 6770. So the declaration is a lever over the whole route
+    // at steady state and not only over the capture: holding removes both the
+    // write and the sampling.
     final RenderGlassSurface surface = tester.renderObject<RenderGlassSurface>(
       find.byType(GlassSurface),
     );
@@ -522,10 +520,9 @@ void main() {
   testWidgets('a change that misses the glass is seen, and held through anyway', (
     WidgetTester tester,
   ) async {
-    // §4.2, asked as a pair. The research document's line is "a shared texture
-    // is a shared dirty flag: a spinner behind button A invalidates the whole
-    // cluster", and until D174 this package had one flag for the whole screen —
-    // so a spinner anywhere invalidated glass everywhere.
+    // Asked as a pair: "a shared texture is a shared dirty flag: a spinner
+    // behind button A invalidates the whole cluster". With one flag for the
+    // whole screen, a spinner anywhere would invalidate glass everywhere.
     //
     // Both arms mount the same widget, the same size, repainting the same way
     // behind its own boundary. The only difference is 300 logical pixels of
@@ -682,10 +679,10 @@ void main() {
   testWidgets('the residual blur pass runs out before the divisor does (D139)', (
     WidgetTester tester,
   ) async {
-    // D139 measured a knee the route's price has no model for: the addition
+    // On a device the route's price has a knee no model accounts for: the addition
     // falls 0.94 and 0.65 ms across the first two intervals of the divisor and
     // 0.05 across the third. The only mechanism anyone has is that the two
-    // things a divisor buys after a scale-free capture (D119) — this pass and
+    // things a divisor buys after a scale-free capture — this pass and
     // the texture's bandwidth — do not fall together, because the pass's sigma
     // is spent in *texels* and the texel grows with the divisor.
     //
@@ -765,7 +762,7 @@ void main() {
     // The fold's whole claim is that it changes nothing but the amount of work,
     // so the arm has to check both halves — and the two halves want opposite
     // things from the instrument, which is why they are asserted together. The
-    // pixels have to agree (spike #21 measured 1 code value on a picture; this
+    // pixels have to agree (to 1 code value on a picture; this
     // is the same on a mounted host, where the sigma comes from the divisor),
     // and the snapshot count has to disagree, because it is the only thing a
     // device report can see about which spelling ran.
@@ -900,7 +897,7 @@ class _Scene extends StatelessWidget {
 
   /// Whether [pulse] sits inside the surface's rectangle or well away from it.
   ///
-  /// The only difference between the two arms of §4.2's pair. Same widget, same
+  /// The only difference between the two arms of the shared-flag pair. Same widget, same
   /// size, same repaint, same boundary: what moves is whether the pixels it
   /// changes are pixels the proxy holds.
   final bool pulseUnder;
@@ -1044,9 +1041,7 @@ Widget _mount(
   // A device pixel ratio of 1, and a finish the policy will not shrink: the
   // identity has no blur of its own, so any divisor would out-blur it and the
   // optics ceiling holds the proxy at full resolution — which is what makes the
-  // identity exact instead of a resampling. This used to say Metal was the
-  // reason (D119); it is not any more (D128, D130), and the arm survived the
-  // change because the real reason was always the finish.
+  // identity exact instead of a resampling.
   data: MediaQueryData(size: kScreen, devicePixelRatio: dpr),
   child: Directionality(
     textDirection: TextDirection.ltr,
@@ -1082,7 +1077,7 @@ Widget _budgeted(double budget) => MediaQuery(
       alignment: Alignment.topLeft,
       child: GlassHost(
         hardware: GlassHardware.appleMetal,
-        // Named: unnamed, a light screen gets the light branch (D230), and
+        // Named: unnamed, a light screen gets the light branch, and
         // the rungs below are the dark one's.
         finish: GlassFinish.regularDark,
         budgetDeltaE: budget,
@@ -1093,7 +1088,7 @@ Widget _budgeted(double budget) => MediaQuery(
 );
 
 /// A host at a pinned divisor on a dpr-2 screen, with the residual blur pass
-/// switchable. The rig for D139's mechanism arm.
+/// switchable. The rig for the blur-knee mechanism arm.
 ///
 /// `regular` rather than the identity, because the identity has no sigma and the
 /// pass under test would do nothing at any divisor — the arm would pass without

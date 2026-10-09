@@ -1,4 +1,4 @@
-// D219 — a label changing inside glass repaints the host and changes nothing
+// A label changing inside glass repaints the host and changes nothing
 // the proxy holds.
 //
 // `flutter test test/glass_label_repaint_test.dart`
@@ -9,8 +9,8 @@
 // it by construction — and so the assertion read "painted and nothing outside
 // the glass changed" as a hole. It is not one when every new picture is inside
 // glass: a bar's label changing with nothing of the boundary's own painted
-// outside the bar. The example application did that on its first tap; no scene
-// in the corpus ever had, because their glass carried no state.
+// outside the bar. The example application does that on its first tap; a scene
+// whose glass carries no state never does.
 //
 // The assertion now reads a second walk that excludes only the glass *draws*,
 // so glass content is watched and the pipeline's own output is not. Not a walk
@@ -185,9 +185,9 @@ void main() {
   testWidgets('and the old predicate fires on the first scene and not on the second', (
     WidgetTester tester,
   ) async {
-    // "Painted, and the excluded walk saw nothing" — what the assertion read
-    // before D219. Both scenes repaint the host's boundary (the label has no
-    // boundary of its own), so the predicate is the excluded walk's silence.
+    // Not "painted, and the excluded walk saw nothing": both scenes repaint
+    // the host's boundary (the label has no boundary of its own), so the
+    // predicate is the excluded walk's silence.
     final bool inside = !(await _flip(tester, insideGlass: true)).excluded.changed;
     final bool outside = !(await _flip(tester, insideGlass: false)).excluded.changed;
     print('old predicate: inside glass $inside, outside glass $outside');

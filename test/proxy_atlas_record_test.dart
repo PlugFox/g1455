@@ -2,7 +2,7 @@
 //
 // `flutter test test/proxy_atlas_record_test.dart`
 //
-// `AtlasLayout.record` is the replay the pixel test of D24 runs against: one
+// `AtlasLayout.record` is the replay the atlas's pixel test runs against: one
 // clipped, translated, scaled replay of the scene per slot. The way it is
 // silently wrong is a map that is self-consistent and not correct, so each arm
 // reads a landmark through `AtlasSlot.toAtlas` and has a negative control:

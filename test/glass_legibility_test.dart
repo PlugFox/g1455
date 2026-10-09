@@ -1,7 +1,7 @@
-// Phase D's remainder: increase contrast, and legibility over a backdrop the
-// application cannot describe by one colour (D203, D204).
+// Increase contrast, and legibility over a backdrop the application cannot
+// describe by one colour.
 //
-// `flutter test test/glass/glass_legibility_test.dart`
+// `flutter test test/glass_legibility_test.dart`
 //
 //  1. **The level range is exact, over any backdrop.** Every rung shows
 //     `mix(b, tint, a)`, monotone in each channel of `b`, so the least and the
@@ -418,7 +418,7 @@ Future<void> _mount(
                     else
                       Positioned.fill(child: ColoredBox(color: backdrop ?? const Color(0xFF808080))),
                     // Keyed on everything the arms vary, so no two arms share a
-                    // render object and a retained layer (D175).
+                    // render object and a retained layer.
                     Positioned.fill(
                       child: KeyedSubtree(
                         key: ValueKey<Object>(

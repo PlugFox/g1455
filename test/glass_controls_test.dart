@@ -1,7 +1,7 @@
 // The switch and the slider: a drop that exists only while held, and what it
 // costs the capture.
 //
-// `flutter test test/glass/glass_controls_test.dart`
+// `flutter test test/glass_controls_test.dart`
 //
 // The claims are about the capture, because that is what a control on a glass
 // screen can cost everyone else: at rest the drop is not captured at all and
@@ -10,7 +10,7 @@
 // is drawn from the proxy it already holds.
 //
 // Disabled, a control is iOS's: drawn whole at half over its backdrop, as one
-// group (D221), and with no drop in the tree, because it cannot be held. The
+// group, and with no drop in the tree, because it cannot be held. The
 // pixel arm's break is the half spent per part instead of on the group — the
 // track then shows through the knob, which Apple's does not.
 
@@ -334,8 +334,8 @@ void main() {
   testWidgets('a held drop is the knob times its scale: 1.57 by default, any when asked', (
     WidgetTester tester,
   ) async {
-    // 1.57 is iOS's, for both controls (D217); macOS's own differ per control
-    // (1.4 the slider, 1.6 the switch, D210), which is what the parameter is for.
+    // 1.57 is iOS's, for both controls; macOS's own differ per control
+    // (1.4 the slider, 1.6 the switch), which is what the parameter is for.
     expect(kGlassDropScale, 1.57);
     const knob = Size(38, 24);
     for (final _Control control in <_Control>[_Control.toggle, _Control.slider]) {
@@ -391,7 +391,7 @@ void main() {
     WidgetTester tester,
   ) async {
     // iOS 26: 0.502 on every part of a disabled UISwitch and UISlider, the
-    // colours unchanged, in both appearances (D221).
+    // colours unchanged, in both appearances.
     expect(kGlassDisabledOpacity, 0.5);
     final SemanticsHandle semantics = tester.ensureSemantics();
     for (final (_Control control, bool on) in <(_Control, bool)>[
@@ -465,7 +465,7 @@ void main() {
     // again. Only a drag: a finger held still is let go by the framework — the
     // tap recognizer, disposed, rejects its gesture and calls the
     // `onTapCancel` it was built with — and that half of the reset is the
-    // break that failed to break (D221).
+    // break that failed to break.
     for (final _Control control in <_Control>[_Control.toggle, _Control.slider]) {
       final GlobalKey hostKey = GlobalKey();
       await _mount(tester, hostKey, _Screen(control: control));

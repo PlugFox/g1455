@@ -1,8 +1,8 @@
 // `GlassOptics.widen` and `zoom`: the glass shows its box grown by a margin,
 // which minifies the backdrop — what iOS's held switch does — or magnified
-// about its centre, which is what its tab bar's drop does (D218).
+// about its centre, which is what its tab bar's drop does.
 //
-// `flutter test test/glass/glass_widen_test.dart`
+// `flutter test test/glass_widen_test.dart`
 //
 // The backdrop is a ramp, red = x and green = y, one code per logical pixel at
 // dpr 1. Bilinear sampling of a linear ramp is exact, so the law is checkable

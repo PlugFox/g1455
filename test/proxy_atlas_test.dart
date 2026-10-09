@@ -1,33 +1,28 @@
-// Phase A, step 8 — the atlas moves into the package, and its bleed stops being
-// a free parameter.
+// The atlas, and a bleed that is not a free parameter.
 //
-// `flutter test test/glass/proxy_atlas_test.dart`
+// `flutter test test/proxy_atlas_test.dart`
 //
-// The atlas arrived from `spikes/13_own_walk/` with its own tests, and those
-// stay there: they are corpus-wide, they compare a packed slot against a
-// separate capture pixel for pixel, and nothing about them needed to move. What
-// is here is the three things that are *new* because it is package code now.
+// Three things are held here:
 //
 //  1. **The bleed is measured.** A blur reads outside the surface, so a slot
-//     has to capture more than the surface — and until now "3 sigma" was a
-//     number the spike wrote down. Measured against the thing it stands in for:
+//     has to capture more than the surface, and "3 sigma" is a number that
+//     needs checking. Measured against the thing it stands in for:
 //     the same blur of the whole screen. The instrument matters more than the
 //     answer, because the answer is a constant somebody will want to shave.
 //  2. **Merging is a lever wherever atlas area is charged, and the criterion
 //     never read the constants it was gated on.** With one `toImageSync` for
 //     the whole atlas the pass term is constant, so what a merge trades is
-//     atlas area against nothing else. For one release that was read as "a
-//     lever on Adreno alone", because the dead-area budget `C_pass / k` exists
-//     for no other family — but the criterion prices every candidate with
+//     atlas area against nothing else. It is not "a lever on Adreno alone",
+//     even though the dead-area budget `C_pass / k` exists for no other
+//     family: the criterion prices every candidate with
 //     `passes: 1`, so `C_pass` cancels and `k` scales both sides alike: the
 //     decision is whether the packed area fell, and it is the same decision
 //     under any constants at all. Area is charged on every family measured
-//     (D28, D128, D134), and the gate was declining a saving on exactly the
-//     family that cannot declare itself (D135, D136).
-//  3. **The register is its input.** The roadmap's rule is that the capture's
-//     geometry is a function of the surfaces and of nothing else (D115),
-//     because Impeller's target pool is keyed by size; the surface register
-//     (D121) is where those surfaces now come from.
+//     (Adreno, Metal, Xclipse), and gating merges on a family would decline a
+//     saving on exactly the family that cannot declare itself.
+//  3. **The register is its input.** The capture's geometry is a function of
+//     the surfaces and of nothing else, because Impeller's target pool is
+//     keyed by size; the surface register is where those surfaces come from.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -182,8 +177,8 @@ void main() {
   });
 
   test('a divisor widens the bleed, because it widens the blur', () {
-    // The line that joins step 6 to this one. Recording at 1/k is itself a
-    // low-pass of 0.30 logical px of sigma per texel (D117) and it composes in
+    // The line that joins the resolution divisor to the atlas. Recording at 1/k
+    // is itself a low-pass of 0.30 logical px of sigma per texel and it composes in
     // quadrature, so the proxy carries more blur than the finish asked for and
     // needs more context to carry it.
     const double sigma = 2.6;
@@ -464,7 +459,7 @@ void main() {
   });
 
   test('the merge is decided on the packed atlas, not on the rectangles', () {
-    // The finding the spike recorded and the reason the criterion is a repack
+    // The reason the criterion is a repack
     // rather than a pairwise rule: two surfaces far apart make a union whose
     // dead area is enormous, and the shelf packer was already wasting some of
     // it. Only a real reduction is taken.
@@ -516,7 +511,7 @@ void main() {
     }
 
     // Slots do not overlap and every origin is on the alignment grid — the two
-    // properties that keep one slot's blur out of the next (D39).
+    // properties that keep one slot's blur out of the next.
     for (var i = 0; i < atlas.slots.length; i++) {
       final AtlasSlot a = atlas.slots[i];
       expect(a.rect.left % 8, 0);
@@ -547,7 +542,7 @@ void main() {
   });
 
   test('one atlas against one bounding box, on surfaces in opposite corners', () {
-    // The comparison D24 is about, on the geometry that makes it lopsided.
+    // One atlas against one bounding box, on the geometry that makes it lopsided.
     final atlas = AtlasLayout.pack(<Rect>[
       const Rect.fromLTWH(0, 0, 100, 60),
       const Rect.fromLTWH(300, 700, 100, 60),

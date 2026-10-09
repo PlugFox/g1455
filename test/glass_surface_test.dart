@@ -1,20 +1,19 @@
-// Phase A, step 7 — the surface type, and the register it feeds.
+// The surface type, and the register it feeds.
 //
-// `flutter test test/glass/glass_surface_test.dart`
+// `flutter test test/glass_surface_test.dart`
 //
-// The surface draws no glass yet (the shader is 9% of the addition and is
-// deliberately last, D63), so everything worth checking here is about the two
-// things it *does* do, and each has a way of being silently wrong:
+// The glass draw aside (the shader is 9% of the addition), what is checked here
+// is the two other things a surface does, and each has a way of being silently
+// wrong:
 //
 //  1. **It must change no pixel.** A declaration that quietly painted something
 //     would be discovered by a person looking at a screenshot, which is the
-//     slowest instrument in the project. Checked the way D115's markers were:
-//     byte for byte against the same tree without it.
+//     slowest instrument there is. Checked byte for byte against the same
+//     tree without it.
 //  2. **It must report where it actually is.** A surface inside a scroll view
 //     or a transform has a paint offset that is not a place on the screen, and
-//     the playground's own rig — which reports `offset & size` and says so —
-//     would pass every test that does not put a layer above the surface. The
-//     capture works in scene coordinates, so a register in the wrong space is a
+//     a rig that reports `offset & size` would pass every test that does not
+//     put a layer above the surface. The capture works in scene coordinates, so a register in the wrong space is a
 //     backdrop sampled from the wrong part of the screen, and that shows up as
 //     glass that looks fine while showing the wrong thing.
 //
@@ -287,7 +286,7 @@ void main() {
     expect(load.rectAreaLogical, 20000);
     expect(load.screensOfGlass, closeTo(20000 / (400 * 400), 1e-9));
     expect(load.bounds, const Rect.fromLTWH(0, 0, 400, 400));
-    // Phase B's question, in the units its budget is quoted in: two chips in
+    // The shared capture's cost, in the units its budget is quoted in: two chips in
     // opposite corners make one shared capture pay for the whole screen.
     expect(load.deadAreaLogical, 160000 - 20000);
   });

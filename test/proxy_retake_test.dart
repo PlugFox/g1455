@@ -1,12 +1,11 @@
-// Phase A, step 10 — when the proxy is re-recorded, and what a frame of
-// staleness actually costs.
+// When the proxy is re-recorded, and what a frame of staleness actually costs.
 //
-// `flutter test test/glass/proxy_retake_test.dart`
+// `flutter test test/proxy_retake_test.dart`
 //
-// The roadmap's shape for this piece is "re-take on a dirty rect, with a
+// The natural shape for this piece is "re-take on a dirty rect, with a
 // threshold and a frequency ceiling assigned by the finish rather than by
 // taste". The ceiling is measured here, from the ladder's own latency rungs,
-// and the answer is not the one the shape assumed: **at the budget that picks a
+// and the answer is not the one that shape assumes: **at the budget that picks a
 // quarter-resolution proxy, no finish may be stale at all.** A frame behind
 // costs more than a quarter of the resolution does, on every finish.
 //
@@ -79,11 +78,11 @@ double _median(List<double> xs) {
 }
 
 /// The package's name for a finish the ladder graded: the ladder has called
-/// the dark branch of `.regular` `regular` since before D230, and every
-/// report keeps the name it was taken under.
+/// the dark branch of `.regular` `regular`, and every report keeps the name it
+/// was taken under.
 String packageName(String ladder) => ladder == 'regular' ? 'regularDark' : ladder;
 
-/// The finishes every ladder run before D230 graded, by the package's names:
+/// The finishes every ladder run before the light branch's graded, by the package's names:
 /// the cross-run claims below are claims about these four. The light branch
 /// has a run of its own, and its own arm.
 const List<String> kRecordedFinishes = <String>['clear', 'thinLight', 'frosted', 'regularDark'];
@@ -94,7 +93,7 @@ void main() {
   // -------------------------------------------------------------------------
 
   test('the light branch\'s staleness row is what its own run says', () {
-    // D230's run, whose `regular` lag arms are the control: they reproduce
+    // The light branch's run, whose `regular` lag arms are the control: they reproduce
     // the table's `regularDark` row, which is what licenses a row from another
     // afternoon in the same table.
     final arms = _armsOf(ProxyResolution.lightDamageSource);
@@ -157,7 +156,7 @@ void main() {
     );
     // And the consequence: at the default budget the ceiling is zero for every
     // finish but one. Not a degenerate case — the finding. The light branch
-    // of `.regular` is the exception (D230): its first stale frame is 0.284,
+    // of `.regular` is the exception: its first stale frame is 0.284,
     // 82% of the budget.
     for (final String finish in ProxyStaleness.measuredFinishes) {
       expect(
@@ -280,7 +279,7 @@ void main() {
     // spend, and named here rather than hidden behind a default.
     //
     // `undeclared` is named for the same reason, and every oracle in this file
-    // that studies the ceiling names it: since D163 the default holds outright
+    // that studies the ceiling names it: the default holds outright
     // and never consults the table, so the branch this file is about is only
     // reachable on the other side of that switch.
     final oracle = RetakeOracle(
@@ -372,9 +371,8 @@ void main() {
   testWidgets('a marker that changes is a change the oracle can see', (
     WidgetTester tester,
   ) async {
-    // `proxyChanges` has been publishing since D115 with nobody listening —
-    // which was the point of making it a `Listenable` rather than a comment.
-    // This is the listener.
+    // `proxyChanges` is a `Listenable` rather than a comment so that something
+    // can listen to it. This is the listener.
     final ledger = GlassLedger();
     final offset = ValueNotifier<Offset>(const Offset(20, 40));
     final role = ValueNotifier<GlassProxyRole>(GlassProxyRole.verbatim);
@@ -448,7 +446,7 @@ void main() {
   testWidgets('the declaration is what makes the hold branch reachable at all', (
     WidgetTester tester,
   ) async {
-    // D142: the ceiling is zero on every measured finish at the default budget,
+    // The ceiling is zero on every measured finish at the default budget,
     // so `hold` is unreachable and the proxy is re-recorded on every frame of
     // every application — a still screen included. The arm above says that on
     // its own; this one runs the silent oracle **beside** the declaring one, on
