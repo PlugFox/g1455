@@ -1,33 +1,25 @@
-// A glass surface, as far as phase A has one: a declared shape in a declared
-// place, and the register it belongs to.
+// A glass surface: a declared shape in a declared place, registered with the
+// ledger, drawn from the host's capture, with its child painted on top.
 //
-// **It does not draw glass yet, and that is the schedule rather than an
-// oversight.** The budget puts the shader at 9% of the addition over the floor
-// and everything upstream of it at 91% (D63), so the shader is deliberately
-// last; what has to exist first is the thing that says *where* the glass is,
-// because two separate machines need that answer and neither can derive it:
+// Where the glass is has to be declared rather than derived, because two
+// machines need that answer and neither can work it out:
 //
-//  - the ledger, because the translucency tax follows glass area (D21) with an
-//    excess for fragmentation (D26), and those are the only two large levers
-//    left — and both are decided when a screen is designed, not when it is
-//    rendered;
+//  - the ledger, because the cost follows glass area with an excess for
+//    fragmentation, and both are decided when a screen is designed, not when
+//    it is rendered;
 //  - the proxy, because its capture region has to be a function of the
 //    surfaces and of nothing else. Impeller's render target pool is keyed by
 //    size (`render_target_cache.cc:69-74`), so a region that changed with the
-//    content would miss the pool every time the content moved (D115).
+//    content would miss the pool every time the content moved.
 //
-// So this registers a rectangle, draws the proxy inside its own shape once a
-// [GlassHost] is above it, and paints its child on top of that — in that order,
-// because the subtree is not in the proxy and therefore belongs above the
-// glass rather than under it.
+// The child is painted after the glass because the subtree is not in the
+// proxy, and so belongs above the glass rather than under it.
 //
-// **What it draws is an identity glass, and that is a control rather than a
-// placeholder.** Sample the captured backdrop at the fragment's own place in it
-// and output that: if the register's coordinate space, the policy's scale, the
-// atlas's map and the recording's clip all line up, the frame with the surface
-// is the frame without it, byte for byte. One number for four mechanisms, and
-// it is the check the roadmap asks for by name. The optics go on top of it
-// later and change only what is sampled where.
+// The identity finish — sample the captured backdrop at the fragment's own
+// place and output that — is the package's own check: if the register's
+// coordinate space, the policy's scale, the atlas's map and the recording's
+// clip all line up, the frame with the surface is the frame without it, byte
+// for byte.
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -72,7 +64,7 @@ bool debugPaintGlassSurfaces = false;
 /// Whether a glass draw asks the engine for antialiasing — `Paint.isAntiAlias`
 /// on the single surface's quad and on a group's unsplit quad.
 ///
-/// **Not an antialiasing switch, and that is the point of the arm.** The
+/// **Not an antialiasing switch.** The
 /// shader writes its own coverage off the shape's distance, and it is zero half
 /// a device pixel outside the shape, so both quads are drawn a device pixel
 /// larger than any pixel that coverage can reach (the group's always was, by
@@ -86,25 +78,22 @@ bool debugPaintGlassSurfaces = false;
 /// macOS and on by default on Windows and Linux, opt-in on iOS, absent on
 /// Android.
 ///
-/// **False, because the SDF draw is both dearer and wrong (D200).** On an M3
-/// Max twelve surfaces cost 1.355 ms of GPU a frame through it and 0.522 ms
+/// **False, because the SDF draw is both dearer and wrong.** On an M3 Max
+/// twelve surfaces cost 1.355 ms of GPU a frame through it and 0.522 ms
 /// directly, and the offscreen shifts the whole interior on a fractional
 /// layout: the identity finish differs from the bare backdrop by up to 136
-/// code values through the SDF draw and by nothing directly. D191 and D199
-/// saw no difference because the `false` never arrived — see
-/// `primeAliasedDraw` — so their "the flag changes nothing" compared the SDF
-/// draw with itself. A global for the reason [debugGlassFusedSplit] is one;
-/// set it before the tree mounts, and read which arm ran off
-/// [RenderGlassSurface.opticsDrawsAliased] and
-/// [RenderGlassGroup.fusedDrawsAliased], never off the label.
+/// code values through the SDF draw and by nothing directly. The `false` only
+/// reaches the engine through `primeAliasedDraw`. A global for the reason
+/// [debugGlassFusedSplit] is one; set it before the tree mounts, and read
+/// which setting ran off [RenderGlassSurface.opticsDrawsAliased] and
+/// [RenderGlassGroup.fusedDrawsAliased].
 ///
 /// {@category Diagnostics}
 bool debugGlassShaderAntiAlias = debugGlassShaderAntiAliasDefault;
 
 /// What [debugGlassShaderAntiAlias] ships as, for a harness that has to name
-/// the arm it did not override — a host that wrote its own constant here would
-/// report the old default after the package moved, which is the trap D190 and
-/// D199 each fell into once with the split.
+/// the setting it did not override — a host that wrote its own constant here
+/// would report the old default after the package changed it.
 ///
 /// {@category Diagnostics}
 const bool debugGlassShaderAntiAliasDefault = false;
@@ -118,15 +107,13 @@ const bool debugGlassShaderAntiAliasDefault = false;
 /// `false`, while Impeller's dispatcher starts every display list, nested ones
 /// included, from `impeller::Paint()`, whose `anti_alias` is `true`
 /// (`dl_dispatcher.cc:801`, `paint.h:88`). So the draw arrives antialiased and,
-/// on an SDF backend, as three offscreen passes (#192994) — D199's "the flag
-/// changes nothing" was this.
+/// on an SDF backend, as three offscreen passes (#192994).
 ///
 /// The primer must be a draw the builder sees and discards. An empty rect is
 /// neither: `Canvas.drawRect` drops an empty fill in Dart before the builder is
-/// called (`painting.dart:7929`), which is why D199's `Rect.zero` primer
-/// refuted a hypothesis that was true. `BlendMode.dst` over a non-empty rect is
+/// called (`painting.dart:7929`). `BlendMode.dst` over a non-empty rect is
 /// recorded as attributes and culled as `kNoEffect` (`dl_builder.cc:2140`), so
-/// it costs two attribute ops and draws nothing on any backend (D200).
+/// it costs two attribute ops and draws nothing on any backend.
 void primeAliasedDraw(Canvas canvas) => canvas.drawRect(const Rect.fromLTWH(0, 0, 1, 1), _aliasPrimer);
 
 final Paint _aliasPrimer = Paint()..blendMode = BlendMode.dst;
@@ -136,8 +123,7 @@ final Paint _aliasPrimer = Paint()..blendMode = BlendMode.dst;
 /// The engine scales radii that do not fit — `_RRectLike.scaleRadii`, Skia's own
 /// rule — so a uniform radius past the box comes out at half the shorter side,
 /// which is a stadium at every size. That is what [GlassButton] and [GlassBar]
-/// want and what SS5.3's "almost always a capsule" is about: Apple uses a pill
-/// for controls, never a squircle.
+/// want: Apple uses a pill for controls, never a squircle.
 ///
 /// It has to be **declared** rather than derived because a `BorderRadius` is a
 /// value with no size in it, and the size only exists after layout. The
@@ -147,7 +133,7 @@ final Paint _aliasPrimer = Paint()..blendMode = BlendMode.dst;
 /// ⚠️ Read back through [RenderGlassSurface.shape], which scales it, and not
 /// raw: `RSuperellipse.contains` uses the radii **as given**, so an unscaled
 /// capsule reads as an *ellipse* — 9425 px² against the 11 214 the engine draws
-/// on a 200x60 box, 16% low (D183).
+/// on a 200x60 box, 16% low.
 ///
 /// ```dart
 /// GlassSurface(
@@ -165,7 +151,7 @@ const BorderRadius kGlassCapsule = BorderRadius.all(Radius.circular(1e9));
 /// A fade across a glass surface: whole at [begin], gone at [end], a
 /// smoothstep between — in the surface's own logical coordinates.
 ///
-/// What a scroll edge is made of (spike 31): Apple's soft edge blurs the
+/// What a scroll edge is made of: Apple's soft edge blurs the
 /// content under a bar and lets it go over a few dozen points, so the glass is
 /// drawn at a fraction and the content shows through the rest. One `dot`, one
 /// clamp and three multiplies per fragment, and an exact `1.0` without it.
@@ -223,15 +209,12 @@ class GlassFade {
 
 /// Declares a region of the screen as glass.
 ///
-/// Phase A: it declares geometry and paints its child. See the file comment for
-/// why that is the order.
-///
 /// The shape is the engine's own round superellipse — `RSuperellipse`, the
 /// shape a Flutter `RoundedRectangleBorder` already lowers to — rather than a
-/// rounded rectangle, because that is what the reference material is and
-/// because the two differ where it shows: the curvature at the join of the two
-/// arcs jumps by 1.6…4.7x on a plain rounded rect and by less on this one
-/// (D79), and a bevel's shading carries that jump.
+/// rounded rectangle, because that is what Apple's material is and because the
+/// two differ where it shows: the curvature at the join of the two arcs jumps
+/// by 1.6…4.7x on a plain rounded rect and by less on this one, and a bevel's
+/// shading carries that jump.
 ///
 /// It needs a [GlassHost] above it to draw glass: the host captures what is
 /// painted under the surface, and the surface samples that capture through
@@ -321,9 +304,8 @@ class GlassSurface extends SingleChildRenderObjectWidget {
 
   /// The corner radii, in logical pixels.
   ///
-  /// A default rather than a required argument because every measured panel in
-  /// this project has one uniform radius and 24 is the middle of the range the
-  /// reference was read at.
+  /// 24 by default: the middle of the range of uniform radii Apple's material
+  /// was calibrated at.
   final BorderRadius borderRadius;
 
   /// The optics. Null takes the host's, which is what a screen with one look
@@ -395,14 +377,6 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// of a static sibling over 7 frames, where a screen that changes nothing
   /// should paint once.
   ///
-  /// D145 read the same shape off the device counters and wrote it up as a fact
-  /// about this class ("a `GlassSurface` is a repaint boundary, so an unchanging
-  /// proxy does not dirty it"). The counters were right and the mechanism was
-  /// not: a held arm records nothing, so there is no publish to dirty anything,
-  /// and the two explanations are indistinguishable from that report. They part
-  /// company on the arm that *does* publish, which is every shipping frame of
-  /// the default declaration.
-  ///
   /// It is also what makes the host's repaint observation possible at all: an
   /// observer above a surface that dirties its ancestors would be watching its
   /// own pipeline publish.
@@ -460,7 +434,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// real screen, so what it draws is a coverage fraction — and a coverage
   /// fraction has to know how big a pixel is. `fwidth` would do it and is not
   /// available: SkSL has no derivatives at all and refuses at load time, on the
-  /// user's device (B11, D60).
+  /// user's device.
   double _devicePixelRatio = 1;
   set devicePixelRatio(double value) {
     if (value == _devicePixelRatio) {
@@ -683,8 +657,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// to invalidate theirs.
   ///
   /// Getting this wrong is invisible on a screen where every surface wears the
-  /// same rung, which is every screen this package had until the ladder
-  /// existed. It shows up on a mixed one, twice: a full panel would read a
+  /// same rung. It shows up on a mixed one, twice: a full panel would read a
   /// backdrop with the cheap panel next to it missing, and the layer watch
   /// would hold that backdrop over a cheap panel that had changed.
   ///
@@ -695,12 +668,11 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
 
   /// Repaints for a new proxy — and only if this surface is going to read it.
   ///
-  /// Not `markNeedsPaint` itself, which is what it was until the ladder: a
-  /// cheap surface *is* in the proxy now, so a cheap surface that repainted on
-  /// every publish would be repainting the content the next capture reads,
+  /// Not `markNeedsPaint` itself: a cheap surface *is* in the proxy, so a cheap
+  /// surface that repainted on every publish would be repainting the content the next capture reads,
   /// which the host's repaint observer reports as a change, which records
-  /// another capture. A publish loop with the holding declaration defeated, on
-  /// the one screen shape the ladder exists to make cheaper.
+  /// another capture — a publish loop on exactly the screens the cheaper rungs
+  /// exist for.
   ///
   /// Glass over a declared backdrop reads no publish, but it does read the
   /// programs the handle carries: a shader that arrives after the first frame
@@ -729,13 +701,11 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// **A publish repaints the glass, and it must not repaint the content.**
   /// The content of a glass that other glass stands on is in that glass's
   /// capture, and the layer watch reads it there; a publish that re-recorded
-  /// a label re-minted its picture, the watch called that a change, the host
-  /// recorded and published again — every frame of a still screen, 30 records
-  /// in 30 frames with a `Text` in a card under a lifted bar, 0 with the same
-  /// `Text` behind a `RepaintBoundary`. It is D177's rule — a node that
-  /// repaints on every publish while inside the proxy feeds the next capture
-  /// its own repaint — met in the surface itself, and it had been there since
-  /// levels (D214): its fixtures put every label behind a boundary.
+  /// a label re-minted its picture, the watch called that a change, and the
+  /// host recorded and published again — every frame of a still screen: 30
+  /// records in 30 frames with a `Text` in a card under a lifted bar, 0 with
+  /// the same `Text` behind a `RepaintBoundary`. A node that repaints on every
+  /// publish while inside the proxy feeds the next capture its own repaint.
   bool _contentDirty = true;
   bool _repaintingForProxy = false;
 
@@ -793,9 +763,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// the same space.
   ///
   /// A rotated surface reports its axis-aligned bounding box, which is larger
-  /// than the glass. Named rather than corrected: no cost measurement covers a
-  /// rotated surface, so a smaller number here would be a guess dressed as
-  /// precision.
+  /// than the glass. Left uncorrected because no cost measurement covers a
+  /// rotated surface, so a smaller number here would only be a guess.
   Rect get globalRect => MatrixUtils.transformRect(getTransformTo(null), Offset.zero & size);
 
   /// The shape this surface would draw, in its own coordinates.
@@ -805,13 +774,10 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   ///
   /// **`scaleRadii` is the whole of it, and it is the engine's rule rather than
   /// ours** (`_RRectLike.scaleRadii`, which is Skia's). Every draw scales radii
-  /// that do not fit, so until something declared one this was invisible — and
-  /// `RSuperellipse.contains` does **not** scale, which is why the register's
-  /// own control could not see it: `contains` and `drawRSuperellipse` disagree
-  /// for an oversized radius, the first reading an ellipse and the second
-  /// drawing a stadium. On a 200x60 capsule that is 9425 px² of declared glass
-  /// against 11 214 drawn — the area law's denominator 16% light (D183). Scaled
-  /// here, once, so that the shader, the canvas, the clip and the register are
+  /// that do not fit, but `RSuperellipse.contains` does **not**: for an
+  /// oversized radius the first reads an ellipse and the second draws a
+  /// stadium. On a 200x60 capsule that is 9425 px² of declared glass against
+  /// 11 214 drawn — the ledger's area 16% low. Scaled here, once, so that the shader, the canvas, the clip and the register are
   /// all reading the same shape.
   RSuperellipse shapeAt(Offset offset) => _borderRadius.toRSuperellipse(offset & size).scaleRadii();
 
@@ -897,10 +863,6 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
 
   /// The blend group this surface belongs to, if any.
   ///
-  /// A surface in a *fusing* group draws no glass of its own: the bridge
-  /// between two members belongs to neither of them, so the group draws the
-  /// whole silhouette in one pass. It still registers its geometry — the atlas
-  /// and the ledger both need it, and the group reads it back to place a shape.
   /// The region this surface declared it may move within, if any. Read by
   /// [readGeometry] only: the paint maps the surface's current place into its
   /// slot whatever was captured, which is what makes the declaration free.
@@ -950,6 +912,13 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   }
 
   GlassBlendGroup? _group;
+
+  /// The blend group this surface belongs to, if any.
+  ///
+  /// A surface in a *fusing* group draws no glass of its own: the bridge
+  /// between two members belongs to neither of them, so the group draws the
+  /// whole silhouette in one pass. It still registers its geometry — the atlas
+  /// and the ledger both need it, and the group reads it back to place a shape.
   set group(GlassBlendGroup? value) {
     if (identical(value, _group)) {
       return;
@@ -973,9 +942,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// counter that separates them.
   ///
   /// **Only ever counted at [GlassTier.full].** A cheap surface has no proxy on
-  /// purpose, and letting it land here would make a working screen indexed
-  /// against the same counter as a broken one — which is the shape of defect
-  /// this file's counters exist to prevent, not to add.
+  /// purpose, and counting it here would make a working screen look like a
+  /// broken one.
   int paintsWithoutProxy = 0;
 
   /// Frames this surface painted the proxy.
@@ -990,7 +958,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// The trace of the declaration: a surface over a declared colour and one
   /// over a captured screen of that colour draw the same pixels, so without
   /// this a declaration that silently fell back to the capture would pass
-  /// every pixel arm.
+  /// every pixel check.
   int paintsWithDeclaredBackdrop = 0;
 
   /// Frames this surface left its glass to the group above it.
@@ -1022,7 +990,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// Of [paintsWithOptics], the draws made with `isAntiAlias` false.
   ///
   /// What [debugGlassShaderAntiAlias] actually did, counted at the draw: the
-  /// two arms differ in no uniform, so a retained layer painted under the other
+  /// two settings differ in no uniform, so a retained layer painted under the other
   /// setting would otherwise be reported as this one.
   int opticsDrawsAliased = 0;
 
@@ -1033,11 +1001,10 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
 
   /// Zeroes the counters above.
   ///
-  /// For a benchmark that measures the same mounted scene several times: the
-  /// harness keeps one rig across repeats and remounts the tree for each, so
-  /// without this the paint totals span every repeat while the host's
-  /// publish counter, read off a handle that is rebuilt with the tree, spans
-  /// one. The ratio between them is the only way to read either.
+  /// For a benchmark that remounts the same scene several times: without this
+  /// the paint totals span every repeat while the host's publish counter, read
+  /// off a handle that is rebuilt with the tree, spans one, and the ratio
+  /// between them is meaningless.
   void resetCounters() {
     paintsWithoutProxy = 0;
     paintsWithProxy = 0;
@@ -1054,11 +1021,11 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
 
   /// Displaces where the proxy is sampled from, without moving the surface.
   ///
-  /// **The negative control, and it exists for the same reason the atlas has
-  /// one** (`AtlasLayout.record`'s `jitter`): an identity glass is invisible,
-  /// and so is a surface that draws nothing at all. Every arm that asserts the
-  /// invisibility needs a twin that samples the wrong place and must therefore
-  /// be visible, or it is checking that two blank frames agree. Moving the
+  /// **For tests**, for the same reason the atlas has `AtlasLayout.record`'s
+  /// `jitter`: an identity glass is invisible, and so is a surface that draws
+  /// nothing at all. A test that asserts the invisibility needs a twin that
+  /// samples the wrong place and must therefore be visible, or it is checking
+  /// that two blank frames agree. Moving the
   /// panel does not do it — the identity is invisible wherever it is — so the
   /// displacement has to be of the *sample*, which nothing else in the package
   /// can express.
@@ -1070,11 +1037,9 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// Glass first, then whatever the surface holds.
   ///
   /// The order is the same claim `skipGlassSurfaces` makes when it drops the
-  /// **whole** subtree out of the proxy — what sits on a nav bar is on top of
-  /// the glass, not behind it — and it was the other way round for two steps,
-  /// invisibly: every arm of every earlier test puts an *empty* panel over the
-  /// scene, and an empty panel's paint order cannot be observed. A panel with a
-  /// title in it drew the proxy over its own title.
+  /// **whole** subtree out of the proxy: what sits on a nav bar is on top of
+  /// the glass, not behind it. An empty panel cannot show its paint order, so
+  /// test this with a panel that holds content.
   @override
   void paint(PaintingContext context, Offset offset) {
     if (fusedByGroup) {
@@ -1197,7 +1162,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// Draws recorded at composite time, and how many of those because the glass
   /// had moved since it was painted — the trace of `GlassDrawLayer`, without
   /// which a moving glass that happened to be repainted anyway would pass every
-  /// pixel arm.
+  /// pixel check.
   int get drawRecords => _drawLayer.layer?.records ?? 0;
 
   /// Of [drawRecords], the ones forced by the glass having moved. See
@@ -1224,8 +1189,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   ///
   /// Clipped to the shape rather than filled with it: a rounded panel that drew
   /// its whole rect would differ from the screen in the corners and the
-  /// invisibility control would fail there and nowhere else, which is the
-  /// hardest place to read a diff.
+  /// identity check would fail there and nowhere else, which is the hardest
+  /// place to read a diff.
   void _paintImage(Canvas canvas, Offset offset, GlassSampleSource source, AtlasSlot slot) {
     final double inset = presenceInset();
     if (inset >= size.shortestSide / 2) {
@@ -1251,16 +1216,14 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
         source.image,
         Rect.fromPoints(topLeft, bottomRight),
         box,
-        // `low`, and both halves of that are measured. Not the default, which
-        // is nearest: at a divisor the proxy is magnified, and nearest there is
-        // a different picture rather than a slightly worse one — the defect
-        // that killed the precedents' path (D1) and that `setImageSampler`
-        // still defaults to. And not `high`, which is **not the identity even
+        // `low`. Not the default, which is nearest: at a divisor the proxy is
+        // magnified, and nearest there is a different picture rather than a
+        // slightly worse one — and `setImageSampler` defaults to it too. And
+        // not `high`, which is **not the identity even
         // at 1:1**: Skia's cubic is Mitchell with B = 1/3, whose kernel at zero
         // phase is (1/18, 8/9, 1/18) rather than a delta, so a proxy drawn back
-        // over its own pixels comes out blurred — measured here at 8528 pixels
-        // of the surface differing by up to 16 code values, on an arm whose
-        // whole point is that the difference is zero.
+        // over its own pixels comes out blurred: 8528 pixels of the surface
+        // differing by up to 16 code values where the identity wants zero.
         Paint()..filterQuality = FilterQuality.low,
       )
       ..restore();
@@ -1269,27 +1232,22 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// Draws a rung that reads nothing: the same shape, the same rim, and the
   /// finish's own tint laid straight over whatever is behind.
   ///
-  /// **No new constants, and phase D is why rather than an excuse.** All three
-  /// rungs are one affine law, `mix(·, tint, a)`, over three arguments: the
-  /// blurred backdrop, the backdrop, and — for [GlassTier.opaque] — the
-  /// backdrop's declared mean (D178). So the cheap rung draws the finish the
-  /// screen already declared, with the two things the proxy paid for removed,
-  /// and its level is the 0.307 `.regular` itself was measured to transmit
-  /// (D66, D70).
+  /// **No new constants.** All three rungs are one affine law,
+  /// `mix(·, tint, a)`, over three arguments: the blurred backdrop, the
+  /// backdrop, and — for [GlassTier.opaque] — the backdrop's declared mean. So
+  /// the cheap rung draws the finish the screen already declared, with the two
+  /// things the proxy paid for removed, and its level is the 0.307 Apple's
+  /// `.regular` was measured to transmit.
   ///
-  /// That it needs no correction of its own is **measured, not assumed**: the
-  /// least-squares cheap rung — the one that trades transmission for the detail
-  /// the blur removes — differs from the declared one by 1.7 code values at
-  /// sigma 2.6 and scores no better in ΔE (0.31 against 0.24). At sigma 8 the
-  /// same correction is worth 16 code values and 12%, which is where the
-  /// roadmap's "one pair of constants will not do for both themes" came from:
-  /// it was written when `frosted` was the working point, and S4 moved it
-  /// (D179).
+  /// It needs no correction of its own: a least-squares cheap rung — trading
+  /// transmission for the detail the blur removes — differs from this one by
+  /// 1.7 code values at sigma 2.6 and scores no better in ΔE (0.31 against
+  /// 0.24). At sigma 8 the same correction would be worth 16 code values.
   ///
   /// The rim is a stroke straddling the edge rather than the shader's inward
   /// coverage ramp, and it is additive because the rim *is* additive: 50.2 code
   /// values of neutral white, fitted across seven rims of two Apple materials,
-  /// against a mix toward a colour that is 4.7x worse (D86–D88). At 0.79
+  /// against a mix toward a colour that is 4.7x worse. At 0.79
   /// logical px it is narrower than a device pixel on every real screen, so
   /// what lands is a coverage fraction either way.
   void _paintFlat(Canvas canvas, Offset offset) {
@@ -1317,7 +1275,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     if (contrastRim != null) {
       // Laid on rather than added, and inside the edge like the shader's band:
       // the switch asks for a line that stands out against the level, and an
-      // addition cannot do that over a light one (D203).
+      // addition cannot do that over a light one.
       canvas.drawRSuperellipse(
         shape.deflate(kHighContrastRimWidthLogical / 2),
         _faded(
@@ -1391,8 +1349,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       return paint;
     }
     // Opaque white under the shader, because a paint's colour alpha still
-    // scales a shaded draw: left at the colour's own, the tint came out at
-    // its alpha squared (0.36 for 0.6, the first run of the fade's arm).
+    // scales a shaded draw: left at the colour's own, the tint comes out at
+    // its alpha squared (0.36 for 0.6).
     return paint
       ..color = const Color(0xFFFFFFFF)
       ..shader = mask
@@ -1440,7 +1398,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     final double scale = slot.pixelRatio;
     var mapOrigin = (srcOrigin - slot.source.topLeft) * scale + slot.rect.topLeft;
     assert(() {
-      // The negative control reaches the shader through the same term the map
+      // The test shift reaches the shader through the same term the map
       // does, so it displaces the sample and nothing else — see
       // [debugSampleShift].
       mapOrigin += debugSampleShift * scale;
@@ -1458,10 +1416,9 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       ..setFloat(4, scale)
       // Texel **centres**, not the slot's edges. A bilinear tap reaches half a
       // texel each way, so clamping to the rect would let it cross into the
-      // neighbouring slot — and clamping a texel short, which is what this said
-      // first, throws away half a texel of the surface's own last column: the
-      // identity control failed on exactly one column, x = 239 of a box ending
-      // at 240, by up to 34 code values.
+      // neighbouring slot — and clamping a whole texel short throws away half
+      // a texel of the surface's own last column (up to 34 code values off on
+      // the last column of the box).
       ..setFloat(5, slot.rect.left + 0.5)
       ..setFloat(6, slot.rect.top + 0.5)
       ..setFloat(7, slot.rect.right - 0.5)
@@ -1497,9 +1454,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       ..setFloat(31, fade.$1)
       ..setFloat(32, fade.$2)
       ..setFloat(33, fade.$3)
-      // Explicit, always: the default is nearest, which is the defect that
-      // killed the precedents' path (D1) and which at a divisor would make the
-      // proxy measure aliasing instead of resolution.
+      // Explicit, always: the default is nearest, which at a divisor would
+      // make the proxy show aliasing instead of resolution.
       ..setImageSampler(0, source.image, filterQuality: FilterQuality.low);
     if (rippleProgram != null) {
       _writeWaves(shader, waves);
@@ -1511,7 +1467,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     // edge pixel (it is zero half a pixel out) and the rasterizer decides none.
     // On the box itself a pixel whose centre fell just outside was dropped
     // without antialiasing and doubly attenuated with it: 648 pixels of one
-    // fractional layout on Skia, up to 31 code values (D200).
+    // fractional layout on Skia, up to 31 code values.
     canvas.drawRect(
       (offset & size).inflate(1 / _devicePixelRatio),
       Paint()
@@ -1560,7 +1516,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   @override
   void detach() {
     _group?.leave(this);
-    // Belt and braces rather than the mechanism: [readGeometry] already refuses
+    // Belt and braces: [readGeometry] already refuses
     // while detached, so a surface that skipped this would be missing from
     // every reading anyway. What this keeps honest is [GlassLedger.
     // registeredCount], which counts declarations rather than places.
