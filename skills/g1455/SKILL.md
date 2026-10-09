@@ -12,7 +12,7 @@ description: >-
 license: MIT
 metadata:
   package: g1455
-  version: 0.1.x
+  version: 0.2.x
   homepage: https://g1455.plugfox.dev
   repository: https://github.com/PlugFox/g1455
 ---
@@ -24,7 +24,7 @@ image, only when something under the glass changed; every glass surface samples
 its slot of that capture. Most rules below follow from that.
 
 Package 0.x: the API changes between minor versions. If the project's
-`pubspec.lock` resolves g1455 to something other than 0.1.x, check the
+`pubspec.lock` resolves g1455 to something other than 0.2.x, check the
 [changelog](https://pub.dev/packages/g1455/changelog) before relying on this
 file. Requires Flutter >= 3.47. Pure Dart and shaders: no platform setup.
 
