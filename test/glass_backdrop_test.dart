@@ -19,6 +19,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart';
+import 'package:g1455/src/proxy/proxy_atlas.dart' show AtlasSlot;
+import 'package:g1455/src/proxy/proxy_pipeline.dart' show GlassProxyFrame;
+import 'package:g1455/src/surface/glass_backdrop.dart' show debugDeclaredTexturesAlive;
 
 const Size kScreen = Size(400, 600);
 const Color _kGrey = Color(0xFF6A6A6A);
@@ -368,6 +371,212 @@ void main() {
     surface.markNeedsPaint();
     await tester.pump();
     expect(surface.paintsWithDeclaredBackdrop, greaterThan(before));
+  });
+
+  testWidgets('a still surface that moves keeps drawing while another materializes over the same declaration', (
+    WidgetTester tester,
+  ) async {
+    // The declaration keeps a few textures, one per blur step, and a surface
+    // materializing asks for a new step on every frame — so the still
+    // surface's texture is pushed out of the cache while its draw layer still
+    // samples it. Moving the still surface re-records that layer at composite
+    // time without painting it; the draw must not lose its texture then.
+    const painter = GradientProxyPainter(LinearGradient(colors: <Color>[Color(0xFF103080), Color(0xFFF0D040)]));
+    final int alive = debugDeclaredTexturesAlive;
+    Widget scene({required Object arm, required double materialize, required double left}) => _wrap(
+      GlassHost(
+        hardware: GlassHardware.appleMetal,
+        finish: GlassFinish.regularDark,
+        child: KeyedSubtree(
+          key: ValueKey<Object>(arm),
+          child: GlassBackdrop.painter(
+            painter,
+            child: Stack(
+              children: <Widget>[
+                Positioned(
+                  left: left,
+                  top: 40,
+                  width: 200,
+                  height: 100,
+                  child: const RepaintBoundary(child: GlassSurface()),
+                ),
+                Positioned(
+                  left: 20,
+                  top: 400,
+                  width: 160,
+                  height: 80,
+                  child: GlassSurface(materialize: materialize),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // The control: the final screen, mounted straight away.
+    final ui.Image control = await _shot(tester, scene(arm: 'control', materialize: 0.9, left: 60));
+    final _Diff bare = await _compare(tester, control, _grab(), const Rect.fromLTWH(60, 40, 200, 100));
+    expect(bare.compared, 20000);
+
+    await _pump(tester, scene(arm: 'churn', materialize: 0.3, left: 20));
+    for (var i = 1; i <= 60; i++) {
+      await tester.pumpWidget(scene(arm: 'churn', materialize: 0.3 + 0.6 * i / 60, left: 20));
+    }
+    final RenderGlassSurface still = _surfaces(tester).first;
+    final GlassBackdropDeclaration declaration = _declaration(tester);
+    expect(declaration.renders, greaterThan(5), reason: 'the cache never turned over, so nothing was evicted');
+    final int paints = still.paintsWithDeclaredBackdrop;
+    final int moved = still.drawRecordsOnMove;
+    final int renders = declaration.renders;
+
+    await tester.pumpWidget(scene(arm: 'churn', materialize: 0.9, left: 60));
+    expect(still.paintsWithDeclaredBackdrop, paints, reason: 'the move repainted the surface, so it tested nothing');
+    expect(still.drawRecordsOnMove, greaterThan(moved), reason: 'the draw was not re-recorded for the move');
+    final _Diff after = await _compare(tester, control, _grab(), const Rect.fromLTWH(60, 40, 200, 100));
+    expect(after.compared, 20000);
+    expect(after.maxDelta, lessThanOrEqualTo(2), reason: 'the moved surface lost its glass: $after');
+    expect(declaration.renders, renders, reason: 'a texture was rendered while compositing');
+    // And it stays drawn.
+    await tester.pump();
+    await tester.pump();
+    final _Diff later = await _compare(tester, control, _grab(), const Rect.fromLTWH(60, 40, 200, 100));
+    expect(later.maxDelta, lessThanOrEqualTo(2), reason: 'blank two frames later: $later');
+
+    // Every texture is the cache's or a live draw's, and none outlives both.
+    expect(debugDeclaredTexturesAlive - alive, lessThanOrEqualTo(4 + 2));
+    await tester.pumpWidget(const SizedBox());
+    expect(debugDeclaredTexturesAlive, alive, reason: 'a declared texture leaked past its declaration and its glass');
+  });
+
+  testWidgets('a fused member is kept out of the capture exactly when its group is', (WidgetTester tester) async {
+    Widget member() => const SizedBox(
+      width: 120,
+      height: 80,
+      child: GlassSurface(
+        child: Center(
+          child: SizedBox(width: 16, height: 16, child: ColoredBox(color: Color(0xFFFF0000))),
+        ),
+      ),
+    );
+    Widget members() => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[member(), const SizedBox(width: 20), member()],
+    );
+    void agree(String nesting) {
+      final RenderGlassGroup group = tester.renderObject<RenderGlassGroup>(find.byType(GlassGroup));
+      expect(group.fusedPaints, greaterThan(0), reason: '$nesting: the group did not fuse');
+      final Finder members = find.descendant(of: find.byType(GlassGroup), matching: find.byType(GlassSurface));
+      expect(members, findsNWidgets(2));
+      for (final RenderGlassSurface surface in tester.renderObjectList<RenderGlassSurface>(members)) {
+        expect(surface.fusedByGroup, isTrue);
+        expect(surface.excludedFromProxy, group.group.excludedFromProxy, reason: '$nesting: member and group disagree');
+      }
+    }
+
+    // A declaration between the group and its members: the group captures, so
+    // its members are glass the capture must not contain.
+    await _pump(
+      tester,
+      _wrap(
+        GlassHost(
+          hardware: GlassHardware.appleMetal,
+          finish: GlassFinish.regularDark,
+          child: Center(
+            child: GlassGroup(spacing: 24, child: GlassBackdrop.color(_kGrey, child: members())),
+          ),
+        ),
+      ),
+    );
+    agree('declaration inside the group');
+    expect(tester.renderObject<RenderGlassGroup>(find.byType(GlassGroup)).group.excludedFromProxy, isTrue);
+
+    // The reverse: the group samples a declaration, so it and its members are
+    // ordinary content — and a live glass laid over a member has to capture
+    // what the member holds.
+    const Rect lens = Rect.fromLTWH(120, 260, 60, 80);
+    await _pump(
+      tester,
+      _wrap(
+        GlassHost(
+          hardware: GlassHardware.appleMetal,
+          finish: GlassFinish.clear,
+          child: Stack(
+            children: <Widget>[
+              GlassBackdrop.color(
+                _kGrey,
+                child: Center(
+                  child: GlassGroup(spacing: 24, child: GlassBackdrop.live(child: members())),
+                ),
+              ),
+              Positioned.fromRect(rect: lens, child: const GlassSurface()),
+            ],
+          ),
+        ),
+      ),
+    );
+    agree('live inside a declared group');
+    final RenderGlassSurface first = _surfaces(tester).first;
+    final Offset red = first.localToGlobal(first.size.center(Offset.zero));
+    expect(lens.contains(red), isTrue, reason: 'the lens is not over the red mark');
+    final GlassProxyFrame frame = _handle(tester).frame!;
+    final RenderGlassSurface lensSurface = _surfaces(tester).last;
+    final AtlasSlot slot = frame.slotForKey(lensSurface)!;
+    final Offset texel = slot.rect.topLeft + (red - slot.source.topLeft) * slot.pixelRatio;
+    final int captured = await _redAt(tester, frame.image, texel);
+    expect(captured, greaterThan(200), reason: 'the capture under the lens is missing the member it covers');
+  });
+
+  testWidgets('a new image keeps glass on the capture until it loads, and the old one stays painted meanwhile', (
+    WidgetTester tester,
+  ) async {
+    late Uint8List grey;
+    late Uint8List orange;
+    await tester.runAsync(() async {
+      for (final (Color color, void Function(Uint8List) put) in <(Color, void Function(Uint8List))>[
+        (_kGrey, (Uint8List b) => grey = b),
+        (_kOrange, (Uint8List b) => orange = b),
+      ]) {
+        final ui.Image image = _solidImage(color);
+        put((await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List());
+        image.dispose();
+      }
+    });
+    final hostKey = GlobalKey();
+    Widget scene(ImageProvider provider) => _wrap(
+      GlassHost(
+        key: hostKey,
+        hardware: GlassHardware.appleMetal,
+        finish: GlassFinish.clear,
+        child: GlassBackdrop.image(
+          provider,
+          child: Stack(
+            children: <Widget>[Positioned.fromRect(rect: _kPanel, child: const GlassSurface())],
+          ),
+        ),
+      ),
+    );
+    final first = MemoryImage(grey);
+    await tester.pumpWidget(scene(first));
+    await tester.runAsync(() => precacheImage(first, tester.element(find.byType(GlassSurface))));
+    await _pump(tester, scene(first));
+    final RenderGlassSurface surface = _surface(tester);
+    expect(surface.readsDeclaredBackdrop, isTrue);
+    final int recorded = (hostKey.currentState! as dynamic).recorded as int;
+    final int glassOverGrey = await _redAt(tester, _grab(), _kPanel.center);
+
+    final second = MemoryImage(orange);
+    await _pump(tester, scene(second));
+    expect(surface.readsDeclaredBackdrop, isFalse, reason: 'the glass went on declaring the image it replaced');
+    expect((hostKey.currentState! as dynamic).recorded, greaterThan(recorded), reason: 'nothing was captured');
+    // No flash: the old image is still what the screen shows, under and through the glass.
+    expect(await _redAt(tester, _grab(), const Offset(20, 20)), (_kGrey.r * 255).round());
+    expect((await _redAt(tester, _grab(), _kPanel.center) - glassOverGrey).abs(), lessThanOrEqualTo(2));
+
+    await tester.runAsync(() => precacheImage(second, tester.element(find.byType(GlassSurface))));
+    await _pump(tester, scene(second));
+    expect(surface.readsDeclaredBackdrop, isTrue);
+    expect(await _redAt(tester, _grab(), _kPanel.center) - glassOverGrey, greaterThan(50), reason: 'still grey');
   });
 
   testWidgets('glass with no declaration above it is unchanged', (WidgetTester tester) async {

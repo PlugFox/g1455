@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart' show GlassProxyHandle, GlassProxyScope;
+import 'package:g1455_example/src/catalog/catalog.dart';
 import 'package:g1455_example/src/pages/home_showcase.dart';
 
 Future<void> _frames(WidgetTester tester, [int n = 30]) async {
@@ -40,15 +43,39 @@ Future<void> _mount(WidgetTester tester, String title, {double width = 343, doub
 GlassProxyHandle _handle(WidgetTester tester) =>
     GlassProxyScope.maybeOf(tester.element(find.byType(GlassSurface).first))!;
 
-/// Idle frames after the scene has settled take no capture.
+/// What a scene spends on its backdrop: the host's captures, and the textures
+/// a declared backdrop renders — a scene whose glass is all declared never
+/// captures, so for it the first alone would be still whatever happened.
+(int, int) _work(WidgetTester tester) => (
+  _handle(tester).snapshots,
+  GlassBackdrop.maybeOf(tester.element(find.byType(GlassSurface).first))?.renders ?? 0,
+);
+
+/// Idle frames after the scene has settled spend nothing on the backdrop.
 Future<void> _quietAtRest(WidgetTester tester) async {
   await _frames(tester, 40);
-  final int before = _handle(tester).snapshots;
+  final (int, int) before = _work(tester);
   await _frames(tester, 60);
-  expect(_handle(tester).snapshots, before, reason: 'a scene at rest captured');
+  expect(_work(tester), before, reason: 'a scene at rest captured or rendered its backdrop');
 }
 
 void main() {
+  test('no page spells the package version out: it is read from the pubspec', () {
+    // A literal agrees with the pubspec on the day it is written and on no
+    // release after, and nothing renders differently when it goes stale.
+    final String version = Site.version;
+    final List<File> sources = <File>[
+      for (final FileSystemEntity e in Directory('lib').listSync(recursive: true))
+        if (e is File && e.path.endsWith('.dart') && !e.path.endsWith('.g.dart')) e,
+    ];
+    expect(sources.length, greaterThan(10), reason: 'the scan found no sources');
+    final List<String> spelled = <String>[
+      for (final File f in sources)
+        if (f.readAsStringSync().contains(version)) f.path,
+    ];
+    expect(spelled, isEmpty, reason: '$version is written out by hand');
+  });
+
   for (final String title in <String>['Shop', 'Onboarding', 'Library']) {
     for (final (double width, double scale) in const <(double, double)>[(343, 1), (560, 1), (343, 1.4)]) {
       testWidgets('$title mounts at $width wide, text ×$scale, without overflow, and is still at rest', (
@@ -60,6 +87,31 @@ void main() {
       });
     }
   }
+
+  // The controls on "still at rest", one per scene: in each, something does
+  // move the quantity the check reads. Onboarding's is its swipe, below.
+  testWidgets('Shop: a new finish renders the declaration again, and only that', (WidgetTester tester) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
+    await _mount(tester, 'Shop');
+    final (int snapshots, int renders) = _work(tester);
+    expect(renders, greaterThan(0), reason: 'the scene declares nothing');
+    await tester.tap(find.bySemanticsLabel('Mint'));
+    await _frames(tester, 20);
+    final (int snapshotsAfter, int rendersAfter) = _work(tester);
+    expect(rendersAfter, greaterThan(renders), reason: 'the counter does not count here');
+    expect(snapshotsAfter, snapshots);
+    await _quietAtRest(tester);
+    semantics.dispose();
+  });
+
+  testWidgets('Library: a scroll under the glass captures', (WidgetTester tester) async {
+    await _mount(tester, 'Library');
+    final int before = _handle(tester).snapshots;
+    await tester.drag(find.byType(ListView), const Offset(0, -120), kind: PointerDeviceKind.mouse);
+    await _frames(tester, 20);
+    expect(_handle(tester).snapshots, greaterThan(before), reason: 'the counter does not count here');
+    await _quietAtRest(tester);
+  });
 
   testWidgets('Shop: the stepper changes the quantity, the badge counts it, and nothing is captured', (
     WidgetTester tester,

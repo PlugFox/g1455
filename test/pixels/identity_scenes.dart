@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
+import 'package:g1455/glass_diagnostics.dart' show GlassProxyHandle, GlassProxyScope;
 
 const Size kIdentityScreen = Size(400, 300);
 
@@ -26,11 +27,29 @@ final GlobalKey _shotKey = GlobalKey();
 ///
 /// [perturb] is the negative control: it moves the tint of the first surface
 /// by one part in a thousand, which a gate that compared nothing would not see.
-Future<List<(String, Uint8List)>> renderIdentityScenes(WidgetTester tester, {bool perturb = false}) async {
+///
+/// [surface] and [group] draw every scene with those programs in place of the
+/// package's own, handed to each host once its own have arrived; the ripple
+/// keeps the package's program, which a host loads once per process.
+Future<List<(String, Uint8List)>> renderIdentityScenes(
+  WidgetTester tester, {
+  bool perturb = false,
+  ui.FragmentProgram? surface,
+  ui.FragmentProgram? group,
+}) async {
   final out = <(String, Uint8List)>[];
 
   Future<void> shoot(String name, Widget scene, {bool highContrast = false, Future<void> Function()? drive}) async {
     await tester.pumpWidget(_shell(scene, highContrast: highContrast));
+    if (surface != null || group != null) {
+      final GlassProxyHandle handle = tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+      // A program still loading would land after this one and replace it.
+      expect(handle.program, isNotNull, reason: '$name: the package program had not arrived');
+      expect(handle.groupProgram, isNotNull, reason: '$name: the package program had not arrived');
+      handle
+        ..program = surface ?? handle.program
+        ..groupProgram = group ?? handle.groupProgram;
+    }
     for (var i = 0; i < 6; i++) {
       await tester.pump();
     }

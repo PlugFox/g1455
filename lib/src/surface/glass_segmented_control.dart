@@ -36,9 +36,13 @@
 // than let out of it — so no capture either way, and a relayout of the drop on
 // the frames it changes.
 //
-// Under a horizontal scrollable it claims the pointer on touch-down, as the
-// switch and the slider do (`glass_controls.dart`); its gestures are raw
-// pointer events, which no arena would otherwise keep from the page.
+// Its gestures are raw pointer events, which are in no arena, so it keeps a
+// drag recognizer in the arena only to learn whether the gesture is still its
+// own: when anything else wins — a vertical list's scroll — the press is
+// cancelled and selects nothing. Under a horizontal scrollable that recognizer
+// also contends for the horizontal drag, as the switch's and the slider's do
+// (`glass_controls.dart`), so a drag across the control is the control's and
+// not the page's.
 //
 // A keyboard reaches it: the arrow keys select the segment beside the selected
 // one, and the focus ring is drawn around the track behind a boundary of its
@@ -369,7 +373,12 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     }
   }
 
-  void _onCancel(PointerCancelEvent e) {
+  void _onCancel(PointerCancelEvent e) => _onLost();
+
+  /// The press ends selecting nothing: its pointer was cancelled, or the arena
+  /// gave the gesture to someone else. Also called for the arena's own end of
+  /// a tap, after the `Listener` has seen the lift — by then nothing is down.
+  void _onLost() {
     if (!_down) {
       return;
     }
@@ -446,21 +455,28 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
         ),
       ),
     );
-    // The control follows the raw pointer and is in no arena, so under a
-    // horizontal scrollable the page won the drag and moved with it: both
-    // followed the finger. There it claims the pointer on touch-down, as the
-    // switch and the slider do — an eager recognizer that wins at once and
-    // does nothing else, the `Listener` still doing the work. Elsewhere it
-    // stays out of the arena, so a vertical list still scrolls over it.
-    // Always the detector, an empty one when not claiming: a wrapper that came
+    // The control follows the raw pointer, and the `Listener` does all the
+    // work; the arena is only asked who has the gesture. Out of it, a press
+    // that a vertical list then scrolled away still selected on the finger's
+    // lift, and under a horizontal scrollable the page won the drag and both
+    // followed the finger. So a horizontal drag sits in the arena and cancels
+    // the press when it loses ([_onLost]). Under a horizontal scrollable it
+    // contends — and, deeper than the page's, wins a horizontal swipe;
+    // elsewhere it never accepts, so it takes nothing from an ancestor. It
+    // never wins on touch-down: a vertical swipe is still a scroll.
+    // Always the detector, an empty one when disabled: a wrapper that came
     // and went would rebuild the drop's region under it.
+    final bool contend = glassControlClaimsPointer(context);
     body = RawGestureDetector(
       behavior: HitTestBehavior.opaque,
-      gestures: _enabled && glassControlClaimsPointer(context)
+      gestures: _enabled
           ? <Type, GestureRecognizerFactory>{
-              EagerGestureRecognizer: GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
-                EagerGestureRecognizer.new,
-                (EagerGestureRecognizer _) {},
+              _SegmentArena: GestureRecognizerFactoryWithHandlers<_SegmentArena>(
+                () => _SegmentArena(debugOwner: this),
+                (_SegmentArena r) => r
+                  ..contend = contend
+                  ..onCancel = _onLost
+                  ..gestureSettings = MediaQuery.maybeGestureSettingsOf(context),
               ),
             }
           : const <Type, GestureRecognizerFactory>{},
@@ -705,4 +721,18 @@ class _WhileVisible extends ChangeNotifier {
     at.removeListener(_tick);
     super.dispose();
   }
+}
+
+/// The segmented control's seat in the gesture arena: a horizontal drag that
+/// does nothing when it wins, and calls `onCancel` when it leaves without
+/// winning — to the arena, or on the finger's lift. Unless it [contend]s, it
+/// never accepts, and so only learns that someone else did.
+class _SegmentArena extends HorizontalDragGestureRecognizer {
+  _SegmentArena({super.debugOwner});
+
+  bool contend = false;
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(PointerDeviceKind pointerDeviceKind, double? deviceTouchSlop) =>
+      contend && super.hasSufficientGlobalDistanceToAccept(pointerDeviceKind, deviceTouchSlop);
 }

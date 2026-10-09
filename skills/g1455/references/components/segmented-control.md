@@ -58,8 +58,8 @@ segments read their text. For icon segments, wrap each icon in `Semantics(label:
   ring is drawn around the track behind a boundary of its own; on a control under other glass, showing or hiding it is
   one capture.
 - Under a right-to-left `Directionality` the first segment is at the right, and the arrows follow.
-- The drop is dragged from touch-down, and inside a horizontal `PageView` the control claims the drag, so the page does
-  not turn under it. In a vertical list a swipe that starts on it still scrolls the list.
+- The drop is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves it and
+  not the page, and a vertical swipe that starts on it still scrolls the vertical list around it.
 - The capsule's corner is concentric with the track's, by `GlassConcentric` (see
   [GlassSurface](../foundations/surface.md)): 14 inside a 16 track inset 2.
 

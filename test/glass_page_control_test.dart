@@ -19,13 +19,16 @@
 //     swipe costs the same captures with the control following it and with a
 //     display whose dots stay put (43 and 43 here) — the swipe itself is the
 //     page view's price.
+//  7. **Fewer pages clamp the current one** at once — what a screen reader
+//     is told, and where a tap steps from — without a controller and with
+//     one that has no view, before the caller moves its own page.
 //
 // Breaks, each undone by swapping the string back:
 //  - in `glass_page_control.dart`, `super(repaint: repaint);` ->
 //    `super(repaint: null);`: arm 5's dots never move between frames (207 ->
 //    207) and arm 2's swipe leaves them where they were (72 -> 72);
-//  - `_goTo(_page + (x < current ? -1 : 1));` -> `_goTo(_page + 1);`: arm 1's
-//    left tap goes right.
+//  - `_goTo(_page + (_along(d.localPosition.dx) < current ? -1 : 1));` ->
+//    `_goTo(_page + 1);`: arm 1's left tap goes right.
 
 import 'dart:typed_data';
 
@@ -175,7 +178,15 @@ void main() {
     final Finder control = find.byType(GlassPageControl);
     expect(
       tester.getSemantics(control),
-      matchesSemantics(label: 'Photos', value: 'Page 1 of 3', increasedValue: 'Page 2 of 3', hasIncreaseAction: true),
+      matchesSemantics(
+        label: 'Photos',
+        value: 'Page 1 of 3',
+        increasedValue: 'Page 2 of 3',
+        hasIncreaseAction: true,
+        // The keyboard's: focusable while interactive.
+        isFocusable: true,
+        hasFocusAction: true,
+      ),
     );
     tester.semantics.increase(find.semantics.byLabel('Photos'));
     await tester.pump(const Duration(milliseconds: 400));
@@ -189,6 +200,8 @@ void main() {
         decreasedValue: 'Page 1 of 3',
         hasIncreaseAction: true,
         hasDecreaseAction: true,
+        isFocusable: true,
+        hasFocusAction: true,
       ),
     );
     // A display offers nothing to do.
@@ -198,6 +211,51 @@ void main() {
       GlassPageControl(count: 3, currentPage: 2, semanticFormatterCallback: (int p, int n) => '${p + 1}/$n'),
     );
     expect(tester.getSemantics(find.byType(GlassPageControl)), matchesSemantics(value: '3/3'));
+    handle.dispose();
+  });
+
+  testWidgets('fewer pages: the current page is clamped into them, before the caller says so', (
+    WidgetTester tester,
+  ) async {
+    final SemanticsHandle handle = tester.ensureSemantics();
+    final pages = <int>[];
+    // The caller shrinks the count and has not yet moved its page: 4 of 3.
+    for (final PageController? controller in <PageController?>[null, PageController(initialPage: 4)]) {
+      if (controller != null) {
+        addTearDown(controller.dispose);
+      }
+      Widget control(int count) => GlassPageControl(
+        count: count,
+        currentPage: 4,
+        controller: controller,
+        semanticLabel: 'Photos',
+        onPageChanged: pages.add,
+      );
+      final ComponentScene scene = await ComponentScene.mount(tester, control(5));
+      await scene.pump(control(3));
+      final String arm = controller == null ? 'no controller' : 'a controller with no view';
+      expect(
+        tester.getSemantics(find.byType(GlassPageControl)),
+        matchesSemantics(
+          label: 'Photos',
+          value: 'Page 3 of 3',
+          decreasedValue: 'Page 2 of 3',
+          hasDecreaseAction: true,
+          isFocusable: true,
+          hasFocusAction: true,
+        ),
+        reason: '$arm: the page was left past the last',
+      );
+      if (controller == null) {
+        // A tap toward the start goes back one from the last page, not from
+        // the stale one.
+        pages.clear();
+        await tester.tapAt(tester.getRect(find.byType(GlassSurface)).centerLeft + const Offset(4, 0));
+        await scene.frames(30);
+        expect(pages, <int>[1], reason: '$arm: a tap back stepped from the page past the end');
+      }
+      await tester.pumpWidget(const SizedBox());
+    }
     handle.dispose();
   });
 

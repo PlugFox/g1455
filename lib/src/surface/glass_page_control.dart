@@ -12,6 +12,13 @@
 // page toward the side tapped** — not to the dot under the finger, which at
 // 8 px is not a target anyone can hit — and a drag along the capsule scrubs,
 // the page following the dot under the finger (iOS 14's interaction).
+// Under `TextDirection.rtl` all of it mirrors, as `UIPageControl` does: the
+// first page's dot is at the right, and a tap, a scrub and the arrow keys
+// read the capsule from there. The geometry stays in reading order — from
+// the capsule's start — and only where it meets a pixel is it flipped.
+//
+// A keyboard turns the page with the arrow keys, and the focus ring is drawn
+// on the surface's own canvas, as a button's is (`glass_focus.dart`).
 //
 // **Not measured:** the sizes. iOS 26's page control was not among the
 // controls read off the device. The dot, the gap and the current dot's width
@@ -21,10 +28,12 @@ import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
@@ -82,7 +91,11 @@ const double _kRestingDot = 0.35;
 /// > the honest price of glass over moving content.
 ///
 /// A screen reader hears one adjustable control — "Page 2 of 5" by default —
-/// and turns the page with increase and decrease.
+/// and turns the page with increase and decrease. A keyboard turns a focused
+/// control's page with the arrow keys; a display takes no focus.
+///
+/// Under [TextDirection.rtl] it is mirrored: the first page's dot is at the
+/// right, a tap toward the left goes on, and so does the left arrow.
 ///
 /// See also:
 ///
@@ -103,6 +116,8 @@ class GlassPageControl extends StatefulWidget {
     this.finish,
     this.semanticLabel,
     this.semanticFormatterCallback,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   }) : assert(count >= 1),
        assert(currentDotWidth >= kGlassPageDot);
@@ -144,6 +159,12 @@ class GlassPageControl extends StatefulWidget {
   /// "Page 2 of 5".
   final String Function(int page, int count)? semanticFormatterCallback;
 
+  /// The control's focus. Null makes one the control owns.
+  final FocusNode? focusNode;
+
+  /// Whether the control takes the focus as soon as it is built.
+  final bool autofocus;
+
   @override
   State<GlassPageControl> createState() => _GlassPageControlState();
 
@@ -157,8 +178,17 @@ class GlassPageControl extends StatefulWidget {
       ..add(DoubleProperty('currentDotWidth', currentDotWidth, defaultValue: 20.0))
       ..add(FlagProperty('interactive', value: onPageChanged != null || controller != null, ifFalse: 'display'))
       ..add(DiagnosticsProperty<GlassFinish>('finish', finish, defaultValue: null))
-      ..add(StringProperty('semanticLabel', semanticLabel, defaultValue: null));
+      ..add(StringProperty('semanticLabel', semanticLabel, defaultValue: null))
+      ..add(DiagnosticsProperty<FocusNode>('focusNode', focusNode, defaultValue: null))
+      ..add(FlagProperty('autofocus', value: autofocus, ifTrue: 'autofocus'));
   }
+}
+
+/// Turns the page by [pages]: one per arrow key.
+class _TurnIntent extends Intent {
+  const _TurnIntent(this.pages);
+
+  final int pages;
 }
 
 class _GlassPageControlState extends State<GlassPageControl> with SingleTickerProviderStateMixin {
@@ -172,6 +202,8 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
   /// The page the last build said, so the semantics and [onPageChanged]
   /// follow a controller only when the nearest page changes, not per pixel.
   late int _page = _nearest;
+
+  bool _focused = false;
 
   bool get _interactive => widget.onPageChanged != null || widget.controller != null;
 
@@ -211,6 +243,21 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
     if (widget.controller == null && widget.currentPage != oldWidget.currentPage) {
       _page = widget.currentPage.clamp(0, widget.count - 1);
       _own.animateTo(_page.toDouble(), duration: widget.duration, curve: widget.curve);
+    } else if (widget.count != oldWidget.count) {
+      // Fewer pages under a page that is no longer there — the caller's
+      // `currentPage` or the controller's catches up a frame later, if at
+      // all. Clamped now, as `UIPageControl` clamps its `currentPage`: what
+      // the screen reader is told and where a tap steps from are both
+      // [_page], and both were past the end.
+      _asked = null;
+      if (widget.controller == null) {
+        _page = widget.currentPage.clamp(0, widget.count - 1);
+        if (_own.value > widget.count - 1) {
+          _own.value = (widget.count - 1).toDouble();
+        }
+      } else {
+        _page = _nearest;
+      }
     }
   }
 
@@ -250,10 +297,19 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
 
   _DotGeometry get _geometry => _DotGeometry(widget.count, widget.currentDotWidth);
 
+  /// Whether the dots run from the right: read by the build.
+  bool _rtl = false;
+
+  /// [dx], from the hit box's left edge, as a distance from the capsule's
+  /// start — its left edge, or its right one under [TextDirection.rtl].
+  double _along(double dx) {
+    final double x = dx - _inset;
+    return _rtl ? _geometry.width - x : x;
+  }
+
   void _onTapUp(TapUpDetails d) {
-    final double x = d.localPosition.dx - _inset;
     final double current = _geometry.centreOf(_page.toDouble(), _page);
-    _goTo(_page + (x < current ? -1 : 1));
+    _goTo(_page + (_along(d.localPosition.dx) < current ? -1 : 1));
   }
 
   /// The page a scrub last asked for: the caller's rebuild, or the
@@ -263,7 +319,7 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
   int? _asked;
 
   void _onDrag(DragUpdateDetails d) {
-    final int page = _geometry.indexAt(d.localPosition.dx - _inset, _position);
+    final int page = _geometry.indexAt(_along(d.localPosition.dx), _position);
     if (page != (_asked ?? _page)) {
       _asked = page;
       _goTo(page);
@@ -286,6 +342,10 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
     final _DotGeometry g = _geometry;
     final int page = _page;
     final bool interactive = _interactive;
+    _rtl = Directionality.maybeOf(context) == TextDirection.rtl;
+    // The arrow toward the last page turns on: rightward, unless the dots
+    // run the other way.
+    final int right = _rtl ? -1 : 1;
     return Semantics(
       container: true,
       label: widget.semanticLabel,
@@ -294,31 +354,56 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
       decreasedValue: interactive && page > 0 ? _say(page - 1) : null,
       onIncrease: interactive && page < widget.count - 1 ? () => _goTo(page + 1) : null,
       onDecrease: interactive && page > 0 ? () => _goTo(page - 1) : null,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        // The node above says what a screen reader can do: a tap that means
-        // "toward this side" has no meaning without a side.
-        excludeFromSemantics: true,
-        onTapUp: interactive ? _onTapUp : null,
-        onHorizontalDragStart: interactive ? (_) => _asked = null : null,
-        onHorizontalDragUpdate: interactive ? _onDrag : null,
-        onHorizontalDragEnd: interactive ? (_) => _asked = null : null,
-        child: SizedBox(
-          width: _hitWidth,
-          height: math.max(kGlassPageControlHeight, kGlassMinTapTarget.height),
-          child: Center(
-            child: SizedBox(
-              width: g.width,
-              height: kGlassPageControlHeight,
-              child: GlassSurface(
-                borderRadius: kGlassCapsule,
-                finish: widget.finish,
-                child: CustomPaint(
-                  painter: _DotsPainter(
-                    geometry: g,
-                    position: () => _position,
-                    colour: label,
-                    repaint: _driver,
+      child: FocusableActionDetector(
+        enabled: interactive,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        shortcuts: <ShortcutActivator, Intent>{
+          const SingleActivator(LogicalKeyboardKey.arrowRight): _TurnIntent(right),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): _TurnIntent(-right),
+          const SingleActivator(LogicalKeyboardKey.arrowUp): const _TurnIntent(1),
+          const SingleActivator(LogicalKeyboardKey.arrowDown): const _TurnIntent(-1),
+        },
+        actions: <Type, Action<Intent>>{
+          _TurnIntent: CallbackAction<_TurnIntent>(
+            onInvoke: (_TurnIntent intent) {
+              final int to = (_page + intent.pages).clamp(0, widget.count - 1);
+              if (to != _page) {
+                _goTo(to);
+              }
+              return null;
+            },
+          ),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          // The node above says what a screen reader can do: a tap that means
+          // "toward this side" has no meaning without a side.
+          excludeFromSemantics: true,
+          onTapUp: interactive ? _onTapUp : null,
+          onHorizontalDragStart: interactive ? (_) => _asked = null : null,
+          onHorizontalDragUpdate: interactive ? _onDrag : null,
+          onHorizontalDragEnd: interactive ? (_) => _asked = null : null,
+          child: SizedBox(
+            width: _hitWidth,
+            height: math.max(kGlassPageControlHeight, kGlassMinTapTarget.height),
+            child: Center(
+              child: SizedBox(
+                width: g.width,
+                height: kGlassPageControlHeight,
+                child: GlassSurface(
+                  borderRadius: kGlassCapsule,
+                  finish: widget.finish,
+                  child: CustomPaint(
+                    painter: _DotsPainter(
+                      geometry: g,
+                      position: () => _position,
+                      colour: label,
+                      rtl: _rtl,
+                      focusRing: _focused && interactive,
+                      repaint: _driver,
+                    ),
                   ),
                 ),
               ),
@@ -374,15 +459,30 @@ class _DotGeometry {
 }
 
 class _DotsPainter extends CustomPainter {
-  _DotsPainter({required this.geometry, required this.position, required this.colour, required Listenable repaint})
-    : super(repaint: repaint);
+  _DotsPainter({
+    required this.geometry,
+    required this.position,
+    required this.colour,
+    required this.rtl,
+    required this.focusRing,
+    required Listenable repaint,
+  }) : super(repaint: repaint);
 
   final _DotGeometry geometry;
   final double Function() position;
   final Color colour;
 
+  /// Whether the first dot is at the right.
+  final bool rtl;
+  final bool focusRing;
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (focusRing) {
+      // Past the capsule, on the surface's own canvas, which the capture
+      // skips: see `glass_focus.dart`.
+      paintGlassFocusRing(canvas, Offset.zero & size, kGlassCapsule);
+    }
     final double p = position().clamp(0.0, geometry.count - 1.0);
     final double y = size.height / 2;
     var x = _kPadding;
@@ -391,7 +491,7 @@ class _DotsPainter extends CustomPainter {
       final double w = geometry.dotWidth(i, p);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, y - kGlassPageDot / 2, w, kGlassPageDot),
+          Rect.fromLTWH(rtl ? size.width - x - w : x, y - kGlassPageDot / 2, w, kGlassPageDot),
           const Radius.circular(kGlassPageDot / 2),
         ),
         Paint()..color = colour.withValues(alpha: colour.a * lerpDouble(_kRestingDot, 1, lit)!),
@@ -404,5 +504,7 @@ class _DotsPainter extends CustomPainter {
   bool shouldRepaint(_DotsPainter oldDelegate) =>
       oldDelegate.geometry.count != geometry.count ||
       oldDelegate.geometry.current != geometry.current ||
-      oldDelegate.colour != colour;
+      oldDelegate.colour != colour ||
+      oldDelegate.rtl != rtl ||
+      oldDelegate.focusRing != focusRing;
 }

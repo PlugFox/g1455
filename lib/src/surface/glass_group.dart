@@ -1258,6 +1258,10 @@ class RenderGlassGroup extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    if (!_group.fuses && context is! ProxyWalkContext) {
+      // No fused draw goes into this frame, so nothing samples a texture.
+      _heldTexture.release();
+    }
     if (_group.fuses) {
       _paintFusedLayer(context, offset);
     } else if (_group._members.isNotEmpty && _group.tier == GlassTier.full) {
@@ -1349,9 +1353,12 @@ class RenderGlassGroup extends RenderProxyBox {
     }
     _paintedProgram = _proxy?.groupProgram;
     if (frame == null || _proxy?.groupProgram == null) {
+      _heldTexture.release();
       paintsWithoutProxy++;
       return;
     }
+    // Held by the draw; see `DeclaredTextureHold`.
+    _heldTexture.hold(frame);
     if (frame is! GlassProxyFrame) {
       paintsWithDeclaredBackdrop++;
     }
@@ -1360,8 +1367,9 @@ class RenderGlassGroup extends RenderProxyBox {
       ..invalidate()
       ..probe = _drawProbe
       ..painter = (Canvas canvas) {
-        // A replaced frame is a disposed texture; see the surface's painter.
-        if (identical(_frame, frame)) {
+        // A replaced frame is a disposed texture; a declared one is held and
+        // not asked for again. See the surface's painter.
+        if (frame is! GlassProxyFrame || identical(_capturedFrame, frame)) {
           _paintFused(canvas, offset, frame);
         }
       };
@@ -1376,6 +1384,10 @@ class RenderGlassGroup extends RenderProxyBox {
     if (backdrop != null && backdrop.ready) {
       return declaredTextureFor(backdrop, effectiveFinish.blurSigmaLogical);
     }
+    return _capturedFrame;
+  }
+
+  GlassProxyFrame? get _capturedFrame {
     final GlassProxyHandle? proxy = _proxy;
     if (proxy == null) {
       return null;
@@ -1412,6 +1424,7 @@ class RenderGlassGroup extends RenderProxyBox {
   bool get readsDeclaredBackdrop => _backdrop?.ready ?? false;
 
   final LayerHandle<GlassDrawLayer> _drawLayer = LayerHandle<GlassDrawLayer>();
+  final DeclaredTextureHold _heldTexture = DeclaredTextureHold();
 
   /// See `RenderGlassSurface.drawLayer`.
   Layer? get drawLayer => _drawLayer.layer;
@@ -1706,6 +1719,7 @@ class RenderGlassGroup extends RenderProxyBox {
   @override
   void dispose() {
     _drawLayer.layer = null;
+    _heldTexture.release();
     _live.remove(this);
     _ledger?.unregisterCluster(_group);
     _proxy?.removeListener(_onProxyPublished);

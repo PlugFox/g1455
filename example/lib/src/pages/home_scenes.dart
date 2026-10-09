@@ -6,6 +6,7 @@ import 'package:flutter_sficon/flutter_sficon.dart';
 import 'package:g1455/g1455.dart';
 
 import '../backdrops.dart';
+import '../catalog/catalog.dart';
 import '../widgets/site_icon.dart';
 
 // More scenes for the home page's gallery, each something to play with rather
@@ -205,10 +206,10 @@ class _CalculatorSceneState extends State<CalculatorScene> {
 
 // ------------------------------------------------------------ Notifications
 
-const List<(IconData, Color, String, String, String)> _kNotes = <(IconData, Color, String, String, String)>[
+final List<(IconData, Color, String, String, String)> _kNotes = <(IconData, Color, String, String, String)>[
   (SFIcons.sf_message_fill, Color(0xFF30D158), 'Messages', 'Mia', 'On my way, ten minutes'),
   (SFIcons.sf_calendar, Color(0xFFFF453A), 'Calendar', 'Design review', 'Today at 15:00 · Room 4'),
-  (SFIcons.sf_envelope_fill, Color(0xFF0A84FF), 'Mail', 'pub.dev', 'g1455 0.2.0 is published'),
+  (SFIcons.sf_envelope_fill, Color(0xFF0A84FF), 'Mail', 'pub.dev', 'g1455 ${Site.version} is published'),
   (SFIcons.sf_bell_fill, Color(0xFFFF9F0A), 'Reminders', 'Water the plants', 'The fern first'),
 ];
 

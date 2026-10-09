@@ -214,6 +214,56 @@ void main() {
     await tester.pump();
     expect(rig.bar.globalRect.width, closeTo(kBarWidth, 0.01));
   });
+
+  // A list in a `PageView` is a scroll view nested in another: its
+  // notifications reach the minimizer at depth 1, which the default predicate
+  // does not take — as an `AppBar`'s does not. The predicate is the way in.
+  testWidgets('a list inside a page view collapses the bar once the predicate takes its depth', (
+    WidgetTester tester,
+  ) async {
+    final collapsed = <String, bool>{};
+    for (final String arm in <String>['default', 'depth 1']) {
+      final _Rig rig = await _Rig.mount(
+        tester,
+        predicate: arm == 'default' ? defaultScrollNotificationPredicate : (ScrollNotification n) => n.depth == 1,
+        around: (Widget list) => PageView(children: <Widget>[list, const SizedBox()]),
+      );
+      final Rect open = rig.bar.globalRect;
+      await tester.drag(find.byType(ListView), const Offset(0, -200));
+      await tester.pumpAndSettle();
+      expect(rig.scroll.offset, greaterThan(100), reason: '$arm: the list did not scroll');
+      collapsed[arm] = rig.minimizer.value;
+      expect(rig.bar.globalRect.width, collapsed[arm]! ? 60 : open.width, reason: arm);
+      await tester.pumpWidget(const SizedBox());
+    }
+    expect(collapsed, <String, bool>{'default': false, 'depth 1': true});
+  });
+
+  // `reverse: true` turns which way the offset grows on the screen, not which
+  // way the reader goes: a chat scrolled back to older messages moves its
+  // content down, as a list scrolled back up does, and must not collapse the
+  // bar for it.
+  testWidgets('a reversed list collapses the bar when its content moves up the screen, as any list does', (
+    WidgetTester tester,
+  ) async {
+    final _Rig rig = await _Rig.mount(tester, reverse: true);
+    final Rect open = rig.bar.globalRect;
+    // Finger down: older content comes into view from the top.
+    await tester.drag(find.byType(ListView), const Offset(0, 200));
+    await tester.pumpAndSettle();
+    expect(rig.scroll.offset, greaterThan(100), reason: 'the list did not scroll');
+    expect(rig.minimizer.value, isFalse, reason: 'content moving down the screen collapsed the bar');
+    // Finger up: the content moves up the screen, as a list read downward does.
+    await tester.drag(find.byType(ListView), const Offset(0, -60));
+    await tester.pumpAndSettle();
+    expect(rig.minimizer.value, isTrue, reason: 'content moving up the screen did not collapse the bar');
+    expect(rig.bar.globalRect.width, 60);
+    // And at the content's top edge on the screen, which is its far end here,
+    // it is open whatever came before.
+    rig.scroll.jumpTo(rig.scroll.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect, open, reason: 'at the top of the content the bar stayed collapsed');
+  });
 }
 
 /// The picture each row's repaint boundary holds: a row repainted on screen
@@ -271,6 +321,9 @@ class _Rig {
     bool accessory = false,
     bool reduceMotion = false,
     GlassTabBarMinimizeBehavior behavior = GlassTabBarMinimizeBehavior.onScrollDown,
+    ScrollNotificationPredicate predicate = defaultScrollNotificationPredicate,
+    Widget Function(Widget list)? around,
+    bool reverse = false,
   }) async {
     await tester.pumpWidget(const SizedBox());
     tester.view
@@ -297,11 +350,15 @@ class _Rig {
               minimizeBehavior: behavior,
               bottomAccessory: accessory ? const Text('Now playing') : null,
             ),
-            body: ListView.builder(
-              controller: scroll,
-              itemCount: 60,
-              itemExtent: 40,
-              itemBuilder: (BuildContext context, int i) => _Row(i),
+            minimizeNotificationPredicate: predicate,
+            body: (around ?? (Widget list) => list)(
+              ListView.builder(
+                controller: scroll,
+                reverse: reverse,
+                itemCount: 60,
+                itemExtent: 40,
+                itemBuilder: (BuildContext context, int i) => _Row(i),
+              ),
             ),
           ),
         ),

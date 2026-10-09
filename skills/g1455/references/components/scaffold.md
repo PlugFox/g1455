@@ -63,7 +63,9 @@ the body sees `MediaQuery.viewInsets` as it is.
 - All three are [lifted](../foundations/above.md), so glass cards scrolling under them show through.
 - The screen is a `GlassTabBarMinimizer`: a [tab bar](../components/tab-bar.md) in `bottomBar` with
   `minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown` collapses when the body scrolls down and expands when it
-  scrolls up. Its box keeps its height, so the body's padding does not move. A bar that does not ask is not told.
+  scrolls up. Its box keeps its height, so the body's padding does not move. A bar that does not ask is not told. A
+  body whose lists are nested one deeper, in a `PageView`, a `TabBarView` or a `NestedScrollView`, needs
+  `minimizeNotificationPredicate: (ScrollNotification n) => n.depth == 1`.
 
 ## The host
 
@@ -182,6 +184,7 @@ class _LibraryPageState extends State<LibraryPage> {
 | `floatingAction` | `Widget?` | `null` | A control at the end edge above the bottom bar, usually a `GlassButton`, at its own size. Lifted. |
 | `barMargin` | `EdgeInsets` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. |
 | `host` | `bool?` | `null` | Whether to mount a `GlassHost`: null when there is none above, `true` always, `false` never. |
+| `minimizeNotificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which of the body's scroll notifications collapse a tab bar that asks to: the minimizer's `notificationPredicate`. |
 | `key` | `Key?` | `null` | |
 
 `double topExtentFor(EdgeInsets safe)`: the top bar's extent from the top of the screen, which the body is told as its

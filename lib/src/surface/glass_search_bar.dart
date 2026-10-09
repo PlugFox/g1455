@@ -154,6 +154,11 @@ class _GlassSearchBarState extends State<GlassSearchBar> with SingleTickerProvid
     _listen();
     if (!widget.showsCancelButton) {
       _cancel.value = 0;
+    } else if (!oldWidget.showsCancelButton) {
+      // Turned on under a field that already has the focus: no focus change
+      // is coming to bring Cancel in, so it comes in now, as it would have on
+      // the focus.
+      _onFocus();
     }
   }
 

@@ -532,8 +532,8 @@ The switch is never smaller than 44 px tall, so it stays easy to hit.
   drawn around the track behind a boundary of its own; on a switch that sits under other glass, showing or hiding it is
   one capture.
 - Under a right-to-left `Directionality` it is mirrored: on is at the left.
-- The knob is dragged from touch-down, and inside a horizontal `PageView` the switch claims the drag, so the page does
-  not turn under it. In a vertical list a swipe that starts on the switch still scrolls the list.
+- The knob is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves the switch and
+  not the page, and a vertical swipe that starts on the switch still scrolls the vertical list around it.
 
 ## The drop
 
@@ -705,8 +705,8 @@ Rounding the value yourself in `onChanged` instead leaves the knob between the s
   the knob, inside the drop's glass, so focusing it costs nothing.
 - Under a right-to-left `Directionality` it is mirrored: 0 is at the right, the fill grows leftward, and the left
   arrow increases.
-- The knob is dragged from touch-down, and inside a horizontal `PageView` the slider claims the drag, so the page does
-  not turn under it. In a vertical list a swipe that starts on the slider still scrolls the list.
+- The knob is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves the slider and
+  not the page, and a vertical swipe that starts on the slider still scrolls the vertical list around it.
 ## Accessibility
 
 Give every slider a `semanticLabel` ("Volume", "Brightness"). `semanticStep` (default 0.1) is how far
@@ -875,8 +875,8 @@ segments read their text. For icon segments, wrap each icon in `Semantics(label:
   ring is drawn around the track behind a boundary of its own; on a control under other glass, showing or hiding it is
   one capture.
 - Under a right-to-left `Directionality` the first segment is at the right, and the arrows follow.
-- The drop is dragged from touch-down, and inside a horizontal `PageView` the control claims the drag, so the page does
-  not turn under it. In a vertical list a swipe that starts on it still scrolls the list.
+- The drop is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves it and
+  not the page, and a vertical swipe that starts on it still scrolls the vertical list around it.
 - The capsule's corner is concentric with the track's, by `GlassConcentric` (see
   [GlassSurface](/foundations/surface)): 14 inside a 16 track inset 2.
 ''',
@@ -1071,7 +1071,11 @@ GlassTabBarMinimizer(
 )
 ```
 
-Only the nearest vertical scroll view counts, not one nested in it, nor a horizontal one.
+By default only the nearest vertical scroll view counts, not one nested in it, nor a horizontal one.
+`notificationPredicate` chooses, as an `AppBar`'s does: a list in a `PageView`, a `TabBarView` or a `NestedScrollView`'s
+body is one deeper, and `(ScrollNotification n) => n.depth == 1` lets it collapse the bar. The direction is the one on the
+screen: a `reverse: true` list collapses the bar when its content moves up, as any list does, and expands at its top
+edge, which is its far end.
 `GlassTabBarMinimizer.maybeOf(context)` is the `ValueNotifier<bool>` it holds: set it `false` to expand the bar when the
 app changes the page.
 
@@ -1206,6 +1210,7 @@ class _AppShellState extends State<AppShell> {
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `child` | `Widget` | **required** | The subtree whose vertical scrolls collapse the bars in it: the scroll view and the bar both. |
+| `notificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which scroll notifications count. The default takes only `depth == 0`; `n.depth == 1` reaches a list in a `PageView` or `TabBarView`. |
 
 `static ValueNotifier<bool>? maybeOf(BuildContext context)`: whether the bars below are collapsed, or null with no
 minimizer above. Writable: set it `false` to expand them.

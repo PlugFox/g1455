@@ -93,7 +93,11 @@ GlassTabBarMinimizer(
 )
 ```
 
-Only the nearest vertical scroll view counts, not one nested in it, nor a horizontal one.
+By default only the nearest vertical scroll view counts, not one nested in it, nor a horizontal one.
+`notificationPredicate` chooses, as an `AppBar`'s does: a list in a `PageView`, a `TabBarView` or a `NestedScrollView`'s
+body is one deeper, and `(ScrollNotification n) => n.depth == 1` lets it collapse the bar. The direction is the one on the
+screen: a `reverse: true` list collapses the bar when its content moves up, as any list does, and expands at its top
+edge, which is its far end.
 `GlassTabBarMinimizer.maybeOf(context)` is the `ValueNotifier<bool>` it holds: set it `false` to expand the bar when the
 app changes the page.
 
@@ -232,6 +236,7 @@ class _AppShellState extends State<AppShell> {
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `child` | `Widget` | **required** | The subtree whose vertical scrolls collapse the bars in it: the scroll view and the bar both. |
+| `notificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which scroll notifications count. The default takes only `depth == 0`; `n.depth == 1` reaches a list in a `PageView` or `TabBarView`. |
 
 `static ValueNotifier<bool>? maybeOf(BuildContext context)`: whether the bars below are collapsed, or null with no
 minimizer above. Writable: set it `false` to expand them.

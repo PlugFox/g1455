@@ -303,13 +303,15 @@ Every name links to its page in the API reference.
 | [`GlassScrollEdge`][GlassScrollEdge] | The scroll edge effect under a bar, and the bar. |
 | [`GlassScaffold`][GlassScaffold] | A screen wired as this README recommends: a host when none is above, a top bar in a soft scroll edge, an optional bottom bar and floating action, and a body that scrolls under the bars. |
 
-The button, switch, slider, segmented control and a toolbar's cells take the
-keyboard's focus: Space and Enter press, the arrows step a slider and a
-segmented control, and the ring is drawn without a capture on glass. The
-switch, slider, segmented control and toolbar mirror under a right-to-left
-`Directionality`. The switch, slider and segmented control claim a drag from
-touch-down inside a horizontal `PageView`, and a swipe that starts on them in
-a vertical list still scrolls the list.
+The button, switch, slider, segmented control, stepper, page control and a
+toolbar's cells take the keyboard's focus: Space and Enter press, the arrows
+step a slider, a segmented control, a stepper and a page control, and the ring
+is drawn without a capture on glass. The switch, slider, segmented control,
+stepper, page control and toolbar mirror under a right-to-left
+`Directionality`. Inside a horizontal `PageView` or list, a horizontal drag
+that starts on the switch, slider or segmented control moves the control and
+not the page, and a vertical swipe that starts on them still scrolls the
+vertical list around them.
 
 ### Modals
 

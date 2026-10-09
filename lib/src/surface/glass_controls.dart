@@ -31,15 +31,18 @@
 // drop and follows it, so every frame of a slider drag is a real change under
 // glass and is retaken — the honest price, stated rather than hidden.
 //
-// **Who gets the finger.** Under a horizontal scrollable — a `PageView`, a
-// carousel — a control claims the pointer the moment it comes down
-// ([_ClaimingDragRecognizer]): the drop lifts on that frame rather than after
-// the tap's 100 ms timeout or the drag's slop, and the page never sees the
-// gesture. Anywhere else it competes as it always did, because under a
-// vertical list a vertical swipe that starts on a switch is a scroll, and a
-// control that won every arena it touched would take it. Drags measure from
-// where the finger came down (`DragStartBehavior.down`), so the knob does not
-// jump by the slop.
+// **Who gets the finger.** A control competes in the gesture arena like any
+// other: a tap, and a horizontal drag. Under a horizontal scrollable — a
+// `PageView`, a carousel — that drag wins a horizontal swipe from the page,
+// because both accept at the same slop and the control's, being deeper, sees
+// each move first. What the control adds there is the drop lifting the moment
+// the finger comes down, rather than after the tap's 100 ms timeout or the
+// drag's slop — a lift and nothing else, put back if the arena goes to someone
+// else. It does not *win* on touch-down: a carousel is often a row of a
+// vertical list, and a vertical swipe that starts on a switch in it is that
+// list's scroll, which a control that won every arena it touched would take
+// and read as a tap. Drags measure from where the finger came down
+// (`DragStartBehavior.down`), so the knob does not jump by the slop.
 //
 // A keyboard reaches both: Space or Enter toggles the switch, the arrow keys
 // step the slider, and the focus ring is drawn where no capture sees it
@@ -50,6 +53,7 @@ import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -232,15 +236,21 @@ class _KnobRing extends CustomPainter {
   bool shouldRepaint(_KnobRing oldDelegate) => false;
 }
 
-/// Overrides whether the switch and the slider claim the pointer on touch-down
-/// — true always, false never — instead of asking whether the nearest
-/// scrollable is horizontal. A `@visibleForTesting` seam: the gesture test
-/// forces the two answers the scrollable did not give.
+/// Overrides whether the controls claim the pointer on touch-down — true
+/// always, false never — instead of asking whether the nearest scrollable is
+/// horizontal. A `@visibleForTesting` seam: the gesture test forces the two
+/// answers the scrollable did not give.
 @visibleForTesting
 bool? debugGlassControlsClaimOverride;
 
-/// Whether a control in [context] takes the pointer on touch-down: when the
+/// Whether a control in [context] claims the pointer on touch-down: when the
 /// nearest scrollable scrolls the same way the control drags, and only then.
+///
+/// For the switch and the slider a claim only lifts the drop at once — their
+/// drag contends for a horizontal swipe either way. For the segmented control,
+/// whose gestures are raw pointer events, it is also what makes its seat in
+/// the arena contend. None wins on touch-down, so a swipe across the
+/// scrollable's axis still goes to whatever scrolls that way.
 ///
 /// Shared by the switch, the slider and the segmented control; not exported.
 bool glassControlClaimsPointer(BuildContext context) {
@@ -252,31 +262,18 @@ bool glassControlClaimsPointer(BuildContext context) {
   return scrollable != null && axisDirectionToAxis(scrollable.axisDirection) == Axis.horizontal;
 }
 
-/// A horizontal drag that, when [claim] says so, wins its arena on the pointer
-/// coming down — the way `EagerGestureRecognizer` does — rather than at the
-/// touch slop. Won at once, a drag with `DragStartBehavior.down` starts at
-/// once, so the tap that would have competed with it is the drag's to tell:
-/// an end that travelled under the slop is a tap.
-class _ClaimingDragRecognizer extends HorizontalDragGestureRecognizer {
-  _ClaimingDragRecognizer({super.debugOwner});
-
-  bool claim = false;
-
-  @override
-  void addAllowedPointer(PointerDownEvent event) {
-    super.addAllowedPointer(event);
-    if (claim) {
-      resolvePointer(event.pointer, GestureDisposition.accepted);
-    }
-  }
-}
-
 /// The recognizers of a control: a tap, and a horizontal drag measured from
-/// touch-down that may [claim] the pointer.
+/// touch-down.
+///
+/// [onPress] is the drag's `onDown`, which is called as the pointer comes down
+/// and before either recognizer has won anything — so it may only lift the
+/// drop, and whatever it does [onCancel] undoes: the drag calls it whenever it
+/// leaves the arena without starting, whether the tap, a scrollable or the
+/// finger lifting ended it.
 Map<Type, GestureRecognizerFactory> _controlGestures({
   required Object owner,
-  required bool claim,
   required DeviceGestureSettings? settings,
+  GestureDragDownCallback? onPress,
   GestureTapDownCallback? onTapDown,
   GestureTapUpCallback? onTapUp,
   GestureTapCallback? onTap,
@@ -295,11 +292,11 @@ Map<Type, GestureRecognizerFactory> _controlGestures({
       ..onTapCancel = onTapCancel
       ..gestureSettings = settings,
   ),
-  _ClaimingDragRecognizer: GestureRecognizerFactoryWithHandlers<_ClaimingDragRecognizer>(
-    () => _ClaimingDragRecognizer(debugOwner: owner),
-    (_ClaimingDragRecognizer d) => d
-      ..claim = claim
+  HorizontalDragGestureRecognizer: GestureRecognizerFactoryWithHandlers<HorizontalDragGestureRecognizer>(
+    () => HorizontalDragGestureRecognizer(debugOwner: owner),
+    (HorizontalDragGestureRecognizer d) => d
       ..dragStartBehavior = DragStartBehavior.down
+      ..onDown = onPress
       ..onStart = onStart
       ..onUpdate = onUpdate
       ..onEnd = onEnd
@@ -500,11 +497,6 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
   /// Under [TextDirection.rtl]: on is to the left.
   bool _rtl = false;
 
-  /// How far the drag has gone from where the finger came down, at the most —
-  /// what tells a claimed drag from a tap.
-  double _dragTravel = 0;
-  double _dragFurthest = 0;
-
   /// Where the knob is drawn for a value position: mirrored under rtl.
   double _visual(double position) => _rtl ? 1 - position : position;
 
@@ -537,10 +529,10 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
     super.didUpdateWidget(oldWidget);
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     if (!_enabled && _lift.value > 0) {
-      // Disabled mid-drag: the drag's end will never arrive. A finger held
-      // still needs none of this — the disposed tap recognizer calls the
-      // `onTapCancel` it was built with — but a drag has already won its arena
-      // and is dropped without a word.
+      // Disabled mid-gesture: the recognizers are kept, but their handlers are
+      // now null, so neither the drag's end nor the tap's cancel will arrive —
+      // the drop is put down and the knob put back here, for a held finger and
+      // a dragging one alike.
       _dragging = false;
       _lift.value = 0;
       _position.animateTo(widget.value ? 1 : 0, curve: Curves.easeOutCubic);
@@ -574,38 +566,32 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
 
   void _dragStart(DragStartDetails _) {
     _dragging = true;
-    _dragTravel = _dragFurthest = 0;
     _lift.forward();
   }
 
   void _dragUpdate(DragUpdateDetails d) {
-    _dragTravel += d.delta.dx;
-    _dragFurthest = math.max(_dragFurthest, _dragTravel.abs());
     _position.value += (_rtl ? -d.delta.dx : d.delta.dx) / (_to - _from);
   }
 
   void _dragEnd(DragEndDetails _) {
     _dragging = false;
     _lift.reverse();
-    // A claimed pointer is a drag from touch-down, taps included: one that
-    // never left the slop is the tap the tap recognizer would have seen.
-    final double slop = MediaQuery.maybeGestureSettingsOf(context)?.touchSlop ?? kTouchSlop;
-    _commit(_dragFurthest < slop && _claimed ? !widget.value : _position.value >= 0.5);
+    _commit(_position.value >= 0.5);
   }
 
+  /// The drag left the arena without starting: to the tap, to a scrollable, or
+  /// to a finger lifted. Puts down a drop lifted on touch-down; a tap that
+  /// wins after this lifts and settles its own.
   void _dragCancel() {
     _dragging = false;
     _lift.reverse();
     _position.animateTo(widget.value ? 1 : 0, curve: Curves.easeOutCubic);
   }
 
-  bool _claimed = false;
-
   @override
   Widget build(BuildContext context) {
     final double margin = _margin(_kSwitchKnob, widget.dropScale, _motion) + _inset;
     _rtl = Directionality.maybeOf(context) == TextDirection.rtl;
-    _claimed = glassControlClaimsPointer(context);
     final bool enabled = _enabled;
     return Semantics(
       label: widget.semanticLabel,
@@ -624,8 +610,8 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
           behavior: HitTestBehavior.opaque,
           gestures: _controlGestures(
             owner: this,
-            claim: _claimed,
             settings: MediaQuery.maybeGestureSettingsOf(context),
+            onPress: enabled && glassControlClaimsPointer(context) ? (_) => _lift.forward() : null,
             onTapDown: enabled ? (_) => _lift.forward() : null,
             onTapCancel: enabled ? () => _dragging ? null : _lift.reverse() : null,
             onTap: enabled
@@ -805,11 +791,13 @@ class GlassSlider extends StatefulWidget {
   final ValueChanged<double>? onChanged;
 
   /// Called with the value before the gesture, as a finger comes down or a
-  /// screen reader steps the value.
+  /// screen reader or a key steps the value — once, before any [onChanged] of
+  /// that gesture.
   final ValueChanged<double>? onChangeStart;
 
-  /// Called with the value at the end of the gesture, as the finger lifts or
-  /// a screen reader's step lands.
+  /// Called once at the end of the gesture — the finger lifted or taken away,
+  /// the slider disabled under it, a step landed — with the last value
+  /// [onChanged] was told, as Material's `Slider` does.
   final ValueChanged<double>? onChangeEnd;
 
   /// The fill from 0 to [value]. iOS's blue by default.
@@ -847,6 +835,15 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
   /// it: the drop is there without having travelled.
   bool _placing = false;
 
+  /// Between [GlassSlider.onChangeStart] and [GlassSlider.onChangeEnd]. A
+  /// gesture can reach the slider through both recognizers — a held finger is
+  /// a tap down before it is a drag — and is still one change.
+  bool _active = false;
+
+  /// The last value [GlassSlider.onChanged] was told — what the end reports,
+  /// since the caller may not have passed it back as [GlassSlider.value] yet.
+  double _last = 0;
+
   bool _focused = false;
 
   /// Under [TextDirection.rtl]: 0 is at the right.
@@ -883,9 +880,16 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
     super.didUpdateWidget(oldWidget);
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     if (!_enabled) {
-      // Disabled mid-drag: see the switch's.
+      // Disabled mid-gesture: see the switch's. The change that began is still
+      // ended, once — after this frame, since the caller is mid-build.
       _lift.value = 0;
       _placing = false;
+      if (_active) {
+        _active = false;
+        final ValueChanged<double>? end = widget.onChangeEnd;
+        final double last = _last;
+        SchedulerBinding.instance.addPostFrameCallback((_) => end?.call(last));
+      }
     }
     if (widget.value != oldWidget.value) {
       if (_placing) {
@@ -921,10 +925,18 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
     if (widget.divisions != null && v == widget.value) {
       return;
     }
+    _last = v;
     widget.onChanged?.call(v);
   }
 
+  /// A finger begins a change: the tap's down or the drag's start, whichever
+  /// comes first — the second is the same gesture.
   void _start(Offset local) {
+    if (_active) {
+      return;
+    }
+    _active = true;
+    _last = widget.value;
     _lift.forward();
     final double v = _valueAt(local);
     _placing = v != widget.value;
@@ -932,10 +944,18 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
     _change(v);
   }
 
+  /// A finger's change ends: the drag's end or cancel, or the tap's up. The
+  /// drag's cancel also comes for a gesture that never began — a quick tap
+  /// whose tap has yet to win, a swipe a scrollable took — and then only puts
+  /// down a drop lifted on touch-down.
   void _end() {
     _placing = false;
     _lift.reverse();
-    widget.onChangeEnd?.call(widget.value);
+    if (!_active) {
+      return;
+    }
+    _active = false;
+    widget.onChangeEnd?.call(_last);
   }
 
   /// A screen reader's increase or decrease: a whole change, start to end, with
@@ -1010,15 +1030,16 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
           behavior: HitTestBehavior.opaque,
           gestures: _controlGestures(
             owner: this,
-            claim: glassControlClaimsPointer(context),
             settings: MediaQuery.maybeGestureSettingsOf(context),
+            onPress: enabled && glassControlClaimsPointer(context) ? (_) => _lift.forward() : null,
             onStart: enabled ? (DragStartDetails d) => _start(d.localPosition) : null,
             onUpdate: enabled ? (DragUpdateDetails d) => _change(_valueAt(d.localPosition)) : null,
             onEnd: enabled ? (_) => _end() : null,
             onCancel: enabled ? _end : null,
             onTapDown: enabled ? (TapDownDetails d) => _start(d.localPosition) : null,
+            // No tap cancel: the tap is cancelled when the drag wins, and
+            // when anything else does the drag is cancelled too.
             onTapUp: enabled ? (_) => _end() : null,
-            onTapCancel: enabled ? () => _lift.reverse() : null,
           ),
           child: SizedBox(height: kGlassMinTapTarget.height, child: _sliderBody(value, margin)),
         ),

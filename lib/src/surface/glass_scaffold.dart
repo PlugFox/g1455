@@ -104,7 +104,9 @@ const double kGlassScaffoldActionGap = 16;
 /// [GlassTabBarMinimizer]: a [GlassTabBar] in [bottomBar] with
 /// `minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown` collapses to
 /// its selected tab when the body scrolls down and expands when it scrolls up.
-/// Its box keeps its height, so the body's padding does not move.
+/// Its box keeps its height, so the body's padding does not move. A body
+/// whose lists are nested in another scroll view — a `PageView`, a
+/// `TabBarView` — reaches it through [minimizeNotificationPredicate].
 ///
 /// > **Note:** every frame of a scroll is one capture of the whole host, for
 /// > every glass on the screen at once, because the content under the bars
@@ -133,6 +135,7 @@ class GlassScaffold extends StatelessWidget {
     this.floatingAction,
     this.barMargin = kGlassScaffoldBarMargin,
     this.host,
+    this.minimizeNotificationPredicate = defaultScrollNotificationPredicate,
     super.key,
   }) : assert(topBarHeight >= 0);
 
@@ -174,6 +177,13 @@ class GlassScaffold extends StatelessWidget {
   /// Whether the scaffold mounts a [GlassHost] of its own: null (the default)
   /// when there is none above it, true always, false never.
   final bool? host;
+
+  /// Which of [body]'s scroll notifications collapse a [GlassTabBar] in
+  /// [bottomBar]: the scaffold's [GlassTabBarMinimizer.notificationPredicate].
+  /// By default the body's own scroll view's; a body that is a `PageView` or a
+  /// `TabBarView` of lists, or a `NestedScrollView`, has its lists one deeper,
+  /// and `(ScrollNotification n) => n.depth == 1` reaches them.
+  final ScrollNotificationPredicate minimizeNotificationPredicate;
 
   /// The top bar's extent from the top of the screen, logical px: the safe
   /// area, [barMargin] above and below, and [topBarHeight]. What the body is
@@ -220,7 +230,7 @@ class GlassScaffold extends StatelessWidget {
       ],
     );
     final bool own = host ?? GlassProxyScope.maybeOf(context) == null;
-    final Widget minimizing = GlassTabBarMinimizer(child: screen);
+    final Widget minimizing = GlassTabBarMinimizer(notificationPredicate: minimizeNotificationPredicate, child: screen);
     return own ? GlassHost(child: minimizing) : minimizing;
   }
 

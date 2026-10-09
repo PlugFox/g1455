@@ -69,6 +69,10 @@ press repaints nothing under any glass: the count under the stage stays where it
 A screen reader hears one adjustable control: its `semanticLabel` and the value, which it increases or decreases by
 `step`. `semanticFormatterCallback` says the value your way, "12.5 points" rather than "12.5".
 
+A focused stepper steps with the arrow keys: up and the arrow toward the plus increase, down and the other decrease. The
+focus ring is drawn inside the glass, so it takes no capture, and a disabled stepper takes no focus. Under a
+right-to-left `Directionality` the stepper is mirrored, with the minus at the end, and so are the left and right arrows.
+
 ## Complete example
 
 ```dart
@@ -143,6 +147,8 @@ class _PrintOptionsState extends State<PrintOptions> {
 | `pressedOverlay` | `Color?` | `null` | Added over the held half. Null takes the finish's rim colour. |
 | `semanticLabel` | `String?` | `null` | What a screen reader calls the control. |
 | `semanticFormatterCallback` | `String Function(double)?` | `null` | How a screen reader says the value. |
+| `focusNode` | `FocusNode?` | `null` | The stepper's focus. Null makes one the stepper owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the stepper is built. |
 | `key` | `Key?` | `null` | |
 
 ### Constants

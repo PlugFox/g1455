@@ -503,6 +503,13 @@ bool debugGlassSheetTravel = true;
 /// and centred on a wide window, where a sheet across the whole width leaves
 /// its content in a corner of the glass. Null, it spans the window.
 ///
+/// **The keyboard.** The sheet stands on the keyboard rather than the window's
+/// bottom, as Apple's does — at medium [kGlassSheetInset] above it, at large
+/// on it, its content laid out in what is left — so a focused field in it
+/// stays in sight. `showModalBottomSheet` leaves this to the content; here the
+/// content's `MediaQuery.viewInsets` has the bottom inset taken out, so a
+/// content already padded by it the Material way is not padded twice.
+///
 /// ```dart
 /// showGlassSheet<void>(
 ///   context: context,
@@ -654,6 +661,15 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   final GlassTravelRegion _area = GlassTravelRegion();
   final GlassTravelRegion _still = GlassTravelRegion();
 
+  /// The frame laying the sheet out, while it is mounted.
+  _RenderSheetFrame? _frame;
+
+  /// Whether a finger has moved the sheet since it last let go. A tap is not
+  /// a drag: the sheet's recognizer wins a tap on bare content and ends it
+  /// with no velocity, and loses one on a button inside and is cancelled — and
+  /// neither may re-pick a detent under a settle that is heading for another.
+  bool _dragged = false;
+
   AnimationController? _settle;
   double _extentFrom = 0;
   double _extentTo = 0;
@@ -664,6 +680,7 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   /// positive.
   void _drag(double dy) {
     _settle?.stop();
+    _dragged = true;
     _moving.value = true;
     final double span = math.max(_span, 1);
     var rest = dy;
@@ -707,10 +724,35 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
     return dy + used;
   }
 
+  /// A finger is down on the sheet. Resting at large it has not measured its
+  /// content's medium height since it got there, and a drag down converts the
+  /// finger's pixels into extent by that height: measure it now, before the
+  /// drag is past the slop, so a content or a window that changed since does
+  /// not make the first frame of the drag jump.
+  void _touch() {
+    if (_extent.value >= 1) {
+      _frame?.remeasure();
+    }
+  }
+
   /// [velocity] is the finger's at release, logical px per second, down
   /// positive.
   void _release(double velocity) {
-    if (dismissible && _drop.value > 0 && (velocity / _pageHeight > 1.5 || _drop.value > _sheetHeight / 3)) {
+    if (!_dragged) {
+      return;
+    }
+    _dragged = false;
+    // Popped while the finger was on it, the sheet is already leaving, from
+    // where the finger left it: another pop would close whatever is under it.
+    if (!isActive) {
+      return;
+    }
+    // And with a route pushed over it, a pop would close that one; it settles
+    // back instead.
+    if (dismissible &&
+        isCurrent &&
+        _drop.value > 0 &&
+        (velocity / _pageHeight > 1.5 || _drop.value > _sheetHeight / 3)) {
       navigator?.pop();
       return;
     }
@@ -786,6 +828,11 @@ class _GlassSheet extends StatelessWidget {
     final GlassThemeData theme = GlassTheme.of(context);
     final GlassFinish base = route.finish ?? theme.finish;
     final GlassFinish large = route.largeFinish ?? base.copyWith(tint: base.tint.withValues(alpha: 1));
+    // The keyboard is a floor the sheet stands on, as Apple's sheet rises above
+    // it — a sheet at its content's height has no other way to keep a focused
+    // field in sight. Its content is told the inset is taken, so a content
+    // padded for the keyboard is not padded twice.
+    final double keyboard = MediaQuery.viewInsetsOf(context).bottom;
     // The theme and the travel the sheet was given, put back under its glass:
     // a rung the sheet takes for itself at large, and the region it declares
     // while it moves, are the sheet's and not its content's.
@@ -793,26 +840,30 @@ class _GlassSheet extends StatelessWidget {
       region: GlassTravelScope.maybeOf(context) ?? route._still,
       child: GlassTheme(
         data: theme,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (route.showGrabber)
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 5, bottom: 4),
-                  width: 36,
-                  height: 5,
-                  decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0x4D3C3C43)),
+        child: MediaQuery.removeViewInsets(
+          context: context,
+          removeBottom: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (route.showGrabber)
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 5, bottom: 4),
+                    width: 36,
+                    height: 5,
+                    decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0x4D3C3C43)),
+                  ),
                 ),
-              ),
-            Flexible(child: Builder(builder: route.builder)),
-          ],
+              Flexible(child: Builder(builder: route.builder)),
+            ],
+          ),
         ),
       ),
     );
     return Padding(
-      padding: EdgeInsets.only(top: safe.top + kGlassSheetInset),
+      padding: EdgeInsets.only(top: safe.top + kGlassSheetInset, bottom: keyboard),
       child: _SheetArea(
         region: route._area,
         child: ValueListenableBuilder<double>(
@@ -842,6 +893,7 @@ class _GlassSheet extends StatelessWidget {
                     );
                   },
                   child: GestureDetector(
+                    onVerticalDragDown: (_) => route._touch(),
                     onVerticalDragUpdate: (DragUpdateDetails d) => route._drag(d.primaryDelta!),
                     onVerticalDragEnd: (DragEndDetails d) => route._release(d.primaryVelocity ?? 0),
                     onVerticalDragCancel: () => route._release(0),
@@ -938,8 +990,33 @@ class _RenderSheetFrame extends RenderShiftedBox {
   }
 
   /// The content's own height at medium, kept while the sheet rests at large,
-  /// where nothing needs it and measuring would lay the content out twice.
+  /// where nothing needs it and measuring would lay the content out twice —
+  /// until a finger comes down on the sheet ([remeasure]): a content or a
+  /// window that changed at large has left it stale, and a drag down is about
+  /// to need it.
   double? _natural;
+
+  /// Forgets [_natural], so the next layout measures it.
+  void remeasure() {
+    if (_natural != null) {
+      _natural = null;
+      markNeedsLayout();
+    }
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    route._frame = this;
+  }
+
+  @override
+  void detach() {
+    if (identical(route._frame, this)) {
+      route._frame = null;
+    }
+    super.detach();
+  }
 
   @override
   Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;

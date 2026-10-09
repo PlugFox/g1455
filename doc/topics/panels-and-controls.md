@@ -49,9 +49,10 @@ GlassCard(
 
 The drop of a switch, a slider, a segmented control and a tab bar moves inside
 a travel region of its own: dragging it takes no capture. The button, switch,
-slider, segmented control and a toolbar's cells take the keyboard's focus, and
-the switch, slider and segmented control claim a drag from touch-down inside a
-horizontal `PageView`.
+slider, segmented control, stepper, page control and a toolbar's cells take the
+keyboard's focus. Inside a horizontal `PageView` or list, a horizontal drag that
+starts on the switch, slider or segmented control moves the control and not the
+page, and a vertical swipe still scrolls the vertical list around it.
 
 ## A stepper with its value
 

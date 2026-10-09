@@ -254,10 +254,13 @@ bool debugGlassTabMinimizeTravel = true;
 /// [GlassTabBar]s below it that collapse on a scroll
 /// ([GlassTabBarMinimizeBehavior.onScrollDown]).
 ///
-/// It listens to the vertical scrolls of its subtree — the nearest scroll view
-/// of each, not one nested in another — and holds one value, [maybeOf]: true
-/// once the content has gone [kGlassTabMinimizeScroll] down, false once it has
-/// come as far back up or reached its top. The bar is not inside the scroll
+/// It listens to the vertical scrolls of its subtree — by default the nearest
+/// scroll view of each, not one nested in another; [notificationPredicate]
+/// reaches deeper — and holds one value, [maybeOf]: true once the content has
+/// moved [kGlassTabMinimizeScroll] up the screen, false once it has come as far
+/// back down or reached its top. On the screen, so a `reverse: true` list
+/// collapses the bars on the same motion of the finger as any other. The bar
+/// is not inside the scroll
 /// view, so both are put under one of these: a [GlassScaffold] does that, and
 /// a screen laid out by hand puts one above its body and its bar.
 ///
@@ -285,10 +288,22 @@ bool debugGlassTabMinimizeTravel = true;
 /// {@category Panels and controls}
 class GlassTabBarMinimizer extends StatefulWidget {
   /// Watches the scrolls in [child] for the tab bars in it.
-  const GlassTabBarMinimizer({required this.child, super.key});
+  const GlassTabBarMinimizer({
+    required this.child,
+    this.notificationPredicate = defaultScrollNotificationPredicate,
+    super.key,
+  });
 
   /// The subtree whose scrolls collapse the bars in it.
   final Widget child;
+
+  /// Which of [child]'s scroll notifications count, as `AppBar`'s does: by
+  /// default only those of a scroll view with none between it and the
+  /// minimizer (`depth == 0`). A list in a `PageView`, a `TabBarView` or the
+  /// body of a `NestedScrollView` is nested one deeper; a predicate of
+  /// `(ScrollNotification n) => n.depth == 1` lets its scrolls collapse the
+  /// bars. Only vertical scrolls count, whatever it says.
+  final ScrollNotificationPredicate notificationPredicate;
 
   /// Whether the bars below [context] are collapsed, or null with no
   /// minimizer above. Writable: a bar sets it false when its collapsed circle
@@ -315,16 +330,20 @@ class _GlassTabBarMinimizerState extends State<GlassTabBarMinimizer> {
 
   bool _onScroll(ScrollUpdateNotification n) {
     final ScrollMetrics m = n.metrics;
-    if (n.depth != 0 || m.axis != Axis.vertical) {
+    if (m.axis != Axis.vertical || !widget.notificationPredicate(n)) {
       return false;
     }
-    if (m.pixels <= m.minScrollExtent) {
+    // On the screen, not in the offset: a reversed list grows its offset
+    // upward, so its content moving up the screen — what collapses the bars on
+    // any list — is its offset going down, and its top edge is its far end.
+    final bool reversed = m.axisDirection == AxisDirection.up;
+    if (reversed ? m.pixels >= m.maxScrollExtent : m.pixels <= m.minScrollExtent) {
       _run = 0;
       _minimized.value = false;
       return false;
     }
     // A bounce past the end is not the reader going back up.
-    final double delta = n.scrollDelta ?? 0;
+    final double delta = (reversed ? -1 : 1) * (n.scrollDelta ?? 0);
     if (m.outOfRange || delta == 0) {
       return false;
     }

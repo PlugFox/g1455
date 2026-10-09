@@ -14,6 +14,12 @@
 // surface's subtree, which is a repaint boundary the capture skips — so none
 // of them is a capture, and none repaints what is under the glass. Asserted,
 // with the control that makes the counter move, in `glass_stepper_test.dart`.
+// The focus ring is drawn there too, as a button's is (`glass_focus.dart`).
+//
+// Under `TextDirection.rtl` the capsule mirrors, as UIKit's controls do: the
+// minus is at the right and the plus at the left, and the arrow keys follow
+// the glyphs — the hit areas, the glyphs, the held light and the keys all
+// read the one direction the build reads, so none can disagree.
 //
 // **Not measured:** the sizes. Apple's material and several controls were
 // read off the device; the iOS 26 stepper was not among them. 94 is
@@ -24,10 +30,12 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassDisabledDarkLabel, kGlassDisabledLightLabel, kGlassMinTapTarget;
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
@@ -87,7 +95,12 @@ const Duration kGlassStepperRepeatInterval = Duration(milliseconds: 100);
 /// > a capture.
 ///
 /// A screen reader hears one adjustable control — its [semanticLabel] and the
-/// value — and increases or decreases it by [step].
+/// value — and increases or decreases it by [step]. A keyboard steps a focused
+/// stepper with the arrow keys, and the focus ring is drawn around the
+/// capsule.
+///
+/// Under [TextDirection.rtl] it is mirrored: the minus is at the right, and
+/// the left arrow increases.
 ///
 /// See also:
 ///
@@ -110,6 +123,8 @@ class GlassStepper extends StatefulWidget {
     this.pressedOverlay,
     this.semanticLabel,
     this.semanticFormatterCallback,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   }) : assert(min <= max),
        assert(step > 0);
@@ -154,6 +169,12 @@ class GlassStepper extends StatefulWidget {
   /// fraction when it has none.
   final String Function(double value)? semanticFormatterCallback;
 
+  /// The stepper's focus. Null makes one the stepper owns.
+  final FocusNode? focusNode;
+
+  /// Whether the stepper takes the focus as soon as it is built.
+  final bool autofocus;
+
   @override
   State<GlassStepper> createState() => _GlassStepperState();
 
@@ -169,16 +190,26 @@ class GlassStepper extends StatefulWidget {
       ..add(FlagProperty('wraps', value: wraps, ifTrue: 'wraps'))
       ..add(FlagProperty('autorepeat', value: autorepeat, ifFalse: 'no autorepeat'))
       ..add(DiagnosticsProperty<GlassFinish>('finish', finish, defaultValue: null))
-      ..add(StringProperty('semanticLabel', semanticLabel, defaultValue: null));
+      ..add(StringProperty('semanticLabel', semanticLabel, defaultValue: null))
+      ..add(DiagnosticsProperty<FocusNode>('focusNode', focusNode, defaultValue: null))
+      ..add(FlagProperty('autofocus', value: autofocus, ifTrue: 'autofocus'));
   }
 }
 
-/// The two halves, left to right.
+/// The two halves, in reading order: the minus at the start.
 enum _Half { decrement, increment }
+
+/// Steps a stepper along [half]: one per arrow key.
+class _StepIntent extends Intent {
+  const _StepIntent(this.half);
+
+  final _Half half;
+}
 
 class _GlassStepperState extends State<GlassStepper> {
   _Half? _held;
   Timer? _repeat;
+  bool _focused = false;
 
   /// The value last reported, until the caller's rebuild hands it back: a
   /// repeat that fires before that rebuild steps from here, not from the
@@ -290,6 +321,11 @@ class _GlassStepperState extends State<GlassStepper> {
     final double value = widget.value.clamp(widget.min, widget.max);
     final double? up = _enabled ? _next(_Half.increment) : null;
     final double? down = _enabled ? _next(_Half.decrement) : null;
+    final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
+    // The arrow toward a glyph steps along it: the plus is rightward, unless
+    // the capsule runs the other way.
+    final _Half right = rtl ? _Half.decrement : _Half.increment;
+    final _Half left = rtl ? _Half.increment : _Half.decrement;
     return Semantics(
       container: true,
       label: widget.semanticLabel,
@@ -299,39 +335,67 @@ class _GlassStepperState extends State<GlassStepper> {
       decreasedValue: down == null ? null : _say(down),
       onIncrease: up == null ? null : () => _stepAlong(_Half.increment),
       onDecrease: down == null ? null : () => _stepAlong(_Half.decrement),
-      child: ExcludeSemantics(
-        child: SizedBox(
-          width: kGlassStepperSize.width,
-          height: math.max(kGlassStepperSize.height, kGlassMinTapTarget.height),
-          child: Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              SizedBox.fromSize(
-                size: kGlassStepperSize,
-                child: GlassSurface(
-                  borderRadius: kGlassCapsule,
-                  finish: widget.finish,
-                  child: CustomPaint(
-                    size: kGlassStepperSize,
-                    painter: _StepperPainter(
-                      held: _held,
-                      overlay: overlay,
-                      glyph: label,
-                      dimmed: dimmed,
-                      decrementEnabled: _canStep(_Half.decrement),
-                      incrementEnabled: _canStep(_Half.increment),
+      child: FocusableActionDetector(
+        enabled: _enabled,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        shortcuts: <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.arrowRight): _StepIntent(right),
+          SingleActivator(LogicalKeyboardKey.arrowLeft): _StepIntent(left),
+          const SingleActivator(LogicalKeyboardKey.arrowUp): const _StepIntent(_Half.increment),
+          const SingleActivator(LogicalKeyboardKey.arrowDown): const _StepIntent(_Half.decrement),
+        },
+        actions: <Type, Action<Intent>>{
+          // One step a key, with no autorepeat of the stepper's own: a held
+          // key repeats by itself.
+          _StepIntent: CallbackAction<_StepIntent>(
+            onInvoke: (_StepIntent intent) {
+              if (_canStep(intent.half)) {
+                _stepAlong(intent.half);
+              }
+              return null;
+            },
+          ),
+        },
+        child: ExcludeSemantics(
+          child: SizedBox(
+            width: kGlassStepperSize.width,
+            height: math.max(kGlassStepperSize.height, kGlassMinTapTarget.height),
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                SizedBox.fromSize(
+                  size: kGlassStepperSize,
+                  child: GlassSurface(
+                    borderRadius: kGlassCapsule,
+                    finish: widget.finish,
+                    child: CustomPaint(
+                      size: kGlassStepperSize,
+                      painter: _StepperPainter(
+                        held: _held,
+                        overlay: overlay,
+                        glyph: label,
+                        dimmed: dimmed,
+                        decrementEnabled: _canStep(_Half.decrement),
+                        incrementEnabled: _canStep(_Half.increment),
+                        rtl: rtl,
+                        focusRing: _focused && _enabled,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              // Over the glass and the whole 44-tall box, so a tap anywhere
-              // in a half lands: a `GlassSurface` hit-tests only its child.
-              Positioned.fill(
-                child: Row(
-                  children: <Widget>[for (final _Half half in _Half.values) Expanded(child: _target(half))],
+                // Over the glass and the whole 44-tall box, so a tap anywhere
+                // in a half lands: a `GlassSurface` hit-tests only its child.
+                // The row follows the ambient direction, as the painter does.
+                Positioned.fill(
+                  child: Row(
+                    textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+                    children: <Widget>[for (final _Half half in _Half.values) Expanded(child: _target(half))],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -350,8 +414,8 @@ class _GlassStepperState extends State<GlassStepper> {
   }
 }
 
-/// The glyphs, the hairline and a held half's light, all on the surface's own
-/// canvas.
+/// The glyphs, the hairline, a held half's light and the focus ring, all on
+/// the surface's own canvas.
 class _StepperPainter extends CustomPainter {
   const _StepperPainter({
     required this.held,
@@ -360,6 +424,8 @@ class _StepperPainter extends CustomPainter {
     required this.dimmed,
     required this.decrementEnabled,
     required this.incrementEnabled,
+    required this.rtl,
+    required this.focusRing,
   });
 
   final _Half? held;
@@ -369,9 +435,21 @@ class _StepperPainter extends CustomPainter {
   final bool decrementEnabled;
   final bool incrementEnabled;
 
+  /// Whether the minus is at the right.
+  final bool rtl;
+  final bool focusRing;
+
   @override
   void paint(Canvas canvas, Size size) {
     final double half = size.width / 2;
+    if (focusRing) {
+      // Past the capsule, on the surface's own canvas, which the capture
+      // skips: see `glass_focus.dart`.
+      paintGlassFocusRing(canvas, Offset.zero & size, kGlassCapsule);
+    }
+    // The left half's left edge and the right half's, in the order drawn.
+    final double decrementAt = rtl ? half : 0;
+    final double incrementAt = rtl ? 0 : half;
     final _Half? lit = held;
     if (lit != null && overlay.a > 0) {
       // `plus` on the glass's own canvas, clipped to the capsule: see the
@@ -380,7 +458,7 @@ class _StepperPainter extends CustomPainter {
         ..save()
         ..clipRSuperellipse(kGlassCapsule.toRSuperellipse(Offset.zero & size).scaleRadii())
         ..drawRect(
-          Rect.fromLTWH(lit == _Half.decrement ? 0 : half, 0, half, size.height),
+          Rect.fromLTWH(lit == _Half.decrement ? decrementAt : incrementAt, 0, half, size.height),
           Paint()
             ..blendMode = BlendMode.plus
             ..color = overlay,
@@ -395,12 +473,12 @@ class _StepperPainter extends CustomPainter {
     const double arm = 7;
     final Paint minus = _stroke(decrementEnabled ? glyph : dimmed);
     final Paint plus = _stroke(incrementEnabled ? glyph : dimmed);
-    final Offset left = Offset(half / 2, size.height / 2);
-    final Offset right = Offset(half * 1.5, size.height / 2);
+    final Offset down = Offset(decrementAt + half / 2, size.height / 2);
+    final Offset up = Offset(incrementAt + half / 2, size.height / 2);
     canvas
-      ..drawLine(left.translate(-arm, 0), left.translate(arm, 0), minus)
-      ..drawLine(right.translate(-arm, 0), right.translate(arm, 0), plus)
-      ..drawLine(right.translate(0, -arm), right.translate(0, arm), plus);
+      ..drawLine(down.translate(-arm, 0), down.translate(arm, 0), minus)
+      ..drawLine(up.translate(-arm, 0), up.translate(arm, 0), plus)
+      ..drawLine(up.translate(0, -arm), up.translate(0, arm), plus);
   }
 
   static Paint _stroke(Color colour) => Paint()
@@ -415,5 +493,7 @@ class _StepperPainter extends CustomPainter {
       oldDelegate.glyph != glyph ||
       oldDelegate.dimmed != dimmed ||
       oldDelegate.decrementEnabled != decrementEnabled ||
-      oldDelegate.incrementEnabled != incrementEnabled;
+      oldDelegate.incrementEnabled != incrementEnabled ||
+      oldDelegate.rtl != rtl ||
+      oldDelegate.focusRing != focusRing;
 }

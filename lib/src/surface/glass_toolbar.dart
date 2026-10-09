@@ -126,6 +126,23 @@ class _GlassButtonGroupState extends State<GlassButtonGroup> {
   int? _focused;
 
   @override
+  void didUpdateWidget(GlassButtonGroup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A removed item's detector goes without reporting that its highlight
+    // ended, so a ring on a cell past the new end would stay, drawn outside
+    // the group. A held one does report its press cancelled — but while the
+    // tree is being torn down, where the `setState` that clears the light
+    // throws; cleared here first, that report changes nothing.
+    final int n = widget.items.length;
+    if ((_focused ?? -1) >= n) {
+      _focused = null;
+    }
+    if ((_held ?? -1) >= n) {
+      _held = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final GlassThemeData theme = GlassTheme.of(context);
     final GlassFinish finish = widget.finish ?? theme.finish;

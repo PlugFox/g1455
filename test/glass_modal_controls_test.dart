@@ -173,8 +173,8 @@ void main() {
       await finger.moveBy(const Offset(0, 8));
       await tester.pump(const Duration(milliseconds: 50));
     }
-    // Moved at all, so the release below is a release of a drag; how far it
-    // moved is the skipped arm's question.
+    // Moved at all, so the release below is a release of a drag; whether it
+    // moved with the finger is the next arm's question.
     expect(tester.getCenter(find.text('sheet body')).dy, greaterThan(rest));
     // Still for a while, so the release carries no velocity.
     await tester.pump(const Duration(milliseconds: 300));
@@ -229,15 +229,165 @@ void main() {
     await finger.up();
     await tester.pumpAndSettle();
   });
+
+  // The route is gone the moment it is popped, but its sheet is still on the
+  // screen sliding out, and a finger already on it still drags it. Its release
+  // past a third used to pop again — and what it popped was the page under it.
+  testWidgets('a sheet popped while a finger drags it does not pop the page under it on release', (
+    WidgetTester tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      _App(
+        navigatorKey: navigator,
+        home: Builder(
+          builder: (BuildContext context) => Center(
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (BuildContext context) => Center(
+                    child: GestureDetector(
+                      onTap: () => showGlassSheet<void>(
+                        context: context,
+                        builder: (_) => const SizedBox(height: 300, child: Center(child: Text('sheet body'))),
+                      ),
+                      child: const Text('page two'),
+                    ),
+                  ),
+                ),
+              ),
+              child: const Text('home'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('home'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('page two'));
+    await tester.pumpAndSettle();
+
+    final TestGesture finger = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+    await finger.moveBy(const Offset(0, 20));
+    await tester.pump();
+    await finger.moveBy(const Offset(0, 150));
+    await tester.pump();
+    navigator.currentState!.pop();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('sheet body'), findsOneWidget, reason: 'the sheet left before the release');
+    final double leaving = tester.getCenter(find.text('sheet body')).dy;
+    await finger.up();
+    await tester.pump(const Duration(milliseconds: 16));
+    // It goes on leaving from where the finger left it, rather than springing
+    // back up on its way out.
+    expect(tester.getCenter(find.text('sheet body')).dy, greaterThanOrEqualTo(leaving));
+    await tester.pumpAndSettle();
+    expect(find.text('sheet body'), findsNothing);
+    expect(find.text('page two'), findsOneWidget, reason: 'the release popped the page under the sheet');
+  });
+
+  testWidgets('a sheet with a route pushed over it while dragged settles back on release, closing neither', (
+    WidgetTester tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      _App(
+        navigatorKey: navigator,
+        home: Builder(
+          builder: (BuildContext context) => Center(
+            child: GestureDetector(
+              onTap: () => showGlassSheet<void>(
+                context: context,
+                builder: (_) => const SizedBox(height: 300, child: Center(child: Text('sheet body'))),
+              ),
+              child: const Text('open sheet'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open sheet'));
+    await tester.pumpAndSettle();
+    final double rest = tester.getCenter(find.text('sheet body')).dy;
+    final TestGesture finger = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+    await finger.moveBy(const Offset(0, 20));
+    await tester.pump();
+    await finger.moveBy(const Offset(0, 150));
+    await tester.pump();
+    // Over the sheet, and leaving the finger's pointer where it was.
+    navigator.currentState!.push<void>(
+      PageRouteBuilder<void>(opaque: false, pageBuilder: (_, _, _) => const IgnorePointer(child: Text('on top'))),
+    );
+    await tester.pump();
+    await finger.up();
+    await tester.pumpAndSettle();
+    expect(find.text('on top'), findsOneWidget, reason: 'the release popped the route over the sheet');
+    expect(find.text('sheet body'), findsOneWidget, reason: 'the sheet closed under a route over it');
+    expect(tester.getCenter(find.text('sheet body')).dy, closeTo(rest, 0.5));
+  });
+
+  // Apple's sheet rises above the keyboard; Material's leaves it to the
+  // content. A sheet that floats at its content's height has nowhere to hide a
+  // focused field but under the keyboard, so it stands on the keyboard's top
+  // instead of the window's bottom — and tells its content there is no inset
+  // left, so content padded for the keyboard the Material way is not padded
+  // twice.
+  testWidgets('a sheet stands above the keyboard, at medium and at large, and its content sees no inset', (
+    WidgetTester tester,
+  ) async {
+    const keyboard = 250.0;
+    final double window = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final insets = <double>[];
+    addTearDown(tester.view.resetViewInsets);
+    for (final GlassSheetDetent detent in GlassSheetDetent.values) {
+      await tester.pumpWidget(
+        _App(
+          home: Builder(
+            builder: (BuildContext context) => Center(
+              child: GestureDetector(
+                onTap: () => showGlassSheet<void>(
+                  context: context,
+                  detents: GlassSheetDetent.values,
+                  initialDetent: detent,
+                  builder: (BuildContext context) {
+                    insets.add(MediaQuery.viewInsetsOf(context).bottom);
+                    return const SizedBox(height: 200, child: Center(child: Text('sheet body')));
+                  },
+                ),
+                child: const Text('open sheet'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open sheet'));
+      await tester.pumpAndSettle();
+      Rect sheet() =>
+          tester.getRect(find.ancestor(of: find.text('sheet body'), matching: find.byType(GlassSurface)).first);
+      final double bottom = detent == GlassSheetDetent.large ? window : window - kGlassSheetInset;
+      expect(sheet().bottom, closeTo(bottom, 0.01), reason: '$detent without a keyboard');
+
+      tester.view.viewInsets = FakeViewPadding(bottom: keyboard * tester.view.devicePixelRatio);
+      await tester.pumpAndSettle();
+      expect(sheet().bottom, closeTo(bottom - keyboard, 0.01), reason: '$detent: the keyboard covers the sheet');
+      expect(insets.last, 0, reason: '$detent: the content was told the inset the sheet already took');
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(sheet().bottom, closeTo(bottom, 0.01), reason: '$detent: the sheet did not come back down');
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
 }
 
 class _App extends StatelessWidget {
-  const _App({required this.home});
+  const _App({required this.home, this.navigatorKey});
 
   final Widget home;
+  final GlobalKey<NavigatorState>? navigatorKey;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    navigatorKey: navigatorKey,
     builder: (BuildContext context, Widget? child) =>
         GlassHost(hardware: GlassHardware.appleMetal, backdrop: const Color(0xFF406080), child: child!),
     home: home,

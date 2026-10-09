@@ -605,6 +605,10 @@ dragged down, and a list inside the sheet does not hand the drag over to the she
 - The content is laid out in a `Flexible` under the grabber. Long content should scroll: a `SingleChildScrollView` works,
   and a `ListView` needs `shrinkWrap: true` or a bounded height. At a large detent the content is given the sheet's
   whole height.
+- The sheet stands on the keyboard, as an iOS sheet does: at medium 8 px above it, at large on it, with the content laid
+  out in the height that is left, so a focused text field in it stays in sight. Unlike `showModalBottomSheet`, there is
+  nothing to add: the content's `MediaQuery.viewInsets` has its bottom taken out, so content already padded by it is
+  not padded twice.
 - The route has no `Material`. Widgets that need one, such as `InkWell` or `ListTile`, need a
   `Material(type: MaterialType.transparency)` around them.
 - `finish` sets the glass of this sheet only. Pass the same finish to `legibility` so the text matches it.
@@ -1238,7 +1242,9 @@ the body sees `MediaQuery.viewInsets` as it is.
 - All three are [lifted](/foundations/above), so glass cards scrolling under them show through.
 - The screen is a `GlassTabBarMinimizer`: a [tab bar](/components/tab-bar) in `bottomBar` with
   `minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown` collapses when the body scrolls down and expands when it
-  scrolls up. Its box keeps its height, so the body's padding does not move. A bar that does not ask is not told.
+  scrolls up. Its box keeps its height, so the body's padding does not move. A bar that does not ask is not told. A
+  body whose lists are nested one deeper, in a `PageView`, a `TabBarView` or a `NestedScrollView`, needs
+  `minimizeNotificationPredicate: (ScrollNotification n) => n.depth == 1`.
 
 ## The host
 
@@ -1353,6 +1359,7 @@ class _LibraryPageState extends State<LibraryPage> {
 | `floatingAction` | `Widget?` | `null` | A control at the end edge above the bottom bar, usually a `GlassButton`, at its own size. Lifted. |
 | `barMargin` | `EdgeInsets` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. |
 | `host` | `bool?` | `null` | Whether to mount a `GlassHost`: null when there is none above, `true` always, `false` never. |
+| `minimizeNotificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which of the body's scroll notifications collapse a tab bar that asks to: the minimizer's `notificationPredicate`. |
 | `key` | `Key?` | `null` | |
 
 `double topExtentFor(EdgeInsets safe)`: the top bar's extent from the top of the screen, which the body is told as its

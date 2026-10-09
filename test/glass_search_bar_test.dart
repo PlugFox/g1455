@@ -127,6 +127,25 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('Cancel turned on while the field has the focus slides in', (WidgetTester tester) async {
+    final focus = FocusNode();
+    addTearDown(focus.dispose);
+    final ComponentScene scene = await ComponentScene.mount(
+      tester,
+      _bar(GlassSearchBar(focusNode: focus, showsCancelButton: false)),
+    );
+    focus.requestFocus();
+    await scene.frames(20);
+    expect(find.text('Cancel'), findsNothing);
+    await scene.pump(_bar(GlassSearchBar(focusNode: focus)));
+    await scene.frames(20);
+    expect(find.text('Cancel').hitTestable(), findsOneWidget, reason: 'Cancel was turned on under the focus');
+    // And off again, under the same focus.
+    await scene.pump(_bar(GlassSearchBar(focusNode: focus, showsCancelButton: false)));
+    await scene.frames(20);
+    expect(find.text('Cancel'), findsNothing);
+  });
+
   testWidgets('one surface; typing and clearing capture nothing; what Cancel\'s slide costs is counted', (
     WidgetTester tester,
   ) async {

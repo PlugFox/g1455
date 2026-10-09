@@ -84,7 +84,7 @@ Compile them before `runApp` and the first frame that has a capture is drawn thr
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GlassHost.precache();
-  runApp(const GlassApp());
+  runApp(const MyApp());
 }
 ```
 
@@ -118,11 +118,11 @@ Future<void> main() async {
   // Compiles the shaders before the first frame, so the first glass on screen
   // is drawn through its optics.
   await GlassHost.precache();
-  runApp(const GlassApp());
+  runApp(const MyApp());
 }
 
-class GlassApp extends StatelessWidget {
-  const GlassApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) => MaterialApp(

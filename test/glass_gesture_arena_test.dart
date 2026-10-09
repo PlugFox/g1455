@@ -13,23 +13,28 @@
 // touch-down, and its negative control is the same scene with the claim
 // turned off (`debugGlassControlsClaimOverride = false`): nothing lifted yet.
 //
-// The second half is where the claim must **not** happen. Under a vertical
-// list, a vertical swipe that starts on a switch is a scroll; a control that
-// claimed every pointer would take it. Its negative control is the claim
-// forced on, under which the list does not move — so the pass is the rule,
-// not a list that scrolls whatever the switch does.
+// The second half is what the claim must **not** take. Under a vertical
+// list, a vertical swipe that starts on a switch is a scroll — and so it is
+// with the claim forced on, because a claim lifts the drop and contends for
+// the horizontal drag but never wins the arena on touch-down. Its negative
+// control is the switch wrapped in an `EagerGestureRecognizer`, which is what
+// a claim that won on touch-down would be: the list does not move — so the
+// pass is the rule, not a list that scrolls whatever the switch does. The same
+// question for a carousel row of a vertical list, where the claim is on by
+// the rule, is `glass_nested_scroll_test.dart`.
 //
 // Breaks, each undone by swapping the string back:
 //  - in `_controlGestures`, `DragStartBehavior.down` -> `DragStartBehavior.start`:
 //    the unclaimed switch's knob loses the 18 px slop;
-//  - in `_GlassSwitchState._dragEnd`, `_commit(_dragFurthest < slop && _claimed
-//    ? !widget.value : _position.value >= 0.5);` -> `_commit(_position.value >=
-//    0.5);`: a claimed tap is a drag of nothing, and toggles nothing.
+//  - in `_GlassSwitchState.build`, `? (_) => _lift.forward() : null` ->
+//    `? null : null`: the claimed drop no longer lifts on touch-down.
 //
 // The segmented control has no drag recognizer of its own — it follows raw
-// pointer events — so its claim is an eager recognizer that only wins, and
-// its arm's negative control is the page moving with the drag unclaimed.
+// pointer events — so it keeps a horizontal drag in the arena that contends
+// only when claimed, and its arm's negative control is the page moving with
+// the drag unclaimed.
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
@@ -120,10 +125,23 @@ void main() {
     }
   });
 
-  testWidgets('under a vertical list a swipe that starts on a switch scrolls the list', (WidgetTester tester) async {
-    final scrolled = <bool?, double>{};
-    for (final bool? override in <bool?>[null, true]) {
-      debugGlassControlsClaimOverride = override;
+  testWidgets('under a vertical list a swipe that starts on a switch scrolls the list, claimed or not', (
+    WidgetTester tester,
+  ) async {
+    final scrolled = <String, double>{};
+    for (final String arm in <String>['rule', 'claimed', 'eager']) {
+      debugGlassControlsClaimOverride = arm == 'claimed' ? true : null;
+      Widget wrap(Widget child) => arm == 'eager'
+          ? RawGestureDetector(
+              gestures: <Type, GestureRecognizerFactory>{
+                EagerGestureRecognizer: GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
+                  EagerGestureRecognizer.new,
+                  (EagerGestureRecognizer _) {},
+                ),
+              },
+              child: child,
+            )
+          : child;
       final controller = ScrollController();
       addTearDown(controller.dispose);
       await tester.pumpWidget(
@@ -131,14 +149,14 @@ void main() {
           // Keyed per arm: a list kept across the two would hand the first
           // arm's offset to the second's controller.
           home: ListView(
-            key: ValueKey<bool?>(override),
+            key: ValueKey<String>(arm),
             controller: controller,
             children: <Widget>[
               for (var i = 0; i < 30; i++)
                 SizedBox(
                   height: 60,
                   child: Center(
-                    child: GlassSwitch(key: ValueKey<int>(i), value: false, onChanged: (_) {}),
+                    child: wrap(GlassSwitch(key: ValueKey<int>(i), value: false, onChanged: (_) {})),
                   ),
                 ),
             ],
@@ -152,12 +170,13 @@ void main() {
       }
       await gesture.up();
       await tester.pumpAndSettle();
-      scrolled[override] = controller.offset;
+      scrolled[arm] = controller.offset;
     }
     // ignore: avoid_print
-    print('list offset after a swipe from a switch: by the rule ${scrolled[null]}, claim forced ${scrolled[true]}');
-    expect(scrolled[true], 0, reason: 'a claiming switch let the list scroll: the arm sees nothing');
-    expect(scrolled[null], greaterThan(50), reason: 'a switch in a vertical list took the swipe');
+    print('list offset after a swipe from a switch: $scrolled');
+    expect(scrolled['eager'], 0, reason: 'an eagerly won switch let the list scroll: the arm sees nothing');
+    expect(scrolled['rule'], greaterThan(50), reason: 'a switch in a vertical list took the swipe');
+    expect(scrolled['claimed'], scrolled['rule'], reason: 'a claiming switch took the swipe');
   });
 
   testWidgets('in a PageView a drag across a segmented control moves the selection and not the page', (
@@ -210,7 +229,10 @@ void main() {
     expect(outcome[null]!.selected, <int>[0], reason: 'claimed, the drag did not select where it was let go');
   });
 
-  testWidgets('under a vertical list a segmented control claims nothing', (WidgetTester tester) async {
+  testWidgets('under a vertical list a swipe from a segmented control scrolls it and selects nothing', (
+    WidgetTester tester,
+  ) async {
+    final selected = <int>[];
     final controller = ScrollController();
     addTearDown(controller.dispose);
     await tester.pumpWidget(
@@ -225,14 +247,18 @@ void main() {
                   key: ValueKey<int>(i),
                   segments: const <Widget>[Text('A'), Text('B')],
                   selectedIndex: 0,
-                  onSelected: (_) {},
+                  onSelected: selected.add,
                 ),
               ),
           ],
         ),
       ),
     );
-    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey<int>(2))));
+    // From the unselected segment, so that a press the scroll did not cancel
+    // selects something.
+    final TestGesture gesture = await tester.startGesture(
+      tester.getCenter(find.descendant(of: find.byKey(const ValueKey<int>(2)), matching: find.text('B'))),
+    );
     for (var i = 0; i < 10; i++) {
       await gesture.moveBy(const Offset(0, -10));
       await tester.pump(const Duration(milliseconds: 16));
@@ -240,6 +266,7 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(controller.offset, greaterThan(50), reason: 'a segmented control in a vertical list took the swipe');
+    expect(selected, isEmpty, reason: 'the swipe the list took selected a segment on the lift');
   });
 }
 

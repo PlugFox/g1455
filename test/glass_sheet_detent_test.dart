@@ -257,6 +257,112 @@ void main() {
     // stand in, not its box.
     expect(atlas[true], greaterThan(0), reason: 'the declared region cost the atlas nothing: $atlas');
   });
+
+  // A tap is not a drag. The sheet's recognizer is the only one under a tap
+  // on its body, so it wins the arena and ends with no velocity; under a tap
+  // on a button inside, it loses and is cancelled. Either used to re-pick the
+  // nearer detent and restart the settle, sending a sheet flicked to large
+  // back to medium.
+  testWidgets('a tap on a settling sheet, on its body or a button in it, leaves the settle alone', (
+    WidgetTester tester,
+  ) async {
+    for (final String target in <String>['sheet body', 'sheet button']) {
+      final detents = <GlassSheetDetent>[];
+      var pressed = 0;
+      final _Rig rig = await _Rig.mount(
+        tester,
+        onDetentChanged: detents.add,
+        content: (BuildContext context) => SizedBox(
+          height: 300,
+          child: Column(
+            children: <Widget>[
+              const Expanded(child: Center(child: Text('sheet body'))),
+              GestureDetector(onTap: () => pressed++, child: const Text('sheet button')),
+            ],
+          ),
+        ),
+      );
+      await rig.open();
+      await tester.fling(find.text('sheet body'), const Offset(0, -60), 1500);
+      await tester.pump();
+      expect(rig.sheet.globalRect.left, greaterThan(0), reason: '$target: the settle was over before the tap');
+      await tester.tap(find.text(target));
+      await tester.pumpAndSettle();
+      expect(rig.sheet.globalRect.left, 0, reason: '$target: the tap sent the sheet back');
+      expect(detents, <GlassSheetDetent>[GlassSheetDetent.large], reason: target);
+      expect(pressed, target == 'sheet button' ? 1 : 0);
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
+  testWidgets('a drag whose pointer is cancelled half way still settles at a detent', (WidgetTester tester) async {
+    final _Rig rig = await _Rig.mount(tester);
+    await rig.open();
+    final double medium = rig.sheet.globalRect.left;
+    final TestGesture finger = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+    await finger.moveBy(const Offset(0, -20));
+    await tester.pump();
+    await finger.moveBy(const Offset(0, -60));
+    await tester.pump();
+    expect(rig.sheet.globalRect.left, inExclusiveRange(0, medium), reason: 'the drag never left medium');
+    await finger.cancel();
+    await tester.pumpAndSettle();
+    expect(rig.sheet.globalRect.left, anyOf(0, medium), reason: 'a cancelled drag left the sheet between detents');
+  });
+
+  // Resting at large, the sheet does not re-measure its content's medium
+  // height on every change — but a drag down from there moves the top by that
+  // height's distance from large, so it must be current when the drag begins.
+  // The content here is as tall as the window when narrow, so at large there is
+  // no distance at all to medium; widened, or shortened, it has 300 px of it.
+  testWidgets('dragged down from large after the content or the window changed, the top follows the finger', (
+    WidgetTester tester,
+  ) async {
+    for (final String change in <String>['window', 'content']) {
+      final tall = ValueNotifier<bool>(true);
+      addTearDown(tall.dispose);
+      final _Rig rig = await _Rig.mount(
+        tester,
+        initialDetent: GlassSheetDetent.large,
+        content: (BuildContext context) => LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) => ValueListenableBuilder<bool>(
+            valueListenable: tall,
+            builder: (BuildContext context, bool tall, Widget? _) => SizedBox(
+              height: tall && constraints.maxWidth < 500 ? 2000 : 300,
+              child: const Center(child: Text('sheet body')),
+            ),
+          ),
+        ),
+      );
+      await rig.open();
+      expect(rig.sheet.globalRect.left, 0);
+      if (change == 'window') {
+        tester.view.physicalSize = const Size(800, 800) * 2;
+      } else {
+        tall.value = false;
+      }
+      await tester.pumpAndSettle();
+      expect(rig.sheet.globalRect.top, closeTo(kGlassSheetInset, 0.01), reason: '$change: not at large');
+
+      final TestGesture finger = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+      await tester.pump();
+      final double start = rig.sheet.globalRect.top;
+      // Past the slop, so the drag is accepted; what it delivers of these 20 px
+      // is the recognizer's business, and is bounded rather than assumed.
+      await finger.moveBy(const Offset(0, 20));
+      await tester.pump();
+      expect(rig.sheet.globalRect.top - start, inInclusiveRange(0, 20.01), reason: '$change: the top jumped');
+      for (final double dy in <double>[30, 30]) {
+        final double before = rig.sheet.globalRect.top;
+        await finger.moveBy(Offset(0, dy));
+        await tester.pump();
+        expect(rig.sheet.globalRect.top - before, closeTo(dy, 0.01), reason: '$change: the top jumped');
+      }
+      await finger.up();
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
 }
 
 class _Cost {
@@ -319,6 +425,7 @@ class _Rig {
     GlassSheetDetent? initialDetent,
     ValueChanged<GlassSheetDetent>? onDetentChanged,
     bool reduceMotion = false,
+    WidgetBuilder? content,
   }) async {
     await tester.pumpWidget(const SizedBox());
     tester.view
@@ -364,9 +471,12 @@ class _Rig {
                     initialDetent: initialDetent,
                     largeFinish: largeFinish,
                     onDetentChanged: onDetentChanged,
-                    builder: (_) => LayoutBuilder(
+                    builder: (BuildContext context) => LayoutBuilder(
                       builder: (BuildContext context, BoxConstraints constraints) {
                         heights.add(constraints.maxHeight);
+                        if (content != null) {
+                          return content(context);
+                        }
                         return SizedBox(
                           height: 300,
                           child: Column(

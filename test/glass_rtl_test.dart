@@ -14,6 +14,12 @@
 //    first segment's label is drawn over the last's;
 //  - in `_CellOverlay._cell`, `(rtl ? count - 1 - i : i)` -> `i`: the held
 //    cell is brightened under the other item.
+//  - in `_StepperPainter.paint`, `final double decrementAt = rtl ? half : 0;`
+//    -> `= 0;` (and `incrementAt` -> `= half;`): the plus is drawn at the
+//    right under rtl, over the half a tap decrements from;
+//  - in `_DotsPainter.paint`, `rtl ? size.width - x - w : x` -> `x`: the first
+//    page's wide dot is at the left; in `_along`, `_rtl ? _geometry.width - x
+//    : x` -> `x`: a tap toward the left goes back.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -22,6 +28,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
+
+import 'component_scene.dart';
 
 const Size kScreen = Size(400, 300);
 
@@ -162,6 +170,126 @@ void main() {
       expect(lift(second), lessThan(5), reason: '$direction: the other item\'s cell brightened');
       await gesture.up();
       await tester.pumpAndSettle();
+    }
+  });
+  testWidgets('a stepper puts minus at the end: its glyphs, its taps and its held light agree', (
+    WidgetTester tester,
+  ) async {
+    for (final TextDirection direction in TextDirection.values) {
+      final steps = <double>[];
+      var value = 5.0;
+      final ComponentScene scene = await ComponentScene.mount(
+        tester,
+        StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) => GlassStepper(
+            value: value,
+            onChanged: (double v) {
+              steps.add(v);
+              setState(() => value = v);
+            },
+          ),
+        ),
+        textDirection: direction,
+      );
+      final Offset centre = tester.getCenter(find.byType(GlassStepper));
+      final Offset left = centre - Offset(kGlassStepperSize.width / 4, 0);
+      final Offset right = centre + Offset(kGlassStepperSize.width / 4, 0);
+      // The plus has a vertical stroke 5 px above its centre and the minus
+      // has none: ink there against the glass 12 px aside, past both arms.
+      final Uint8List rest = await scene.pixels();
+      double stroke(Offset at) =>
+          (meanAt(rest, at - const Offset(0, 5), side: 1) - meanAt(rest, at - const Offset(12, 5), side: 1)).abs();
+      final double leftInk = stroke(left);
+      final double rightInk = stroke(right);
+      // ignore: avoid_print
+      print('$direction: vertical stroke left $leftInk, right $rightInk');
+      expect((leftInk - rightInk).abs(), greaterThan(20), reason: '$direction: no half carries the plus\'s stroke');
+      final bool plusRight = rightInk > leftInk;
+      expect(plusRight, direction == TextDirection.ltr, reason: '$direction: the plus is drawn on the wrong side');
+      final Offset minus = plusRight ? left : right;
+      final Offset plus = plusRight ? right : left;
+
+      // Held, the minus glyph's half is the one lit — off the glyph, at its
+      // outer quarter.
+      final Offset minusOuter = centre + (minus - centre) * 1.5;
+      final Offset plusOuter = centre + (plus - centre) * 1.5;
+      final TestGesture finger = await tester.startGesture(minus);
+      await tester.pump();
+      final Uint8List held = await scene.pixels();
+      await finger.up();
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        meanAt(held, minusOuter) - meanAt(rest, minusOuter),
+        greaterThan(20),
+        reason: '$direction: the held minus half is not lit',
+      );
+      expect(meanAt(held, plusOuter), meanAt(rest, plusOuter), reason: '$direction: the plus half lit');
+      expect(steps, <double>[4], reason: '$direction: pressing the minus glyph did not decrement');
+
+      await tester.tapAt(plus);
+      await tester.pump();
+      expect(steps, <double>[4, 5], reason: '$direction: tapping the plus glyph did not increment');
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
+  testWidgets('a page control runs from the right: its current dot, a tap toward a side, a scrub', (
+    WidgetTester tester,
+  ) async {
+    for (final TextDirection direction in TextDirection.values) {
+      final rtl = direction == TextDirection.rtl;
+      final pages = <int>[];
+      var page = 0;
+      final ComponentScene scene = await ComponentScene.mount(
+        tester,
+        StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) => GlassPageControl(
+            count: 5,
+            currentPage: page,
+            onPageChanged: (int p) {
+              pages.add(p);
+              setState(() => page = p);
+            },
+          ),
+        ),
+        textDirection: direction,
+      );
+      final Rect box = tester.getRect(find.byType(GlassSurface));
+      // The first page's dot is the wide one, 10…30 px from the capsule's
+      // start; 22 px from its end is the gap between the last two round dots.
+      // So 22 px in is ink at the start and glass at the end — and the other
+      // way round on dots that were not mirrored.
+      final Uint8List px = await scene.pixels();
+      double ink(double x) =>
+          (meanAt(px, Offset(x, box.center.dy), side: 1) - meanAt(px, Offset(x, box.top + 3), side: 1)).abs();
+      final double startEdge = rtl ? box.right - 22 : box.left + 22;
+      final double endEdge = rtl ? box.left + 22 : box.right - 22;
+      // ignore: avoid_print
+      print('$direction: ink at the start dot\'s edge ${ink(startEdge)}, at the end dot\'s ${ink(endEdge)}');
+      expect(ink(startEdge) - ink(endEdge), greaterThan(20), reason: '$direction: the current dot is not at the start');
+
+      // A tap toward the end goes on one; toward the start, back one.
+      final Offset towardEnd = rtl ? box.centerLeft + const Offset(4, 0) : box.centerRight - const Offset(4, 0);
+      final Offset towardStart = rtl ? box.centerRight - const Offset(4, 0) : box.centerLeft + const Offset(4, 0);
+      await tester.tapAt(towardEnd);
+      await scene.frames(30);
+      expect(pages, <int>[1], reason: '$direction: a tap toward the end did not go on one');
+      await tester.tapAt(towardStart);
+      await scene.frames(30);
+      expect(pages, <int>[1, 0], reason: '$direction: a tap toward the start did not go back one');
+
+      // A scrub from the first dot toward the end asks for each page.
+      pages.clear();
+      final Offset start = Offset(rtl ? box.right - 20 : box.left + 20, box.center.dy);
+      final TestGesture finger = await tester.startGesture(start);
+      for (var i = 1; i <= 20; i++) {
+        await finger.moveTo(start + Offset((rtl ? -1 : 1) * (box.width - 20) * i / 20, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await finger.up();
+      await scene.frames(30);
+      expect(pages, <int>[1, 2, 3, 4], reason: '$direction: a scrub toward the end did not walk the pages');
+      await tester.pumpWidget(const SizedBox());
     }
   });
 }

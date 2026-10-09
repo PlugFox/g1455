@@ -64,8 +64,8 @@ The switch is never smaller than 44 px tall, so it stays easy to hit.
   drawn around the track behind a boundary of its own; on a switch that sits under other glass, showing or hiding it is
   one capture.
 - Under a right-to-left `Directionality` it is mirrored: on is at the left.
-- The knob is dragged from touch-down, and inside a horizontal `PageView` the switch claims the drag, so the page does
-  not turn under it. In a vertical list a swipe that starts on the switch still scrolls the list.
+- The knob is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves the switch and
+  not the page, and a vertical swipe that starts on the switch still scrolls the vertical list around it.
 
 ## The drop
 

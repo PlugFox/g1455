@@ -66,8 +66,8 @@ Rounding the value yourself in `onChanged` instead leaves the knob between the s
   the knob, inside the drop's glass, so focusing it costs nothing.
 - Under a right-to-left `Directionality` it is mirrored: 0 is at the right, the fill grows leftward, and the left
   arrow increases.
-- The knob is dragged from touch-down, and inside a horizontal `PageView` the slider claims the drag, so the page does
-  not turn under it. In a vertical list a swipe that starts on the slider still scrolls the list.
+- The knob is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves the slider and
+  not the page, and a vertical swipe that starts on the slider still scrolls the vertical list around it.
 ## Accessibility
 
 Give every slider a `semanticLabel` ("Volume", "Brightness"). `semanticStep` (default 0.1) is how far

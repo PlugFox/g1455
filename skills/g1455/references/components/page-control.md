@@ -62,6 +62,10 @@ the price of glass over a moving page, not of the control. The count under the d
 A screen reader hears one adjustable control, "Page 2 of 5" by default, and turns the page with increase and decrease.
 `semanticLabel` names what the pages are; `semanticFormatterCallback` says the page your way.
 
+A focused page control turns the page with the arrow keys; a control with no `onPageChanged` and no `controller` is a
+display and takes no focus. Under a right-to-left `Directionality` the first page's dot is at the right, and taps, drags
+and the left and right arrows follow it. When `count` shrinks below the current page, the control shows the last page.
+
 ## Complete example
 
 ```dart
@@ -135,6 +139,8 @@ class _OnboardingState extends State<Onboarding> {
 | `finish` | `GlassFinish?` | `null` | The glass. Null takes the theme's. |
 | `semanticLabel` | `String?` | `null` | What a screen reader says the control is for. |
 | `semanticFormatterCallback` | `String Function(int page, int count)?` | `null` | How a screen reader says the page, from 0, of `count`. Null says "Page 2 of 5". |
+| `focusNode` | `FocusNode?` | `null` | The page control's focus. Null makes one the page control owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the page control is built. |
 | `key` | `Key?` | `null` | |
 
 ### Constants

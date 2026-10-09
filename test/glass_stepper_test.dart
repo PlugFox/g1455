@@ -158,6 +158,9 @@ void main() {
         isEnabled: true,
         hasIncreaseAction: true,
         hasDecreaseAction: true,
+        // The keyboard's: focusable while enabled.
+        isFocusable: true,
+        hasFocusAction: true,
       ),
     );
     tester.semantics.increase(find.semantics.byLabel('Copies'));
@@ -172,6 +175,8 @@ void main() {
         hasEnabledState: true,
         isEnabled: true,
         hasDecreaseAction: true,
+        isFocusable: true,
+        hasFocusAction: true,
       ),
       reason: 'increase is offered at max',
     );

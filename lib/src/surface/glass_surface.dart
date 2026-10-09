@@ -663,8 +663,21 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   ///
   /// Glass over a declared backdrop draws no proxy either — it samples the
   /// declaration — so it is ordinary content too, for the same two machines.
+  ///
+  /// A fused member asks its group: the group draws its glass, from whatever
+  /// the group samples, and a member that answered from a declaration of its
+  /// own — one between the group and the member, or a `GlassBackdrop.live`
+  /// there — would disagree with the draw it is part of. Kept in when the
+  /// group captures, it would be in its own capture; kept out when the group
+  /// is ordinary content, what it holds would be missing from its neighbours'.
   @override
-  bool get excludedFromProxy => effectiveTier.readsBackdrop && !readsDeclaredBackdrop;
+  bool get excludedFromProxy {
+    final GlassBlendGroup? group = _group;
+    if (group != null && group.fuses) {
+      return group.excludedFromProxy;
+    }
+    return effectiveTier.readsBackdrop && !readsDeclaredBackdrop;
+  }
 
   /// Repaints for a new proxy — and only if this surface is going to read it.
   ///
@@ -1042,6 +1055,10 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// test this with a panel that holds content.
   @override
   void paint(PaintingContext context, Offset offset) {
+    if (context is! ProxyWalkContext && (fusedByGroup || _materialize <= 0 || !effectiveTier.readsBackdrop)) {
+      // No draw layer goes into this frame, so nothing samples a texture.
+      _heldTexture.release();
+    }
     if (fusedByGroup) {
       if (context is! ProxyWalkContext) {
         paintsDeferredToGroup++;
@@ -1077,9 +1094,13 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     }
     final GlassSampleSource? source = _source;
     if (source == null || source.slotForKey(this) == null) {
+      _heldTexture.release();
       paintsWithoutProxy++;
       return;
     }
+    // Held by the draw, so a declaration's cache turning over cannot take it
+    // from under the layer below; see `DeclaredTextureHold`.
+    _heldTexture.hold(source);
     paintsWithProxy++;
     if (source is! GlassProxyFrame) {
       paintsWithDeclaredBackdrop++;
@@ -1105,8 +1126,9 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
         // would sample a released texture. Only reachable by compositing a
         // moved surface without painting it first, which `drawFrame` never
         // does — it paints the publish before it composites. A declared
-        // texture is replaced the same way, when its box is resized.
-        if (!identical(_source, source)) {
+        // texture is not asked for again here: it is held, and asking would
+        // render one during compositing whenever the cache had let it go.
+        if (source is GlassProxyFrame && !identical(_proxy?.frameFor(this), source)) {
           return;
         }
         // The slot read here rather than at paint: a declared backdrop can
@@ -1125,6 +1147,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   }
 
   final LayerHandle<GlassDrawLayer> _drawLayer = LayerHandle<GlassDrawLayer>();
+  final DeclaredTextureHold _heldTexture = DeclaredTextureHold();
 
   /// The layer this surface's own glass is drawn into, or null before it has
   /// drawn any. Read by the host's layer watch when glass stands on this one:
@@ -1531,6 +1554,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   @override
   void dispose() {
     _drawLayer.layer = null;
+    _heldTexture.release();
     _contentLayer.layer = null;
     _ledger?.unregister(this);
     _group?.leave(this);

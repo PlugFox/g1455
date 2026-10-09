@@ -3,7 +3,10 @@
 A minor version rather than a patch: new components, new parameters on the
 sheet, the tab bar and the controls, and a declared backdrop. Existing code
 builds unchanged; the one layout change is in the ripple shader's uniforms
-(see Performance).
+(see Performance). Three defaults behave differently: a pressed `GlassButton`
+swells (`GlassPress.none` turns it off), a sheet stands on the keyboard
+instead of under it, and a switch, slider or segmented control inside a
+horizontal scrollable takes a horizontal drag from the page.
 
 A backdrop the application declares:
 
@@ -21,10 +24,16 @@ A backdrop the application declares:
   back to the capture, so a page can declare its wallpaper and still let the
   bar over its list refract the list. The widget paints what it declares under
   its child unless `paintBackdrop: false`, and an image that has not loaded
-  leaves the glass on the capture until it has.
+  leaves the glass on the capture until it has; so does a replaced image,
+  with the old one still painted until the new one arrives.
 - Glass over a declared backdrop is ordinary content for the capture of other
   glass, as a cheap surface is: a captured bar over declared cards shows them.
-  Fused groups sample the declaration too. Adaptive glass does not read a
+  Fused groups sample the declaration too, and a fused member is left out of
+  the capture exactly when its group is, whatever `GlassBackdrop` sits between
+  them. A draw holds the texture it was recorded with, so glass that moves
+  without repainting keeps drawing while other glass under the same
+  declaration asks for new blurs, and no texture is made while a frame is
+  composited. Adaptive glass does not read a
   declared backdrop yet, and falls back to its declarations.
 - `RenderGlassSurface.paintsWithDeclaredBackdrop`,
   `RenderGlassGroup.paintsWithDeclaredBackdrop`,
@@ -41,12 +50,14 @@ Components:
   (100 ms), and the half that would pass a limit is disabled unless `wraps`.
   One surface: a press, the repeat and a glyph dimming are drawn inside the
   glass and are no capture. A screen reader hears one adjustable control.
+  Under right to left it is mirrored, with the minus at the end.
 - `GlassPageControl`: page dots on a glass capsule, as `UIPageControl` on its
   platter. It follows a `PageController` without a build and turns it; a tap
   moves one page toward the side tapped, as iOS's does, and a drag scrubs.
   One surface. A `PageView` beside it is retaken while it scrolls (43 captures
   a swipe in the package's tests), which belongs to the view: the same 43 with
-  dots that stay put.
+  dots that stay put. Under right to left the first dot is at the right, and
+  a `count` that shrinks below the current page clamps it.
 - `GlassSearchBar`: the glass search field with a clear button while there is
   text, and a Cancel that slides in while it has the focus. One surface, the
   field's; typing and the clear button are no capture. Cancel's slide narrows
@@ -68,7 +79,8 @@ iOS 26 behaviours:
   onDetentChanged:)` with `GlassSheetDetent.medium` (the content's height, as
   before; Apple's is half the window) and `GlassSheetDetent.large` (the whole
   height below the top safe area less 8, edge to edge). A drag between them
-  follows the finger and settles at the nearer, or where a flick was heading.
+  follows the finger and settles at the nearer, or where a flick was heading;
+  a tap on a settling sheet, or on a button in it, leaves the settle alone.
 - A large sheet is `largeFinish`, by default the finish with its tint at full
   alpha. Once it is all the way up it is drawn on `GlassTier.cheap` and reads
   no backdrop: headless, with a glass bar under it, one surface of two
@@ -83,7 +95,11 @@ iOS 26 behaviours:
   the scroll view and the bar; `GlassScaffold` is one. The collapse moves
   inside a declared travel region: no record over 60 frames, against 60
   without the declaration. Collapsed, a screen reader hears one button named
-  for the selected tab.
+  for the selected tab. `GlassTabBarMinimizer.notificationPredicate` (and
+  `GlassScaffold.minimizeNotificationPredicate`) lets a list one level down,
+  in a `PageView`, `TabBarView` or `NestedScrollView`, collapse it, and the
+  direction is read on the screen, so a `reverse: true` list collapses it as
+  any list does.
 - `GlassTabBar.bottomAccessory`: a glass capsule `kGlassTabAccessoryHeight`
   (48) tall above the bar, which moves down beside the collapsed circle. The
   bar's box keeps its height, so the body is not laid out again for it.
@@ -106,19 +122,22 @@ Interaction:
 - `GlassSlider.divisions`: every input, a drag, a tap, a key or a screen
   reader, lands on a stop, and `onChanged` is called only when the stop
   changes.
-- The switch, the slider and the segmented control drag from touch-down and
-  claim the pointer inside a horizontal scrollable such as a `PageView`; in a
-  vertical list a swipe that starts on them still scrolls the list.
-- The keyboard: the button, switch, slider, segmented control and toolbar
-  cells take the focus (`focusNode`, `autofocus`); Space and Enter activate,
-  and the arrows step the slider and the segmented control. The ring
+- The switch, the slider and the segmented control drag from touch-down.
+  Inside a horizontal scrollable such as a `PageView` a horizontal drag that
+  starts on them moves the control and not the page, and a vertical swipe
+  still scrolls the vertical list around them, a carousel row's included.
+- The keyboard: the button, switch, slider, segmented control, stepper, page
+  control and toolbar cells take the focus (`focusNode`, `autofocus`); Space
+  and Enter activate, and the arrows step the slider, the segmented control,
+  the stepper and the page control. The ring
   (`kGlassFocusRingColor`, `kGlassFocusRingWidth`, `kGlassFocusRingGap`) is
   drawn inside the glass's own subtree, which no capture sees; a switch's or a
   segmented control's ring under other glass costs one capture as the focus
   changes.
 - Right to left: the switch is on at the left, the slider fills from the
   right, the segmented control's first segment is at the right, the toolbar's
-  first item is at the right, and the arrow keys follow.
+  first item is at the right, the stepper's minus and the page control's first
+  dot are at the right, and the arrow keys follow.
   `SliderGeometry.fillEnd` takes a `textDirection`.
 - `GlassConcentric`: Apple's concentric corners as arithmetic, a shape's
   radius as its container's less the inset, with a floor. The segmented
@@ -131,6 +150,20 @@ Fixes:
   moves it declares where it travels: one retake a drag instead of 16.
 - Under right to left, the segmented control's capsule sat under the wrong
   label, and `GlassButtonGroup` brightened the wrong cell.
+- A sheet stands on the keyboard, as an iOS sheet does: 8 px above it at
+  medium, on it at large. Its content sees no bottom `viewInsets`, so content
+  already padded by them is not padded twice.
+- A sheet popped while a finger drags it no longer pops the page under it when
+  the finger lifts, and a drag down from large after the content or the window
+  changed no longer jumps.
+- `GlassSlider` sends one `onChangeStart` before its changes and one
+  `onChangeEnd` after, carrying the last value it sent, for a tap, a hold, a
+  drag, a cancelled pointer and a slider disabled mid-gesture: a tap used to
+  end before it started, and a hold then a drag started twice.
+- A segmented control in a vertical list no longer selects a segment after the
+  list scrolled away under the finger.
+- `GlassButtonGroup` threw, or kept its ring on a cell that was gone, when the
+  focused or held item was removed.
 
 Performance:
 
@@ -140,7 +173,9 @@ Performance:
   byte-identical; the raster thread spends 0.9 to 1.4 µs less a surface draw
   and 1.0 to 1.8 µs less a group draw, on macOS under Impeller/Metal. The ripple's
   `count`, `reach` and `light` moved after its arrays, which matters only to
-  code that writes the uniforms by hand.
+  code that writes the uniforms by hand. Every `flutter test` run checks the
+  lane order against an unpacked copy of each shader, with a lane swap as the
+  control that it fails.
 
 Platforms:
 

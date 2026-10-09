@@ -57,7 +57,10 @@ const int _kMaxDivisor = 4;
 ///
 /// A screen wears one to three finishes; a surface materializing animates its
 /// sigma, and each frame of that asks for a texture no other frame will, so
-/// the oldest go first.
+/// the oldest go first. Leaving the cache does not release a texture a glass
+/// is still drawn with: that draw holds it ([DeclaredTextureHold]) until it
+/// is painted again, so the textures alive are at most these and one per
+/// glass.
 const int _kKeptTextures = 4;
 
 /// What a [GlassBackdrop] declared, as the surfaces below it read it.
@@ -130,12 +133,12 @@ class GlassBackdropDeclaration extends ChangeNotifier {
       _textures[key] = kept;
       return kept;
     }
-    kept?.dispose();
+    kept?._release();
     final _DeclaredTexture made = _solid != null ? _renderSolid(_solid!) : _render(_painter!, size, sigmaLogical);
     _renders++;
     _textures[key] = made;
     while (_textures.length > _kKeptTextures) {
-      _textures.remove(_textures.keys.first)!.dispose();
+      _textures.remove(_textures.keys.first)!._release();
     }
     return made;
   }
@@ -226,7 +229,7 @@ class GlassBackdropDeclaration extends ChangeNotifier {
 
   void _invalidate() {
     for (final _DeclaredTexture texture in _textures.values) {
-      texture.dispose();
+      texture._release();
     }
     _textures.clear();
     if (!_disposed) {
@@ -250,11 +253,48 @@ class GlassBackdropDeclaration extends ChangeNotifier {
 GlassSampleSource? declaredTextureFor(GlassBackdropDeclaration declaration, double sigmaLogical) =>
     declaration._textureFor(sigmaLogical);
 
+/// Keeps alive the declared texture a glass draw was recorded with.
+///
+/// A glass's draw is recorded again at composite time when the glass moved
+/// without being painted, and it has to draw from the texture it was painted
+/// with: asking the declaration again then could find it evicted — a surface
+/// materializing nearby asks for a new blur step every frame — and would
+/// render a new one in the middle of compositing. So the texture is held by
+/// the draw rather than looked up, and the declaration's cache only decides
+/// what is kept for the *next* paint. One per glass; released when the glass
+/// paints from something else and when it is disposed.
+final class DeclaredTextureHold {
+  _DeclaredTexture? _texture;
+
+  /// Holds [source] if it is a declared texture, and lets go of the one held
+  /// before. A captured frame is the pipeline's to dispose and is not held.
+  void hold(GlassSampleSource? source) {
+    final _DeclaredTexture? next = source is _DeclaredTexture ? source : null;
+    if (identical(next, _texture)) {
+      return;
+    }
+    next?._retain();
+    _texture?._release();
+    _texture = next;
+  }
+
+  /// Lets go of the texture held, if any.
+  void release() => hold(null);
+}
+
 /// One rendered texture of a declaration, and the slot that maps the screen
 /// into it — computed when asked, because the backdrop may have moved since
 /// the texture was made and the texture does not care.
+///
+/// Counted, not owned: the declaration's cache holds it once, and every glass
+/// draw recorded with it once more ([DeclaredTextureHold]); the image goes
+/// when the last of those lets go.
 class _DeclaredTexture implements GlassSampleSource {
-  _DeclaredTexture(this._owner, this.image, this.size, this.devicePixelRatio, this.ratio);
+  _DeclaredTexture(this._owner, this.image, this.size, this.devicePixelRatio, this.ratio) {
+    _alive++;
+  }
+
+  int _holds = 1;
 
   final GlassBackdropDeclaration _owner;
 
@@ -307,8 +347,26 @@ class _DeclaredTexture implements GlassSampleSource {
     );
   }
 
-  void dispose() => image.dispose();
+  void _retain() {
+    assert(_holds > 0, 'a released declared texture was held again');
+    _holds++;
+  }
+
+  void _release() {
+    assert(_holds > 0);
+    if (--_holds == 0) {
+      _alive--;
+      image.dispose();
+    }
+  }
 }
+
+int _alive = 0;
+
+/// How many declared textures exist, across every declaration: what a test
+/// reads to see that none outlives both its declaration and its glass.
+@visibleForTesting
+int get debugDeclaredTexturesAlive => _alive;
 
 /// Declares what is behind the glass in [child], so that glass samples the
 /// declaration instead of a capture of the screen.
@@ -398,7 +456,9 @@ class GlassBackdrop extends StatefulWidget {
   /// A backdrop of [image], placed in this widget's box by [fit] and
   /// [alignment] as `DecorationImage` places one.
   ///
-  /// Until the image has loaded the glass below captures the screen.
+  /// Until the image has loaded the glass below captures the screen. So it
+  /// does when [image] is replaced, until the new one has loaded; the old one
+  /// stays painted under [child] meanwhile.
   const GlassBackdrop.image(
     ImageProvider this.image, {
     super.key,
@@ -498,6 +558,10 @@ class _GlassBackdropState extends State<GlassBackdrop> {
   ImageInfo? _info;
   ImageStreamListener? _listener;
 
+  /// Whether [_info] is the image of the provider in force, rather than the
+  /// one it replaced and that is still painted while the new one loads.
+  bool _loaded = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -524,9 +588,17 @@ class _GlassBackdropState extends State<GlassBackdrop> {
       return;
     }
     _stopListening();
+    // Until the new image arrives the glass captures, as it does before the
+    // first one: declaring the old image would be a declaration of something
+    // no longer asked for. The old image stays painted under the child
+    // meanwhile, so the screen does not flash, and the capture shows it.
+    _loaded = false;
     _stream = stream;
     _listener = ImageStreamListener(
-      (ImageInfo info, bool _) => setState(() => _setInfo(info)),
+      (ImageInfo info, bool _) => setState(() {
+        _setInfo(info);
+        _loaded = true;
+      }),
       onError: (Object error, StackTrace? stack) {
         FlutterError.reportError(
           FlutterErrorDetails(
@@ -560,7 +632,16 @@ class _GlassBackdropState extends State<GlassBackdrop> {
     _listener = null;
   }
 
-  /// What the declaration paints, from the widget and whatever has loaded.
+  /// What the declaration samples: [_painter], except while a new image is
+  /// still loading.
+  GlassProxyPainter? get _declared {
+    if (widget.image != null && widget.texture == null && !_loaded) {
+      return null;
+    }
+    return _painter;
+  }
+
+  /// What is painted under the child, from the widget and whatever has loaded.
   GlassProxyPainter? get _painter {
     final ui.Image? image = widget.texture ?? _info?.image;
     if (image != null) {
@@ -574,7 +655,7 @@ class _GlassBackdropState extends State<GlassBackdrop> {
 
   void _sync() {
     _declaration._update(
-      painter: widget._live ? null : _painter,
+      painter: widget._live ? null : _declared,
       solid: widget._live ? null : widget.color,
       devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? View.maybeOf(context)?.devicePixelRatio ?? 1,
     );
