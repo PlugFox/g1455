@@ -123,6 +123,7 @@ export 'src/surface/glass_modal.dart'
         GlassMenuController,
         GlassMenuItem,
         GlassPopoverAnchor,
+        GlassSheetDetent,
         kGlassAlertRadius,
         kGlassAlertWidth,
         kGlassMenuRadius,
@@ -134,7 +135,17 @@ export 'src/surface/glass_modal.dart'
         showGlassDialog,
         showGlassSheet;
 export 'src/surface/glass_tab_bar.dart'
-    show GlassTabBar, GlassTabItem, GlassTabItemBuilder, GlassTabItemLook, kGlassTabDropGrow, kGlassTabDropZoom;
+    show
+        GlassTabBar,
+        GlassTabBarMinimizeBehavior,
+        GlassTabBarMinimizer,
+        GlassTabItem,
+        GlassTabItemBuilder,
+        GlassTabItemLook,
+        kGlassTabAccessoryHeight,
+        kGlassTabDropGrow,
+        kGlassTabDropZoom,
+        kGlassTabMinimizeScroll;
 export 'src/surface/glass_text_field.dart' show GlassTextField, kGlassFieldHeight;
 export 'src/surface/glass_toolbar.dart'
     show GlassButtonGroup, GlassToolbarItem, kGlassToolbarHeight, kGlassToolbarItemWidth;
