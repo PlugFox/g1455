@@ -3,8 +3,8 @@
 // `flutter test test/proxy_walk_layers_test.dart`
 //
 // `ProxyWalkContext` flattens layers onto one canvas, and every flattening is a
-// re-implementation of what the engine does at composite time. The corpus
-// reaches the common routes; this file reaches the rest by name, because a route
+// re-implementation of what the engine does at composite time. Ordinary scenes
+// reach the common routes; this file reaches the rest by name, because a route
 // that no scene happens to use is a route nobody has compared:
 //
 //  1. **Every route the pass claims to reproduce, reproduces.** Each arm is a

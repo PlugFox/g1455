@@ -1,4 +1,4 @@
-// The ripple (D229): a viscous wave from where the glass was touched.
+// The ripple: a viscous wave from where the glass was touched.
 //
 // `flutter test test/glass_ripple_test.dart`
 //

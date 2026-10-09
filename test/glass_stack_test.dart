@@ -1,6 +1,6 @@
 // Glass on glass — a lens on a tab bar, a drop on a card.
 //
-// `flutter test test/glass/glass_stack_test.dart`
+// `flutter test test/glass_stack_test.dart`
 //
 // The capture skips every glass subtree (the self-capture rule), so a glass
 // written inside another one used to sample the screen *under both*: the bar's
@@ -23,8 +23,8 @@
 //    the lens is held over;
 //  - the same swap fails the resized arm: a bar resized inside its declared
 //    travel changes no capture rect, and what sees it is the watch over the
-//    bar's content. (Watching the bar's actual rect as well was tried and
-//    broke nothing when removed, D218.)
+//    bar's content. (Watching the bar's actual rect as well breaks nothing
+//    when removed, so the package does not.)
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;

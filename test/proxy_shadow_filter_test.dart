@@ -1,4 +1,4 @@
-// The canvas half of the shadow policy (D31): `FilteringCanvas` drops the draws a
+// The canvas half of the shadow policy: `FilteringCanvas` drops the draws a
 // `ShadowFilter` names and forwards everything else unchanged.
 //
 // `flutter test test/proxy_shadow_filter_test.dart`

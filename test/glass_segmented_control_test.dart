@@ -1,5 +1,5 @@
 // The segmented control: a selection that lifts into a clear drop over a track
-// that is not glass (spike 32), and what that costs the capture.
+// that is not glass, and what that costs the capture.
 //
 // `flutter test test/glass_segmented_control_test.dart`
 //
@@ -23,7 +23,7 @@ import 'package:g1455/src/proxy/proxy_pipeline.dart' show GlassProxyFrame;
 
 const Size kScreen = Size(400, 300);
 
-/// The control's box: 360 wide, as spike 32's was.
+/// The control's box: 360 wide, as the iOS reference's was.
 const Rect kControl = Rect.fromLTWH(20, 128, 360, 44);
 
 /// Segment [i]'s centre on the screen: 2 in from the ends, four segments.
@@ -53,7 +53,7 @@ void main() {
     final GlassProxyHandle handle = _handle(tester);
     expect(handle.frame!.keys, <Object>[drop]);
     expect(handle.upper.whereType<GlassProxyFrame>(), isEmpty, reason: 'a drop over a plain track was stacked');
-    // Spike 32: 86 x 28 at rest on a pitch of 89, 110 x 44 held.
+    // iOS's: 86 x 28 at rest on a pitch of 89, 110 x 44 held.
     expect(drop.size.width, closeTo((360 - 4) / 4 - 3 + 2 * kGlassSegmentDropGrow.width, 0.05));
     expect(drop.size.height, closeTo(28 + 2 * kGlassSegmentDropGrow.height, 0.05));
 

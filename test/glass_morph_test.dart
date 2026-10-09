@@ -1,7 +1,7 @@
 // Glass appearing and leaving inside a blend group: `presence`, and why it is
 // a field offset rather than a size.
 //
-// `flutter test test/glass/glass_morph_test.dart`
+// `flutter test test/glass_morph_test.dart`
 //
 // Every arm is a tinted identity at dpr 1: no refraction and no blur, so the
 // backdrop reads straight through, and a tint so that *where* the glass is

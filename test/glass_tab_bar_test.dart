@@ -1,7 +1,7 @@
 // The tab bar: a selection that lifts into a clear drop over the bar's own
-// glass — glass on glass — and what that costs the capture (D218).
+// glass — glass on glass — and what that costs the capture.
 //
-// `flutter test test/glass/glass_tab_bar_test.dart`
+// `flutter test test/glass_tab_bar_test.dart`
 //
 // Breaks, each undone by swapping the string back:
 //  - in `_GlassTabBarState._onUp`, `: _pressed;` -> `: _at.value.round();`: a
@@ -15,9 +15,9 @@
 //
 // The mechanisms the cost arms lean on — the drop as a level of its own, and
 // the watch over what the bar bears — are `GlassHost`'s, and their breaks are
-// in `glass_stack_test.dart`. Two of this file's own were tried and broke
-// nothing, and were removed rather than kept (D218): a repaint boundary around
-// the drop's stage, and watching where the bar actually is.
+// in `glass_stack_test.dart`. Two mechanisms that look necessary are not, and
+// the package has neither: a repaint boundary around the drop's stage, and
+// watching where the bar actually is — removing either broke nothing.
 
 import 'dart:math' as math;
 import 'dart:ui' show Tristate;

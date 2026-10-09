@@ -2,9 +2,9 @@
 //
 // `flutter test test/glass_above_test.dart`
 //
-// Levels are counted by the tree (D214), so a bar beside the cards it covers
-// was one level with them, and the capture — which skips every glass subtree —
-// showed the page with the cards cut out. A lifted bar is a level above them,
+// Levels are counted by the tree, so a bar beside the cards it covers is one
+// level with them, and the capture — which skips every glass subtree —
+// shows the page with the cards cut out. A lifted bar is a level above them,
 // and its walk draws them through their own frames.
 //
 // The arm is the identity once more: an identity bar lifted over a tinted card

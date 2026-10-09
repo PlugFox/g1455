@@ -1,13 +1,12 @@
-// `.regular` is two materials, and the host picks the one the screen is on
-// (D230).
+// `.regular` is two materials, and the host picks the one the screen is on.
 //
 // `flutter test test/glass_regular_test.dart`
 //
 //  1. **The constants are the run's.** `provenance/regular/` is the digest of
-//     S4's rig in either appearance and of eight flat greys under a bar-sized
-//     capsule. The dark fit has to land on [GlassFinish.regularDark] — S4's
-//     own, from an iPad — which is what says the simulator reads this
-//     material; `.clear` reading the same in both appearances is what says the
+//     the native reference rig (Apple's own glass) in either appearance and of
+//     eight flat greys under a bar-sized capsule. The dark fit has to land on
+//     [GlassFinish.regularDark] — the reference's own, from an iPad — which
+//     is what says the simulator reads this material; `.clear` reading the same in both appearances is what says the
 //     appearance reached the native side and moved nothing it should not.
 //  2. **The choice.** Against the appearance alone, and against a declared
 //     backdrop on each side of each threshold.
@@ -77,11 +76,11 @@ void main() {
   // 1. The constants are the run's.
   // -------------------------------------------------------------------------
 
-  test('the dark fit is S4\'s, so the simulator reads this material', () {
+  test('the dark fit is the reference\'s, so the simulator reads this material', () {
     final fit = s4Fit('dark', 'regular');
     const GlassFinish dark = GlassFinish.regularDark;
     expect(fit.slope, closeTo(1 - dark.tint.a, 0.003));
-    expect(fit.intercept / (1 - fit.slope), closeTo(255 * dark.tint.r, 2), reason: 'the tint is not S4\'s');
+    expect(fit.intercept / (1 - fit.slope), closeTo(255 * dark.tint.r, 2), reason: 'the tint is not the reference\'s');
   });
 
   test('the light branch is the light fit, and the law describes it as well as the dark', () {

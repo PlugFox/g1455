@@ -1,15 +1,14 @@
 // Two finishes on one screen: each surface blurred by its own.
 //
-// `flutter test test/glass/glass_mixed_finish_test.dart`
+// `flutter test test/glass_mixed_finish_test.dart`
 //
 // A finish decides two things the *pipeline* does — how much the atlas is
-// blurred, and which damage table prices the divisor — and until this arm the
-// host's finish decided both for every surface. So a `GlassSurface(finish:
-// GlassFinish.clear)` under a `regular` host drew σ 2.6 of blur it did not
-// have, and nothing said so: the shader got the clear tint and optics, and the
-// picture looked like glass. The drop a pressed control turns into is clear
-// glass on a regular screen (spike 27), which is where this stopped being
-// hypothetical.
+// blurred, and which damage table prices the divisor. If the host's finish
+// decided both for every surface, a `GlassSurface(finish: GlassFinish.clear)`
+// under a `regular` host would draw σ 2.6 of blur it does not have, and
+// nothing would say so: the shader gets the clear tint and optics, and the
+// picture looks like glass. The drop a pressed control turns into is clear
+// glass on a regular screen, so this is not hypothetical.
 //
 // The arm that makes the claim is a swap: host `regular` with one surface
 // declaring `clear`, against host `clear` with the other declaring `regular`.
@@ -17,11 +16,11 @@
 // and with one blur for the whole atlas they differ everywhere under the glass,
 // because the host decides whose blur it is.
 //
-// Since D227 each class is blurred over its own slots' box rather than the
-// whole atlas. Breaks, undone by swapping the string back: that box shrunk to
-// one texel, on either pass, fails the swap (the class's glass reads nothing);
-// shrunk by 8 texels it does not — the slots' own 2.5 σ of bleed is wider, and
-// that is the claim the box rests on: nothing a class samples lies outside it.
+// Each class is blurred over its own slots' box rather than the whole atlas.
+// Breaks, undone by swapping the string back: that box shrunk to one texel, on
+// either pass, fails the swap (the class's glass reads nothing); shrunk by 8
+// texels it does not — the slots' own 2.5 σ of bleed is wider, and that is the
+// claim the box rests on: nothing a class samples lies outside it.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
