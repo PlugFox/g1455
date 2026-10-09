@@ -1,4 +1,4 @@
-// The thermal vocabulary the host spends staleness against (D205).
+// The thermal vocabulary the host spends staleness against.
 //
 // Only the vocabulary: the package does not read the device. Flutter carries no
 // thermal state, and reading it takes native code on every platform, which this

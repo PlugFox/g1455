@@ -1,26 +1,19 @@
 // Whether anything under the host changed, read off the composited layer tree.
 //
-// This is D2's dirty oracle, finally built — and built smaller. The original
-// plan was a layer walk comparing `PictureLayer.picture` by identity, chosen
-// because our own `PaintingContext` cannot pass a repaint boundary and the
-// render tree therefore cannot be watched from above. Phase A never built it:
-// the oracle got the cheap inputs instead (a surface moving, a marker changing)
-// and, since D147–D151, three observations the host makes for itself. The
-// census that produced those also measured what they are worth, and the answer
-// was uncomfortable: a realistic screen crosses 8–15 nested repaint boundaries
-// (`bank_home` 8, `scroll_under_bar` 10, the same under Material 13 and 15), and
-// every one of them is a place where a declared hold freezes over content that
-// really moved. Not a rare shape — the commonest one.
+// The render tree cannot be watched from above: a `PaintingContext` of our own
+// cannot pass a repaint boundary, and a realistic screen crosses 8–15 nested
+// repaint boundaries, every one of them a place where a held proxy would freeze
+// over content that really moved.
 //
 // A repaint cannot hide from the *layer* tree, because a repaint mints new
 // `PictureLayer`s and a new `ui.Picture` inside whichever boundary owns it. Nor
-// can the one class that repaints nothing at all (D151): an opacity or a filter
+// can a change that repaints nothing at all: an opacity or a filter
 // that changed without painting changed a property of a retained layer, and the
 // property is right here to be read.
 //
 // The cost is a walk over composited layers — tens, against the hundreds of
 // render objects the capture pass itself visits — on frames that were going to
-// be produced anyway. It buys the whole of D146's 97.8%.
+// be produced anyway.
 //
 // **The rule that makes it safe is that the table is a whitelist.** A layer type
 // this file does not understand reports a change on every frame, for ever: a
@@ -29,13 +22,11 @@
 // matters for the next SDK — anything added to `layer.dart` after this was
 // written. The failure mode of not knowing is then "expensive", never "wrong".
 //
-// The rule is only as good as the reading of the SDK behind it, and the audit
-// that reading finally got (D162) found the table one property short and the
-// whitelist one word too generous. What it reads now is checked against
-// `layer.dart` itself, in `test/glass/proxy_layer_watch_test.dart`: every
-// concrete layer class is named there, and every property a class hands to the
-// `SceneBuilder` is either read here or listed there with the reason it is not.
-// That test fails on the next SDK that adds either.
+// The rule is only as good as the reading of the SDK behind it, so what it reads
+// is checked against `layer.dart` itself, in `test/proxy_layer_watch_test.dart`:
+// every concrete layer class is named there, and every property a class hands to
+// the `SceneBuilder` is either read here or listed there with the reason it is
+// not. That test fails on the next SDK that adds either.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
@@ -53,20 +44,18 @@ typedef LayerSignature = List<Object?>;
 
 /// What the watch saw: whether the subtree composites differently, and where.
 ///
-/// The "where" is the half D174 added, and it is not a refinement of the bit —
-/// it is what §4.2 of the research document needs before it can ask its
-/// question at all. A shared proxy is a shared dirty flag, so the cost of the
-/// route is `P(anything changed) x cost(capture)`, and every term of that is
-/// about *regions*: a spinner that turns in a corner invalidates a proxy of the
-/// opposite corner only because nobody asked where it turned.
+/// The "where" is not a refinement of the bit. A shared proxy is a shared dirty
+/// flag, so the cost of the route is `P(anything changed) x cost(capture)`, and
+/// every term of that is about *regions*: a spinner that turns in a corner
+/// invalidates a proxy of the opposite corner only if nobody asks where it
+/// turned.
 ///
 /// **The bound is never tighter than the nearest enclosing repaint boundary**,
 /// because a repaint mints a `ui.Picture` inside the boundary that owns it and
 /// the layer carries that boundary's bounds, not the picture's. That is the
 /// mechanism's applicability statement rather than a caveat: it pays exactly
-/// where the change sits in a nested boundary that misses the glass, and the
-/// census behind D147-D151 already measured how common that is — 8 to 15 nested
-/// boundaries on a realistic screen.
+/// where the change sits in a nested boundary that misses the glass, which is
+/// common: a realistic screen has 8 to 15 nested boundaries.
 @immutable
 class LayerChange {
   const LayerChange._({required this.changed, required this.region, required this.bounded});
@@ -219,7 +208,7 @@ class ProxyLayerWatch {
   // added. The framework's own three subclasses of handled types are the
   // inspector's, they carry nothing and they only exist in debug, so exactness
   // costs nothing here — and it takes the ordering hazard out of the chain,
-  // where an unknown descendant of `OffsetLayer` used to land on the first
+  // where an unknown descendant of `OffsetLayer` would land on the first
   // branch that matched it.
   static const Set<Type> _exact = <Type>{
     PictureLayer,
@@ -316,9 +305,8 @@ class ProxyLayerWatch {
         ..add(layer.blendMode);
     } else if (layer is BackdropFilterLayer) {
       // `backdropKey` is read for the same reason as the other two: it reaches
-      // the engine, as `SceneBuilder.pushBackdropFilter(backdropId:)`. It was
-      // missing until the audit of this table against `layer.dart` (D162), and
-      // it is the shape D151 already closed for alpha and for filters —
+      // the engine, as `SceneBuilder.pushBackdropFilter(backdropId:)`. It is the
+      // same shape as alpha and filters —
       // `RenderBackdropFilter` reuses its layer (`layer ??= BackdropFilterLayer()`)
       // and only assigns the property, so a group that re-keys mints no picture
       // anywhere. `BackdropGroup` re-keys on every rebuild it is not handed a
@@ -354,8 +342,8 @@ class ProxyLayerWatch {
 /// entry of it, the root-space bounds of what that entry composites.
 ///
 /// Two parallel lists rather than a list of pairs, so that the comparison in
-/// [ProxyLayerWatch.changeSince] stays the element-wise identity check it has
-/// always been: a record with a `Rect` in it would have needed an `==` that
+/// [ProxyLayerWatch.changeSince] stays an element-wise identity check: a record
+/// with a `Rect` in it would need an `==` that
 /// looks at the value and not at the bounds, and that is one refactor away from
 /// a collision — the failure this whole mechanism exists to prevent.
 ///
@@ -508,12 +496,11 @@ class _Walk {
     // a null bound — it never differs on its own, and if it does the lengths
     // differ and the walk has already said `everywhere`.
     //
-    // **A layer that spreads patches its descendants too, and that took a
-    // failing arm.** A blur over a repainting picture changes the picture's
-    // entry and nothing else, so patching only this layer's own entries left
-    // the region at the picture's tight bounds — a filtered subtree reported as
-    // dirty exactly where it would have been dirty unfiltered, which is the one
-    // answer that is certainly wrong.
+    // **A layer that spreads patches its descendants too.** A blur over a
+    // repainting picture changes the picture's entry and nothing else, so
+    // patching only this layer's own entries would leave the region at the
+    // picture's tight bounds — a filtered subtree reported as dirty exactly
+    // where it would be dirty unfiltered, which is certainly wrong.
     final int end = spreads ? out.length : selfEnd;
     for (var i = start; i < end; i++) {
       bounds[i] = subtree;

@@ -1,9 +1,6 @@
-// The one content policy M11 left alive: shadows are not drawn into the proxy.
-//
-// D31 measured it at **0.00 ΔE** behind a blur — the only degradation on the
-// whole quality ladder that costs nothing — and the ladder was re-taken with
-// `debugDisableShadows = false` afterwards, so the number describes a shadow
-// that actually had a blur in it.
+// Shadows are not drawn into the proxy: behind the glass's blur, dropping them
+// measured **0.00 ΔE** (with real, blurred shadows drawn), the only content
+// degradation that costs nothing visible.
 //
 // **A per-node policy cannot express it.** A shadow is not a node. It is a
 // `drawShadow` call inside `RenderPhysicalModel.paint`, or a `drawRRect` with a

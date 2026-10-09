@@ -5,10 +5,9 @@
 // Two routes, on purpose. [ProxyRecorder.walk] runs our own pass, which is what
 // makes the capture selective (roles, occlusion, the shadow filter);
 // [ProxyRecorder.stock] goes through `OffsetLayer.toImageSync` and subtracts
-// nothing. The second is not a leftover — it is the structural fallback the
-// roadmap requires to exist from the first commit rather than to be added after
-// the first divergence, and having both produce the *same* value type is what
-// lets a caller swap them per subtree.
+// nothing. The second is not a leftover: it is the structural fallback for a
+// subtree the pass cannot reproduce, and both producing the *same* value type is
+// what lets a caller swap them per subtree.
 //
 // **The map is the part that costs pixels when it is wrong.** The engine's own
 // arithmetic is `texel = (logical - bounds.topLeft - layer.offset) * pixelRatio`
@@ -21,10 +20,10 @@
 // **And the region is snapped before anything else happens.** `Rect.fromLTWH`
 // stores `bottom = top + height`, so the height it gives back is
 // `(top + h) - top`, which differs by an ULP when `top` is an awkward fraction —
-// and `ceil` turns that ULP into a whole extra row of texels. Measured on the
-// harness: at `passes = 8, side = 64` on a 360x772 source, pass 5 sits at
-// `top = 505.7142857142857` and the capture comes back 128x129. Snapping outward
-// to whole logical pixels costs at most one pixel per side and cannot do that.
+// and `ceil` turns that ULP into a whole extra row of texels (at
+// `top = 505.7142857142857` a 64-pixel capture at 2x comes back 128x129).
+// Snapping outward to whole logical pixels costs at most one pixel per side and
+// cannot do that.
 
 import 'dart:ui' as ui;
 
@@ -125,9 +124,9 @@ abstract final class ProxyRecorder {
   /// The fallback: the engine's own capture of the retained layer, subtracting
   /// nothing.
   ///
-  /// The route every number in M2 and M10 was measured through, and the one a
-  /// subtree falls back to when the pass reports a construct it cannot
-  /// reproduce — `BackdropFilter`, or an opacity folded into a colour filter.
+  /// The route a subtree falls back to when the pass reports a construct it
+  /// cannot reproduce — `BackdropFilter`, or an opacity folded into a colour
+  /// filter.
   static ProxyRecording stock(
     RenderRepaintBoundary boundary, {
     required Rect region,

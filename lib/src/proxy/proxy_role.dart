@@ -1,20 +1,17 @@
 // What a subtree is, as far as the glass proxy is concerned — declared by the
 // application, because the engine cannot report it.
 //
-// This is the third time the same shape appears here and the first time it is
-// public. `Overlay.opaque` exists because opacity is not readable from a render
-// tree; `CoverDeclaration` in `occlusion.dart` exists for the same reason (D42,
-// and the commonest opaque widget in Flutter — `ColoredBox` — paints through a
-// private render object); `reduceTransparency` does not reach Dart at all
-// (D59), so the host declares it. The engine does not supply the reason; the
+// The same shape as `Overlay.opaque`, which exists because opacity is not
+// readable from a render tree, and as `CoverDeclaration` in `occlusion.dart`
+// (the commonest opaque widget in Flutter, `ColoredBox`, paints through a
+// private render object). The engine does not supply the answer; the
 // application does.
 //
-// **What this is not.** Automatic content simplification lost its argument
-// already: replacing text and images with mean-colour blocks saves 24…28% and
-// costs 0.95…9.6 ΔE, while lowering the proxy resolution saves 47…73% and costs
-// 0.47 — so the generic version is beaten on both axes at once and is struck out
-// of the roadmap (D28, D29). Nothing here is sold as "cheaper pixels". The three
-// things it *is* for:
+// **What this is not.** Automatic content simplification does not pay:
+// replacing text and images with mean-colour blocks saves 24…28% and costs
+// 0.95…9.6 ΔE, while lowering the proxy resolution saves 47…73% and costs 0.47,
+// so it loses on both axes at once. Nothing here is sold as "cheaper pixels".
+// The three things it *is* for:
 //
 //  - Content that cannot be read at all. A platform view or a `Texture` paints
 //    nothing into a recording — `PlatformViewLayer::Paint` without an embedder
@@ -22,11 +19,10 @@
 //    stock capture leaves a hole there too. A stub is the only option, not the
 //    cheap one.
 //  - Retake frequency. A subtree replaced by a stub cannot dirty the proxy, and
-//    the retake ceiling is a finish parameter rather than a constant (D30).
-//  - Foreign side effects. The pass executes somebody else's `paint()`, which
-//    moved the corpus's own counters by 2–12 per pass. Counters, analytics and
-//    lazy initialisation all happen a second time per frame, and
-//    [GlassProxy.hidden] is the only way to stop them.
+//    the retake ceiling is a finish parameter rather than a constant.
+//  - Foreign side effects. The pass executes somebody else's `paint()`, so
+//    counters, analytics and lazy initialisation in it all happen a second time
+//    per frame, and [GlassProxy.hidden] is the only way to stop them.
 //
 // Nothing here changes the real frame: in the live pipeline every one of these
 // is a `RenderProxyBox` that paints its child.
@@ -68,9 +64,8 @@ enum GlassProxyRole {
   /// Paints opaquely over its own box, so the descent may stop before it.
   ///
   /// Read by `OcclusionPlan`, not by the pass: a declaration says "this covers
-  /// itself", never "this covers the region" — the geometry decides that, and
-  /// letting a declaration skip it turned every `ColoredBox` in a tree into a
-  /// full-screen cover once already.
+  /// itself", never "this covers the region" — the geometry decides that;
+  /// otherwise every `ColoredBox` in a tree would be a full-screen cover.
   opaque,
 
   /// Exempt from canvas-level policy inside the subtree.
@@ -179,7 +174,7 @@ class SolidProxyPainter extends GlassProxyPainter {
 }
 
 /// A stub of one gradient. Keeps a local mean where a flat colour would not —
-/// which is the axis a blur cannot restore (D29): a low-pass removes what is
+/// which is the axis a blur cannot restore: a low-pass removes what is
 /// above its cutoff and cannot bring back a mean that is no longer there.
 ///
 /// Never reported opaque, whatever the gradient's stops are.
@@ -371,11 +366,9 @@ class RenderGlassProxy extends RenderProxyBox {
 
   /// Fires when this subtree's contribution to the proxy has changed.
   ///
-  /// The retake oracle's input — subscribed by `GlassHost` through
-  /// `RetakeOracle.watch` since D142, and inert for every application before
-  /// that. A `Listenable` and not a comment because an axis with no observable
-  /// trace is not an axis, and `shouldRepaint` returning false has to be
-  /// distinguishable from `shouldRepaint` never having been called.
+  /// The retake oracle's input, subscribed by `GlassHost` through
+  /// `RetakeOracle.watch`. A `Listenable` so that `shouldRepaint` returning
+  /// false is distinguishable from `shouldRepaint` never having been called.
   ///
   /// It fires on this subtree's *declaration* changing, which is a role or a
   /// painter. Content that repaints in place under an ordinary widget is
