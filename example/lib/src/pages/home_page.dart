@@ -367,29 +367,9 @@ class _WhatsNew extends StatelessWidget {
       <(String, String, String, IconData, List<Color>)>[
         (
           'components',
-          'morph',
-          'A button that flows into a menu',
-          SFIcons.sf_wand_and_sparkles,
-          <Color>[
-            Color(0xFFFF375F),
-            Color(0xFFFF9F0A),
-          ],
-        ),
-        (
-          'foundations',
-          'adaptive',
-          'Glass that reads what is under it',
-          SFIcons.sf_circle_lefthalf_filled,
-          <Color>[
-            Color(0xFF5E5CE6),
-            Color(0xFF64D2FF),
-          ],
-        ),
-        (
-          'foundations',
-          'drop-motion',
-          'Drops that stretch and squash',
-          SFIcons.sf_drop,
+          'stepper',
+          'A stepper that repeats while held',
+          SFIcons.sf_plus_forwardslash_minus,
           <Color>[
             Color(0xFF30D158),
             Color(0xFF64D2FF),
@@ -397,9 +377,39 @@ class _WhatsNew extends StatelessWidget {
         ),
         (
           'components',
-          'scaffold',
-          'A whole glass screen in one widget',
-          SFIcons.sf_rectangle_3_group,
+          'page-control',
+          'Page dots that follow a swipe',
+          SFIcons.sf_ellipsis,
+          <Color>[
+            Color(0xFF5E5CE6),
+            Color(0xFF64D2FF),
+          ],
+        ),
+        (
+          'components',
+          'search-bar',
+          'Search with a Cancel that slides in',
+          SFIcons.sf_magnifyingglass,
+          <Color>[
+            Color(0xFF0A84FF),
+            Color(0xFF5E5CE6),
+          ],
+        ),
+        (
+          'components',
+          'badge',
+          'Counts on tabs and icons',
+          SFIcons.sf_app_badge,
+          <Color>[
+            Color(0xFFFF375F),
+            Color(0xFFFF9F0A),
+          ],
+        ),
+        (
+          'foundations',
+          'backdrop',
+          'Declare the backdrop, skip the capture',
+          SFIcons.sf_photo,
           <Color>[
             Color(0xFFBF5AF2),
             Color(0xFFFF375F),
@@ -407,19 +417,29 @@ class _WhatsNew extends StatelessWidget {
         ),
         (
           'components',
-          'tab-bar',
-          'Tab icons and badges of your own',
-          SFIcons.sf_menubar_dock_rectangle,
+          'sheet',
+          'Sheets with medium and large detents',
+          SFIcons.sf_rectangle_bottomhalf_filled,
           <Color>[
-            Color(0xFF0A84FF),
-            Color(0xFF5E5CE6),
+            Color(0xFF64D2FF),
+            Color(0xFF30D158),
           ],
         ),
         (
-          'start',
-          'installation',
-          'Shaders ready before the first frame',
-          SFIcons.sf_bolt_fill,
+          'components',
+          'tab-bar',
+          'A tab bar that folds away on scroll',
+          SFIcons.sf_menubar_dock_rectangle,
+          <Color>[
+            Color(0xFF0A84FF),
+            Color(0xFF64D2FF),
+          ],
+        ),
+        (
+          'components',
+          'button',
+          'Glass that swells under a finger',
+          SFIcons.sf_hand_tap,
           <Color>[
             Color(0xFFFFD60A),
             Color(0xFFFF9F0A),
