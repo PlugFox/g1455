@@ -1,4 +1,9 @@
-## 0.1.5
+## 0.2.0
+
+A minor version rather than a patch: new components, new parameters on the
+sheet, the tab bar and the controls, and a declared backdrop. Existing code
+builds unchanged; the one layout change is in the ripple shader's uniforms
+(see Performance).
 
 A backdrop the application declares:
 
