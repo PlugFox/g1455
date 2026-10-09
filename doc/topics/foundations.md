@@ -69,3 +69,19 @@ wears unless it names its own, the tier, the label floor, the drop motion.
   label from it.
 - [GlassDropMotion](../g1455/GlassDropMotion-class.html): how the held drop of a switch, a slider, a segmented control
   or a tab bar stretches as it sets off and squashes as it stops.
+- [GlassPress](../g1455/GlassPress-class.html): how a pressed [GlassButton](../g1455/GlassButton-class.html) swells and leans toward a
+  dragging finger. On by default; two captures a press and none at rest. [GlassPress.none](../g1455/GlassPress/none-constant.html)
+  turns it off, and so does reduced motion.
+
+## Nested shapes
+
+[GlassConcentric](../g1455/GlassConcentric-class.html) is Apple's rule for a shape inside another: its radius is the
+container's less the inset between them, never below a floor. Use it for a highlight, a thumb or a ring inset in glass.
+
+```dart
+// A highlight 4 px inside a card of radius 24: radius 20.
+final BorderRadius inner = GlassConcentric.borderRadius(
+  const BorderRadius.all(Radius.circular(24)),
+  const EdgeInsets.all(4),
+);
+```

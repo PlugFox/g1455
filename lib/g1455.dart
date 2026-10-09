@@ -24,9 +24,9 @@
 ///
 /// | Topic | What is in it |
 /// |---|---|
-/// | Foundations | [GlassHost], [GlassSurface], [GlassFinish], [GlassTheme], [GlassRipple], [GlassAdaptive] |
+/// | Foundations | [GlassHost], [GlassSurface], [GlassFinish], [GlassTheme], [GlassRipple], [GlassAdaptive], [GlassPress], [GlassConcentric] |
 /// | Panels and controls | [GlassBar], [GlassButton], [GlassCard], [GlassSwitch], [GlassSlider], [GlassTabBar], [GlassSegmentedControl], [GlassButtonGroup], [GlassTextField], [GlassSearchBar], [GlassStepper], [GlassPageControl], [GlassBadge], [GlassScrollEdge], [GlassScaffold] |
-/// | Modals | [showGlassDialog], [GlassAlert], [showGlassSheet], [GlassMenuAnchor], [GlassPopoverAnchor] |
+/// | Modals | [showGlassDialog], [GlassAlert], [showGlassSheet], [GlassSheetDetent], [GlassMenuAnchor], [GlassPopoverAnchor] |
 /// | Composition | [GlassGroup], [GlassTravel], [GlassMorph], [GlassAbove] |
 /// | Capture control | [GlassProxy], [GlassProxyPainter], [GlassBackdrop] |
 /// | Cost and policy | [GlassTierPolicy], [GlassLedger], [GlassHardware], [GlassThermalState] |

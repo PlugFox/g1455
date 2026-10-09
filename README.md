@@ -284,25 +284,39 @@ Every name links to its page in the API reference.
 | [`GlassRipple`][GlassRipple] | Optional, and not Apple's. A viscous wave from the touch: a dimple under the finger, a front that travels out, a spring-back on release. `viscosity` goes from water (0) to honey (1). Declare it on `GlassHost.ripple` for every surface, or on `GlassSurface.ripple` for one. A wave takes no capture and repaints nothing; off under reduced motion. |
 | [`GlassAdaptive`][GlassAdaptive] | Optional: glass that reads its own backdrop. Each bar, card and button picks the branch of `.regular` and its label from the mean level of the capture under it, instead of from `backdrop`. Off by default and free when off; on, a small read-back per capture, at most once per `interval` (250 ms, a second on the web), behind a band and a hold. |
 | [`GlassDropMotion`][GlassDropMotion] | How the held drop of the switch, slider, segmented control and tab bar stretches as it sets off and squashes as it stops. On and subtle by default, because it costs no capture; `GlassDropMotion.none` turns it off, and so does reduced motion. Declare it on `GlassHost`, the theme or one control. |
+| [`GlassPress`][GlassPress] | How a pressed `GlassButton` swells (12 px on its longest side) and leans toward a dragging finger, then springs back. A feel, not a measurement: Apple's press was not measured. Two captures a press and none at rest; `GlassPress.none` turns it off, and so does reduced motion. Declare it on `GlassHost`, the theme or one button. |
+| [`GlassConcentric`][GlassConcentric] | Apple's concentric corners as arithmetic: a shape inset inside glass takes the glass's radius less the inset, never below a floor. For anything you nest in a surface. |
 
 ### Panels and controls
 
 | API | What it is |
 |---|---|
 | [`GlassBar`][GlassBar] · [`GlassButton`][GlassButton] · [`GlassCard`][GlassCard] | Panels with a label colour chosen for legibility. |
-| [`GlassSwitch`][GlassSwitch] · [`GlassSlider`][GlassSlider] | Controls whose knob turns into a clear drop while held. |
-| [`GlassTabBar`][GlassTabBar] · [`GlassSegmentedControl`][GlassSegmentedControl] | The selection lifts into a drop that can be dragged between items. A tab's icon and label can be any widget, through `iconBuilder` and `labelBuilder`. |
+| [`GlassSwitch`][GlassSwitch] · [`GlassSlider`][GlassSlider] | Controls whose knob turns into a clear drop while held. A slider with `divisions` lands on stops. |
+| [`GlassTabBar`][GlassTabBar] · [`GlassSegmentedControl`][GlassSegmentedControl] | The selection lifts into a drop that can be dragged between items. A tab's icon and label can be any widget, through `iconBuilder` and `labelBuilder`. The tab bar collapses to its selected tab on a scroll down (`minimizeBehavior`, under a [`GlassTabBarMinimizer`][GlassTabBarMinimizer]) and carries a `bottomAccessory`. |
+| [`GlassStepper`][GlassStepper] | A minus and a plus in one glass capsule; a held half repeats, and the end at a limit is disabled. One surface; a press is no capture. |
+| [`GlassPageControl`][GlassPageControl] | Page dots on a glass capsule; follows and turns a `PageController`, a tap steps toward its side, a drag scrubs. One surface. |
 | [`GlassButtonGroup`][GlassButtonGroup] | A toolbar capsule of icon buttons ([`GlassToolbarItem`][GlassToolbarItem]). |
 | [`GlassTextField`][GlassTextField] | A single line of text in a glass capsule. |
+| [`GlassSearchBar`][GlassSearchBar] | The search field with a clear button and a Cancel that slides in on focus. One surface; the slide costs a capture a frame for 250 ms (16 captures; 1 with reduced motion). |
+| [`GlassBadge`][GlassBadge] | A count or a dot on an icon's corner, as an opaque red capsule. Not glass, as Apple's is not; costs no surface. |
 | [`GlassScrollEdge`][GlassScrollEdge] | The scroll edge effect under a bar, and the bar. |
 | [`GlassScaffold`][GlassScaffold] | A screen wired as this README recommends: a host when none is above, a top bar in a soft scroll edge, an optional bottom bar and floating action, and a body that scrolls under the bars. |
+
+The button, switch, slider, segmented control and a toolbar's cells take the
+keyboard's focus: Space and Enter press, the arrows step a slider and a
+segmented control, and the ring is drawn without a capture on glass. The
+switch, slider, segmented control and toolbar mirror under a right-to-left
+`Directionality`. The switch, slider and segmented control claim a drag from
+touch-down inside a horizontal `PageView`, and a swipe that starts on them in
+a vertical list still scrolls the list.
 
 ### Modals
 
 | API | What it is |
 |---|---|
 | [`showGlassDialog`][showGlassDialog] · [`GlassAlert`][GlassAlert] | An alert that materializes over the screen, blur first and tint last. |
-| [`showGlassSheet`][showGlassSheet] | A glass sheet from the bottom edge. |
+| [`showGlassSheet`][showGlassSheet] | A glass sheet from the bottom edge that follows the finger. With [`GlassSheetDetent.large`][GlassSheetDetent] it pulls up to the whole height, where it turns opaque and stops reading its backdrop. |
 | [`GlassMenuAnchor`][GlassMenuAnchor] · [`GlassPopoverAnchor`][GlassPopoverAnchor] | A menu, or a panel of any content, that grows out of its anchor. |
 
 Glass appears and leaves through `GlassSurface.materialize`: the bend, the blur
@@ -548,6 +562,61 @@ class NotesBar extends StatelessWidget {
 }
 ```
 
+### A tab bar that collapses on scroll
+
+iOS 26's tab bar shrinks to its selected tab while the content scrolls down,
+and comes back on a scroll up. A scroll only reports upward, and the bar is
+not inside the scroll view, so both go under one
+[`GlassTabBarMinimizer`][GlassTabBarMinimizer], which [`GlassScaffold`][GlassScaffold]
+already is. The collapse moves inside a declared travel region and takes no
+capture; the scroll that set it off captures as any scroll does.
+
+```dart
+class Library extends StatefulWidget {
+  const Library({super.key});
+
+  @override
+  State<Library> createState() => _LibraryState();
+}
+
+class _LibraryState extends State<Library> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) => GlassTabBarMinimizer(
+    // Above the list and the bar both: the list's scrolls bubble up to it,
+    // and the bar, which is not inside the list, reads it.
+    child: Stack(
+      children: <Widget>[
+        ListView.builder(
+          padding: const EdgeInsets.only(bottom: 160),
+          itemCount: 60,
+          itemBuilder: (BuildContext context, int i) => ListTile(title: Text('Song $i')),
+        ),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 0,
+          child: SafeArea(
+            child: GlassTabBar(
+              items: const <GlassTabItem>[
+                GlassTabItem(icon: Icons.library_music, label: 'Library'),
+                GlassTabItem(icon: Icons.search, label: 'Search'),
+              ],
+              selectedIndex: _tab,
+              onSelected: (int i) => setState(() => _tab = i),
+              minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown,
+              // Above the bar, and beside its circle once it collapses.
+              bottomAccessory: const Text('Now playing'),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+```
+
 ### A video, a map or a platform view under glass
 
 The host captures what is under its glass by painting that part of the tree a
@@ -773,6 +842,11 @@ cyan outline. The same list, at more length:
 - **The glass does not refract what scrolls under it.** A `GlassBackdrop`
   above it declares the backdrop, and the glass shows the declaration only.
   Wrap the part with live content in `GlassBackdrop.live`.
+- **A tab bar with `minimizeBehavior: onScrollDown` never collapses.** A
+  scroll reports only upward, and the bar is the scroll view's sibling. Put a
+  `GlassTabBarMinimizer` above both, as in
+  [the pattern above](#a-tab-bar-that-collapses-on-scroll); `GlassScaffold` is
+  one. Only the nearest vertical scroll view counts, not one nested in it.
 
 ### Look and legibility
 
@@ -804,6 +878,13 @@ cyan outline. The same list, at more length:
   below `GlassTier.full` and on a fused group member.
 - **A panel appearing through `presence` narrows to a line.** `presence` is for
   budding inside a group; animate `materialize` instead.
+- **A shape inside glass sits badly in its corners.** A highlight, a thumb or a
+  ring inset in glass has the glass's radius less the inset:
+  `GlassConcentric.radius(outer, inset)` or `.borderRadius(...)`, not a number
+  that agrees by accident until one of the two moves.
+- **A badge drawn as glass is a different red over every backdrop.** Apple's
+  badge is opaque, on the glass and not of it: use `GlassBadge`, which is a
+  plain capsule and costs no surface.
 
 ### Cost
 
@@ -818,12 +899,38 @@ cyan outline. The same list, at more length:
   keeps the name.
 - **Too much glass.** Each surface is a draw, and the cost grows faster than
   the count: glass is for bars and controls, not every card of a feed. A row of
-  icon actions is one `GlassButtonGroup`; a group is a look, not a saving
+  icon actions is one `GlassButtonGroup`, and a minus and a plus are one
+  `GlassStepper`, not two buttons; a group is a look, not a saving
   (twelve clustered surfaces cost 1.60 to 1.65 times ungrouped).
+- **The search bar captures when it takes or loses the focus.** Cancel's slide
+  narrows the field's glass, and glass whose box changes is retaken: 16
+  captures over the 250 ms at 60 Hz, each way, and none after it (headless,
+  in the package's tests). `showsCancelButton:
+  false` keeps the box still; under reduced motion it is one frame.
+- **A change inside a large sheet captures.** An opaque large sheet is drawn
+  on `GlassTier.cheap` and reads no backdrop, but a cheap surface is content to
+  the capture of the glass around it, so a change in the sheet is a retake.
+  Headless, a 400 × 800 window with a glass bar under the sheet: one surface
+  of two captured instead of two, 20,608 px² of capture against 337,408, and
+  one retake for a label changed in the sheet against none. A translucent
+  `largeFinish` keeps it glass, and its capture with it.
+- **Every press of a button captures twice.** The swell grows inside a travel
+  region declared from touch-down until the spring settles: one capture as it
+  appears, one as it goes, nothing at rest. `GlassPress.none` on the host, a
+  theme or one button keeps the box still and builds no region.
+- **A tab bar rebuilt by a bare `setState` captures once.** A known cost, not
+  yet traced. Rebuild the bar when its selection changes, not with every
+  change of the screen around it.
+- **A page control captures while the pages turn.** The control does not: the
+  `PageView` moving under the glass does: 43 captures a swipe headless, with
+  the dots following it and with dots that stay put. Content that moves under glass is a capture a frame.
 - **Glass is coarser on a large window.** The capture must fit the GPU's
   texture limit, and the host assumes the specification's floor (4096 on
   Vulkan, 8192 on Metal). Every GPU measured allocates 16384:
   `GlassHost(maxTextureSide: 16384)` on a device you know.
+- **A slider rounded in `onChanged` is told every frame.** Pass `divisions`:
+  every input lands on a stop, and `onChanged` is called only when the stop
+  changes.
 - **Every frame captures, still or not.** `content:
   GlassContentDeclaration.undeclared` is for ruling the change detection out,
   not for shipping; nor are `maxCaptures`, `resolution` and `blurPass`.
@@ -959,6 +1066,8 @@ from the tables beside them; change both together.
 [GlassHost]: https://pub.dev/documentation/g1455/latest/g1455/GlassHost-class.html
 [GlassAdaptive]: https://pub.dev/documentation/g1455/latest/g1455/GlassAdaptive-class.html
 [GlassDropMotion]: https://pub.dev/documentation/g1455/latest/g1455/GlassDropMotion-class.html
+[GlassPress]: https://pub.dev/documentation/g1455/latest/g1455/GlassPress-class.html
+[GlassConcentric]: https://pub.dev/documentation/g1455/latest/g1455/GlassConcentric-class.html
 [GlassScaffold]: https://pub.dev/documentation/g1455/latest/g1455/GlassScaffold-class.html
 [GlassMorph]: https://pub.dev/documentation/g1455/latest/g1455/GlassMorph-class.html
 [GlassSurface]: https://pub.dev/documentation/g1455/latest/g1455/GlassSurface-class.html
@@ -976,10 +1085,16 @@ from the tables beside them; change both together.
 [GlassButtonGroup]: https://pub.dev/documentation/g1455/latest/g1455/GlassButtonGroup-class.html
 [GlassToolbarItem]: https://pub.dev/documentation/g1455/latest/g1455/GlassToolbarItem-class.html
 [GlassTextField]: https://pub.dev/documentation/g1455/latest/g1455/GlassTextField-class.html
+[GlassSearchBar]: https://pub.dev/documentation/g1455/latest/g1455/GlassSearchBar-class.html
+[GlassStepper]: https://pub.dev/documentation/g1455/latest/g1455/GlassStepper-class.html
+[GlassPageControl]: https://pub.dev/documentation/g1455/latest/g1455/GlassPageControl-class.html
+[GlassBadge]: https://pub.dev/documentation/g1455/latest/g1455/GlassBadge-class.html
+[GlassTabBarMinimizer]: https://pub.dev/documentation/g1455/latest/g1455/GlassTabBarMinimizer-class.html
 [GlassScrollEdge]: https://pub.dev/documentation/g1455/latest/g1455/GlassScrollEdge-class.html
 [showGlassDialog]: https://pub.dev/documentation/g1455/latest/g1455/showGlassDialog.html
 [GlassAlert]: https://pub.dev/documentation/g1455/latest/g1455/GlassAlert-class.html
 [showGlassSheet]: https://pub.dev/documentation/g1455/latest/g1455/showGlassSheet.html
+[GlassSheetDetent]: https://pub.dev/documentation/g1455/latest/g1455/GlassSheetDetent.html
 [GlassMenuAnchor]: https://pub.dev/documentation/g1455/latest/g1455/GlassMenuAnchor-class.html
 [GlassPopoverAnchor]: https://pub.dev/documentation/g1455/latest/g1455/GlassPopoverAnchor-class.html
 [GlassGroup]: https://pub.dev/documentation/g1455/latest/g1455/GlassGroup-class.html

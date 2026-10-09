@@ -33,6 +33,7 @@ class _SegmentedControlDemoState extends State<SegmentedControlDemo> {
   int _selected = 1;
   bool _enabled = true;
   String _thumb = 'White';
+  TextDirection _direction = TextDirection.ltr;
 
   void _setCount(int count) => setState(() {
     _count = count;
@@ -45,7 +46,9 @@ class _SegmentedControlDemoState extends State<SegmentedControlDemo> {
     return DemoStage(
       height: 320,
       background: GridBackdrop(hue: _selected * 65.0),
-      hint: 'Press and hold the selected segment: it lifts into a clear drop. Slide it to another and let go.',
+      hint:
+          'Press and hold the selected segment: it lifts into a clear drop. Slide it to another and let go. '
+          'Right to left, the first segment is at the right.',
       knobs: <Widget>[
         KnobChoice<int>(
           label: 'Segments',
@@ -60,6 +63,13 @@ class _SegmentedControlDemoState extends State<SegmentedControlDemo> {
           onChanged: (String t) => setState(() => _thumb = t),
         ),
         KnobSwitch(label: 'Enabled', value: _enabled, onChanged: (bool v) => setState(() => _enabled = v)),
+        KnobChoice<TextDirection>(
+          label: 'Direction',
+          values: const <TextDirection>[TextDirection.ltr, TextDirection.rtl],
+          selected: _direction,
+          labelOf: (TextDirection d) => d == TextDirection.ltr ? 'LTR' : 'RTL',
+          onChanged: (TextDirection d) => setState(() => _direction = d),
+        ),
       ],
       child: Center(
         child: Padding(
@@ -73,11 +83,14 @@ class _SegmentedControlDemoState extends State<SegmentedControlDemo> {
                 children: <Widget>[
                   DefaultTextStyle.merge(
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                    child: GlassSegmentedControl(
-                      segments: <Widget>[for (final (String label, _) in _kRanges.take(_count)) Text(label)],
-                      selectedIndex: _selected,
-                      thumbColor: _kThumbs[_thumb]!,
-                      onSelected: _enabled ? (int i) => setState(() => _selected = i) : null,
+                    child: Directionality(
+                      textDirection: _direction,
+                      child: GlassSegmentedControl(
+                        segments: <Widget>[for (final (String label, _) in _kRanges.take(_count)) Text(label)],
+                        selectedIndex: _selected,
+                        thumbColor: _kThumbs[_thumb]!,
+                        onSelected: _enabled ? (int i) => setState(() => _selected = i) : null,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

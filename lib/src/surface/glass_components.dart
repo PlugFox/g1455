@@ -66,8 +66,10 @@ import 'glass_theme.dart';
 /// and this is not.
 ///
 /// Every control in the package — [GlassButton], [GlassSwitch], [GlassSlider],
-/// [GlassSegmentedControl], [GlassTabBar], each item of a [GlassButtonGroup] and
-/// [GlassTextField] — is at least this tall, whatever it draws.
+/// [GlassSegmentedControl], [GlassTabBar], each item of a [GlassButtonGroup],
+/// [GlassTextField] and the [GlassSearchBar] built on it with its Cancel,
+/// [GlassStepper] and [GlassPageControl] — is at least this tall, whatever it
+/// draws.
 ///
 /// {@category Panels and controls}
 const Size kGlassMinTapTarget = Size(44, 44);

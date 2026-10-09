@@ -28,6 +28,115 @@ A backdrop the application declares:
   textures were made; `GlassSurfaceRecord.declared` and `readsCapture` say
   what the ledger priced.
 
+Components:
+
+- `GlassStepper`: a minus and a plus in one glass capsule, as `UIStepper`. A
+  press steps at once; held, a half repeats after
+  `kGlassStepperRepeatDelay` (500 ms) every `kGlassStepperRepeatInterval`
+  (100 ms), and the half that would pass a limit is disabled unless `wraps`.
+  One surface: a press, the repeat and a glyph dimming are drawn inside the
+  glass and are no capture. A screen reader hears one adjustable control.
+- `GlassPageControl`: page dots on a glass capsule, as `UIPageControl` on its
+  platter. It follows a `PageController` without a build and turns it; a tap
+  moves one page toward the side tapped, as iOS's does, and a drag scrubs.
+  One surface. A `PageView` beside it is retaken while it scrolls (43 captures
+  a swipe in the package's tests), which belongs to the view: the same 43 with
+  dots that stay put.
+- `GlassSearchBar`: the glass search field with a clear button while there is
+  text, and a Cancel that slides in while it has the focus. One surface, the
+  field's; typing and the clear button are no capture. Cancel's slide narrows
+  the glass, and that is a capture a frame for `cancelDuration` (16 over
+  250 ms at 60 Hz, each way), one frame under reduced motion.
+- `GlassBadge`: a count, a label or a dot on the corner of an icon or a tab,
+  as an opaque `systemRed` capsule. Not glass, as iOS 26's badge is not; it
+  costs no surface, and a count changing on glass is a repaint inside the
+  glass.
+- Their sizes (`kGlassStepperSize`, `kGlassPageDot`, `kGlassPageDotGap`,
+  `kGlassPageControlHeight`, `kGlassBadgeHeight`, `kGlassBadgeDot`) are
+  layout, not Apple measurements: none of the four was among the controls
+  the spikes read. The stepper, the page control and the search bar are laid
+  out at least `kGlassMinTapTarget` tall.
+
+iOS 26 behaviours:
+
+- Sheet detents: `showGlassSheet(detents:, initialDetent:,
+  onDetentChanged:)` with `GlassSheetDetent.medium` (the content's height, as
+  before; Apple's is half the window) and `GlassSheetDetent.large` (the whole
+  height below the top safe area less 8, edge to edge). A drag between them
+  follows the finger and settles at the nearer, or where a flick was heading.
+- A large sheet is `largeFinish`, by default the finish with its tint at full
+  alpha. Once it is all the way up it is drawn on `GlassTier.cheap` and reads
+  no backdrop: headless, with a glass bar under it, one surface of two
+  captured instead of two, and 20,608 px² of capture against 337,408. The
+  other way: the sheet is then content to the capture of the glass around it,
+  so a change inside it is a retake (1 against 0). A translucent
+  `largeFinish` keeps it glass.
+- `GlassTabBar(minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown)`
+  collapses the bar to a circle of the selected tab's icon when the content
+  scrolls down, and expands it on a scroll up or a tap on the circle, which
+  selects nothing. The scroll is read by a `GlassTabBarMinimizer` above both
+  the scroll view and the bar; `GlassScaffold` is one. The collapse moves
+  inside a declared travel region: no record over 60 frames, against 60
+  without the declaration. Collapsed, a screen reader hears one button named
+  for the selected tab.
+- `GlassTabBar.bottomAccessory`: a glass capsule `kGlassTabAccessoryHeight`
+  (48) tall above the bar, which moves down beside the collapsed circle. The
+  bar's box keeps its height, so the body is not laid out again for it.
+- The gap above a large sheet, its radius, the circle's size, the accessory's
+  height and gaps, `kGlassTabMinimizeScroll` (12) and the springs are layout
+  taste: none was measured on Apple's devices.
+
+Interaction:
+
+- `GlassPress`: a pressed `GlassButton` swells by 12 px on its longest side
+  and leans up to 3 px toward a dragging finger, then springs back. Declared
+  on `GlassHost.press`, `GlassThemeData.press` or `GlassButton.press`;
+  `GlassPress.none` turns it off, and so do reduced motion and a disabled
+  button. A feel rather than a measurement: Apple's press was not measured,
+  and 17 px, another package's number, would be 1.39× a 44 px button. It
+  costs two captures a press (touch-down and settle) and nothing at rest,
+  because the region it grows in is declared only while it moves; declared
+  always, it doubled a 44 px button's captured area (3,600 to 7,056 px²).
+  Toolbar cells take the focus but do not swell: the group is one surface.
+- `GlassSlider.divisions`: every input, a drag, a tap, a key or a screen
+  reader, lands on a stop, and `onChanged` is called only when the stop
+  changes.
+- The switch, the slider and the segmented control drag from touch-down and
+  claim the pointer inside a horizontal scrollable such as a `PageView`; in a
+  vertical list a swipe that starts on them still scrolls the list.
+- The keyboard: the button, switch, slider, segmented control and toolbar
+  cells take the focus (`focusNode`, `autofocus`); Space and Enter activate,
+  and the arrows step the slider and the segmented control. The ring
+  (`kGlassFocusRingColor`, `kGlassFocusRingWidth`, `kGlassFocusRingGap`) is
+  drawn inside the glass's own subtree, which no capture sees; a switch's or a
+  segmented control's ring under other glass costs one capture as the focus
+  changes.
+- Right to left: the switch is on at the left, the slider fills from the
+  right, the segmented control's first segment is at the right, the toolbar's
+  first item is at the right, and the arrow keys follow.
+  `SliderGeometry.fillEnd` takes a `textDirection`.
+- `GlassConcentric`: Apple's concentric corners as arithmetic, a shape's
+  radius as its container's less the inset, with a floor. The segmented
+  control's capsule (pixel for pixel what it was) and the focus rings use it.
+
+Fixes:
+
+- A dismissible sheet follows the finger: a 116 px drag moved it about
+  4.5 px. It closes past a third of its height or on a flick, and while it
+  moves it declares where it travels: one retake a drag instead of 16.
+- Under right to left, the segmented control's capsule sat under the wrong
+  label, and `GlassButtonGroup` brightened the wrong cell.
+
+Performance:
+
+- The shaders' uniforms are packed into `vec4`s: 19 slots to 9 for a surface
+  and a group, 24 to 12 for the ripple. Metal binds each declared float
+  uniform on its own every draw, where Vulkan binds one struct. The pixels are
+  byte-identical; the raster thread spends 0.9 to 1.4 µs less a surface draw
+  and 1.0 to 1.8 µs less a group draw, on macOS under Impeller/Metal. The ripple's
+  `count`, `reach` and `light` moved after its arrays, which matters only to
+  code that writes the uniforms by hand.
+
 Platforms:
 
 - The floor is Flutter 3.47.0 (Dart 3.13.0): `sdk: ^3.13.1` shut 3.47.0 out
@@ -41,6 +150,11 @@ Documentation:
 - "Misuse and common errors", in the README and on the site: each mistake
   with what it looks like, the error text where there is one, the cause and
   the fix.
+- The site has a page with a live demo for the stepper, the page control, the
+  search bar and the badge, and the sheet, tab bar, button, slider and
+  segmented control pages show detents, the collapse, the press, divisions,
+  the keyboard and right to left. The README has a pattern for a tab bar that
+  collapses on scroll, and the agent skill has the same pages and rules.
 
 ## 0.1.4
 

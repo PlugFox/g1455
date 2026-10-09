@@ -64,8 +64,9 @@ When `finish` is null the host uses Apple's `.regular`, which is two materials: 
 `regularLight` from `backdrop` and the platform's appearance, and follows appearance changes. With `adaptive:` set it
 picks per glass instead, from what each one reads under it: see [Adaptive glass](../foundations/adaptive.md).
 
-The host also sets the screen's motion: `ripple:` for a touch wave ([Ripple](../foundations/ripple.md)) and `dropMotion:`
-for how the held drops of the controls stretch and squash ([Drop motion](../foundations/drop-motion.md)).
+The host also sets the screen's motion: `ripple:` for a touch wave ([Ripple](../foundations/ripple.md)), `dropMotion:`
+for how the held drops of the controls stretch and squash ([Drop motion](../foundations/drop-motion.md)), and `press:` for
+how a pressed [button](../components/button.md) swells and leans (`GlassPress.none` to keep buttons still).
 
 ## Gotchas
 
@@ -153,6 +154,7 @@ class HomePage extends StatelessWidget {
 | `highContrast` | `bool?` | `null` | Draws an opaque outline instead of the subtle rim. Null reads `MediaQuery.highContrastOf`; on macOS pass it yourself. |
 | `ripple` | `GlassRipple?` | `null` | A touch wave for every surface below. None by default. |
 | `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How the held drop of the switch, slider, segmented control and tab bar stretches and squashes. `GlassDropMotion.none` keeps it round. |
+| `press` | `GlassPress` | `GlassPress()` | How a pressed `GlassButton` swells and leans: two captures a press, none at rest. `GlassPress.none` keeps every button its size. |
 | `adaptive` | `GlassAdaptive?` | `null` | Each bar, card and button reads the backdrop under it and picks its branch and label. Null reads nothing. |
 | `thermal` | `GlassThermalState?` | `null` | The device's thermal state, read by your app. Null is nominal. |
 | `thermalPolicy` | `GlassThermalPolicy` | `GlassThermalPolicy()` | How much staleness each thermal state may spend. `GlassThermalPolicy.never` keeps every frame fresh. |

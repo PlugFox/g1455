@@ -21,6 +21,7 @@ the keyboard's search action.
 - **Not** for fields that sit *on* a glass card or in a sheet. On iOS those are ordinary fields, and a glass field
   there is glass on glass, which costs an extra capture level. Use a plain field there.
 - **Not** for multi-line text or full forms. There is no `maxLines`, `decoration`, `inputFormatters` or validation.
+- **Not** for a search with a clear button and Cancel built by hand: that is the [search bar](../components/search-bar.md).
 
 ## Usage
 

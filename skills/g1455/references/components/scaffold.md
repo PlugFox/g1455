@@ -61,6 +61,9 @@ the body sees `MediaQuery.viewInsets` as it is.
 - **The floating action** sits `kGlassScaffoldActionGap` (16) from the end edge and above the bottom bar. It is on the
   left in a right-to-left app.
 - All three are [lifted](../foundations/above.md), so glass cards scrolling under them show through.
+- The screen is a `GlassTabBarMinimizer`: a [tab bar](../components/tab-bar.md) in `bottomBar` with
+  `minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown` collapses when the body scrolls down and expands when it
+  scrolls up. Its box keeps its height, so the body's padding does not move. A bar that does not ask is not told.
 
 ## The host
 

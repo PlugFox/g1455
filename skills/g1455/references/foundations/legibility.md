@@ -142,6 +142,7 @@ class LightPanel extends StatelessWidget {
 | `minLabelContrast` | `double?` | `null` | The least label contrast. The glass is dimmed just enough to meet it. |
 | `ripple` | `GlassRipple?` | `null` | The default touch wave. |
 | `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How held drops stretch and squash. See [Drop motion](../foundations/drop-motion.md). |
+| `press` | `GlassPress` | `GlassPress()` | How a pressed button swells and leans. See [Button](../components/button.md). |
 | `adaptive` | `GlassAdaptive?` | `null` | Whether glass reads its backdrop. Installed by `GlassHost.adaptive`. See [Adaptive glass](../foundations/adaptive.md). |
 | `regularAppearance` | `Brightness?` | `null` | The appearance `finish` was picked in when it is `.regular` and nobody named it. Set by an adaptive host. |
 | `reading` | `GlassBackdropReading?` | `null` | What the glass this theme was installed for read of its backdrop. |

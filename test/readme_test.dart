@@ -84,7 +84,7 @@ void main() {
     test('every block is a verbatim piece of test/readme/patterns.dart', () {
       final String source = File('test/readme/patterns.dart').readAsStringSync();
       final List<String> blocks = _dartBlocks(_section('Common patterns'));
-      expect(blocks, hasLength(7));
+      expect(blocks, hasLength(8));
       for (final String block in blocks) {
         expect(source.contains(block.trim()), isTrue, reason: 'not in patterns.dart:\n$block');
       }
@@ -111,6 +111,20 @@ void main() {
       await _frames(tester);
       expect(find.byType(GlassAbove), findsOneWidget);
       expect(find.byType(GlassCard), findsWidgets);
+    });
+
+    testWidgets('a tab bar that collapses on scroll', (WidgetTester tester) async {
+      await tester.pumpWidget(_hosted(const Library()));
+      await _frames(tester);
+      expect(find.text('Now playing'), findsOneWidget);
+      final ValueNotifier<bool> minimized = GlassTabBarMinimizer.maybeOf(tester.element(find.byType(GlassTabBar)))!;
+      expect(minimized.value, isFalse);
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await _frames(tester, 40);
+      expect(minimized.value, isTrue, reason: 'a scroll down collapses the bar');
+      await tester.drag(find.byType(ListView), const Offset(0, 100));
+      await _frames(tester, 40);
+      expect(minimized.value, isFalse, reason: 'a scroll up expands it');
     });
 
     testWidgets('a stand-in for a video under glass', (WidgetTester tester) async {

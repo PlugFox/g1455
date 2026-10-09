@@ -7,7 +7,8 @@ import '../widgets/stage.dart';
 import '../widgets/site_icon.dart';
 
 /// Volume and brightness on a glass card. Brightness dims the backdrop, so
-/// dragging it changes what is under the glass.
+/// dragging it changes what is under the glass. Both can snap to steps, and
+/// the card can be laid out right to left.
 class SliderDemo extends StatefulWidget {
   const SliderDemo({super.key});
 
@@ -27,6 +28,8 @@ class _SliderDemoState extends State<SliderDemo> {
   double _brightness = 0.8;
   bool _enabled = true;
   String _accent = 'Blue';
+  int? _divisions;
+  TextDirection _direction = TextDirection.ltr;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +43,9 @@ class _SliderDemoState extends State<SliderDemo> {
           ColoredBox(color: Colors.black.withValues(alpha: (1 - _brightness) * 0.7)),
         ],
       ),
-      hint: 'Press and hold a knob: it becomes a clear drop over the track. Brightness dims the picture behind.',
+      hint:
+          'Press and hold a knob: it becomes a clear drop over the track. Brightness dims the picture behind. '
+          'With steps, every drag, tap and arrow key lands on a stop.',
       knobs: <Widget>[
         KnobChoice<String>(
           label: 'Active colour',
@@ -49,35 +54,54 @@ class _SliderDemoState extends State<SliderDemo> {
           onChanged: (String a) => setState(() => _accent = a),
         ),
         KnobSwitch(label: 'Enabled', value: _enabled, onChanged: (bool v) => setState(() => _enabled = v)),
+        KnobChoice<int?>(
+          label: 'Steps',
+          values: const <int?>[null, 4, 10],
+          selected: _divisions,
+          labelOf: (int? d) => d == null ? 'Continuous' : '$d',
+          onChanged: (int? d) => setState(() => _divisions = d),
+        ),
+        KnobChoice<TextDirection>(
+          label: 'Direction',
+          values: const <TextDirection>[TextDirection.ltr, TextDirection.rtl],
+          selected: _direction,
+          labelOf: (TextDirection d) => d == TextDirection.ltr ? 'LTR' : 'RTL',
+          onChanged: (TextDirection d) => setState(() => _direction = d),
+        ),
       ],
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 380),
-            child: GlassCard(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  _SliderRow(
-                    label: 'Volume',
-                    low: SFIcons.sf_speaker_fill,
-                    high: SFIcons.sf_speaker_wave_2_fill,
-                    value: _volume,
-                    color: accent,
-                    onChanged: _enabled ? (double v) => setState(() => _volume = v) : null,
-                  ),
-                  const SizedBox(height: 8),
-                  _SliderRow(
-                    label: 'Brightness',
-                    low: SFIcons.sf_sun_min,
-                    high: SFIcons.sf_sun_max_fill,
-                    value: _brightness,
-                    color: accent,
-                    onChanged: _enabled ? (double v) => setState(() => _brightness = v) : null,
-                  ),
-                ],
+            child: Directionality(
+              textDirection: _direction,
+              child: GlassCard(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    _SliderRow(
+                      label: 'Volume',
+                      low: SFIcons.sf_speaker_fill,
+                      high: SFIcons.sf_speaker_wave_2_fill,
+                      value: _volume,
+                      color: accent,
+                      divisions: _divisions,
+                      onChanged: _enabled ? (double v) => setState(() => _volume = v) : null,
+                    ),
+                    const SizedBox(height: 8),
+                    _SliderRow(
+                      label: 'Brightness',
+                      low: SFIcons.sf_sun_min,
+                      high: SFIcons.sf_sun_max_fill,
+                      value: _brightness,
+                      color: accent,
+                      divisions: _divisions,
+                      onChanged: _enabled ? (double v) => setState(() => _brightness = v) : null,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -95,6 +119,7 @@ class _SliderRow extends StatelessWidget {
     required this.value,
     required this.color,
     required this.onChanged,
+    this.divisions,
   });
 
   final String label;
@@ -103,6 +128,7 @@ class _SliderRow extends StatelessWidget {
   final double value;
   final Color color;
   final ValueChanged<double>? onChanged;
+  final int? divisions;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -129,6 +155,7 @@ class _SliderRow extends StatelessWidget {
               activeColor: color,
               semanticLabel: label,
               semanticStep: 0.05,
+              divisions: divisions,
               onChanged: onChanged,
             ),
           ),

@@ -88,6 +88,13 @@ painted on top of it. Lift the bar with the edge; `GlassScrollEdge.child` does t
 A known issue, not yet fixed: when a host replaces one surface with another at exactly the same rect, it keeps the old
 capture, and the new surface draws nothing until something else under the glass changes.
 
+### A tab bar with minimizeBehavior: onScrollDown never collapses
+
+A scroll notification travels only up the tree, and the bar is the scroll view's sibling, not its child, so it hears
+nothing by itself. Put a `GlassTabBarMinimizer` above both the scroll view and the bar; a
+[GlassScaffold](../components/scaffold.md) is one already. Only the nearest vertical scroll view counts: a list nested in
+another scroll view, or a horizontal one, does not collapse the bar. See [Tab bar](../components/tab-bar.md).
+
 ## Look and legibility
 
 ### "A glass component has no GlassThemeData.backdrop, and its finish is not legible over every backdrop"
@@ -150,6 +157,19 @@ member of a fusing group. It is also off by default: declare it on `GlassHost.ri
 `presence` erodes the shape and is for budding inside a `GlassGroup`; a lone panel erodes to its middle line. Animate
 `materialize` to make a panel appear or leave.
 
+### A shape inside glass sits badly in its corners
+
+A highlight, a thumb or an inner panel inset in glass looks off when its corner does not share the glass's centre of
+curvature. Its radius is the glass's less the inset: `GlassConcentric.radius(outer, inset)`, or
+`GlassConcentric.borderRadius(outer, insets)` per corner, rather than a number that agrees by accident until one of the
+two moves. See [GlassSurface](../foundations/surface.md).
+
+### A badge drawn as glass is a different red over every backdrop
+
+Apple's badge is opaque, on the glass and not of it, so that it reads at a glance over anything. A translucent glass
+pill is one more surface and a colour that changes with what is behind it. Use [GlassBadge](../components/badge.md), a plain
+capsule that costs no surface.
+
 ## Cost
 
 ### Moving glass captures on every frame
@@ -163,6 +183,49 @@ still content inside it captures nothing. The switch, slider, segmented control 
 Motion is free only if moving the glass repaints nothing else, because a repaint under the glass is changed content.
 Put the still content behind a `RepaintBoundary` of its own and the moving glass behind another, so the moving glass's
 parent paints nothing. A surface that leaves the region is captured again.
+
+### A minus and a plus are two surfaces
+
+Two [GlassButton](../components/button.md)s side by side are two glasses. A [GlassStepper](../components/stepper.md) is one
+capsule, with the divider and the held half drawn inside it, and a press that costs no capture.
+
+### The search bar captures when it takes or loses the focus
+
+Cancel slides in as the field takes the focus, and the field's glass narrows to make room: glass whose box changes is
+retaken, a capture a frame for `cancelDuration`, 16 over 250 ms at 60 Hz in the package's tests, each way. A
+`GlassTravel` does not help, because it is the resize that costs, not Cancel's paint. `showsCancelButton: false` keeps
+the box still; under reduced motion the slide is one frame. See [Search bar](../components/search-bar.md).
+
+### A change inside a large sheet captures
+
+An opaque large sheet (the default `largeFinish`) reads no backdrop and is drawn on the cheap tier, which saves its
+capture: one surface fewer in it, 20,608 px² against 337,408 headless. But a cheap surface is ordinary content to the
+capture of the glass around it, so a change inside the sheet is a retake where a glass sheet took none. A sheet whose
+content animates may be cheaper with a translucent `largeFinish`. See [Sheet](../components/sheet.md).
+
+### Every press of a button captures twice
+
+The press swells the glass inside a travel region declared from touch-down until the spring settles: one capture as
+the region appears and one as it goes, nothing while it moves and nothing at rest. `GlassPress.none`, on
+`GlassHost.press`, a theme or one button, keeps the box still and builds no region.
+
+### A tab bar rebuilt by a bare setState captures once
+
+A known cost, not yet traced: a `setState` that rebuilds a [GlassTabBar](../components/tab-bar.md) costs one capture even
+when nothing it draws changed. Rebuild the bar when its selection or its items change, not with every change of the
+screen around it.
+
+### A page control captures while the pages turn
+
+It does not: the `PageView` moving under the glass does, 43 captures a swipe in the package's tests, the same with the
+dots following and with dots that stay put. Content that moves under glass is a capture a frame. See
+[Page control](../components/page-control.md).
+
+### A slider rounded in onChanged is told every frame
+
+Rounding the value yourself leaves the knob between the stops and calls `onChanged` on every frame of a drag. Pass
+`divisions`: every input lands on a stop, and `onChanged` is called only when the stop changes. See
+[Slider](../components/slider.md).
 
 ### A custom finish costs more than the preset it came from
 

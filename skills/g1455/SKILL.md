@@ -5,6 +5,7 @@ description: >-
   refraction, blur, tint, rim). Use when a Flutter project depends on g1455 or
   imports package:g1455, when code uses GlassHost, GlassSurface, GlassBar,
   GlassCard, GlassButton, GlassTabBar, GlassSwitch, GlassSlider,
+  GlassStepper, GlassSearchBar, GlassPageControl, GlassBadge,
   showGlassDialog, showGlassSheet, GlassMenuAnchor or another Glass* name, or
   when the user asks for liquid glass, glassmorphism, frosted or iOS 26 glass
   in a Flutter app.
@@ -134,9 +135,13 @@ Break one of these and the result is wrong, slow or invisible.
     to offsets yourself (or use `GlassScaffold`).
 14. **Controlled widgets.** `GlassSwitch(value:, onChanged:)`,
     `GlassSlider(value: 0..1, onChanged:)` (needs bounded width: `Expanded` in a
-    `Row`; no snapping), `GlassSegmentedControl(segments:, selectedIndex:,
-    onSelected:)` and `GlassTabBar(items:, selectedIndex:, onSelected:)` take
-    2 to 5 items. `onChanged`/`onSelected: null` disables.
+    `Row`; `divisions:` for steps, never rounding in `onChanged`),
+    `GlassStepper(value:, onChanged:, min:, max:, step:)`,
+    `GlassSegmentedControl(segments:, selectedIndex:, onSelected:)` and
+    `GlassTabBar(items:, selectedIndex:, onSelected:)` take 2 to 5 items.
+    `onChanged`/`onSelected: null` disables. The switch, slider and segmented
+    control work inside a `PageView` and a vertical list with no setup, take
+    the keyboard's focus, and mirror under RTL.
 15. **Appearing/leaving:** animate `GlassSurface.materialize` (0..1; blur and
     bend first, tint last; captures every frame while it runs). `presence`
     erodes the shape and is for budding inside a `GlassGroup`; alone it
@@ -167,6 +172,29 @@ Break one of these and the result is wrong, slow or invisible.
     texture made once while the host captures nothing for it. Never over
     content that moves (a list, a video): the glass shows the declaration, not
     the screen. `GlassBackdrop.live` hands a subtree back to the capture.
+23. **A minus and a plus are one `GlassStepper`**, not two `GlassButton`s; a
+    count on an icon is a `GlassBadge` (opaque red, not glass, costs no
+    surface), never a glass pill; a search with Cancel is `GlassSearchBar`,
+    placed on its own row (Cancel's slide narrows the glass: 16 captures over
+    250 ms each way; `showsCancelButton: false` costs none); page dots are
+    `GlassPageControl(count:, controller:)` over the `PageView`.
+24. **A tab bar that collapses on scroll** (`minimizeBehavior:
+    GlassTabBarMinimizeBehavior.onScrollDown`) needs a `GlassTabBarMinimizer`
+    above both the scroll view and the bar. `GlassScaffold` is one; a `Stack`
+    built by hand wraps itself in one. Rebuild the bar only when its selection
+    or items change: a bare `setState` on it costs a capture.
+25. **Sheets:** `showGlassSheet(detents: [GlassSheetDetent.medium,
+    GlassSheetDetent.large])` to pull up to the whole height. At large the
+    default is opaque and reads no backdrop (one surface fewer captured), but
+    then a change inside the sheet is a retake; pass a translucent
+    `largeFinish` for content that animates.
+26. **A shape nested in glass** (highlight, thumb, inner panel, ring) takes
+    `GlassConcentric.radius(outer, inset)` / `.borderRadius(outer, insets)`,
+    never a hand-picked radius.
+27. **`GlassButton` swells under a press** (`GlassPress`, 12 px): two captures a
+    press, none at rest. `GlassPress.none` on `GlassHost.press`, a
+    `GlassTheme` or one button turns it off. Never fake a press with a
+    `Transform` or `AnimatedScale` around glass.
 
 ## Pick the widget
 
@@ -174,6 +202,8 @@ Break one of these and the result is wrong, slow or invisible.
 |---|---|---|
 | App-wide capture and config | `GlassHost` | [foundations/host](references/foundations/host.md) |
 | Custom glass shape, lens, panel | `GlassSurface` | [foundations/surface](references/foundations/surface.md) |
+| Radius of a shape nested in glass | `GlassConcentric` | [foundations/surface](references/foundations/surface.md) |
+| Button press swell, or none | `GlassPress` | [components/button](references/components/button.md) |
 | Material: regular, clear, frosted, custom tint | `GlassFinish` | [foundations/finishes](references/foundations/finishes.md) |
 | Label colour, subtree finish/tier/backdrop | `GlassTheme`, `GlassThemeData` | [foundations/legibility](references/foundations/legibility.md) |
 | Glass reads its own backdrop | `GlassAdaptive` | [foundations/adaptive](references/foundations/adaptive.md) |
@@ -191,13 +221,17 @@ Break one of these and the result is wrong, slow or invisible.
 | Standalone tappable glass | `GlassButton` | [components/button](references/components/button.md) |
 | Floating content panel | `GlassCard` | [components/card](references/components/card.md) |
 | On/off | `GlassSwitch` | [components/switch](references/components/switch.md) |
-| Continuous 0..1 value | `GlassSlider` | [components/slider](references/components/slider.md) |
+| Continuous or stepped 0..1 value | `GlassSlider` | [components/slider](references/components/slider.md) |
+| Small count, one step at a time | `GlassStepper` | [components/stepper](references/components/stepper.md) |
+| Page dots over a `PageView` | `GlassPageControl` | [components/page-control](references/components/page-control.md) |
 | 2–5 views/filters in one screen | `GlassSegmentedControl` | [components/segmented-control](references/components/segmented-control.md) |
-| 2–5 app sections | `GlassTabBar`, `GlassTabItem` | [components/tab-bar](references/components/tab-bar.md) |
-| Search / single-line input | `GlassTextField`, `.search` | [components/text-field](references/components/text-field.md) |
+| 2–5 app sections, collapsing on scroll | `GlassTabBar`, `GlassTabItem`, `GlassTabBarMinimizer` | [components/tab-bar](references/components/tab-bar.md) |
+| Search with clear and Cancel | `GlassSearchBar` | [components/search-bar](references/components/search-bar.md) |
+| Single-line input | `GlassTextField`, `.search` | [components/text-field](references/components/text-field.md) |
+| Unread count or dot on an icon or tab | `GlassBadge` | [components/badge](references/components/badge.md) |
 | Row of icon actions | `GlassButtonGroup`, `GlassToolbarItem` | [components/toolbar](references/components/toolbar.md) |
 | Confirmation | `showGlassDialog`, `GlassAlert` | [components/alert](references/components/alert.md) |
-| Bottom sheet | `showGlassSheet` | [components/sheet](references/components/sheet.md) |
+| Bottom sheet, medium or large detent | `showGlassSheet`, `GlassSheetDetent` | [components/sheet](references/components/sheet.md) |
 | "More" menu of actions | `GlassMenuAnchor`, `GlassMenuItem` | [components/menu](references/components/menu.md) |
 | Panel of live controls from a button | `GlassPopoverAnchor` | [components/popover](references/components/popover.md) |
 | Glass that flows to a new child's size | `GlassMorph` | [components/morph](references/components/morph.md) |
