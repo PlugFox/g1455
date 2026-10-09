@@ -1151,10 +1151,13 @@ class _GlassHostState extends State<GlassHost> {
       // and reads nothing, so charging the atlas for it would pay for a
       // snapshot no shader will ever sample.
       //
+      // Nor is glass over a declared backdrop (`GlassBackdrop`), which samples
+      // a texture of its own: the declaration is what makes it free.
+      //
       // Nor is a surface at presence zero, which draws nothing: capturing it
       // would size the atlas — and, for a finish of its own, the divisor — for
       // glass that is not there (a control's drop at rest).
-      if (record != null && record.tier.readsBackdrop && record.presence > 0 && record.materialize > 0) {
+      if (record != null && record.readsCapture && record.presence > 0 && record.materialize > 0) {
         final GlassFinish finish = record.finish ?? _finish;
         // A widened or minifying glass samples past its box (D218); by its
         // full reach rather than the presence-scaled one, so a drop lifting in

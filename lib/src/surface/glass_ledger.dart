@@ -80,7 +80,17 @@ class GlassSurfaceRecord {
     this.finish,
     this.presence = 1,
     this.materialize = 1,
+    this.declared = false,
   });
+
+  /// Whether the surface samples a backdrop its application declared
+  /// (`GlassBackdrop`) rather than a capture. Such a surface reads a backdrop
+  /// and is in no atlas: see [readsCapture].
+  final bool declared;
+
+  /// Whether the host has to capture for this surface: it is on the rung that
+  /// reads a backdrop, and the backdrop is not declared.
+  bool get readsCapture => tier.readsBackdrop && !declared;
 
   /// How far the surface has materialized (`RenderGlassSurface.materialize`).
   /// At zero it draws nothing and is captured for nothing, like [presence].
@@ -439,7 +449,7 @@ class GlassLedger extends ChangeNotifier {
       // which was true and is now the wrong sentence, because a screen with one
       // full panel and eleven cheap ones would have reported a capture eleven
       // panels wide.
-      if (!r.tier.readsBackdrop) {
+      if (!r.readsCapture) {
         continue;
       }
       capturedCount++;

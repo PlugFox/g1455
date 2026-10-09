@@ -172,6 +172,40 @@ class Player extends StatelessWidget {
   );
 }
 
+class Lockscreen extends StatelessWidget {
+  const Lockscreen({super.key, required this.wallpaper, required this.feed});
+
+  /// The wallpaper, which does not change while the screen is up.
+  final ImageProvider wallpaper;
+
+  /// A list that scrolls under the bar.
+  final Widget feed;
+
+  @override
+  Widget build(BuildContext context) => GlassBackdrop.image(
+    wallpaper,
+    // Painted under the child, then sampled by every glass below: the cards
+    // capture nothing at all.
+    child: Column(
+      children: <Widget>[
+        const GlassCard(child: Text('12:45')),
+        const GlassCard(child: Text('2 notifications')),
+        Expanded(
+          // The bar over the list has to refract the list, so it captures.
+          child: GlassBackdrop.live(
+            child: Stack(
+              children: <Widget>[
+                feed,
+                const Positioned(left: 16, right: 16, top: 8, child: GlassBar(child: Text('Feed'))),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 Widget cheapApp({required bool reduceTransparency, required bool lowEndDevice}) => MaterialApp(
   builder: (BuildContext context, Widget? navigator) => GlassHost(
     backdrop: Colors.white, // what the opaque rung fills to match

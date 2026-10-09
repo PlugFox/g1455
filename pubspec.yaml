@@ -3,7 +3,7 @@ description: >-
   Liquid Glass for Flutter: refraction, blur and finishes; bars, tabs,
   switches, sliders, menus, sheets, dialogs and fusing groups, all sampling one
   shared capture.
-version: 0.1.4
+version: 0.1.5
 homepage: https://github.com/PlugFox/g1455
 repository: https://github.com/PlugFox/g1455
 issue_tracker: https://github.com/PlugFox/g1455/issues
@@ -52,7 +52,12 @@ screenshots:
     path: doc/screenshots/alert.webp
 
 environment:
-  sdk: ^3.13.1
+  # The Dart of Flutter 3.47.0, which `^3.13.1` shut out although the package
+  # runs on it unchanged: analyze, every test and the example's showcase pass
+  # there. Below 3.47 it does not, and not only for want of a compile:
+  # `glass_modal.dart` creates a `late` controller from `dispose`, which the
+  # framework tolerates only since 3.47 (flutter/flutter#185248).
+  sdk: ^3.13.0
   # Every number the package bakes in was measured on 3.47; below that the
   # engine paths it relies on (D200's anti-alias flag, the uber-SDF split on
   # desktop) are other code.

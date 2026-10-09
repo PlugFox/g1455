@@ -84,7 +84,23 @@ WalkAction skipGlassSurfaces(RenderObject child) {
 }
 
 /// One frame of proxy: the texture, and the map from the screen into it.
-class GlassProxyFrame {
+/// What glass samples: a texture, and where each surface's backdrop is in it.
+///
+/// The captured atlas ([GlassProxyFrame]) is one; a texture a `GlassBackdrop`
+/// declared is the other. The shader cannot tell them apart, and that is the
+/// point: a declared backdrop is drawn through the same optics, uniform for
+/// uniform, so it differs from the captured one by what is in the texture and
+/// by nothing else.
+abstract interface class GlassSampleSource {
+  /// The texture.
+  ui.Image get image;
+
+  /// Where [key]'s backdrop is in [image], or null when this source does not
+  /// hold it.
+  AtlasSlot? slotForKey(Object key);
+}
+
+class GlassProxyFrame implements GlassSampleSource {
   GlassProxyFrame._({
     required this.image,
     required this.layout,
@@ -95,6 +111,7 @@ class GlassProxyFrame {
   });
 
   /// The atlas texture. Owned by the caller: dispose it or leak it.
+  @override
   final ui.Image image;
 
   /// Where each surface's slot sits in [image], and what part of the screen it
@@ -129,6 +146,7 @@ class GlassProxyFrame {
   /// Null is the honest answer for a surface that arrived after the capture,
   /// and the caller's job is to draw nothing rather than to draw a neighbour's
   /// backdrop.
+  @override
   AtlasSlot? slotForKey(Object key) {
     final int index = keys.indexOf(key);
     if (index < 0) {

@@ -28,7 +28,7 @@
 /// | Panels and controls | [GlassBar], [GlassButton], [GlassCard], [GlassSwitch], [GlassSlider], [GlassTabBar], [GlassSegmentedControl], [GlassButtonGroup], [GlassTextField], [GlassScrollEdge], [GlassScaffold] |
 /// | Modals | [showGlassDialog], [GlassAlert], [showGlassSheet], [GlassMenuAnchor], [GlassPopoverAnchor] |
 /// | Composition | [GlassGroup], [GlassTravel], [GlassMorph], [GlassAbove] |
-/// | Capture control | [GlassProxy], [GlassProxyPainter] |
+/// | Capture control | [GlassProxy], [GlassProxyPainter], [GlassBackdrop] |
 /// | Cost and policy | [GlassTierPolicy], [GlassLedger], [GlassHardware], [GlassThermalState] |
 ///
 /// Each topic has a page of its own in the sidebar, with an overview and
@@ -81,6 +81,9 @@ export 'src/surface/glass_above.dart' show GlassAbove, RenderGlassAbove, kGlassM
 // — the one input to the label and the branch that is measured on the device
 // rather than declared.
 export 'src/surface/glass_adaptive.dart' show GlassAdaptive, GlassBackdropReading;
+// A backdrop the application declares, so the glass over it samples a texture
+// made once instead of a capture.
+export 'src/surface/glass_backdrop.dart' show GlassBackdrop, GlassBackdropDeclaration;
 export 'src/surface/glass_components.dart'
     show GlassBar, GlassButton, GlassCard, kGlassDisabledDarkLabel, kGlassDisabledLightLabel, kGlassMinTapTarget;
 // Controls whose knob becomes a clear drop while held (spike 27): the drop

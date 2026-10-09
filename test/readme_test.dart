@@ -19,6 +19,7 @@
 //    the quick-start arm fails, the README no longer showing the file.
 
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,7 +84,7 @@ void main() {
     test('every block is a verbatim piece of test/readme/patterns.dart', () {
       final String source = File('test/readme/patterns.dart').readAsStringSync();
       final List<String> blocks = _dartBlocks(_section('Common patterns'));
-      expect(blocks, hasLength(6));
+      expect(blocks, hasLength(7));
       for (final String block in blocks) {
         expect(source.contains(block.trim()), isTrue, reason: 'not in patterns.dart:\n$block');
       }
@@ -119,6 +120,34 @@ void main() {
       final GlassProxy proxy = tester.widget(find.byType(GlassProxy));
       expect(proxy.role, GlassProxyRole.replace);
       expect(find.byType(GlassBar), findsOneWidget);
+    });
+
+    testWidgets('a backdrop that does not change', (WidgetTester tester) async {
+      // A memory image decodes on an engine future, so the decode runs outside
+      // the fake clock, and only then is the declaration sampled.
+      late MemoryImage wallpaper;
+      await tester.runAsync(() async {
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 4, 4), Paint()..color = const Color(0xFF3060A0));
+        final ui.Image image = await recorder.endRecording().toImage(4, 4);
+        wallpaper = MemoryImage((await image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List());
+        image.dispose();
+      });
+      await tester.pumpWidget(
+        _hosted(
+          Lockscreen(
+            wallpaper: wallpaper,
+            feed: ListView(children: const <Widget>[]),
+          ),
+        ),
+      );
+      await tester.runAsync(() => precacheImage(wallpaper, tester.element(find.byType(Lockscreen))));
+      await _frames(tester);
+      final List<RenderGlassSurface> surfaces = tester
+          .renderObjectList<RenderGlassSurface>(find.byType(GlassSurface))
+          .toList();
+      expect(surfaces, hasLength(3));
+      expect(surfaces.where((RenderGlassSurface s) => s.readsDeclaredBackdrop), hasLength(2));
     });
 
     testWidgets('a menu and a dialog over a bar', (WidgetTester tester) async {

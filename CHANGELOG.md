@@ -1,3 +1,47 @@
+## 0.1.5
+
+A backdrop the application declares:
+
+- `GlassBackdrop` declares what is behind the glass in a subtree, and that
+  glass samples a texture made from the declaration instead of a capture of
+  the screen: `GlassBackdrop.color`, `.image` (an `ImageProvider`, placed by
+  `fit` and `alignment`), `.texture` (a `ui.Image` the application holds) and
+  `.gradient` and `.painter` (any `GlassProxyPainter`). The texture is
+  made once per finish blur and size, through the same shader and the same
+  blur arithmetic as a captured slot, and the host leaves those surfaces out
+  of its capture: a screen whose glass is all declared takes no snapshot.
+  Over a declared colour the glass draws what it draws over a captured screen
+  of that colour, to 2 code values.
+- Scoped to the subtree, innermost first: `GlassBackdrop.live` hands a part
+  back to the capture, so a page can declare its wallpaper and still let the
+  bar over its list refract the list. The widget paints what it declares under
+  its child unless `paintBackdrop: false`, and an image that has not loaded
+  leaves the glass on the capture until it has.
+- Glass over a declared backdrop is ordinary content for the capture of other
+  glass, as a cheap surface is: a captured bar over declared cards shows them.
+  Fused groups sample the declaration too. Adaptive glass does not read a
+  declared backdrop yet, and falls back to its declarations.
+- `RenderGlassSurface.paintsWithDeclaredBackdrop`,
+  `RenderGlassGroup.paintsWithDeclaredBackdrop`,
+  `RenderGlassSurface.readsDeclaredBackdrop` and
+  `GlassBackdropDeclaration.renders` say what was sampled and how many
+  textures were made; `GlassSurfaceRecord.declared` and `readsCapture` say
+  what the ledger priced.
+
+Platforms:
+
+- The floor is Flutter 3.47.0 (Dart 3.13.0): `sdk: ^3.13.1` shut 3.47.0 out
+  although the package runs on it unchanged, and CI now tests that exact
+  version rather than the newest 3.47 patch. Below 3.47 the package would need
+  code changes, and on Apple hosts that opt into SDF rendering it would draw
+  differently, so the floor stays there.
+
+Documentation:
+
+- "Misuse and common errors", in the README and on the site: each mistake
+  with what it looks like, the error text where there is one, the cause and
+  the fix.
+
 ## 0.1.4
 
 - `showGlassSheet(barrierDismissible: false)` is a sheet only its content

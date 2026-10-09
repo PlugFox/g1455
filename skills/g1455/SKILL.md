@@ -158,6 +158,15 @@ Break one of these and the result is wrong, slow or invisible.
     `kMaxFusedShapes` (12) fuse. Never wrap the page background in one.
 20. **Ripple (`GlassRipple`) is opt-in and not Apple's.** Leave it off for an
     iOS-faithful app. A rippling surface is hit-testable over its whole shape.
+21. **Never put glass inside an `Opacity`, `FadeTransition`, `ColorFilter` or
+    `ImageFiltered`.** The layer it opens drops the glass. Fade glass with
+    `materialize`; hide it with `Visibility`.
+22. **A backdrop that does not change is declared, not captured.** Glass over a
+    fixed gradient, wallpaper or colour: wrap the page in
+    `GlassBackdrop.painter` / `.image` / `.color`, and the glass samples a
+    texture made once while the host captures nothing for it. Never over
+    content that moves (a list, a video): the glass shows the declaration, not
+    the screen. `GlassBackdrop.live` hands a subtree back to the capture.
 
 ## Pick the widget
 
@@ -175,6 +184,7 @@ Break one of these and the result is wrong, slow or invisible.
 | Moving glass without captures | `GlassTravel` | [foundations/travel](references/foundations/travel.md) |
 | Glass refracting sibling glass | `GlassAbove` | [foundations/above](references/foundations/above.md) |
 | Video, platform view, map under glass | `GlassProxy` | [foundations/capture](references/foundations/capture.md) |
+| Fixed colour, gradient or wallpaper: skip the capture | `GlassBackdrop` | [foundations/backdrop](references/foundations/backdrop.md) |
 | iOS scroll-edge blur under a bar | `GlassScrollEdge` | [foundations/scroll-edge](references/foundations/scroll-edge.md) |
 | Cost, surface count, `GlassLedger` | — | [foundations/performance](references/foundations/performance.md) |
 | Top/bottom navigation capsule | `GlassBar` | [components/bar](references/components/bar.md) |
@@ -196,7 +206,10 @@ Break one of these and the result is wrong, slow or invisible.
 Background: [start/how-it-works](references/start/how-it-works.md) (what
 triggers a capture), [start/declarations](references/start/declarations.md)
 (everything the app declares), [start/platforms](references/start/platforms.md)
-(renderers, web), [start/installation](references/start/installation.md).
+(renderers, web), [start/installation](references/start/installation.md),
+[start/common-errors](references/start/common-errors.md) (symptom, cause and
+fix for missing glass, holes, grey boxes, captures on every frame, and every
+debug message the package prints).
 
 Each reference has the guide, a complete runnable example, and the full
 parameter table. Read the one for the widget you are about to use before
@@ -248,6 +261,10 @@ const SizedBox.square(
 
 ## Verify
 
+- Glass missing, grey, or capturing every frame, or a debug message from the
+  package: look it up in
+  [start/common-errors](references/start/common-errors.md) before changing
+  code.
 - `flutter analyze` must be clean; parameter names come from the references.
 - Widget tests: the first frame of a screen has no glass (the capture lands a
   frame later). Pump at least one more frame before asserting on glass. Glass

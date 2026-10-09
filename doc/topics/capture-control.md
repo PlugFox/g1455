@@ -48,3 +48,9 @@ class PosterProxyPainter extends GlassProxyPainter {
 A stand-in changes **what** the glass sees, not **when** the host captures: a
 video that composites a new frame is still a change. Live, with each
 declaration: [Capture control](https://g1455.plugfox.dev/foundations/capture).
+
+## When the backdrop is known
+
+[GlassBackdrop](../g1455/GlassBackdrop-class.html) is the other side of the same question: it declares what is behind
+the glass in a subtree — a colour, an image, a gradient — and that glass samples a texture made once from the
+declaration instead of a capture. The host captures nothing for it.

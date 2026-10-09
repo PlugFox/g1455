@@ -76,6 +76,7 @@ on the site.
 - [Common patterns](#common-patterns)
 - [What is not here, and why](#what-is-not-here-and-why)
 - [Things the application has to declare](#things-the-application-has-to-declare)
+- [Misuse and common errors](#misuse-and-common-errors)
 - [Platforms](#platforms)
 - [Diagnostics](#diagnostics)
 - [Development](#development)
@@ -316,6 +317,7 @@ budding inside a `GlassGroup`; on a lone panel it narrows to a line.
 | [`GlassTravel`][GlassTravel] | Declares the region a moving glass travels in, so the motion does not trigger a capture. |
 | [`GlassMorph`][GlassMorph] | Swap the child and the glass flows to its size, the way a button becomes its menu. A neck forms while it grows; at rest it is one plain surface. |
 | [`GlassAbove`][GlassAbove] | Raises the glass below it a level above the glass beside it: a bar over glass cards sees the cards. |
+| [`GlassBackdrop`][GlassBackdrop] | Declares what is behind the glass in a subtree — a colour, an image, a texture the app holds, a gradient — so that glass samples it instead of a capture. A screen whose glass is all declared takes no snapshot. |
 | [`GlassProxy`][GlassProxy] | Tells the capture what a subtree is: a stand-in for a video or a platform view ([`GlassProxyPainter`][GlassProxyPainter], [`SolidProxyPainter`][SolidProxyPainter], [`GradientProxyPainter`][GradientProxyPainter]), a subtree to leave out, an opaque cover, or a blur to keep. The frame the user sees does not change. |
 
 ### Policy and accounting
@@ -592,6 +594,66 @@ A stand-in changes what the glass sees, not when the host captures: a video
 that composites a new frame is still a change. Live, with each declaration:
 [Capture control](https://g1455.plugfox.dev/foundations/capture).
 
+### A backdrop that does not change
+
+When the application already knows what is behind the glass — a page of one
+colour, a wallpaper, a gradient — capturing it is a snapshot of something in
+hand. [`GlassBackdrop`][GlassBackdrop] declares it for a subtree: the glass
+below samples a texture made once from the declaration, through the same
+shader, and the host leaves it out of the capture. The cards here capture
+nothing; the bar over the list still refracts the list:
+
+```dart
+class Lockscreen extends StatelessWidget {
+  const Lockscreen({super.key, required this.wallpaper, required this.feed});
+
+  /// The wallpaper, which does not change while the screen is up.
+  final ImageProvider wallpaper;
+
+  /// A list that scrolls under the bar.
+  final Widget feed;
+
+  @override
+  Widget build(BuildContext context) => GlassBackdrop.image(
+    wallpaper,
+    // Painted under the child, then sampled by every glass below: the cards
+    // capture nothing at all.
+    child: Column(
+      children: <Widget>[
+        const GlassCard(child: Text('12:45')),
+        const GlassCard(child: Text('2 notifications')),
+        Expanded(
+          // The bar over the list has to refract the list, so it captures.
+          child: GlassBackdrop.live(
+            child: Stack(
+              children: <Widget>[
+                feed,
+                const Positioned(left: 16, right: 16, top: 8, child: GlassBar(child: Text('Feed'))),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+```
+
+| | Declares | Made |
+|---|---|---|
+| `GlassBackdrop.color` | one colour | once: a single texel, at every blur and size |
+| `GlassBackdrop.image` | an `ImageProvider`, placed by `fit` and `alignment` | once per finish blur and size, after the image loads |
+| `GlassBackdrop.texture` | a `ui.Image` the application holds | the same; a new `ui.Image` re-renders |
+| `GlassBackdrop.gradient` | a `Gradient` across the box | once per finish blur and size |
+| `GlassBackdrop.painter` | a `GlassProxyPainter`: anything drawn | the same; `shouldRepaint` re-renders |
+| `GlassBackdrop.live` | nothing: the subtree captures again | — |
+
+The declaration is what the glass shows, so it has to be true. The widget
+paints it under its child unless `paintBackdrop: false`; content between the
+backdrop and the glass is not refracted, and a backdrop that changes without
+the declaration changing is shown as it was. Until an image loads, the glass
+captures as if nothing were declared.
+
 ### The cheap rung
 
 `GlassTier.cheap` draws the tint over the backdrop and captures nothing. The
@@ -658,6 +720,126 @@ application declares them:
   records nothing, and the glass over it shows a hole. Wrap it in
   `GlassProxy.replace` with a stand-in; see
   [the pattern above](#a-video-a-map-or-a-platform-view-under-glass).
+
+## Misuse and common errors
+
+Most mistakes with glass fail quietly: no exception, only glass that is
+missing, grey, or captured on every frame. Each entry is the symptom, then the
+cause and the fix; a message a debug build prints is quoted as it starts. To see
+where the glass is, set `debugPaintGlassSurfaces = true`: every surface gets a
+cyan outline. The same list, at more length:
+[Misuse & common errors](https://g1455.plugfox.dev/start/common-errors).
+
+### Setup
+
+- **Only the children are drawn, with no glass.** No `GlassHost` above the
+  surface: it paints its child over nothing, and says nothing. Put one host in
+  `MaterialApp.builder`, as in the [quick start](#quick-start).
+- **`GlassAlert was built with no GlassHost above it.`** Or "A glass sheet", or
+  a menu's or popover's panel. Modals are built in the navigator's overlay, and
+  a host inside a route does not reach them, nor does the one `GlassScaffold`
+  mounts when none is above. Debug only; in release the modal shows without
+  glass. Move the host above the navigator.
+- **A `GlassTheme` above the host changes nothing.** The host installs its own
+  theme from its parameters. Declare on `GlassHost`, and put a `GlassTheme`
+  below it for a subtree.
+- **The first frames show no glass, then a blur without tint or rim.** The
+  first frame of a screen has no glass by design: the capture reads the frame
+  just painted. The blur without optics is the shaders still compiling;
+  `await GlassHost.precache()` in `main()` compiles them first.
+
+### What the glass shows
+
+- **A hole over a video, a map or a platform view.** They paint outside
+  Flutter's pictures and record nothing into the capture. Wrap them in
+  `GlassProxy.replace` with a stand-in, as in
+  [the pattern above](#a-video-a-map-or-a-platform-view-under-glass).
+- **Glass inside an `Opacity` or a fade disappears.** An `Opacity` below 1, a
+  `FadeTransition`, a `ColorFilter` or an `ImageFiltered` opens a layer, and
+  glass inside it does not survive it. On the cheap rung the rim and the press
+  highlight add to the layer instead: one `Opacity(0.99)` above a button takes
+  its press from +50 code values to +4. Fade glass with
+  `GlassSurface.materialize`, hide it with `Visibility`. Content fading *under*
+  glass is fine.
+- **A bar over glass cards shows the page with the cards cut out.** Sibling
+  glass does not see sibling glass: wrap the bar in `GlassAbove`, as in
+  [Glass on glass](#glass-on-glass).
+- **An unlifted bar shows up blurred inside a scroll edge.** Levels are a
+  declaration, not paint order. Lift the bar with the edge, which
+  `GlassScrollEdge.child` does.
+- **A surface that replaces another at the same place draws nothing.** A known
+  issue: a host replacing one surface with another at exactly the same rect
+  keeps the old capture until something else under the glass changes.
+- **The glass does not refract what scrolls under it.** A `GlassBackdrop`
+  above it declares the backdrop, and the glass shows the declaration only.
+  Wrap the part with live content in `GlassBackdrop.live`.
+
+### Look and legibility
+
+- **`A glass component has no GlassThemeData.backdrop, and its finish is not
+  legible over every backdrop`.** Declare `backdrop` for a flat screen, or
+  `richBackdrop: true` with `minLabelContrast` over an image or a feed; see
+  [what the application declares](#things-the-application-has-to-declare).
+- **`GlassTier.opaque with no GlassThemeData.backdrop declared.`** The opaque
+  rung fills with the level the glass shows over `backdrop`; without one it
+  fills with the tint, 29 of 255 for `.regularDark` where the glass shows 69
+  over mid-grey. Declare `backdrop` whenever reduce transparency can be on.
+- **Glass over a flat colour is a grey box.** There is nothing to refract. Put
+  glass over content, or use a plain `Container`.
+- **A lens or a held drop looks grey.** The label floor dims glass for a label
+  it does not have: pass `labelled: false` to glass with no text.
+- **Labels in a bar have the wrong colour.** Bars, cards, buttons and modals set
+  `DefaultTextStyle` and `IconTheme` to a legible colour; a colour hard-coded
+  inside them overrides it.
+- **Adaptive glass does not adapt.** `GlassAdaptive` re-picks bars, cards and
+  buttons. A raw `GlassSurface`, `GlassScrollEdge`, the tab bar and the
+  segmented control do not adapt, and a finish named anywhere is held.
+- **`N of M surfaces in a GlassGroup name their own finish.`** A fused group is
+  one draw with one finish: the group's. Its members draw no `fade` and no
+  ripple either.
+- **`A GlassGroup holds N surfaces; the fused draw carries 12.`** Past
+  `kMaxFusedShapes` the group is refused, not truncated: the members draw
+  themselves without the bridges. Fuse fewer.
+- **A ripple does not show.** It is off by default, under reduced motion,
+  below `GlassTier.full` and on a fused group member.
+- **A panel appearing through `presence` narrows to a line.** `presence` is for
+  budding inside a group; animate `materialize` instead.
+
+### Cost
+
+- **Moving glass captures on every frame.** Its slot is its own box. Wrap the
+  region it moves in in a `GlassTravel`, as in
+  [the pattern above](#moving-glass-inside-a-glasstravel).
+- **Glass in a `GlassTravel` still captures as it moves.** Moving it must
+  repaint nothing else: put the still content and the moving glass behind a
+  `RepaintBoundary` each.
+- **A custom finish costs more than its preset.** A `name` outside the measured
+  tables gets no lower capture resolution. Derive it with `copyWith`, which
+  keeps the name.
+- **Too much glass.** Each surface is a draw, and the cost grows faster than
+  the count: glass is for bars and controls, not every card of a feed. A row of
+  icon actions is one `GlassButtonGroup`; a group is a look, not a saving
+  (twelve clustered surfaces cost 1.60 to 1.65 times ungrouped).
+- **Glass is coarser on a large window.** The capture must fit the GPU's
+  texture limit, and the host assumes the specification's floor (4096 on
+  Vulkan, 8192 on Metal). Every GPU measured allocates 16384:
+  `GlassHost(maxTextureSide: 16384)` on a device you know.
+- **Every frame captures, still or not.** `content:
+  GlassContentDeclaration.undeclared` is for ruling the change detection out,
+  not for shipping; nor are `maxCaptures`, `resolution` and `blurPass`.
+
+### Platform settings and tests
+
+- **Reduce transparency, contrast on macOS or thermal state change nothing.**
+  Flutter does not pass them on: read them natively and
+  [declare them](#things-the-application-has-to-declare). A
+  `GlassTierPolicy(pinned: ...)` overrides the user's setting; never ship one.
+- **A widget test finds no glass.** The test needs a `GlassHost` above the glass
+  (above the `Navigator` for modals), and the first frame has none: pump one
+  more.
+- **`await GlassHost.precache()` hangs in a widget test.** The fake clock never
+  completes the shader load. Alternate `tester.runAsync` with `tester.pump`
+  until it completes, or leave the precache out.
 
 ## Platforms
 
@@ -804,6 +986,7 @@ from the tables beside them; change both together.
 [GlassUnion]: https://pub.dev/documentation/g1455/latest/g1455/GlassUnion-class.html
 [GlassTravel]: https://pub.dev/documentation/g1455/latest/g1455/GlassTravel-class.html
 [GlassAbove]: https://pub.dev/documentation/g1455/latest/g1455/GlassAbove-class.html
+[GlassBackdrop]: https://pub.dev/documentation/g1455/latest/g1455/GlassBackdrop-class.html
 [GlassProxy]: https://pub.dev/documentation/g1455/latest/g1455/GlassProxy-class.html
 [GlassProxyPainter]: https://pub.dev/documentation/g1455/latest/g1455/GlassProxyPainter-class.html
 [SolidProxyPainter]: https://pub.dev/documentation/g1455/latest/g1455/SolidProxyPainter-class.html

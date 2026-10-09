@@ -105,6 +105,7 @@ catch it if the app should start regardless.
   [Alert](../components/alert.md), [Sheet](../components/sheet.md) and more.
 - [Adaptive glass](../foundations/adaptive.md): glass that reads its backdrop, for screens over photographs.
 - [Performance](../foundations/performance.md): what glass costs and how to keep it cheap.
+- [Misuse & common errors](../start/common-errors.md): missing glass, holes, grey boxes, and what the debug messages mean.
 
 ## Complete example
 

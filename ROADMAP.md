@@ -58,6 +58,29 @@ cheap setting is reachable without a fork.
 - [x] `GlassScaffold`: a host, a bar, a body that scrolls under it and an
       optional tab bar, wired the way the README recommends.
 
+## Done — 0.1.5
+
+- [x] A backdrop the application declares (`GlassBackdrop`): a colour, an
+      image, a texture or a painter, per subtree. Glass under it samples a
+      texture made once per finish blur and size, and the host captures
+      nothing for it; `GlassBackdrop.live` hands a part back to the capture.
+- [x] The SDK floor at Flutter 3.47.0 / Dart 3.13.0, the lowest the package
+      runs on unchanged; CI tests that exact version.
+- [x] "Misuse and common errors" in the README and on the site.
+
+## Next — what 0.1.5 left open
+
+- [ ] Measure a declared backdrop against its capture on the devices: the
+      saving is a snapshot per changed frame, and a still screen already
+      holds its capture, so the price on a scrolling or animating screen is
+      the number to have.
+- [ ] Adaptive glass over a declared backdrop: the texture is in hand, so the
+      mean level is a read-back once per texture, not per capture.
+- [ ] `glass_modal.dart` creates a `late` animation controller from `dispose`
+      the first time it is read there; Flutter tolerates it from 3.47 only
+      (flutter/flutter#185248). Creating it in `initState` is the whole fix,
+      and the first step towards any floor below 3.47.
+
 ## Next — what the branch left open
 
 - [ ] Adaptivity for the rest: a raw `GlassSurface`, `GlassScrollEdge` (still

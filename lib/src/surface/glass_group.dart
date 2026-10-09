@@ -35,6 +35,7 @@ import 'package:flutter/widgets.dart';
 import '../proxy/proxy_atlas.dart';
 import '../proxy/proxy_pipeline.dart';
 import '../proxy/proxy_walk.dart';
+import 'glass_backdrop.dart';
 import 'glass_draw_layer.dart';
 import 'glass_finish.dart';
 import 'glass_host.dart';
@@ -103,8 +104,16 @@ class GlassBlendGroup implements GlassSurfaceCluster {
   /// their own glass, so its subtree still has to stay out of the proxy. Below
   /// the top rung nothing in it draws a proxy at all, and then it is ordinary
   /// content.
+  ///
+  /// A group over a declared backdrop draws no proxy either, and is ordinary
+  /// content for the same reason a lone surface over one is.
   @override
-  bool get excludedFromProxy => _tier.readsBackdrop;
+  bool get excludedFromProxy => _tier.readsBackdrop && !declared;
+
+  /// Whether the group samples a declared backdrop (`GlassBackdrop`) rather
+  /// than the host's capture. Its fused members report this as their own: the
+  /// group draws their glass, so the group's declaration is the one in force.
+  bool get declared => _owner?.readsDeclaredBackdrop ?? false;
 
   @override
   double get bridgeReach {
@@ -965,6 +974,7 @@ class _GlassGroupRenderWidget extends SingleChildRenderObjectWidget {
   @override
   RenderGlassGroup createRenderObject(BuildContext context) => RenderGlassGroup(group, GlassScope.maybeOf(context))
     ..proxy = GlassProxyScope.maybeOf(context)
+    ..backdrop = GlassBackdrop.maybeOf(context)
     ..theme = GlassTheme.of(context)
     ..spacing = spacing
     ..finish = finish
@@ -976,6 +986,7 @@ class _GlassGroupRenderWidget extends SingleChildRenderObjectWidget {
     renderObject
       ..ledger = GlassScope.maybeOf(context)
       ..proxy = GlassProxyScope.maybeOf(context)
+      ..backdrop = GlassBackdrop.maybeOf(context)
       ..theme = GlassTheme.of(context)
       ..spacing = spacing
       ..finish = finish
@@ -1113,11 +1124,18 @@ class RenderGlassGroup extends RenderProxyBox {
 
   /// Repaints for a new proxy, and only if this group is going to read it. See
   /// `RenderGlassSurface._onProxyPublished`.
+  ///
+  /// Over a declared backdrop only a program that arrived repaints it; see the
+  /// surface's.
   void _onProxyPublished() {
-    if (_group.tier.readsBackdrop) {
+    if (_group.excludedFromProxy ||
+        (_group.tier.readsBackdrop && readsDeclaredBackdrop && !identical(_proxy?.groupProgram, _paintedProgram))) {
       markNeedsPaint();
     }
   }
+
+  /// The program the last fused draw was recorded with, or null.
+  ui.FragmentProgram? _paintedProgram;
 
   GlassThemeData _theme = const GlassThemeData();
 
@@ -1267,6 +1285,7 @@ class RenderGlassGroup extends RenderProxyBox {
   void resetCounters() {
     fusedPaints = 0;
     paintsIntoProxy = 0;
+    paintsWithDeclaredBackdrop = 0;
     refusedPaints = 0;
     paintsWithoutProxy = 0;
     splitSlots = 0;
@@ -1371,7 +1390,7 @@ class RenderGlassGroup extends RenderProxyBox {
   /// by a scroll paints this node. Everything the draw needs is read when it is
   /// recorded, so the counters below count recorded draws.
   void _paintFusedLayer(PaintingContext context, Offset offset) {
-    final GlassProxyFrame? frame = _frame;
+    final GlassSampleSource? frame = _frame;
     if (context is ProxyWalkContext) {
       // Into the capture of glass standing on this group; see
       // `RenderGlassSurface._paintIntoProxy`.
@@ -1381,9 +1400,13 @@ class RenderGlassGroup extends RenderProxyBox {
       }
       return;
     }
+    _paintedProgram = _proxy?.groupProgram;
     if (frame == null || _proxy?.groupProgram == null) {
       paintsWithoutProxy++;
       return;
+    }
+    if (frame is! GlassProxyFrame) {
+      paintsWithDeclaredBackdrop++;
     }
     final GlassDrawLayer layer = _drawLayer.layer ??= GlassDrawLayer();
     layer
@@ -1398,9 +1421,14 @@ class RenderGlassGroup extends RenderProxyBox {
     context.addLayer(layer);
   }
 
-  /// The frame the members' slot is in: the base one, or the level of glass
-  /// this group stands at.
-  GlassProxyFrame? get _frame {
+  /// What the group samples: the declared backdrop's texture for its finish,
+  /// or the frame the members' slot is in — the base one, or the level of
+  /// glass this group stands at.
+  GlassSampleSource? get _frame {
+    final GlassBackdropDeclaration? backdrop = _backdrop;
+    if (backdrop != null && backdrop.ready) {
+      return declaredTextureFor(backdrop, effectiveFinish.blurSigmaLogical);
+    }
     final GlassProxyHandle? proxy = _proxy;
     if (proxy == null) {
       return null;
@@ -1411,6 +1439,30 @@ class RenderGlassGroup extends RenderProxyBox {
   /// Fused draws made into a capture of the level above rather than onto the
   /// screen.
   int paintsIntoProxy = 0;
+
+  /// Fused draws that sampled a declared backdrop (`GlassBackdrop`) rather
+  /// than the host's capture. See `RenderGlassSurface.paintsWithDeclaredBackdrop`.
+  int paintsWithDeclaredBackdrop = 0;
+
+  GlassBackdropDeclaration? _backdrop;
+
+  /// The backdrop declared above this group, or null where it samples the
+  /// host's capture.
+  set backdrop(GlassBackdropDeclaration? value) {
+    if (identical(value, _backdrop)) {
+      return;
+    }
+    _backdrop?.removeListener(markNeedsPaint);
+    _backdrop = value;
+    if (attached) {
+      _backdrop?.addListener(markNeedsPaint);
+    }
+    markNeedsPaint();
+  }
+
+  /// Whether this group samples a declared backdrop now; see
+  /// `RenderGlassSurface.readsDeclaredBackdrop`.
+  bool get readsDeclaredBackdrop => _backdrop?.ready ?? false;
 
   final LayerHandle<GlassDrawLayer> _drawLayer = LayerHandle<GlassDrawLayer>();
 
@@ -1429,11 +1481,12 @@ class RenderGlassGroup extends RenderProxyBox {
 
   List<Object?> _drawProbe() => <Object?>[
     if (attached && hasSize) globalRect,
+    _backdrop?.globalRect,
     for (final RenderGlassSurface member in _group._members)
       if (member.attached && member.hasSize) ...<Object?>[member.globalRect, member.presence],
   ];
 
-  void _paintFused(Canvas canvas, Offset offset, GlassProxyFrame frame) {
+  void _paintFused(Canvas canvas, Offset offset, GlassSampleSource frame) {
     final ui.FragmentProgram program = _proxy!.groupProgram!;
     // Every member that is on the screen, and the slot they share. A member the
     // frame has never seen — mounted since the last capture — is left out of
@@ -1691,11 +1744,13 @@ class RenderGlassGroup extends RenderProxyBox {
     _live.add(this);
     _ledger?.registerCluster(_group);
     _proxy?.addListener(_onProxyPublished);
+    _backdrop?.addListener(markNeedsPaint);
   }
 
   @override
   void detach() {
     _live.remove(this);
+    _backdrop?.removeListener(markNeedsPaint);
     _ledger?.unregisterCluster(_group);
     _proxy?.removeListener(_onProxyPublished);
     super.detach();
@@ -1707,6 +1762,7 @@ class RenderGlassGroup extends RenderProxyBox {
     _live.remove(this);
     _ledger?.unregisterCluster(_group);
     _proxy?.removeListener(_onProxyPublished);
+    _backdrop?.removeListener(markNeedsPaint);
     _group._owner = null;
     super.dispose();
   }

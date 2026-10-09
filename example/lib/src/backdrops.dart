@@ -103,6 +103,9 @@ class PhotoBackdrop extends StatelessWidget {
   Widget build(BuildContext context) => CustomPaint(painter: _PhotoPainter(seed));
 }
 
+/// The painter of [PhotoBackdrop], for a demo that renders it into an image.
+CustomPainter photoPainter(int seed) => _PhotoPainter(seed);
+
 class _PhotoPainter extends CustomPainter {
   _PhotoPainter(this.seed);
 

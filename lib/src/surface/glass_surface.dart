@@ -38,6 +38,7 @@ import 'dart:ui' as ui;
 import '../proxy/proxy_atlas.dart';
 import '../proxy/proxy_pipeline.dart';
 import '../proxy/proxy_walk.dart';
+import 'glass_backdrop.dart';
 import 'glass_draw_layer.dart';
 import 'glass_finish.dart';
 import 'glass_group.dart';
@@ -334,6 +335,7 @@ class GlassSurface extends SingleChildRenderObjectWidget {
   RenderGlassSurface createRenderObject(BuildContext context) =>
       RenderGlassSurface(borderRadius, GlassScope.maybeOf(context))
         ..proxy = GlassProxyScope.maybeOf(context)
+        ..backdrop = GlassBackdrop.maybeOf(context)
         ..group = GlassGroupScope.maybeOf(context)
         ..travel = GlassTravelScope.maybeOf(context)
         ..theme = GlassTheme.of(context)
@@ -356,6 +358,7 @@ class GlassSurface extends SingleChildRenderObjectWidget {
     renderObject
       ..ledger = GlassScope.maybeOf(context)
       ..proxy = GlassProxyScope.maybeOf(context)
+      ..backdrop = GlassBackdrop.maybeOf(context)
       ..group = GlassGroupScope.maybeOf(context)
       ..travel = GlassTravelScope.maybeOf(context)
       ..theme = GlassTheme.of(context)
@@ -684,8 +687,11 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// existed. It shows up on a mixed one, twice: a full panel would read a
   /// backdrop with the cheap panel next to it missing, and the layer watch
   /// would hold that backdrop over a cheap panel that had changed.
+  ///
+  /// Glass over a declared backdrop draws no proxy either — it samples the
+  /// declaration — so it is ordinary content too, for the same two machines.
   @override
-  bool get excludedFromProxy => effectiveTier.readsBackdrop;
+  bool get excludedFromProxy => effectiveTier.readsBackdrop && !readsDeclaredBackdrop;
 
   /// Repaints for a new proxy — and only if this surface is going to read it.
   ///
@@ -695,13 +701,27 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// which the host's repaint observer reports as a change, which records
   /// another capture. A publish loop with the holding declaration defeated, on
   /// the one screen shape the ladder exists to make cheaper.
+  ///
+  /// Glass over a declared backdrop reads no publish, but it does read the
+  /// programs the handle carries: a shader that arrives after the first frame
+  /// has to reach it, or it draws the unrefracted declaration until something
+  /// else repaints it — on a still screen, for ever, since no capture comes to
+  /// repaint it.
   void _onProxyPublished() {
-    if (effectiveTier.readsBackdrop) {
+    if (excludedFromProxy ||
+        (effectiveTier.readsBackdrop &&
+            readsDeclaredBackdrop &&
+            (!identical(_proxy?.program, _paintedProgram) || !identical(_proxy?.rippleProgram, _paintedRipple)))) {
       _repaintingForProxy = true;
       markNeedsPaint();
       _repaintingForProxy = false;
     }
   }
+
+  /// The programs the last glass draw was recorded with; see
+  /// [_onProxyPublished].
+  ui.FragmentProgram? _paintedProgram;
+  ui.FragmentProgram? _paintedRipple;
 
   /// Whether what this surface holds has to be painted again — set by every
   /// `markNeedsPaint` except the one a new proxy asks for.
@@ -824,7 +844,39 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       finish: fusedByGroup ? (_group?.finish ?? effectiveFinish) : effectiveFinish,
       presence: _presence,
       materialize: fusedByGroup ? 1 : _materialize,
+      declared: fusedByGroup ? (_group?.declared ?? false) : readsDeclaredBackdrop,
     );
+  }
+
+  GlassBackdropDeclaration? _backdrop;
+
+  /// The backdrop declared above this surface (`GlassBackdrop`), or null where
+  /// it samples the host's capture.
+  set backdrop(GlassBackdropDeclaration? value) {
+    if (identical(value, _backdrop)) {
+      return;
+    }
+    _backdrop?.removeListener(markNeedsPaint);
+    _backdrop = value;
+    if (attached) {
+      _backdrop?.addListener(markNeedsPaint);
+    }
+    markNeedsPaint();
+  }
+
+  /// Whether this surface samples a declared backdrop now: one is declared
+  /// above, and it is ready — an image that has not loaded leaves the surface
+  /// on the capture.
+  bool get readsDeclaredBackdrop => _backdrop?.ready ?? false;
+
+  /// What this surface samples now: the declared backdrop's texture for its
+  /// finish, or the host's frame that holds its slot.
+  GlassSampleSource? get _source {
+    final GlassBackdropDeclaration? backdrop = _backdrop;
+    if (backdrop != null && backdrop.ready) {
+      return declaredTextureFor(backdrop, effectiveFinish.blurSigmaLogical);
+    }
+    return _proxy?.frameFor(this);
   }
 
   GlassProxyHandle? _proxy;
@@ -927,7 +979,19 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   int paintsWithoutProxy = 0;
 
   /// Frames this surface painted the proxy.
+  ///
+  /// A declared backdrop counts here too — it is what the surface samples —
+  /// and in [paintsWithDeclaredBackdrop] as well.
   int paintsWithProxy = 0;
+
+  /// Of [paintsWithProxy], the frames that sampled a declared backdrop
+  /// (`GlassBackdrop`) rather than the host's capture.
+  ///
+  /// The trace of the declaration: a surface over a declared colour and one
+  /// over a captured screen of that colour draw the same pixels, so without
+  /// this a declaration that silently fell back to the capture would pass
+  /// every pixel arm.
+  int paintsWithDeclaredBackdrop = 0;
 
   /// Frames this surface left its glass to the group above it.
   ///
@@ -977,6 +1041,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   void resetCounters() {
     paintsWithoutProxy = 0;
     paintsWithProxy = 0;
+    paintsWithDeclaredBackdrop = 0;
     paintsWithOptics = 0;
     paintsDeferredToGroup = 0;
     paintsCheap = 0;
@@ -1045,14 +1110,18 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       _paintIntoProxy(context.canvas, offset);
       return;
     }
-    final GlassProxyFrame? frame = _proxy?.frameFor(this);
-    final AtlasSlot? slot = frame?.slotForKey(this);
-    if (frame == null || slot == null) {
+    final GlassSampleSource? source = _source;
+    if (source == null || source.slotForKey(this) == null) {
       paintsWithoutProxy++;
       return;
     }
     paintsWithProxy++;
+    if (source is! GlassProxyFrame) {
+      paintsWithDeclaredBackdrop++;
+    }
     final ui.FragmentProgram? program = _proxy?.program;
+    _paintedProgram = program;
+    _paintedRipple = _proxy?.rippleProgram;
     if (program != null) {
       paintsWithOptics++;
       if (!debugGlassShaderAntiAlias) {
@@ -1070,14 +1139,21 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
         // A frame the pipeline has since replaced is disposed: drawing it
         // would sample a released texture. Only reachable by compositing a
         // moved surface without painting it first, which `drawFrame` never
-        // does — it paints the publish before it composites.
-        if (!identical(_proxy?.frameFor(this), frame)) {
+        // does — it paints the publish before it composites. A declared
+        // texture is replaced the same way, when its box is resized.
+        if (!identical(_source, source)) {
+          return;
+        }
+        // The slot read here rather than at paint: a declared backdrop can
+        // move without this surface painting, and the probe re-records then.
+        final AtlasSlot? slot = source.slotForKey(this);
+        if (slot == null) {
           return;
         }
         if (program != null) {
-          _paintOptics(canvas, offset, frame, slot, program, ripple: true);
+          _paintOptics(canvas, offset, source, slot, program, ripple: true);
         } else {
-          _paintImage(canvas, offset, frame, slot);
+          _paintImage(canvas, offset, source, slot);
         }
       };
     context.addLayer(layer);
@@ -1104,17 +1180,17 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// frame is the one this surface reads on screen, already published for this
   /// round: the host records the levels bottom up.
   void _paintIntoProxy(Canvas canvas, Offset offset) {
-    final GlassProxyFrame? frame = _proxy?.frameFor(this);
-    final AtlasSlot? slot = frame?.slotForKey(this);
-    if (frame == null || slot == null) {
+    final GlassSampleSource? source = _source;
+    final AtlasSlot? slot = source?.slotForKey(this);
+    if (source == null || slot == null) {
       return;
     }
     paintsIntoProxy++;
     final ui.FragmentProgram? program = _proxy?.program;
     if (program != null) {
-      _paintOptics(canvas, offset, frame, slot, program);
+      _paintOptics(canvas, offset, source, slot, program);
     } else {
-      _paintImage(canvas, offset, frame, slot);
+      _paintImage(canvas, offset, source, slot);
     }
   }
 
@@ -1134,7 +1210,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       shift = debugSampleShift;
       return true;
     }());
-    return <Object?>[if (attached && hasSize) globalRect.topLeft, shift];
+    return <Object?>[if (attached && hasSize) globalRect.topLeft, shift, _backdrop?.globalRect];
   }
 
   /// Draws the captured backdrop inside this surface's shape, unrefracted — what
@@ -1150,7 +1226,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   /// its whole rect would differ from the screen in the corners and the
   /// invisibility control would fail there and nowhere else, which is the
   /// hardest place to read a diff.
-  void _paintImage(Canvas canvas, Offset offset, GlassProxyFrame frame, AtlasSlot slot) {
+  void _paintImage(Canvas canvas, Offset offset, GlassSampleSource source, AtlasSlot slot) {
     final double inset = presenceInset();
     if (inset >= size.shortestSide / 2) {
       return;
@@ -1172,7 +1248,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       ..save()
       ..clipRSuperellipse(inset > 0 ? shapeAt(offset).deflate(inset) : shapeAt(offset))
       ..drawImageRect(
-        frame.image,
+        source.image,
         Rect.fromPoints(topLeft, bottomRight),
         box,
         // `low`, and both halves of that are measured. Not the default, which
@@ -1341,7 +1417,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
   void _paintOptics(
     Canvas canvas,
     Offset offset,
-    GlassProxyFrame frame,
+    GlassSampleSource source,
     AtlasSlot slot,
     ui.FragmentProgram program, {
     bool ripple = false,
@@ -1375,8 +1451,8 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     final Color rim = contrastRim ?? finish.rim;
     final double rimWidth = contrastRim != null ? kHighContrastRimWidthLogical : (rim.a <= 0 ? 0 : kRimWidthLogical);
     final ui.FragmentShader shader = program.fragmentShader()
-      ..setFloat(0, frame.image.width.toDouble())
-      ..setFloat(1, frame.image.height.toDouble())
+      ..setFloat(0, source.image.width.toDouble())
+      ..setFloat(1, source.image.height.toDouble())
       ..setFloat(2, mapOrigin.dx)
       ..setFloat(3, mapOrigin.dy)
       ..setFloat(4, scale)
@@ -1424,7 +1500,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
       // Explicit, always: the default is nearest, which is the defect that
       // killed the precedents' path (D1) and which at a divisor would make the
       // proxy measure aliasing instead of resolution.
-      ..setImageSampler(0, frame.image, filterQuality: FilterQuality.low);
+      ..setImageSampler(0, source.image, filterQuality: FilterQuality.low);
     if (rippleProgram != null) {
       _writeWaves(shader, waves);
     }
@@ -1472,6 +1548,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     _ledger?.register(this);
     _group?.join(this);
     _proxy?.addListener(_onProxyPublished);
+    _backdrop?.addListener(markNeedsPaint);
     if (_rippleField != null) {
       _proxy?.wantRippleProgram();
     }
@@ -1486,6 +1563,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     // registeredCount], which counts declarations rather than places.
     _ledger?.unregister(this);
     _proxy?.removeListener(_onProxyPublished);
+    _backdrop?.removeListener(markNeedsPaint);
     _stopRipple();
     _rippleField?.clear();
     super.detach();
@@ -1498,6 +1576,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     _ledger?.unregister(this);
     _group?.leave(this);
     _proxy?.removeListener(_onProxyPublished);
+    _backdrop?.removeListener(markNeedsPaint);
     super.dispose();
   }
 
@@ -1506,5 +1585,6 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     super.debugFillProperties(properties);
     properties.add(DiagnosticsProperty<BorderRadius>('borderRadius', _borderRadius));
     properties.add(FlagProperty('registered', value: _ledger != null, ifFalse: 'no GlassScope above'));
+    properties.add(FlagProperty('declaredBackdrop', value: readsDeclaredBackdrop, ifTrue: 'samples a GlassBackdrop'));
   }
 }

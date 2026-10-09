@@ -67,6 +67,9 @@ opaque: its corners are where the page shows through.
 resolution, and that is a cheaper and better-looking saving than swapping text for blocks of colour. Declare what the
 capture cannot know, not what it can.
 
+When the whole backdrop is known and does not change (one colour, a gradient, a wallpaper), the capture can be skipped
+altogether: declare it with [`GlassBackdrop`](../foundations/backdrop.md).
+
 ## Complete example
 
 ```dart

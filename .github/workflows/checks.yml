@@ -26,11 +26,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The floor the pubspec declares, and whatever stable is today (an
-        # empty version is the channel's latest).
+        # The floor the pubspec declares, exactly — `3.47.x` resolves to the
+        # newest 3.47 patch, which is the same SDK as the stable leg — and
+        # whatever stable is today (an empty version is the channel's latest).
         include:
-          - name: '3.47'
-            version: '3.47.x'
+          - name: '3.47.0'
+            version: '3.47.0'
           - name: stable
             version: ''
     steps:
@@ -50,8 +51,12 @@ jobs:
           flutter pub get
           (cd example && flutter pub get)
 
-      # Width and trailing commas come from analysis_options.yaml.
+      # Width and trailing commas come from analysis_options.yaml. On the
+      # floor leg only: the formatter's style follows the language version, but
+      # a later SDK can ship a style fix that does not, and two legs would then
+      # demand two layouts of one file.
       - name: Format
+        if: matrix.name == '3.47.0'
         run: dart format --output=none --set-exit-if-changed .
 
       - name: Analyze
