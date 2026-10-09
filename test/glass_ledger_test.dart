@@ -489,7 +489,7 @@ void main() {
       expect(
         choice.routeCostFactor == null,
         hardware == GlassHardware.unmeasured || hardware == GlassHardware.adrenoVulkan,
-        reason: '$hardware: the route is priced on Metal alone (D128)',
+        reason: '$hardware: the route is priced on Metal alone',
       );
     }
     // The negative control in the same arm, and it is about the *ledger*

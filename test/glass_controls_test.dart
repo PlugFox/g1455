@@ -313,7 +313,7 @@ void main() {
     }
   });
 
-  test('the drop optics reproduce the two readings they were fitted to (D218)', () {
+  test('the drop optics reproduce the two readings they were fitted to', () {
     // The shader's bend: `(1 - (u/t)^shoulder)^edgePower`, times the strength.
     double shift(double u) {
       const GlassOptics o = kGlassDropOptics;

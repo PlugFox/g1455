@@ -340,7 +340,7 @@ void main() {
     expect(
       coarse.layout.pixelRatio,
       0.5,
-      reason: 'dpr 1 keeps only a half — the policy refuses a quarter on a coarse screen (D120)',
+      reason: 'dpr 1 keeps only a half — the policy refuses a quarter on a coarse screen',
     );
     // Same texel scale by coincidence, and the atlas is still the same size —
     // which is why the arm that matters is the one below: the *sources* have to

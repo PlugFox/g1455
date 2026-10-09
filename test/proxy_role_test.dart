@@ -289,7 +289,11 @@ void main() {
 
     // `ColoredBox` lowers to a private render object, so nothing public
     // can read its colour. That is the whole reason the declaration exists.
-    expect(without.hasCover, isFalse, reason: 'a ColoredBox became readable — check D42');
+    expect(
+      without.hasCover,
+      isFalse,
+      reason: 'a ColoredBox became readable, so the opaque declaration may be redundant',
+    );
     expect(with_.hasCover, isTrue, reason: 'the declaration did not reach the planner');
     expect(with_.occludedNodes, greaterThan(0));
     expect(cut.policy!.valid, isTrue, reason: 'paint order disagreed with visit order');

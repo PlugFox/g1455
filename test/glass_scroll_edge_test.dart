@@ -44,7 +44,7 @@ const double kBottom = 86;
 final GlobalKey _shotKey = GlobalKey();
 
 void main() {
-  test('the instrument reads Apple\'s frames as the spike\'s tools did', () async {
+  test('the instrument reads Apple\'s frames as the original tools did', () async {
     final _Fit dark = _fit(await _frame('soft_dark'), await _frame('hidden_dark'));
     final _Fit light = _fit(await _frame('soft_light'), await _frame('hidden_light'));
     // ignore: avoid_print

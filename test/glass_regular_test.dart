@@ -76,11 +76,11 @@ void main() {
   // 1. The constants are the run's.
   // -------------------------------------------------------------------------
 
-  test('the dark fit is S4\'s, so the simulator reads this material', () {
+  test('the dark fit is the reference\'s, so the simulator reads this material', () {
     final fit = s4Fit('dark', 'regular');
     const GlassFinish dark = GlassFinish.regularDark;
     expect(fit.slope, closeTo(1 - dark.tint.a, 0.003));
-    expect(fit.intercept / (1 - fit.slope), closeTo(255 * dark.tint.r, 2), reason: 'the tint is not S4\'s');
+    expect(fit.intercept / (1 - fit.slope), closeTo(255 * dark.tint.r, 2), reason: 'the tint is not the reference\'s');
   });
 
   test('the light branch is the light fit, and the law describes it as well as the dark', () {

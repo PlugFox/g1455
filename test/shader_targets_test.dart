@@ -233,7 +233,7 @@ void main() {
           '$s does not build for every target.\n'
           '${failed.isEmpty ? all.message : failed.join('\n')}\n'
           'The escape is compile-time: #ifdef SKIA_GRAPHICS_BACKEND for the '
-          'fallback, IMPELLER_GRAPHICS_BACKEND for the real technique (spike #19). '
+          'fallback, IMPELLER_GRAPHICS_BACKEND for the real technique. '
           'Left unguarded, a SkSL refusal kills the web build and ships every '
           'other platform an asset that throws on Skia at runtime.',
         );

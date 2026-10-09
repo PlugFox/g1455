@@ -1131,7 +1131,7 @@ void main() {
           inInclusiveRange(1.05, 1.30),
           reason:
               'the raster thread is supposed to read the split as dearer here, which is '
-              "the Mac's sign; if it does not, D190 is not explained by the instrument",
+              "the Mac's sign; if it does not, the Mac's reading is not explained by the instrument",
         );
       }
 

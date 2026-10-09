@@ -962,7 +962,7 @@ void main() {
     expect(ProxyResolution.maxDivisorFor(0, 2), 1);
   });
 
-  test('and a host that pays for it gets the divisor, which is what D164 changed', () {
+  test('and a host that pays for it gets the divisor, even at sigma 0', () {
     // The lever a host needs, and the arm is keyed on the quantity that moves
     // rather than on the knob: 0.646 ΔE is the first rung's own price, so a
     // budget just above it buys exactly that rung and a budget just below it
@@ -1168,7 +1168,7 @@ void main() {
     expect(c / full['plain']!.frameMs, closeTo(1.10, 0.02));
   });
 
-  test('the divisor nobody had run came back 18.6% off the prediction (D138)', () {
+  test('the divisor nobody had run came back 18.6% off the prediction', () {
     // The arm this file existed for. The number was written here **before** the
     // run so that taking it would be a comparison and not a fresh derivation,
     // and the comparison came out against the prediction: `A·f + C` fitted on
@@ -1257,7 +1257,7 @@ void main() {
     );
   });
 
-  test('the fourth divisor refuted the shape, not the exponent (D139)', () {
+  test('the fourth divisor refuted the shape, not the exponent', () {
     // Three points could not resolve an exponent, so a fourth was taken. It
     // did not settle the exponent — it removed the question: no `A·k^-p + C` at
     // any exponent describes the four points.
@@ -1322,12 +1322,12 @@ void main() {
     expect(
       residualOnThree(d28),
       lessThan(residualOnThree(threeQuarter)),
-      reason: 'D28 was not the best in-sample family, so the inversion is not the one recorded',
+      reason: 'Adreno\'s capture shape was not the best in-sample family, so the inversion is not the one recorded',
     );
     expect(
       missOf(d28).abs(),
       greaterThan(missOf(threeQuarter).abs() * 5),
-      reason: 'the best in-sample family did not predict worst, so D139 says something else',
+      reason: 'the best in-sample family did not predict worst, so the four-point run says something else',
     );
 
     // Why it is the shape and not the exponent. A power law's successive drops
@@ -1363,7 +1363,7 @@ void main() {
     }
   });
 
-  test('what the divisor buys is the blur pass and nothing else (D140)', () {
+  test('what the divisor buys is the blur pass and nothing else', () {
     // The knee above had one hypothesis, the residual blur pass, and it was
     // arithmetic over the source rather than a measurement. This is the
     // measurement: the same two divisors with the residual blur pass switched
@@ -1399,7 +1399,7 @@ void main() {
     expect(
       add('glass_d1_noblur') - add('glass_d8_noblur'),
       closeTo(-0.249, 0.01),
-      reason: 'the divisor bought something other than the blur, so D140 says less than it does',
+      reason: 'the divisor bought something other than the blur, so the blur split says less than it claims',
     );
     expect(
       (blurAtFull - blurAtEighth) / (add('glass_d1') - add('glass_d8')),
@@ -1451,7 +1451,7 @@ void main() {
     expect(clear.reason, ProxyDivisorReason.damageBudget);
   });
 
-  test('the knee belongs to the blur pass, against a prediction (D141)', () {
+  test('the knee belongs to the blur pass, against a prediction', () {
     // The blur split had two points and therefore a ratio rather than a law. The middle
     // was the discriminating cell and both answers were written down before the
     // run: a power law through those two points gives 0.814 ms for the pass at a

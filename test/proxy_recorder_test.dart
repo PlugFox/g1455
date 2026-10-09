@@ -248,7 +248,7 @@ void main() {
       // And the optics, because a report taken before the optics were
       // recalibrated grades a different glass.
       final optics = report['optics']! as Map<String, Object?>;
-      expect(optics['shoulder'], isNotNull, reason: '$path predates the M13 optics');
+      expect(optics['shoulder'], isNotNull, reason: '$path predates the recalibrated optics');
 
       final arms = (report['arms']! as List<Object?>).cast<Map<String, Object?>>();
       // The four these runs graded; the light branch's rows come from their

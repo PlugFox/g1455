@@ -676,7 +676,7 @@ void main() {
     );
   });
 
-  testWidgets('the residual blur pass runs out before the divisor does (D139)', (
+  testWidgets('the residual blur pass runs out before the divisor does', (
     WidgetTester tester,
   ) async {
     // On a device the route's price has a knee no model accounts for: the addition
