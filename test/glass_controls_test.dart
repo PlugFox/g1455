@@ -100,8 +100,11 @@ void main() {
 
     final Offset knob = tester.getTopLeft(find.byType(GlassSwitch)) + const Offset(21, 22);
     final TestGesture gesture = await tester.startGesture(knob);
-    // Past the 18 px touch slop, so the drag recognizer wins.
+    // Past the 18 px touch slop, so the drag recognizer wins — and back, since
+    // the drag measures from touch-down and the slop's 20 px carried the knob
+    // most of its 22.
     await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveBy(const Offset(-16, 0));
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 16));
     }

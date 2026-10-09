@@ -47,11 +47,14 @@
 // controls on glass bars — but it is the largest lever left in the package and
 // it is decided by whoever writes the tree, so the register counts it.
 
+import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_adaptive.dart';
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_host.dart';
+import 'glass_press.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
@@ -278,6 +281,17 @@ class GlassCard extends StatelessWidget {
 /// of this would be a guess where this is at least a quantity somebody read off
 /// the reference. Pass your own to disagree.
 ///
+/// **And it swells.** While held the glass grows by [GlassPress.grow] and
+/// leans toward a finger that drags ([press], [GlassThemeData.press]) — inside
+/// a travel region of its own and behind a boundary of its own, so the press
+/// costs two captures — the region declared at touch-down and let go at the
+/// settle — and repaints nothing but the glass. The button's layout
+/// is its resting box throughout; the glass is drawn past it.
+///
+/// A keyboard reaches it: it takes the focus, Space or Enter presses it, and
+/// while the focus is shown a ring ([kGlassFocusRingColor]) is drawn around
+/// the glass from inside its own subtree — which no capture sees.
+///
 /// The tap target is [kGlassMinTapTarget] at the smallest, and the whole capsule
 /// takes the tap rather than only where the label is: the gesture handler is
 /// outside the surface and opaque, because a [GlassSurface] is a
@@ -314,8 +328,11 @@ class GlassButton extends StatefulWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
     this.minSize = kGlassMinTapTarget,
     this.pressedOverlay,
+    this.press,
     this.finish,
     this.semanticLabel,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   });
 
@@ -341,8 +358,19 @@ class GlassButton extends StatefulWidget {
   /// control that draws nothing.
   final Color? pressedOverlay;
 
+  /// How the glass swells and leans while held. Null takes
+  /// [GlassThemeData.press]; [GlassPress.none] keeps the button its size and
+  /// builds no travel region for it. Off under reduced motion either way.
+  final GlassPress? press;
+
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
+
+  /// The button's focus. Null makes one the button owns.
+  final FocusNode? focusNode;
+
+  /// Whether the button takes the focus as soon as it is built.
+  final bool autofocus;
 
   /// What a screen reader says in place of [child] — for a button that is
   /// only an icon, which says nothing. Null lets [child]'s own semantics speak.
@@ -356,19 +384,69 @@ class GlassButton extends StatefulWidget {
   State<GlassButton> createState() => _GlassButtonState();
 }
 
-class _GlassButtonState extends State<GlassButton> {
+class _GlassButtonState extends State<GlassButton> with TickerProviderStateMixin {
   bool _held = false;
+  bool _focused = false;
+
+  /// 0 at rest, 1 held — on a spring, so past either end for a moment.
+  late final AnimationController _press = AnimationController.unbounded(vsync: this);
+
+  /// What the finger's drag is scaled by: 1 while held, sprung to 0 after.
+  late final AnimationController _release = AnimationController.unbounded(vsync: this, value: 1);
+
+  /// The finger from where it came down, while it is down.
+  final ValueNotifier<Offset> _finger = ValueNotifier<Offset>(Offset.zero);
+  Offset? _downAt;
+  int? _pointer;
+
+  GlassPress _spec = GlassPress.none;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _spec = GlassPress.resolve(context, widget.press);
+  }
 
   @override
   void didUpdateWidget(GlassButton oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _spec = GlassPress.resolve(context, widget.press);
     // Disabled under a finger: the framework cancels the tap from inside the
     // build that removed the handlers, through the `onTapCancel` it was built
     // with, and a `setState` there is one during build. Let go first and that
     // cancel finds nothing to do (D221).
     if (widget.onPressed == null) {
       _held = false;
+      _press.value = 0;
+      _release.value = 0;
+      _pointer = null;
     }
+  }
+
+  @override
+  void dispose() {
+    _press.dispose();
+    _release.dispose();
+    _finger.dispose();
+    super.dispose();
+  }
+
+  void _spring(AnimationController c, double to) {
+    final GlassPress spec = _spec;
+    c
+        .animateWith(
+          SpringSimulation(
+            SpringDescription(mass: 1, stiffness: spec.stiffness, damping: spec.damping),
+            c.value,
+            to,
+            c.velocity,
+            tolerance: const Tolerance(distance: 1e-3, velocity: 1e-2),
+          ),
+        )
+        // The spring settles within its tolerance, not on the target: a glass
+        // left a thousandth larger than its rest would be a box that never
+        // returns, and a region that differs from the one captured.
+        .then((_) => c.value = to);
   }
 
   void _setHeld(bool value) {
@@ -376,46 +454,128 @@ class _GlassButtonState extends State<GlassButton> {
       return;
     }
     setState(() => _held = value);
+    if (_spec.isNone) {
+      return;
+    }
+    if (value) {
+      _release
+        ..stop()
+        ..value = 1;
+      _spring(_press, 1);
+    } else {
+      _spring(_press, 0);
+      _spring(_release, 0);
+    }
+  }
+
+  void _onPointerDown(PointerDownEvent e) {
+    if (_pointer != null) {
+      return;
+    }
+    _pointer = e.pointer;
+    _downAt = e.localPosition;
+    _finger.value = Offset.zero;
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    final Offset? at = _downAt;
+    // Only while held: a finger that a scroll took is not pressing anything.
+    if (e.pointer != _pointer || at == null || !_held) {
+      return;
+    }
+    _finger.value = e.localPosition - at;
+  }
+
+  void _onPointerEnd(PointerEvent e) {
+    if (e.pointer == _pointer) {
+      _pointer = null;
+      _downAt = null;
+    }
+  }
+
+  void _activate() {
+    widget.onPressed?.call();
   }
 
   @override
   Widget build(BuildContext context) {
     final GlassFinish finish = widget.finish ?? GlassTheme.of(context).finish;
     final Color overlay = widget.pressedOverlay ?? finish.rim;
+    final bool enabled = widget.onPressed != null;
+    Widget glass = _GlassPanel(
+      borderRadius: widget.borderRadius,
+      padding: widget.padding,
+      finish: widget.finish,
+      overlay: _held ? overlay : null,
+      focusRing: _focused && enabled,
+      enabled: enabled,
+      // Factors of one: centred inside the minimum size, and no larger
+      // than the label otherwise. A bare `Center` takes every pixel it is
+      // offered, so a button in a `Wrap` or a `Column` was a bar.
+      child: Center(
+        widthFactor: 1,
+        heightFactor: 1,
+        // A label is not text to select: a drag across a page that
+        // selects would otherwise take it along.
+        child: SelectionContainer.disabled(
+          child: ExcludeSemantics(excluding: widget.semanticLabel != null, child: widget.child),
+        ),
+      ),
+    );
+    // Only while it can be pressed: a disabled button takes no press, and
+    // pays for no region.
+    if (enabled && !_spec.isNone) {
+      final GlassPress spec = _spec;
+      glass = AnimatedBuilder(
+        animation: Listenable.merge(<Listenable>[_press, _release, _finger]),
+        child: glass,
+        builder: (BuildContext context, Widget? panel) => GlassPressStage(
+          press: spec,
+          value: _press.value,
+          finger: _finger.value * _release.value,
+          // From touch-down until the spring has settled: at rest the glass is
+          // its box, and its slot no larger.
+          active:
+              _held ||
+              _press.isAnimating ||
+              _release.isAnimating ||
+              _press.value != 0 ||
+              _finger.value * _release.value != Offset.zero,
+          child: panel!,
+        ),
+      );
+    }
     return Semantics(
       button: true,
-      enabled: widget.onPressed != null,
+      enabled: enabled,
       label: widget.semanticLabel,
-      child: GestureDetector(
-        // Opaque, so the whole capsule takes the tap and not only the part the
-        // label covers. Outside the surface for the same reason.
-        behavior: HitTestBehavior.opaque,
-        onTapDown: widget.onPressed == null ? null : (_) => _setHeld(true),
-        onTapUp: widget.onPressed == null ? null : (_) => _setHeld(false),
-        onTapCancel: widget.onPressed == null ? null : () => _setHeld(false),
-        onTap: widget.onPressed,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: widget.minSize.width,
-            minHeight: widget.minSize.height,
-          ),
-          child: _GlassPanel(
-            borderRadius: widget.borderRadius,
-            padding: widget.padding,
-            finish: widget.finish,
-            overlay: _held ? overlay : null,
-            enabled: widget.onPressed != null,
-            // Factors of one: centred inside the minimum size, and no larger
-            // than the label otherwise. A bare `Center` takes every pixel it is
-            // offered, so a button in a `Wrap` or a `Column` was a bar.
-            child: Center(
-              widthFactor: 1,
-              heightFactor: 1,
-              // A label is not text to select: a drag across a page that
-              // selects would otherwise take it along.
-              child: SelectionContainer.disabled(
-                child: ExcludeSemantics(excluding: widget.semanticLabel != null, child: widget.child),
+      child: FocusableActionDetector(
+        enabled: enabled,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) => _activate()),
+        },
+        child: Listener(
+          onPointerDown: enabled ? _onPointerDown : null,
+          onPointerMove: enabled ? _onPointerMove : null,
+          onPointerUp: _onPointerEnd,
+          onPointerCancel: _onPointerEnd,
+          child: GestureDetector(
+            // Opaque, so the whole capsule takes the tap and not only the part the
+            // label covers. Outside the surface for the same reason.
+            behavior: HitTestBehavior.opaque,
+            onTapDown: enabled ? (_) => _setHeld(true) : null,
+            onTapUp: enabled ? (_) => _setHeld(false) : null,
+            onTapCancel: enabled ? () => _setHeld(false) : null,
+            onTap: widget.onPressed,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: widget.minSize.width,
+                minHeight: widget.minSize.height,
               ),
+              child: glass,
             ),
           ),
         ),
@@ -432,6 +592,7 @@ class _GlassPanel extends StatefulWidget {
     required this.finish,
     required this.child,
     this.overlay,
+    this.focusRing = false,
     this.enabled = true,
   });
 
@@ -439,6 +600,10 @@ class _GlassPanel extends StatefulWidget {
   final EdgeInsets padding;
   final GlassFinish? finish;
   final Color? overlay;
+
+  /// Whether the keyboard's focus ring is drawn around the glass — from here,
+  /// inside the surface's subtree, where no capture sees it.
+  final bool focusRing;
   final bool enabled;
   final Widget child;
 
@@ -576,7 +741,9 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
           // does open one, and then the press adds to nothing; that is a hazard
           // for whoever wraps a control, and it is why this sits directly over the
           // surface rather than under anything convenient.
-          painter: widget.overlay == null ? null : _GlassOverlay(widget.borderRadius, widget.overlay!),
+          painter: widget.overlay == null && !widget.focusRing
+              ? null
+              : _GlassOverlay(widget.borderRadius, widget.overlay, focusRing: widget.focusRing),
           child: Padding(
             padding: widget.padding,
             child: _labelled(theme, shown, widget.child),
@@ -663,16 +830,24 @@ void _reportIllegible(double worst) {
   }());
 }
 
-/// Adds a colour over the whole shape, in the layer it is recorded in.
+/// Adds a colour over the whole shape, in the layer it is recorded in — and
+/// draws the focus ring around it.
 class _GlassOverlay extends CustomPainter {
-  const _GlassOverlay(this.borderRadius, this.color);
+  const _GlassOverlay(this.borderRadius, this.color, {this.focusRing = false});
 
   final BorderRadius borderRadius;
-  final Color color;
+  final Color? color;
+  final bool focusRing;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (color.a <= 0) {
+    final Color? color = this.color;
+    if (focusRing) {
+      // Past the shape, and drawn here — on the surface's own canvas — so the
+      // capture, which skips this subtree, never holds it.
+      paintGlassFocusRing(canvas, Offset.zero & size, borderRadius);
+    }
+    if (color == null || color.a <= 0) {
       return;
     }
     canvas.drawRSuperellipse(
@@ -688,5 +863,5 @@ class _GlassOverlay extends CustomPainter {
 
   @override
   bool shouldRepaint(_GlassOverlay oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
+      oldDelegate.color != color || oldDelegate.borderRadius != borderRadius || oldDelegate.focusRing != focusRing;
 }

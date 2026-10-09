@@ -39,6 +39,7 @@ import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_group.dart';
 import 'glass_ledger.dart';
+import 'glass_press.dart';
 import 'glass_ripple.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
@@ -415,7 +416,7 @@ class GlassProxyScope extends InheritedWidget {
 ///  * the accessibility the platform does not relay everywhere:
 ///    [highContrast], and a floor for the labels, [minLabelContrast];
 ///  * the device: [hardware], and its [thermal] state;
-///  * the look: [finish], [tier], [ripple], [dropMotion], and whether the
+///  * the look: [finish], [tier], [ripple], [dropMotion], [press], and whether the
 ///    glass reads its own backdrop, [adaptive].
 ///
 /// Each is installed into a [GlassThemeData] for the screen, which an inner
@@ -479,6 +480,7 @@ class GlassHost extends StatefulWidget {
     this.minLabelContrast,
     this.ripple,
     this.dropMotion = const GlassDropMotion(),
+    this.press = const GlassPress(),
     this.thermal,
     this.thermalPolicy = const GlassThermalPolicy(),
     this.budgetDeltaE = ProxyResolutionPolicy.defaultDamageBudgetDeltaE,
@@ -593,6 +595,12 @@ class GlassHost extends StatefulWidget {
   /// its own. [GlassDropMotion.none] keeps every drop round. It costs no
   /// capture; see [GlassThemeData.dropMotion] and [GlassDropMotion].
   final GlassDropMotion dropMotion;
+
+  /// How a pressed [GlassButton] swells and leans toward a dragging finger,
+  /// unless it declares its own. [GlassPress.none] keeps every button its
+  /// size. It costs two captures a press and nothing at rest; see
+  /// [GlassThemeData.press] and [GlassPress].
+  final GlassPress press;
 
   /// The device's thermal state, as the application read it — the package
   /// ships no platform code to read it (D219). Null is nominal.
@@ -1564,6 +1572,7 @@ class _GlassHostState extends State<GlassHost> {
           minLabelContrast: widget.minLabelContrast,
           ripple: widget.ripple,
           dropMotion: widget.dropMotion,
+          press: widget.press,
           adaptive: widget.adaptive,
           // Only for a reader: off, the theme is the one it always was.
           regularAppearance: widget.adaptive == null ? null : _regularAppearance,
