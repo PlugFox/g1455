@@ -284,7 +284,8 @@ class GlassCard extends StatelessWidget {
 /// **And it swells.** While held the glass grows by [GlassPress.grow] and
 /// leans toward a finger that drags ([press], [GlassThemeData.press]) — inside
 /// a travel region of its own and behind a boundary of its own, so the press
-/// costs no capture and repaints nothing but the glass. The button's layout
+/// costs two captures — the region declared at touch-down and let go at the
+/// settle — and repaints nothing but the glass. The button's layout
 /// is its resting box throughout; the glass is drawn past it.
 ///
 /// A keyboard reaches it: it takes the focus, Space or Enter presses it, and
@@ -532,6 +533,14 @@ class _GlassButtonState extends State<GlassButton> with TickerProviderStateMixin
           press: spec,
           value: _press.value,
           finger: _finger.value * _release.value,
+          // From touch-down until the spring has settled: at rest the glass is
+          // its box, and its slot no larger.
+          active:
+              _held ||
+              _press.isAnimating ||
+              _release.isAnimating ||
+              _press.value != 0 ||
+              _finger.value * _release.value != Offset.zero,
           child: panel!,
         ),
       );

@@ -598,7 +598,8 @@ class GlassHost extends StatefulWidget {
 
   /// How a pressed [GlassButton] swells and leans toward a dragging finger,
   /// unless it declares its own. [GlassPress.none] keeps every button its
-  /// size. It costs no capture; see [GlassThemeData.press] and [GlassPress].
+  /// size. It costs two captures a press and nothing at rest; see
+  /// [GlassThemeData.press] and [GlassPress].
   final GlassPress press;
 
   /// The device's thermal state, as the application read it — the package

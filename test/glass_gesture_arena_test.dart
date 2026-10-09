@@ -25,6 +25,10 @@
 //  - in `_GlassSwitchState._dragEnd`, `_commit(_dragFurthest < slop && _claimed
 //    ? !widget.value : _position.value >= 0.5);` -> `_commit(_position.value >=
 //    0.5);`: a claimed tap is a drag of nothing, and toggles nothing.
+//
+// The segmented control has no drag recognizer of its own — it follows raw
+// pointer events — so its claim is an eager recognizer that only wins, and
+// its arm's negative control is the page moving with the drag unclaimed.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,10 +42,11 @@ void main() {
     WidgetTester tester,
   ) async {
     final lifted = <bool?, double>{};
+    final pages = <bool?, double>{};
     for (final bool? override in <bool?>[null, false]) {
       debugGlassControlsClaimOverride = override;
       var on = false;
-      final controller = PageController();
+      final controller = PageController(initialPage: 1);
       addTearDown(controller.dispose);
       await tester.pumpWidget(
         _paged(controller, (StateSetter setState) => _switch(on, (bool v) => setState(() => on = v))),
@@ -56,11 +61,15 @@ void main() {
         await gesture.moveBy(const Offset(2, 0));
         await tester.pump(const Duration(milliseconds: 16));
       }
+      pages[override] = controller.page! - 1;
       await gesture.up();
       await tester.pumpAndSettle();
       expect(on, isTrue, reason: 'claim $override: a drag across did not toggle the switch');
-      expect(controller.page, 0, reason: 'claim $override: the page moved');
     }
+    // ignore: avoid_print
+    print('page offset during the drag: claimed ${pages[null]}, unclaimed ${pages[false]}');
+    expect(pages[null], 0, reason: 'claimed, the page moved');
+    expect(pages[false], 0, reason: 'unclaimed, the page moved: the deeper recognizer did not win');
     // ignore: avoid_print
     print('drop 32 ms after touch-down: claimed ${lifted[null]}, unclaimed ${lifted[false]}');
     expect(lifted[null], greaterThan(0), reason: 'claimed, the drop did not lift on touch-down');
@@ -71,7 +80,7 @@ void main() {
     WidgetTester tester,
   ) async {
     var on = false;
-    final controller = PageController();
+    final controller = PageController(initialPage: 1);
     addTearDown(controller.dispose);
     await tester.pumpWidget(
       _paged(controller, (StateSetter setState) => _switch(on, (bool v) => setState(() => on = v))),
@@ -90,7 +99,7 @@ void main() {
       Widget control(StateSetter setState) => _switch(false, (_) {});
       await tester.pumpWidget(
         paged
-            ? _paged(PageController(), control)
+            ? _paged(PageController(initialPage: 1), control)
             : MaterialApp(
                 home: StatefulBuilder(
                   builder: (BuildContext context, StateSetter setState) => Center(child: control(setState)),
@@ -150,10 +159,96 @@ void main() {
     expect(scrolled[true], 0, reason: 'a claiming switch let the list scroll: the arm sees nothing');
     expect(scrolled[null], greaterThan(50), reason: 'a switch in a vertical list took the swipe');
   });
+
+  testWidgets('in a PageView a drag across a segmented control moves the selection and not the page', (
+    WidgetTester tester,
+  ) async {
+    // The control follows raw pointer events and is in no arena, so before
+    // it claimed, the page won the drag and both followed the finger. The
+    // negative control is that, with the claim turned off.
+    final outcome = <bool?, ({List<int> selected, double page})>{};
+    for (final bool? override in <bool?>[null, false]) {
+      debugGlassControlsClaimOverride = override;
+      final selected = <int>[];
+      // From the last segment leftward: a page view on its first page has
+      // nowhere to go rightward, and would pass this arm for that reason.
+      var index = 2;
+      final controller = PageController(initialPage: 1);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        _paged(
+          controller,
+          (StateSetter setState) => SizedBox(
+            width: 300,
+            child: GlassSegmentedControl(
+              segments: const <Widget>[Text('A'), Text('B'), Text('C')],
+              selectedIndex: index,
+              onSelected: (int i) => setState(() {
+                selected.add(i);
+                index = i;
+              }),
+            ),
+          ),
+        ),
+      );
+      final Offset a = tester.getCenter(find.text('A'));
+      final Offset c = tester.getCenter(find.text('C'));
+      final TestGesture gesture = await tester.startGesture(c);
+      for (var i = 1; i <= 20; i++) {
+        await gesture.moveTo(Offset.lerp(c, a, i / 20)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final double during = controller.page! - 1;
+      await gesture.up();
+      await tester.pumpAndSettle();
+      outcome[override] = (selected: selected, page: during);
+    }
+    // ignore: avoid_print
+    print('segmented control dragged in a PageView: $outcome');
+    expect(outcome[false]!.page, greaterThan(0.1), reason: 'unclaimed, the page did not move: the arm is blind');
+    expect(outcome[null]!.page, 0, reason: 'claimed, the page moved with the drag');
+    expect(outcome[null]!.selected, <int>[0], reason: 'claimed, the drag did not select where it was let go');
+  });
+
+  testWidgets('under a vertical list a segmented control claims nothing', (WidgetTester tester) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ListView(
+          controller: controller,
+          children: <Widget>[
+            for (var i = 0; i < 20; i++)
+              SizedBox(
+                height: 80,
+                child: GlassSegmentedControl(
+                  key: ValueKey<int>(i),
+                  segments: const <Widget>[Text('A'), Text('B')],
+                  selectedIndex: 0,
+                  onSelected: (_) {},
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey<int>(2))));
+    for (var i = 0; i < 10; i++) {
+      await gesture.moveBy(const Offset(0, -10));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(controller.offset, greaterThan(50), reason: 'a segmented control in a vertical list took the swipe');
+  });
 }
 
 Widget _switch(bool on, ValueChanged<bool> onChanged) => GlassSwitch(value: on, onChanged: onChanged);
 
+/// The control on the middle of three pages, so the page can follow a drag
+/// either way: on the first page a rightward drag has nowhere to go, and an
+/// arm that dragged rightward there would find the page still for that reason.
+/// Use a controller with `initialPage: 1`.
 Widget _paged(PageController controller, Widget Function(StateSetter setState) control) => MaterialApp(
   // Keyed by the controller: a page view kept across arms keeps its state.
   key: ObjectKey(controller),
@@ -161,8 +256,9 @@ Widget _paged(PageController controller, Widget Function(StateSetter setState) c
     builder: (BuildContext context, StateSetter setState) => PageView(
       controller: controller,
       children: <Widget>[
+        const Center(child: Text('the page before')),
         Center(child: control(setState)),
-        const Center(child: Text('the next page')),
+        const Center(child: Text('the page after')),
       ],
     ),
   ),

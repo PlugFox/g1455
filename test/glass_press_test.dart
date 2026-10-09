@@ -1,5 +1,5 @@
 // A pressed button swells and leans toward a dragging finger, and what that
-// costs the capture: nothing.
+// costs the capture: the region's coming and going, and nothing while it moves.
 //
 // `flutter test test/glass_press_test.dart`
 //
@@ -11,7 +11,10 @@
 // calls a change under the glass.
 //
 // The negative control for the capture is an arm: `debugGlassPressTravel`
-// off builds the same press without its region, and the count moves. The two
+// off builds the same press without its region, and the count moves. The
+// region is declared from touch-down until the spring settles, which is two
+// captures a press; the arm declared always is the zero they are counted
+// against. The two
 // for the boundary are breaks, each undone by swapping the string back:
 //  - in `RenderGlassPressBody`, `bool get isRepaintBoundary => true;` ->
 //    `=> false;`: every frame of the press repaints the screen's boundary, and
@@ -26,7 +29,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
-import 'package:g1455/src/surface/glass_press.dart' show RenderGlassPressBody, debugGlassPressTravel;
+import 'package:g1455/src/surface/glass_press.dart'
+    show RenderGlassPressBody, debugGlassPressRegionAtRest, debugGlassPressTravel;
 
 const Size kScreen = Size(400, 400);
 
@@ -105,13 +109,20 @@ void main() {
     });
   });
 
-  testWidgets('held, the glass grows and leans; dragged and let go, nothing is captured and nothing repainted', (
+  testWidgets('held, the glass grows and leans; dragged and let go, it costs two captures and repaints nothing', (
     WidgetTester tester,
   ) async {
-    final Map<bool, int> captures = <bool, int>{};
-    for (final bool travel in <bool>[true, false]) {
+    // Three arms: the region declared from touch-down until the settle (the
+    // default), declared always, and never.
+    final Map<String, int> captures = <String, int>{};
+    for (final String arm in <String>['on demand', 'always', 'never']) {
+      final bool travel = arm != 'never';
       debugGlassPressTravel = travel;
-      addTearDown(() => debugGlassPressTravel = true);
+      debugGlassPressRegionAtRest = arm == 'always';
+      addTearDown(() {
+        debugGlassPressTravel = true;
+        debugGlassPressRegionAtRest = false;
+      });
       final hostKey = GlobalKey();
       final paints = _Counter();
       await _mount(tester, hostKey, _Screen(paints: paints));
@@ -150,16 +161,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(glass.globalRect.size, rest.size, reason: 'the glass did not spring back');
       expect(tester.getRect(find.byType(GlassButton)), box, reason: 'the button\'s layout moved');
-      captures[travel] = (host.recorded as int) - before;
+      final int taken = captures[arm] = (host.recorded as int) - before;
       if (travel) {
         expect(body.pressLayouts - layoutsBefore, greaterThan(30), reason: 'the press was not laid out by the body');
-        expect(paints.value, paintsBefore, reason: 'the press repainted the content beside the button');
+        // A capture paints the content once, into the proxy; anything past
+        // that is a repaint the press caused.
+        expect(paints.value - paintsBefore, taken, reason: '$arm: the press repainted the content beside it');
       }
     }
     // ignore: avoid_print
-    print('captures across a press: with its region ${captures[true]}, without ${captures[false]}');
-    expect(captures[false], greaterThan(10), reason: 'without the region the press was not retaken: the arm is blind');
-    expect(captures[true], 0, reason: 'the press retook the proxy');
+    print('captures across a press: $captures');
+    expect(
+      captures['never'],
+      greaterThan(10),
+      reason: 'without the region the press was not retaken: the arm is blind',
+    );
+    expect(captures['always'], 0, reason: 'a region declared throughout retook the proxy');
+    // One as the region appears at touch-down, one as it goes at the settle;
+    // `glass_press_region_test.dart` has what that buys at rest.
+    expect(captures['on demand'], 2, reason: 'the press retook more than its region\'s coming and going');
   });
 
   testWidgets('a label that changes under the boundary still resizes the button', (WidgetTester tester) async {

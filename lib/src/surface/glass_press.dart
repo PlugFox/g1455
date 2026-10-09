@@ -12,14 +12,16 @@
 // panel swelling), so the default is 12 and a spec with a zero, like
 // [GlassDropMotion].
 //
-// What it costs, by construction — and the first two are asserted in
-// `glass_press_test.dart`:
+// What it costs, by construction — asserted in `glass_press_test.dart` and
+// `glass_press_region_test.dart`:
 //
-//  - **no capture.** The glass grows inside a travel region declared around
-//    it, whose capture is the region and not the glass's box, so the capture
-//    input does not move while the glass does (D208's mechanism). The region
-//    is the resting box grown by [GlassPress.margin] — the most the spec can
-//    reach — so nothing it draws leaves it;
+//  - **two captures a press, and none while it moves.** The glass grows
+//    inside a travel region declared around it, whose capture is the region
+//    and not the glass's box, so the capture input does not move while the
+//    glass does (D208's mechanism). The region is the resting box grown by
+//    [GlassPress.margin] — the most the spec can reach — so nothing it draws
+//    leaves it. It is declared **from touch-down until the spring settles**,
+//    and its coming and going are a capture each;
 //  - **no repaint of anything but the glass.** The glass is laid out inside a
 //    render object that is a relayout *and* repaint boundary of its own, so a
 //    frame of the press relays out the glass and re-records a layer that holds
@@ -29,9 +31,20 @@
 //    captures in 30 frames for one); the second scales the glass's draw but
 //    not the map into its slot, which `RenderGlassSurface` takes from its
 //    global rect unscaled;
-//  - a slot that is the region rather than the box, while the press is on:
-//    `margin` px more of the atlas on every side, at rest too, because a
-//    region that appeared on touch-down would itself be a capture;
+//  - a slot that is the region rather than the box, while a press is under
+//    way — and only then. Declared always, the region cost every enabled
+//    button its slot again at rest: 7056 logical px² against 3600 for a 44 px
+//    button, 5981 a button in a row of five, for zero captures a press. On
+//    demand the resting slot is the box's, exactly a button without a press,
+//    for one capture as the region appears and one as it goes. And no frame
+//    of the swell is drawn from the old slot: the spring's first tick is at
+//    rest, so the frame that declares the region draws the glass at its box
+//    and the capture taken after it is in place before the glass grows —
+//    checked pixel for pixel against the always-declared arm, frame by frame;
+//  - the rim reads a little past the box's bleed, so a larger slot changes it
+//    by a few code values on a few pixels: the always-declared arm drew a
+//    resting button differently from one with no press (22 channels over 2 at
+//    dpr 2). On demand it does not;
 //  - a ticker while the spring moves, none at rest or while a finger holds
 //    still.
 //
@@ -56,8 +69,10 @@ import 'glass_travel.dart';
 /// switch.
 ///
 /// A feel rather than a measurement — see the numbers on each field. It costs
-/// no capture: the glass grows inside a travel region declared around it
-/// ([margin] past its box), behind a boundary of its own.
+/// two captures a press and none while the glass moves: the glass grows inside
+/// a travel region declared around it ([margin] past its box) from touch-down
+/// until the spring settles, behind a boundary of its own. At rest it costs
+/// nothing.
 ///
 /// ```dart
 /// // No swell on one button, and a gentler one everywhere else.
@@ -235,6 +250,12 @@ class GlassPress {
 @visibleForTesting
 bool debugGlassPressTravel = true;
 
+/// Declares a pressed control's region while it is at rest too, rather than
+/// only from touch-down until its spring settles. A `@visibleForTesting` seam:
+/// the arm the on-demand default was measured against.
+@visibleForTesting
+bool debugGlassPressRegionAtRest = false;
+
 /// The region a pressed control's glass grows in: the resting box of
 /// [RenderGlassPressBody], grown by the press's [GlassPress.margin] at that size.
 ///
@@ -245,10 +266,14 @@ class _PressRegion extends GlassTravelRegion {
   RenderGlassPressBody? _body;
   Size _margin = Size.zero;
 
+  /// Whether the region is declared now; when not, the glass is captured at
+  /// its own box, as if there were no region at all.
+  bool declared = true;
+
   @override
   Rect? get globalRect {
     final RenderGlassPressBody? body = _body;
-    if (body == null || !body.attached || !body.hasSize) {
+    if (!declared || body == null || !body.attached || !body.hasSize) {
       return null;
     }
     final Size m = _margin;
@@ -271,8 +296,14 @@ class GlassPressStage extends StatefulWidget {
     required this.value,
     required this.finger,
     required this.child,
+    this.active = true,
     super.key,
   });
+
+  /// Whether the press is under way — held, or springing back — on this
+  /// build: the travel region is declared only then. At rest the glass is
+  /// its box, and is captured at its box.
+  final bool active;
 
   /// The spec. Must not be [GlassPress.none]: a control with none builds
   /// [child] alone.
@@ -297,6 +328,7 @@ class _GlassPressStageState extends State<GlassPressStage> {
 
   @override
   Widget build(BuildContext context) {
+    _region.declared = widget.active || debugGlassPressRegionAtRest;
     final Widget body = _PressStage(
       press: widget.press,
       region: _region,

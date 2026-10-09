@@ -243,7 +243,9 @@ bool? debugGlassControlsClaimOverride;
 
 /// Whether a control in [context] takes the pointer on touch-down: when the
 /// nearest scrollable scrolls the same way the control drags, and only then.
-bool _claimsPointer(BuildContext context) {
+///
+/// Shared by the switch, the slider and the segmented control; not exported.
+bool glassControlClaimsPointer(BuildContext context) {
   final bool? forced = debugGlassControlsClaimOverride;
   if (forced != null) {
     return forced;
@@ -605,7 +607,7 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     final double margin = _margin(_kSwitchKnob, widget.dropScale, _motion) + _inset;
     _rtl = Directionality.maybeOf(context) == TextDirection.rtl;
-    _claimed = _claimsPointer(context);
+    _claimed = glassControlClaimsPointer(context);
     final bool enabled = _enabled;
     return Semantics(
       label: widget.semanticLabel,
@@ -1010,7 +1012,7 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
           behavior: HitTestBehavior.opaque,
           gestures: _controlGestures(
             owner: this,
-            claim: _claimsPointer(context),
+            claim: glassControlClaimsPointer(context),
             settings: MediaQuery.maybeGestureSettingsOf(context),
             onStart: enabled ? (DragStartDetails d) => _start(d.localPosition) : null,
             onUpdate: enabled ? (DragUpdateDetails d) => _change(_valueAt(d.localPosition)) : null,

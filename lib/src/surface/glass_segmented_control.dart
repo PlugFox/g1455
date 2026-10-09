@@ -37,6 +37,10 @@
 // than let out of it — so no capture either way, and a relayout of the drop on
 // the frames it changes.
 //
+// Under a horizontal scrollable it claims the pointer on touch-down, as the
+// switch and the slider do (`glass_controls.dart`); its gestures are raw
+// pointer events, which no arena would otherwise keep from the page.
+//
 // A keyboard reaches it: the arrow keys select the segment beside the selected
 // one, and the focus ring is drawn around the track behind a boundary of its
 // own (`glass_focus.dart`). Under `TextDirection.rtl` the segments run right to
@@ -58,7 +62,7 @@ import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
 import 'glass_concentric.dart';
-import 'glass_controls.dart' show kGlassDropOptics;
+import 'glass_controls.dart' show glassControlClaimsPointer, kGlassDropOptics;
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_focus.dart';
@@ -394,7 +398,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   // drop is placed by a layout delegate, and the gestures read the box.
   @override
   Widget build(BuildContext context) {
-    final Widget body = Listener(
+    Widget body = Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: _onDown,
       onPointerMove: _onMove,
@@ -442,6 +446,26 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
           ),
         ),
       ),
+    );
+    // The control follows the raw pointer and is in no arena, so under a
+    // horizontal scrollable the page won the drag and moved with it: both
+    // followed the finger. There it claims the pointer on touch-down, as the
+    // switch and the slider do — an eager recognizer that wins at once and
+    // does nothing else, the `Listener` still doing the work. Elsewhere it
+    // stays out of the arena, so a vertical list still scrolls over it.
+    // Always the detector, an empty one when not claiming: a wrapper that came
+    // and went would rebuild the drop's region under it.
+    body = RawGestureDetector(
+      behavior: HitTestBehavior.opaque,
+      gestures: _enabled && glassControlClaimsPointer(context)
+          ? <Type, GestureRecognizerFactory>{
+              EagerGestureRecognizer: GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
+                EagerGestureRecognizer.new,
+                (EagerGestureRecognizer _) {},
+              ),
+            }
+          : const <Type, GestureRecognizerFactory>{},
+      child: body,
     );
     // The arrow along the row selects toward its end: rightward, unless the
     // row runs the other way.

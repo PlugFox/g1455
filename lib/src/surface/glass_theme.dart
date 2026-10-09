@@ -54,9 +54,9 @@
 //    `glass_drop_motion.dart`); [GlassDropMotion.none] turns it off app-wide,
 //    and the platform's reduced-motion switch turns it off regardless.
 //  - [GlassThemeData.press] is how a pressed button swells and leans toward a
-//    dragging finger. On by default for the same reason — it grows inside a
-//    travel region of its own and costs no capture (`glass_press.dart`) — and
-//    off under reduced motion.
+//    dragging finger. On by default: it grows inside a travel region declared
+//    only while a press is under way, so it costs nothing at rest and two
+//    captures a press (`glass_press.dart`); off under reduced motion.
 //
 // And one that *is* a reading, opt-in: [GlassThemeData.adaptive]. With it the
 // host reads the captured backdrop back under each glass, and a component
