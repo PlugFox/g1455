@@ -1317,7 +1317,7 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
           'itself, which is the colour the material lays on rather than the level '
           'it shows: 29 of 255 for GlassFinish.regularDark, against the 69 the glass '
           'shows over a mid-grey screen. Over a light screen that is 23.3 ΔE, '
-          'two thirds of the distance between Apple .regular and .clear (D179).\n'
+          'two thirds of the distance between Apple .regular and .clear.\n'
           'Declare it on GlassHost or GlassTheme — it is the screen background '
           'colour the application already keeps.',
         );

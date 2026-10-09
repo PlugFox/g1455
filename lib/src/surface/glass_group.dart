@@ -1288,9 +1288,8 @@ class RenderGlassGroup extends RenderProxyBox {
               'A GlassGroup holds ${_group._members.length} surfaces; the fused draw '
               'carries $kMaxFusedShapes.\n'
               'Its members are drawing themselves, so the bridges between them are '
-              'missing. Twelve is where the measured corpus stops (D26) — past it the '
-              'cost of a group is an extrapolation nobody took — so the group is '
-              'refused rather than truncated.',
+              'missing. Twelve is the most a group was measured with — past it the '
+              'cost is unknown — so the group is refused rather than truncated.',
             ),
             library: 'glass',
             context: ErrorDescription('while painting a GlassGroup'),

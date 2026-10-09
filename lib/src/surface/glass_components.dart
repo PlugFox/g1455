@@ -794,7 +794,7 @@ void _reportIllegible(double worst) {
           'not legible over every backdrop: the best label reaches a contrast of '
           '${worst.toStringAsFixed(2)} in the worst case, under WCAG AA (4.5).\n'
           'The label was chosen against every backdrop because nothing said which '
-          'one is behind the glass (D204). Declare the screen background on '
+          'one is behind the glass. Declare the screen background on '
           'GlassHost or GlassTheme if it is flat — then the label is chosen '
           'against it — or set richBackdrop and minLabelContrast if it is an '
           'image, and the glass is dimmed until the label reaches the floor.',
