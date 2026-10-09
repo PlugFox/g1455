@@ -337,9 +337,9 @@ class GlassScrollEdge extends StatelessWidget {
           finish: GlassFinish(
             // A measured material's name, because the divisor reads its damage
             // table by name and a name without one is held at full resolution —
-            // which is how `identity` is protected, and what made this edge cost
-            // 1.7 ms of a scrolling frame on the iPad: its level went to 1/1 while
-            // the cards' stayed at 1/4. `thinLight` (σ 2.6 under a light
+            // which is how `identity` is protected, and what made this edge
+            // costly on the iPad (the file's header has the number): its level
+            // went to 1/1 while the cards' stayed at 1/4. `thinLight` (σ 2.6 under a light
             // 0.22) in both appearances. Borrowed, not measured: this blurs less,
             // which is the direction that underestimates. The light edge passes
             // only 0.15 of the backdrop and was tried on `regular`'s table, which
