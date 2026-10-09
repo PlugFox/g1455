@@ -1,49 +1,30 @@
-// How much glass is on the screen — the second of phase A's two large levers,
-// and the one that has to be *visible* rather than clever.
+// How much glass is on the screen.
 //
-// The budget says why it is a lever at all. Over the floor the addition splits
-// tax 34% / capture 40% / blur 17% / shader 9% (D63), and the tax is the item
-// with no implementation trick behind it: it follows the **area of the glass**,
-// 1.1101 cycles per logical px² measured directly on three areas 3x apart at
-// fixed content and fixed surface count, R² = 0.99917 (D21, Adreno 830). M9
-// tried the one implementation lever anybody proposed — an opaque backing under
-// the surface, so the engine's depth pass could cull what it covers — and it
-// returned nothing in five scenes and two seeds. So the amount of glass is
-// decided when the screen is designed, which makes it an API question rather
-// than an engine one, and the API's whole job here is to make the number
-// sayable.
+// On Adreno 830 (Galaxy S25 Ultra) a third of the glass's cost over a plain
+// frame is a translucency tax with no implementation trick behind it: it follows
+// the **area of the glass**, 1.1101 cycles per logical px², R² = 0.99917 over
+// three areas 3x apart. An opaque backing under the surface, so the engine's
+// depth pass could cull what it covers, saves nothing. So the amount of glass is
+// decided when the screen is designed — an API question rather than an engine
+// one — and this file's job is to make the number sayable.
 //
-// **And there is a second term, which is the reason "lots of small chips" is
-// the wrong instinct.** At the *same* total glass area twelve surfaces cost
-// 1.41x the tax of two, and the excess over `k·area` is 0.7 / 5.8 / 26.8
-// thousand cycles at n = 2 / 6 / 12 — growing faster than the count, exponent
-// ≈ 2.0 on three points (D26). A constant per surface is refuted (it would
-// predict +524% at n = 2), and so is perimeter (+1429%). What is *not* punished
-// is smallness on its own: at n = 2 the panel side varies 1.7x with no excess
-// at all, sign changing and modulus at the noise floor. So the rule is "merge
-// the glass, do not enlarge it", and one big panel beats many chips at equal
-// area.
+// There is a second term, which is why "lots of small chips" is the wrong
+// instinct: at the same total area twelve surfaces cost 1.41x the tax of two,
+// and the excess grows about as the square of the count. Smallness on its own is
+// not punished. So the rule is "merge the glass, do not enlarge it".
 //
-// **The two platforms measured do not agree on the shape of any of this, and
-// the disagreement is not a constant.** On Adreno there is a law and it was
-// measured over 0.10…0.30 screens of glass — a tenth of a screen to a third —
-// and nowhere further. On Metal there is no law at all: throughput was measured
-// out to 25.6 screens and it is flat and cheap until it falls off a cliff
-// between 12.8 and 19.2 screens (0.17 → 2.98 ms of raster on the same shape,
-// 0.42 → 8.41 on another), while the surface *count* is nearly free — 0.29 →
-// 0.59 ms going from 64 to 256 tiled panels at constant area, about 0.0016 ms
-// each (D71, S4, one M2 iPad, one run per arm). Neither platform's numbers say
-// anything about the other's, and neither range covers the other's, so this
-// file carries two tables and refuses outside both rather than interpolating a
-// third.
+// The two measured platforms disagree on the shape of all this. On Adreno there
+// is a law, measured over 0.10…0.30 screens of glass and nowhere further. On
+// Metal (an M2 iPad Pro) there is none: raster time is flat and cheap until it
+// falls off a cliff between 12.8 and 19.2 screens, while the surface count is
+// nearly free — about 0.0016 ms a panel from 64 to 256. Neither range covers
+// the other's, so this file carries two tables and refuses outside both rather
+// than interpolating a third.
 //
-// The contrast that makes the shape of our own route legible is Apple's, on the
-// same device in the same run: `.glassEffect` is bound by surface **count** —
-// 192 panels drop it to ~90 fps whether they cover 0.8 screens or 19.2 — and is
-// untroubled by 64 overlapping panels covering 25.6. One backdrop read per
-// surface there against one capture for all of them here (D38). So the two
-// routes fail in opposite directions, and an app that would break SwiftUI with
-// two hundred chips is comfortable here.
+// Apple's `.glassEffect` on the same iPad is the opposite: bound by surface
+// **count** (~90 fps at 192 panels whatever their area), untroubled by area. It
+// reads the backdrop once per surface; this package captures once for all of
+// them.
 
 import 'dart:math' as math;
 
@@ -128,12 +109,10 @@ class GlassSurfaceRecord {
   /// Which rung of the ladder this surface draws.
   ///
   /// Here rather than left to the host, because the register is read by two
-  /// machines that need **different** subsets of it and neither can work the
-  /// other's out. The capture wants the surfaces that read a proxy; the tally
-  /// wants every surface there is, because the translucency tax and its
-  /// fragmentation excess follow any translucent fill and have nothing to do
-  /// with the capture (D21, D26, and phase D says so of the ladder in as many
-  /// words).
+  /// consumers that need **different** subsets of it. The capture wants the
+  /// surfaces that read a proxy; the tally wants every surface there is,
+  /// because the translucency tax and its fragmentation excess follow any
+  /// translucent fill and have nothing to do with the capture.
   final GlassTier tier;
 
   /// The rect's own area, which is the denominator every measured constant here
@@ -147,14 +126,12 @@ class GlassSurfaceRecord {
 /// Something in the render tree that can say where it is.
 ///
 /// The register holds these rather than the rects they last reported, and asks
-/// them at the moment somebody reads it. That is not a refinement — it is the
-/// only version that works. **A scroll moves a surface without repainting it:**
-/// a sliver's children are repaint boundaries by default, so the viewport
-/// re-adds an existing layer at a new offset and the child's `paint` is never
-/// called. A register written from `paint` therefore holds the place the
-/// surface was before the list moved, for as long as nothing else dirties it —
-/// measured, in `glass_surface_test.dart`, where a jump of 60 logical pixels
-/// left the cached rect exactly where it started.
+/// them at the moment somebody reads it, because **a scroll moves a surface
+/// without repainting it**: a sliver's children are repaint boundaries by
+/// default, so the viewport re-adds an existing layer at a new offset and the
+/// child's `paint` is never called. A register written from `paint` would hold
+/// the place the surface was before the list moved, for as long as nothing
+/// else dirties it.
 ///
 /// Implemented by [RenderGlassSurface]; a custom render object that draws
 /// glass implements it and calls [GlassLedger.register] when it attaches.
@@ -178,9 +155,9 @@ abstract interface class GlassSurfaceGeometry {
   /// Whether this surface's subtree is kept out of the proxy — by the walk that
   /// records it, and by the watch that decides whether it is stale.
   ///
-  /// The two have to agree, and until the ladder existed they agreed by both
-  /// saying "it is a glass surface". The predicate they actually meant is "it
-  /// draws the proxy".
+  /// The two have to agree. The predicate is "it draws the proxy", not "it is a
+  /// glass surface": a surface on a cheaper [GlassTier] is recorded like any
+  /// other content.
   bool get excludedFromProxy;
 
   /// The layer this surface's own glass is drawn into, or null if it draws
@@ -192,10 +169,10 @@ abstract interface class GlassSurfaceGeometry {
 
 /// A set of surfaces whose silhouettes are one shape.
 ///
-/// The picture-side grouping of §4.4, and the register holds it for one reason:
-/// the atlas has to know. Members of a blend group share a coordinate system by
-/// construction, so they are **required** to share an atlas slot — the one-way
-/// invariant, and the only thing about grouping that is not an optimisation.
+/// The register holds it for one reason: the atlas has to know. Members of a
+/// blend group share a coordinate system by construction, so they are
+/// **required** to share an atlas slot — the one thing about grouping that is
+/// not an optimisation.
 /// The reverse does not hold and must not be assumed: a tab bar and a floating
 /// button can share a texture without ever fusing.
 ///
@@ -237,15 +214,15 @@ abstract interface class GlassSurfaceCluster {
   /// two surfaces bulges past both of their boxes, and a shader sampling there
   /// from a slot that stopped at the boxes reads the slot's clamped edge row:
   /// up to 132 code values off the identity over the rows just outside a
-  /// fused pair, on every backend (D201).
+  /// fused pair, on every backend.
   double get bridgeReach;
 }
 
 /// The register of glass surfaces on one screen.
 ///
 /// A [Listenable] rather than an inherited value, because geometry moves every
-/// frame and a surface changing position must not rebuild anybody's subtree —
-/// the same reason the roadmap gives for phase C's API. [GlassScope] carries
+/// frame and a surface changing position must not rebuild anybody's subtree.
+/// [GlassScope] carries
 /// one of these down the tree; its identity never changes, so the inherited
 /// widget never notifies.
 ///
@@ -380,9 +357,8 @@ class GlassLedger extends ChangeNotifier {
   /// Area of the engine's round superellipse, in logical px².
   ///
   /// Closed form rather than a sample: `contains` is a native call per point
-  /// and this runs per surface per frame. It is checked against the engine over
-  /// a corpus of shapes in the tests, with the residual asserted rather than
-  /// assumed — which is how the two things below were found.
+  /// and this runs per surface per frame. The tests check it against the
+  /// engine over a range of shapes, residual asserted.
   ///
   /// **Radii that overflow the box are clamped per axis, and `scaleRadii()` is
   /// the wrong answer here.** The inherited helper divides every radius by one
@@ -444,11 +420,8 @@ class GlassLedger extends ChangeNotifier {
       }
       // The capture side counts only the rungs that read a proxy, and the tally
       // side counts everything: a cheap surface pays the tax and takes no
-      // snapshot. Before the ladder existed the two sets were the same set, and
-      // `bounds` in particular was documented as spanning "every surface" —
-      // which was true and is now the wrong sentence, because a screen with one
-      // full panel and eleven cheap ones would have reported a capture eleven
-      // panels wide.
+      // snapshot. Spanning every surface would report a screen with one full
+      // panel and eleven cheap ones as a capture eleven panels wide.
       if (!r.readsCapture) {
         continue;
       }
@@ -475,8 +448,7 @@ class GlassLedger extends ChangeNotifier {
 ///
 /// Not a rendering backend: it is "whose numbers apply", and the two that exist
 /// were taken on one device each. The third value is what every other device
-/// gets, and it is not a placeholder — most of them have neither a counter nor
-/// a run.
+/// gets.
 ///
 /// Normally read off the declared hardware with
 /// [GlassHardware.surfaceCostModel] rather than named.
@@ -488,15 +460,14 @@ class GlassLedger extends ChangeNotifier {
 ///
 /// {@category Cost and policy}
 enum GlassSurfaceCostModel {
-  /// Adreno 830 / Impeller-Vulkan, on a Galaxy S25 Ultra (D21, D26). A linear
-  /// law in the glass area
-  /// plus a superlinear excess in the surface count, measured over 0.10…0.30
-  /// screens of glass and 2…12 surfaces.
+  /// Adreno 830 / Impeller-Vulkan, on a Galaxy S25 Ultra. A linear law in the
+  /// glass area plus a superlinear excess in the surface count, measured over
+  /// 0.10…0.30 screens of glass and 2…12 surfaces.
   adrenoCycles,
 
-  /// Apple M2 / Metal, on an 11" iPad Pro (D71). No law: raster time is flat and cheap out to 12.8
-  /// screens of glass and falls off a cliff by 19.2, and the surface count is
-  /// nearly free to 256.
+  /// Apple M2 / Metal, on an 11" iPad Pro. No law: raster time is flat and
+  /// cheap out to 12.8 screens of glass and falls off a cliff by 19.2, and the
+  /// surface count is nearly free to 256.
   metalThroughput,
 
   /// Nobody measured this hardware. Every number below refuses.
@@ -558,18 +529,17 @@ class GlassLoad {
   /// is not the same as the glass the eye sees: a rounded panel covers
   /// [shapeAreaLogical]. On the panels the law was measured on — 118…205 px
   /// square at radius 18 — the two differ by 0.7…2.1%, which is inside the
-  /// fit's own worst residual of 2.2% (Adreno 830), so **that measurement cannot tell the
-  /// two denominators apart**. It matters for shapes the measurement never had:
+  /// fit's own worst residual of 2.2% (Adreno 830), so **that measurement cannot
+  /// tell the two denominators apart**. It matters for shapes it never had:
   /// a stadium or a circle covers 21% less than its rect, and which of the two
   /// the cost follows there is not known.
   final double rectAreaLogical;
 
   /// The part of [rectAreaLogical] belonging to surfaces that read a proxy.
   ///
-  /// The two numbers were one number until the ladder existed, and separating
-  /// them is the whole arithmetic of the cheap rung: the tax follows the first
-  /// and the capture follows the second, so moving a panel down a rung removes
-  /// it from one denominator and not the other.
+  /// Separating the two is the whole arithmetic of the cheap rung: the tax
+  /// follows the first and the capture follows the second, so moving a panel
+  /// down a rung removes it from one denominator and not the other.
   final double capturedRectAreaLogical;
 
   /// The same, clipped to the view.
@@ -582,9 +552,8 @@ class GlassLoad {
   /// What the shapes cover, corners removed.
   final double shapeAreaLogical;
 
-  /// What one capture spanning every surface that reads a proxy would cover —
-  /// phase B's dead-area question, in the same units as its measured budget of
-  /// ~102 000 device px.
+  /// What one capture spanning every surface that reads a proxy would cover,
+  /// including the dead area between them ([deadAreaLogical]).
   ///
   /// Null when nothing on the screen reads a proxy, which is a whole screen of
   /// cheap glass and not an empty one.
@@ -607,19 +576,19 @@ class GlassLoad {
     return math.max(0, b.width * b.height - capturedRectAreaLogical);
   }
 
-  /// D21's law: cycles of translucency tax per frame, or null off Adreno.
+  /// The area law: cycles of translucency tax per frame, or null off Adreno.
   ///
   /// Excludes the fragmentation excess, which is [fragmentationExcessCycles].
   double? get areaTaxCycles => model == GlassSurfaceCostModel.adrenoCycles ? kTaxPerLogicalPx2 * rectAreaLogical : null;
 
-  /// D26's second term, in the same cycles, or null off Adreno.
+  /// The excess the surface count adds over the area law, in the same cycles,
+  /// or null off Adreno.
   ///
-  /// The quadratic is the only simple form the three points leave standing, and
-  /// it is written as what the data showed rather than as a law: three points
-  /// on one decade, no mechanism proposed, and the exponent between successive
-  /// pairs is 1.90 / 2.02 / 2.21. Calibrated at n = 12 and stated for the
-  /// measured range; past 12 surfaces it is an extrapolation of a curve nobody
-  /// has a reason for, which is why [verdict] says so rather than quoting this.
+  /// The quadratic is the only simple form three measured points leave
+  /// standing (a constant per surface and a perimeter term are both far off),
+  /// and it is what the data showed rather than a law: no mechanism, and the
+  /// exponent between successive pairs is 1.90 / 2.02 / 2.21. Calibrated at
+  /// n = 12; past 12 surfaces it is an extrapolation.
   double? get fragmentationExcessCycles => model == GlassSurfaceCostModel.adrenoCycles
       ? kFragmentationExcessAt12 * (surfaceCount * surfaceCount) / (12 * 12)
       : null;
@@ -654,7 +623,7 @@ class GlassLoad {
         // The law is linear and was measured from a tenth of a screen to a
         // third. Past that there is no cliff *and no evidence of one*: the grid
         // simply stopped. Saying "fine" there would be quoting a fit outside
-        // its own range, which is what the whole file exists not to do.
+        // its own range.
         if (screensOfGlass > kAdrenoMeasuredScreens) {
           return GlassLoadVerdict.pastMeasuredRange;
         }
@@ -670,24 +639,23 @@ class GlassLoad {
     }
   }
 
-  /// D21, measured directly: cycles of translucency tax per logical px² of
-  /// glass (0.1233 per device px), R² = 0.99917 on three areas 3x apart.
+  /// Cycles of translucency tax per logical px² of glass (0.1233 per device
+  /// px), R² = 0.99917 on three areas 3x apart.
   ///
-  /// Adreno 830, two seeds, worst median disagreement 1.78%, zero caveats in
-  /// either report. Reproduced independently by M7 and M9 across scenes as
-  /// unlike as the corpus gets.
+  /// Adreno 830 (Galaxy S25 Ultra), two orderings, worst median disagreement
+  /// 1.78%; reproduced across unlike scenes.
   static const double kTaxPerLogicalPx2 = 1.1101;
 
-  /// D26: the excess over `k·area` at twelve surfaces and 56 160 logical px²,
-  /// in cycles on Adreno 830. 715 at n = 2 and 5 776 at n = 6 on the same area.
+  /// The excess over `k·area` at twelve surfaces and 56 160 logical px², in
+  /// cycles on Adreno 830. 715 at n = 2 and 5 776 at n = 6 on the same area.
   static const double kFragmentationExcessAt12 = 26769;
 
   /// The deepest the Adreno grid went: 30% of a 360x780 screen.
   static const double kAdrenoMeasuredScreens = 0.30;
 
   /// The most glass Metal was measured carrying comfortably, on the M2 iPad
-  /// Pro: 12.8 screens, at
-  /// 0.17 ms of raster on 32 stacked panels and 0.42 on 128 half-size ones.
+  /// Pro: 12.8 screens, at 0.17 ms of raster on 32 stacked panels and 0.42 on
+  /// 128 half-size ones.
   static const double kMetalComfortableScreens = 12.8;
 
   /// Where it stopped being comfortable: 19.2 screens, 2.98 and 8.41 ms on the
@@ -696,12 +664,12 @@ class GlassLoad {
   static const double kMetalCliffScreens = 19.2;
 
   /// Apple's own limit on the same device (the M2 iPad Pro, iPadOS 26), for
-  /// contrast: `.glassEffect` falls
-  /// to ~90 fps somewhere between 128 and 192 surfaces, **whatever area they
-  /// cover** — 0.8 screens and 19.2 give 91.5 and 90.0 fps.
+  /// contrast: `.glassEffect` falls to ~90 fps somewhere between 128 and 192
+  /// surfaces, **whatever area they cover** — 0.8 screens and 19.2 give 91.5
+  /// and 90.0 fps.
   ///
   /// Not a limit of this package: one backdrop read per surface there, one
-  /// capture for all of them here (D38). It is here because it is the number an
+  /// capture for all of them here. It is here because it is the number an
   /// app author is most likely to have in mind from the platform, and it points
   /// the other way.
   static const int kAppleSurfaceLimit = 192;
@@ -742,12 +710,12 @@ enum GlassLoadVerdict {
   pastMeasuredRange,
 
   /// Between the last comfortable measurement and the first bad one. On Metal
-  /// (the M2 iPad Pro) that gap is 12.8 to 19.2 screens and nothing was run inside it.
+  /// (the M2 iPad Pro) that gap is 12.8 to 19.2 screens and nothing was run
+  /// inside it.
   betweenMeasuredPoints,
 
   /// At or past a point measured to fall over: on Metal (the M2 iPad Pro), 19.2
-  /// screens of glass,
-  /// where raster time steps by a factor of 18.
+  /// screens of glass, where raster time steps by a factor of 18.
   overMeasuredCliff,
 
   /// No run covers this hardware.

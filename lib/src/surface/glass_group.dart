@@ -1,9 +1,8 @@
 // A blend group: N glass surfaces drawn as one silhouette.
 //
-// **The two groupings of §4.4, and the whole point of this file is that they
-// are not the same thing.** `CaptureBatch` — surfaces sharing one atlas slot —
-// is a runtime decision made by the cost of packing, it changes only the
-// price, and it has been in the package since D122. A blend group changes the
+// **There are two groupings, and they are not the same thing.** `CaptureBatch`
+// — surfaces sharing one atlas slot — is a runtime decision made by the cost of
+// packing, and it changes only the price. A blend group changes the
 // *picture*: two shapes near each other grow a bridge between them, the way
 // Apple's `glassEffectUnion` does. The invariant between them runs one way —
 // a blend group must share a capture batch, because its members sample one
@@ -15,9 +14,9 @@
 // a group paints one quad over its own bounds and the members paint only their
 // children. The price is the dead area of that quad — fragments outside every
 // shape, shaded and then discarded by coverage — and it is the thing a group
-// trades against what it saves: at equal total area, twelve surfaces cost 1.41x
-// two on the translucency tax alone (D26), and that excess is charged per
-// *draw*.
+// trades against what it saves: at equal total area, twelve separate surfaces
+// cost 1.41x two on the translucency tax alone (Adreno), and that excess is
+// charged per *draw*.
 //
 // **The shape order is registration order and it is load-bearing.** The fused
 // field is a fold of smooth minima, and `smin` is not associative: reordering
@@ -52,10 +51,9 @@ const String kGlassGroupShaderAsset = 'packages/g1455/shaders/glass_group.frag';
 
 /// Shapes one fused draw can carry.
 ///
-/// Twelve because that is where the measured corpus stops: the fragmentation
-/// excess is read at two and at twelve surfaces (D26) and everything past it is
-/// an extrapolation of a curve nobody took, so a thirteenth shape would be
-/// priced by guess. The shader's array is this long; a larger group is
+/// Twelve because that is as far as the cost has been measured: the
+/// fragmentation excess was read at two and at twelve surfaces, and a
+/// thirteenth shape would be priced by guess. The shader's array is this long; a larger group is
 /// **refused** — its members go back to drawing themselves, which loses the
 /// bridges and says so in a counter — rather than truncated, because a
 /// truncated group would draw a picture with shapes missing and no sign of it.
@@ -171,18 +169,15 @@ class GlassBlendGroup implements GlassSurfaceCluster {
   /// False for an empty group, for one past [kMaxFusedShapes], and **below
   /// [GlassTier.full]**.
   ///
-  /// The last of those is a decision with a visible consequence, so it is
-  /// stated rather than buried: a group below the full rung stops fusing, its
-  /// members draw their own flat panels, and the silhouette **loses its
-  /// bridges**. That contradicts half of D58's promise — the fallback is
-  /// supposed to keep the same shape — and the alternative would be worse. The
-  /// bridge is a fold of two distance fields evaluated in a fragment shader
-  /// that samples the atlas; drawing it without reading the backdrop needs a
-  /// second fused program whose picture nobody has designed, because a bridge
-  /// with no refraction in it is a filled blob rather than glass pulling
-  /// towards its neighbour. Phase D designs it; until then the degradation is
-  /// the one that already exists for an over-capacity group, which is one
-  /// behaviour rather than two.
+  /// The last of those has a visible consequence: a group below the full rung
+  /// stops fusing, its members draw their own flat panels, and the silhouette
+  /// **loses its bridges**, although a lower rung is otherwise meant to keep
+  /// the same shape. The bridge is a fold of distance fields evaluated in a
+  /// shader that samples the atlas; drawing it without the backdrop would need
+  /// a second fused program, and a bridge with no refraction in it is a filled
+  /// blob rather than glass pulling towards its neighbour. So the degradation is
+  /// the one an over-capacity group already has — one behaviour rather than
+  /// two.
   bool get fuses => _members.isNotEmpty && _members.length <= kMaxFusedShapes && _tier == GlassTier.full;
 
   /// Adds [surface] at the end of the fold. Called by a surface as it
@@ -358,8 +353,8 @@ List<GlassFusedTile>? fusedDrawTiles({
   // one on the far side of the screen, which shares no pixel with it and cannot
   // change what is drawn there. Boxes that do not overlap are already disjoint
   // rectangles, so their decompositions cannot collide and each can be taken on
-  // its own. Measured on the corpus: twelve scattered panels fall into 14-21
-  // rectangles this way and into 39-55 without it, for the same area.
+  // its own. Twelve scattered panels fall into 14-21 rectangles this way and
+  // into 39-55 without it, for the same area.
   final rects = <Rect>[];
   for (final List<int> part in _overlapping(covers)) {
     final slice = <Rect>[for (final int i in part) covers[i]];
@@ -621,14 +616,12 @@ const double _kNoCull = 1e9;
 
 /// Whether the fused fold skips a shape farther than `k` from the field so far.
 ///
-/// True everywhere but a measurement. The skip is bit-identical — `h` is
-/// exactly zero there, so the fold keeps `d` and `mix(n, ni, 0)` is exactly `n`
-/// — which is precisely why turning it off has to be possible: a saving that
-/// changes no pixel is invisible in every frame and can only be seen as a
-/// price. It bought 25% of a twelve-shape group's whole addition on Adreno 830
-/// (D170) and 44% on Xclipse 920 (D171), and a dynamic branch is not free on
-/// every GPU, so the arm that says so has to exist on hardware nobody here has
-/// run.
+/// True except when measuring. The skip is bit-identical — `h` is exactly
+/// zero there, so the fold keeps `d` and `mix(n, ni, 0)` is exactly `n` — which
+/// is why turning it off has to be possible: a saving that changes no pixel can
+/// only be seen as a price. It saves 25% of a twelve-shape group's cost on
+/// Adreno 830 and 44% on Xclipse 920, and a dynamic branch is not free on every
+/// GPU, so the switch exists for hardware that has not been timed.
 ///
 /// A global rather than a constructor argument, and the same shape
 /// [debugPaintGlassSurfaces] has: it is a property of the process under
@@ -637,8 +630,8 @@ const double _kNoCull = 1e9;
 ///
 /// Setting it repaints every group that is already mounted. That is not a
 /// convenience: the switch changes no pixel, so a group that kept its retained
-/// layer would go on culling with the switch off and the run would report the
-/// branch as free. The first arm written against this found exactly that.
+/// layer would go on culling with the switch off and a measurement would report
+/// the branch as free.
 ///
 /// {@category Diagnostics}
 bool get debugGlassFoldCull => _foldCull;
@@ -659,49 +652,31 @@ bool _foldCull = true;
 ///
 /// The split changes no pixel — [fusedDrawTiles] carries the proof — so it can
 /// only be seen as a price, and what it trades runs both ways: fewer fragments,
-/// each folding fewer shapes, against more draw calls. **On by default except
-/// on desktop, because what a draw costs is decided by whether the engine runs
-/// SDFs, and Dart can tell that only by the platform.** Where it does not —
-/// Android always, iOS unless the app opts in — both GPUs that have been timed
-/// charge for the fragments. On Adreno 830 eleven
-/// rectangles cost 0.91x the one quad's frame and twenty cost 0.52x it, the
-/// glass over its floor 0.83x and 0.35x (D192). On the M2 iPad Pro the same two
-/// scenes cost 0.71-0.76x and 0.40-0.42x in GPU time, the glass over its floor
-/// 0.61-0.67x and 0.30-0.32x, two seeds (D194).
+/// each folding fewer shapes, against more draw calls. **On by default on
+/// every platform.** On Adreno 830 eleven rectangles cost 0.91x the one quad's
+/// frame and twenty cost 0.52x it. On the M2 iPad Pro the same two scenes cost
+/// 0.71-0.76x and 0.40-0.42x in GPU time. On an M3 Max (Metal System Trace)
+/// the split costs 0.94-0.95x the quad's frame on a clustered layout and
+/// 0.70-0.75x on a scattered one.
 ///
-/// For a day the default was keyed on the declared hardware — the quad on
-/// Apple, from D190: on an Apple-silicon Mac eleven rectangles cost 3.2x the
-/// one quad and fifteen 5.8-6.3x. That run had one instrument, the raster
-/// thread's wall time, because a desktop's GPU tracer dies with its uptime; on
-/// the iPad, where both instruments read the same arms, the raster thread says
-/// +8-25% for the split while the GPU says -24…-60%, and the GPU is where the
-/// frame is spent (3-7 ms of 8.3 against 0.5-0.6). So D190 priced the raster
-/// thread, and the key answered the same for every declaration once the GPU
-/// had been asked — it was removed rather than kept as a switch that switches
-/// nothing.
-///
-/// It came back keyed on the platform for a day (D199): on an M3 Max in Metal
-/// System Trace eleven rectangles cost 1.88x the quad's frame and fifteen
-/// 1.39x, because every shader rectangle there was three offscreen passes — a
-/// white SDF mask, the shader and a `kSrcIn` blend (`canvas.cc:2185-2209`,
-/// flutter/flutter#192994). The tiles asked for `isAntiAlias = false`, which
-/// keeps a draw off that path, and the flag never arrived: it opened the
-/// picture, where the recorder does not write a `false` it already holds and
-/// Impeller starts from `true` (`primeAliasedDraw`). Primed, a tile is one
-/// draw on macOS as well, and the split costs 0.94-0.95x the quad's frame on
-/// the cluster and 0.70-0.75x on the scatter, two seeds (D200). So it ships on
-/// every platform again, and nothing keys it.
+/// On macOS that holds only because the tiles are drawn without
+/// antialiasing: where the engine runs SDFs, an antialiased shader rectangle
+/// is three offscreen passes — a white SDF mask, the shader and a `kSrcIn`
+/// blend (`canvas.cc:2185-2209`, flutter/flutter#192994). A `false` set on the
+/// first draw of a picture is not recorded, because the recorder does not
+/// write a value it already holds and Impeller starts from `true`, so the
+/// picture is primed first (`primeAliasedDraw`).
 ///
 /// Set `null` to return to the default.
 ///
 /// Independent of [debugGlassFoldCull]: dropping a shape from a tile is exact
-/// whether or not the shader's own skip runs, so the arm that prices one does
-/// not silently price the other.
+/// whether or not the shader's own skip runs, so measuring one does not
+/// silently measure the other.
 ///
 /// Set it before the tree mounts, and restore it afterwards. Setting it
 /// repaints every group already mounted, for the reason the cull's setter
-/// does: a retained layer would go on drawing the old way and the run would
-/// report the split as free.
+/// does: a retained layer would go on drawing the old way and a measurement
+/// would report the split as free.
 ///
 /// {@category Diagnostics}
 bool get debugGlassFusedSplit => _fusedSplit ?? debugGlassFusedSplitDefault;
@@ -721,10 +696,10 @@ bool? _fusedSplit;
 
 /// What [debugGlassFusedSplit] reads while nothing is imposed: the split.
 ///
-/// Separate from the flag because a benchmark records what an unnamed arm
-/// resolved to, and by then an earlier arm may have imposed a value; and a
-/// getter rather than a constant because this default has moved three times
-/// (D190, D194, D199, D200), and a harness that copied it was wrong after each.
+/// Separate from the flag because a benchmark records what the default
+/// resolved to, and by then an earlier run may have imposed a value; and a
+/// getter rather than a constant so that a harness reads the default instead
+/// of copying it.
 ///
 /// {@category Diagnostics}
 bool get debugGlassFusedSplitDefault => true;
@@ -760,48 +735,25 @@ bool get debugGlassFusedSplitDefault => true;
 /// optics, so a member that names its own finish is declaring something the
 /// fused picture cannot express. Reported in debug, once, and then ignored.
 ///
-/// **What a group costs is fragments, on both GPUs it has been timed on.**
+/// **A group costs fragments.** One draw of N shapes evaluates every shape at
+/// every fragment, so each declared shape adds about **0.030 cycles per device
+/// pixel** on Adreno 830 to every pixel the group covers — roughly half of what
+/// a lone glass fragment costs — and twelve make the fragment about six times a
+/// single surface's (same sign on Xclipse 920). The group draws tiles
+/// ([debugGlassFusedSplit]) to cover as little as it can: twelve grouped
+/// panels then cost 1.70x a stock Material card when clustered and 1.65x when
+/// scattered, on Adreno 830. On the M2 iPad Pro, in GPU time, twelve clustered
+/// panels grouped cost 1.18-1.21x the same twelve ungrouped.
 ///
-/// One draw of N shapes evaluates every shape at every fragment, so each
-/// declared shape adds about **0.030 cycles per device pixel** to every pixel
-/// the group covers — roughly half of what a lone glass fragment costs in
-/// total, each — and twelve of them make the fragment about six times a single
-/// surface's. Measured on Adreno 830 (D169, D170), reproduced in sign on
-/// Xclipse 920 (D171), and re-derived from the tracked digests by
-/// `test/glass/glass_group_test.dart`. In screens: twelve panels declared one
-/// group came out at 2.25x stock Material where the same twelve ungrouped were
-/// 1.19x, and at 3.24x against 1.18x once spread over the screen. There, a
-/// group is a way to get a picture and not a way to get a price.
-///
-/// Those are the one quad's numbers, and the group no longer draws one: since
-/// D192 it draws tiles ([debugGlassFusedSplit]), which on Adreno
-/// took the clustered twelve from 1.87x Material to 1.70x and the scattered
-/// twelve from 3.17x to 1.65x. The layout stopped being the price; the
-/// declaration still is.
-///
-/// *On the M2 iPad Pro (D194), in GPU time,* the sign is the same: the
-/// clustered twelve grouped cost 1.60-1.65x the same twelve ungrouped as one
-/// quad and 1.18-1.21x as tiles, two seeds.
-///
-/// *What D190 read on an Apple-silicon Mac is the other sign* — the ungrouped
-/// twelve at **5.1-5.4x** the one fused draw, the area not entering — and it
-/// was read off the raster thread's wall time, the only instrument a desktop
-/// run has. On the iPad that instrument agrees with the Mac's sign on the same
-/// arms (the grouped quad 0.86-0.90x the ungrouped) while the GPU reads the
-/// opposite, and the GPU is where the frame goes. So the Mac's number is a
-/// price of the raster thread, not of the GPU, which on a desktop is still
-/// untimed.
-///
-/// So the guidance is the picture: declare the surfaces that should *look*
+/// So declare a group for the picture: put in the surfaces that should *look*
 /// merged and leave the rest out.
 ///
-/// **And [spacing] zero is not the cheap way to have a group.** It is the other
+/// **[spacing] zero is not the cheap way to have a group.** It is the other
 /// declaration — one draw, one shared capture, every member keeping its own
 /// silhouette — and it costs 2.34x an ungrouped screen's addition where a
-/// spacing of 8 costs 3.05x (D172). The difference between the two spacings is
-/// area and nothing else: the fragment costs the same to within 0.4% either
-/// way, and what a non-zero spacing buys is a quad reaching further out. The
-/// cheap thing is not grouping.
+/// spacing of 8 costs 3.05x (Adreno 830). The difference between the two
+/// spacings is area and nothing else: the fragment costs the same to within
+/// 0.4% either way. The cheap thing is not grouping.
 ///
 /// See also:
 ///
@@ -861,27 +813,24 @@ class _GlassGroupState extends State<GlassGroup> {
 /// Draws every [GlassSurface] below it as one piece of glass, **however far
 /// apart they are**.
 ///
-/// SwiftUI's `glassEffectUnion`, and the reason it is a type of its own rather
-/// than a [GlassGroup] with a large spacing: it takes no spacing at all. The
-/// roadmap's standing guess was that a union is `GlassGroup(spacing: infinity)`
-/// and therefore not worth a name. It is not — infinity is not a value this
-/// machine can take. The quad a fused draw shades is the members' union grown
-/// by `delta(n) * k`, so an infinite `k` is an infinite quad; and the fold's
-/// skip, which is a quarter of a twelve-shape group's whole addition on Adreno
-/// and 44% of it on Xclipse (D170, D171), fires when a shape is farther than
-/// `k` than the field so far, so an infinite `k` never skips anything. A union
-/// declared that way would ask for every pixel on the screen and pay full price
-/// for each.
+/// SwiftUI's `glassEffectUnion`. It is a type of its own rather than
+/// `GlassGroup(spacing: infinity)` because infinity is not a value the fused
+/// draw can take. The quad it shades is the members' union grown by
+/// `delta(n) * k`, so an infinite `k` is an infinite quad; and the fold's skip,
+/// a quarter of a twelve-shape group's cost on Adreno and 44% of it on Xclipse,
+/// fires when a shape is farther than `k` from the field so far, so an infinite
+/// `k` never skips anything. A union declared that way would shade every pixel
+/// on the screen at full price.
 ///
 /// So the union **solves** for `k` instead of taking it: the smallest radius
 /// that connects the members that are there, which is twice the longest edge of
 /// their minimum spanning tree ([unionBlendRadius]). Finite, minimal for the
 /// picture asked for, and usually *smaller* than the spacing somebody would
 /// have declared to be safe — a spacing costs the quad and nothing else (the
-/// fragment is the same to within 0.4% at `spacing` 0 and 8, D172), so the
+/// fragment is the same to within 0.4% at `spacing` 0 and 8), so the
 /// difference between a solved `k` and a guessed one is paid in area.
 ///
-/// **Two consequences, both visible, both named rather than buried.**
+/// **Two visible consequences:**
 ///
 ///  - `k` smooths the *whole* fold, not just the bridges, so a union spread
 ///    over a distance is a puffier silhouette than the same shapes near each
@@ -901,10 +850,10 @@ class _GlassGroupState extends State<GlassGroup> {
 /// each other and the outer ones with each other. Two unions are two widgets.
 /// An id would be a second way to say what the tree already says, and the thing
 /// Apple's id does that position cannot — carrying a shape's identity *across*
-/// an appearance so the glass morphs between them — is still not here. What is
-/// here since D209 is the half that needs no identity: a member that appears or
-/// leaves inside a group buds out of its neighbours through
-/// `GlassSurface.presence`, which is a field offset and exact at zero.
+/// an appearance so the glass morphs between them — is not supported. The half
+/// that needs no identity is: a member that appears or leaves inside a group
+/// buds out of its neighbours through `GlassSurface.presence`, which is a field
+/// offset and exact at zero.
 ///
 /// ```dart
 /// GlassUnion(
@@ -1014,7 +963,7 @@ class RenderGlassGroup extends RenderProxyBox {
   final GlassBlendGroup _group;
 
   /// A group repaints on every published proxy, and nothing else should — the
-  /// same reason [RenderGlassSurface] gives (D149). Without this, a publish
+  /// same reason [RenderGlassSurface] gives. Without this, a publish
   /// would repaint the whole screen under the glass.
   ///
   /// It is also what gives the layer watch something to exclude: the group's
@@ -1155,7 +1104,7 @@ class RenderGlassGroup extends RenderProxyBox {
   /// silhouette can reach, for [boxes] in any one translated space.
   ///
   /// One function for the quad and for the capture, because the two have to
-  /// agree: a capture smaller than the quad is the clamped band D201 found,
+  /// agree: a capture smaller than the quad shows a clamped band at its edge,
   /// and a quad smaller than the silhouette cuts the bridges off.
   ({double blend, double depression, double slack, double reach}) _fusedReach(
     List<Rect> boxes,
@@ -1211,9 +1160,8 @@ class RenderGlassGroup extends RenderProxyBox {
   /// The rectangle the fused draw last covered, in this group's paint space.
   ///
   /// Null until the group has fused once. Read by an instrument or a report:
-  /// dead area is one of the two articles a group moves — the other is D26's
-  /// fragmentation tax, which it moves the other way — and a report without the
-  /// quad would be describing the widget tree's shape rather than the mechanism.
+  /// dead area is one of the two costs a group moves — the other is the
+  /// per-draw translucency tax, which it moves the other way.
   Rect? lastFusedQuad;
 
   /// The blend radius `k` the last fused draw handed the shader, in logical
@@ -1228,9 +1176,9 @@ class RenderGlassGroup extends RenderProxyBox {
   /// pixels: `k`, or 1e9 — a distance no screen reaches — when
   /// [debugGlassFoldCull] is off.
   ///
-  /// Recorded because the switch it reflects changes no pixel by construction,
-  /// and an axis with no observable trace is not an axis — a run of the `off`
-  /// arm that silently culled anyway would report as "the branch is free".
+  /// Recorded because the switch it reflects changes no pixel by construction:
+  /// without this, a run with the switch off that silently culled anyway would
+  /// report the branch as free.
   double lastCullDistance = 0;
 
   /// The rectangles the last fused draw covered, or null when it covered
@@ -1243,15 +1191,15 @@ class RenderGlassGroup extends RenderProxyBox {
 
   /// Draws the fused glass took, summed over [fusedPaints].
   ///
-  /// The article the split trades against fragments, and the one quantity a
+  /// The quantity the split trades against fragments, and the one quantity a
   /// tiled draw adds. Its denominator is [fusedPaints]: a group that split into
   /// eleven rectangles and one that refused to split are the same row otherwise.
   int fusedDraws = 0;
 
   /// Frames the split was asked for and refused as too fine ([kMaxFusedTiles]).
   ///
-  /// Must be zero on every layout the corpus has; non-zero means a screen is
-  /// paying the whole quad on a bound nobody measured.
+  /// Zero on every layout the package is tested against; non-zero means a
+  /// screen is paying for the whole quad because of an unmeasured bound.
   int fusedTileRefusals = 0;
 
   /// Of [fusedDraws], those made with `isAntiAlias` false: every tile, and the
@@ -1274,7 +1222,7 @@ class RenderGlassGroup extends RenderProxyBox {
   /// Shaded area weighted by the shapes folded over it, in logical px^2 per
   /// shape, summed over [fusedPaints].
   ///
-  /// The third total, and the one D169's model multiplies: the fragment costs
+  /// The third total, and the one the cost model multiplies: the fragment costs
   /// `0.0343 + 0.0441 * n` cycles per device pixel on Adreno 830, so a draw
   /// that halves its area and quarters the shapes in it moves this by eight and
   /// [fusedQuadArea] by two. Area alone would have called those the same run.
@@ -1472,7 +1420,7 @@ class RenderGlassGroup extends RenderProxyBox {
   /// Draws recorded at composite time, and how many of those because the glass
   /// had moved since it was painted — the trace of `GlassDrawLayer`, without
   /// which a moving glass that happened to be repainted anyway would pass every
-  /// pixel arm.
+  /// pixel test.
   int get drawRecords => _drawLayer.layer?.records ?? 0;
 
   /// Of [drawRecords], those recorded because the glass had moved since it
@@ -1523,7 +1471,7 @@ class RenderGlassGroup extends RenderProxyBox {
     // laid out by whatever holds its children — a `Stack` over the page, a
     // `Row` across the screen — so its box says where the group *is* and not
     // where its glass is, and shading the difference is the largest single
-    // article a group adds. Nothing outside this rect can reach the screen:
+    // cost a group adds. Nothing outside this rect can reach the screen:
     // the shader's coverage is `clamp(0.5 - d / uPixel, 0, 1)`, exactly zero
     // half a device pixel outside the fused shape, and every other term is
     // multiplied by it.
@@ -1542,9 +1490,9 @@ class RenderGlassGroup extends RenderProxyBox {
     // the equidistant one it is tight on.
     //
     // Why bother, when `k` alone is a valid bound: a spacing costs the quad and
-    // nothing else. Measured, at twelve shapes, the fragment costs the same at
+    // nothing else. At twelve shapes the fragment costs the same at
     // `spacing = 0` and `spacing = 8` to within 0.4% — the whole price of the
-    // bridges is the area this number inflates (D172). At twelve it is 0.758,
+    // bridges is the area this number inflates. At twelve it is 0.758,
     // at two it is 0.25, so the naive `k` overcharges a pair by four times.
     Rect union = boxes.first;
     for (var i = 1; i < boxes.length; i++) {
