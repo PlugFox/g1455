@@ -102,6 +102,13 @@ export 'src/surface/glass_controls.dart'
 // How a held drop deforms as it launches and brakes: a theme token, the pure
 // model a custom control can feed, and the ticker that runs it.
 export 'src/surface/glass_drop_motion.dart' show GlassDropMotion, GlassDropStretch, GlassDropStretchDriver;
+// How a pressed button swells and leans toward the finger: a theme token whose
+// geometry is pure, so a custom control can ask it.
+export 'src/surface/glass_press.dart' show GlassPress;
+// Apple's concentric corners, as arithmetic.
+export 'src/surface/glass_concentric.dart' show GlassConcentric;
+// The keyboard's focus ring, which is drawn where no capture sees it.
+export 'src/surface/glass_focus.dart' show kGlassFocusRingColor, kGlassFocusRingGap, kGlassFocusRingWidth;
 export 'src/surface/glass_scroll_edge.dart'
     show
         GlassScrollEdge,

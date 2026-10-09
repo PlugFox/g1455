@@ -14,11 +14,19 @@
 // way [GlassButton] brightens its whole: the finish's rim, added, over the
 // item's cell clipped to the capsule (D185's rule about `plus` holds — nothing
 // between the overlay and the glass opens a `saveLayer`).
+//
+// Each item takes the keyboard's focus and Space or Enter presses it; its
+// focus ring is drawn inside its cell, concentric with the capsule, on the
+// group's own canvas — inside the surface's subtree, which no capture sees.
+// An item does not swell when pressed, as a [GlassButton] does: the group is
+// one glass, and one cell of it cannot grow.
 
 import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_concentric.dart';
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
@@ -66,7 +74,11 @@ class GlassToolbarItem {
 /// The group is [kGlassToolbarHeight] tall and [kGlassToolbarItemWidth] wide
 /// per item. A held item brightens its own cell of the capsule by
 /// [pressedOverlay], the way [GlassButton] brightens its whole; a disabled
-/// item is drawn at 0.3 opacity.
+/// item is drawn at 0.3 opacity. A focused item is pressed by Space or Enter,
+/// and ringed inside its cell.
+///
+/// The items run in the reading direction: under [TextDirection.rtl] the
+/// first is at the right.
 ///
 /// ```dart
 /// GlassButtonGroup(
@@ -93,7 +105,7 @@ class GlassButtonGroup extends StatefulWidget {
   /// A group of [items], of which there must be at least one.
   const GlassButtonGroup({required this.items, this.finish, this.pressedOverlay, super.key}) : assert(items.length > 0);
 
-  /// The actions, left to right.
+  /// The actions, in the reading direction.
   final List<GlassToolbarItem> items;
 
   /// The optics. Null takes the theme's.
@@ -110,6 +122,9 @@ class GlassButtonGroup extends StatefulWidget {
 class _GlassButtonGroupState extends State<GlassButtonGroup> {
   int? _held;
 
+  /// The item whose focus ring is shown.
+  int? _focused;
+
   @override
   Widget build(BuildContext context) {
     final GlassThemeData theme = GlassTheme.of(context);
@@ -125,7 +140,15 @@ class _GlassButtonGroupState extends State<GlassButtonGroup> {
         borderRadius: kGlassCapsule,
         finish: widget.finish,
         child: CustomPaint(
-          painter: _held == null ? null : _CellOverlay(_held!, n, overlay),
+          painter: _held == null && _focused == null
+              ? null
+              : _CellOverlay(
+                  _held,
+                  n,
+                  overlay,
+                  focused: _focused,
+                  rtl: Directionality.maybeOf(context) == TextDirection.rtl,
+                ),
           child: IconTheme.merge(
             data: IconThemeData(color: label, size: 22),
             child: Row(
@@ -152,16 +175,29 @@ class _GlassButtonGroupState extends State<GlassButtonGroup> {
       button: true,
       enabled: enabled,
       label: item.label,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: enabled ? (_) => hold(true) : null,
-        onTapUp: enabled ? (_) => hold(false) : null,
-        onTapCancel: enabled ? () => hold(false) : null,
-        onTap: item.onPressed,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: kGlassMinTapTarget.height),
-          child: Center(
-            child: enabled ? item.icon : Opacity(opacity: 0.3, child: item.icon),
+      child: FocusableActionDetector(
+        enabled: enabled,
+        onShowFocusHighlight: (bool on) {
+          if (on) {
+            setState(() => _focused = i);
+          } else if (_focused == i) {
+            setState(() => _focused = null);
+          }
+        },
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) => item.onPressed?.call()),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: enabled ? (_) => hold(true) : null,
+          onTapUp: enabled ? (_) => hold(false) : null,
+          onTapCancel: enabled ? () => hold(false) : null,
+          onTap: item.onPressed,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: kGlassMinTapTarget.height),
+            child: Center(
+              child: enabled ? item.icon : Opacity(opacity: 0.3, child: item.icon),
+            ),
           ),
         ),
       ),
@@ -169,33 +205,64 @@ class _GlassButtonGroupState extends State<GlassButtonGroup> {
   }
 }
 
-/// Adds a colour over item [index]'s cell, clipped to the capsule.
+/// Adds a colour over item [index]'s cell, clipped to the capsule, and rings
+/// item [focused]'s cell inside it.
 class _CellOverlay extends CustomPainter {
-  const _CellOverlay(this.index, this.count, this.color);
+  const _CellOverlay(this.index, this.count, this.color, {this.focused, this.rtl = false});
 
-  final int index;
+  final int? index;
   final int count;
   final Color color;
+  final int? focused;
+
+  /// The row runs right to left, so item 0's cell is the rightmost.
+  final bool rtl;
+
+  Rect _cell(int i, Size size) {
+    final double cell = size.width / count;
+    return Rect.fromLTWH(cell * (rtl ? count - 1 - i : i), 0, cell, size.height);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (color.a <= 0) {
-      return;
+    final int? index = this.index;
+    final int? focused = this.focused;
+    if (index != null && color.a > 0) {
+      canvas
+        ..save()
+        ..clipRSuperellipse(kGlassCapsule.toRSuperellipse(Offset.zero & size).scaleRadii())
+        ..drawRect(
+          _cell(index, size),
+          Paint()
+            ..blendMode = BlendMode.plus
+            ..color = color,
+        )
+        ..restore();
     }
-    final double cell = size.width / count;
-    canvas
-      ..save()
-      ..clipRSuperellipse(kGlassCapsule.toRSuperellipse(Offset.zero & size).scaleRadii())
-      ..drawRect(
-        Rect.fromLTWH(cell * index, 0, cell, size.height),
+    if (focused != null) {
+      // Inside the cell — a ring outside it would sit on its neighbours — and
+      // concentric with the capsule it is inset in. Over the press, which
+      // would otherwise add to it.
+      const double inset = kGlassFocusRingGap + kGlassFocusRingWidth / 2;
+      final Rect ring = _cell(focused, size).deflate(inset);
+      canvas.drawRSuperellipse(
+        GlassConcentric.borderRadius(
+          BorderRadius.circular(size.height / 2),
+          const EdgeInsets.all(inset),
+        ).toRSuperellipse(ring).scaleRadii(),
         Paint()
-          ..blendMode = BlendMode.plus
-          ..color = color,
-      )
-      ..restore();
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = kGlassFocusRingWidth
+          ..color = kGlassFocusRingColor,
+      );
+    }
   }
 
   @override
   bool shouldRepaint(_CellOverlay oldDelegate) =>
-      oldDelegate.index != index || oldDelegate.count != count || oldDelegate.color != color;
+      oldDelegate.index != index ||
+      oldDelegate.count != count ||
+      oldDelegate.color != color ||
+      oldDelegate.focused != focused ||
+      oldDelegate.rtl != rtl;
 }

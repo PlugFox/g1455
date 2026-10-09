@@ -53,6 +53,10 @@
 //    slows down. On by default and subtle, because it costs no capture (see
 //    `glass_drop_motion.dart`); [GlassDropMotion.none] turns it off app-wide,
 //    and the platform's reduced-motion switch turns it off regardless.
+//  - [GlassThemeData.press] is how a pressed button swells and leans toward a
+//    dragging finger. On by default for the same reason — it grows inside a
+//    travel region of its own and costs no capture (`glass_press.dart`) — and
+//    off under reduced motion.
 //
 // And one that *is* a reading, opt-in: [GlassThemeData.adaptive]. With it the
 // host reads the captured backdrop back under each glass, and a component
@@ -75,6 +79,7 @@ import 'package:flutter/widgets.dart';
 import 'glass_adaptive.dart';
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
+import 'glass_press.dart';
 import 'glass_ripple.dart';
 import 'glass_tier.dart';
 
@@ -83,7 +88,7 @@ import 'glass_tier.dart';
 /// The material ([finish]), the rung of the ladder ([tier]), what is behind
 /// the glass ([backdrop], [richBackdrop]), the platform's increase-contrast
 /// switch ([highContrast]), a floor for the labels ([minLabelContrast]), and
-/// motion ([ripple], [dropMotion]). A [GlassHost] installs one built from its
+/// motion ([ripple], [dropMotion], [press]). A [GlassHost] installs one built from its
 /// own arguments; a [GlassTheme] below it changes them for a subtree.
 ///
 /// What the glass draws from these — the finish after any dim, the label
@@ -121,6 +126,7 @@ class GlassThemeData {
     this.minLabelContrast,
     this.ripple,
     this.dropMotion = const GlassDropMotion(),
+    this.press = const GlassPress(),
     this.adaptive,
     this.regularAppearance,
     this.reading,
@@ -225,6 +231,11 @@ class GlassThemeData {
   /// Ignored under reduced motion. See [GlassDropMotion].
   final GlassDropMotion dropMotion;
 
+  /// How a pressed [GlassButton] swells and leans toward a dragging finger,
+  /// unless it declares its own; [GlassPress.none] for a button that keeps its
+  /// box. Ignored under reduced motion. See [GlassPress].
+  final GlassPress press;
+
   /// Whether glass under this theme reads its own backdrop, and how; null for
   /// glass that goes by what is declared. Installed by `GlassHost.adaptive`.
   ///
@@ -272,6 +283,7 @@ class GlassThemeData {
       minLabelContrast: minLabelContrast,
       ripple: ripple,
       dropMotion: dropMotion,
+      press: press,
       adaptive: adaptive,
       regularAppearance: appearance,
       reading: reading,
@@ -289,6 +301,7 @@ class GlassThemeData {
     minLabelContrast: minLabelContrast,
     ripple: ripple,
     dropMotion: dropMotion,
+    press: press,
     adaptive: adaptive,
     regularAppearance: regularAppearance,
     reading: reading,
@@ -373,6 +386,7 @@ class GlassThemeData {
     double? minLabelContrast,
     GlassRipple? ripple,
     GlassDropMotion? dropMotion,
+    GlassPress? press,
     GlassAdaptive? adaptive,
     Brightness? regularAppearance,
     GlassBackdropReading? reading,
@@ -385,6 +399,7 @@ class GlassThemeData {
     minLabelContrast: minLabelContrast ?? this.minLabelContrast,
     ripple: ripple ?? this.ripple,
     dropMotion: dropMotion ?? this.dropMotion,
+    press: press ?? this.press,
     adaptive: adaptive ?? this.adaptive,
     // A finish given here is named, and a named finish does not move with a
     // reading unless the caller says in which appearance it was picked.
@@ -403,6 +418,7 @@ class GlassThemeData {
       other.minLabelContrast == minLabelContrast &&
       other.ripple == ripple &&
       other.dropMotion == dropMotion &&
+      other.press == press &&
       other.adaptive == adaptive &&
       other.regularAppearance == regularAppearance &&
       other.reading == reading;
@@ -417,6 +433,7 @@ class GlassThemeData {
     minLabelContrast,
     ripple,
     dropMotion,
+    press,
     adaptive,
     regularAppearance,
     reading,
@@ -430,6 +447,7 @@ class GlassThemeData {
       '${minLabelContrast == null ? '' : ', label >= $minLabelContrast'}'
       '${ripple == null ? '' : ', $ripple'}'
       '${dropMotion == const GlassDropMotion() ? '' : ', $dropMotion'}'
+      '${press == const GlassPress() ? '' : ', $press'}'
       '${adaptive == null ? '' : ', reads its backdrop'}'
       '${reading == null ? '' : ', $reading'})';
 }

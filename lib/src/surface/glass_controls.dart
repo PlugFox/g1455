@@ -31,15 +31,33 @@
 // the drop appears and none while it moves. The slider's fill ends under the
 // drop and follows it, so every frame of a slider drag is a real change under
 // glass and is retaken — the honest price, stated rather than hidden.
+//
+// **Who gets the finger.** Under a horizontal scrollable — a `PageView`, a
+// carousel — a control claims the pointer the moment it comes down
+// ([_ClaimingDragRecognizer]): the drop lifts on that frame rather than after
+// the tap's 100 ms timeout or the drag's slop, and the page never sees the
+// gesture. Anywhere else it competes as it always did, because under a
+// vertical list a vertical swipe that starts on a switch is a scroll, and a
+// control that won every arena it touched would take it. Drags measure from
+// where the finger came down (`DragStartBehavior.down`), so the knob does not
+// jump by the slop.
+//
+// A keyboard reaches both: Space or Enter toggles the switch, the arrow keys
+// step the slider, and the focus ring is drawn where no capture sees it
+// (`glass_focus.dart`). Under `TextDirection.rtl` both mirror: the switch is on
+// to the left and the slider fills from the right.
 
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_surface.dart';
 import 'glass_travel.dart';
 
@@ -119,7 +137,14 @@ const double _kSliderTrack = 6;
 /// Laid out at its resting size and drawn past it, so what places it — a
 /// `Positioned`, an `Align` — places the knob's centre and not the drop's box.
 class _Drop extends StatelessWidget {
-  const _Drop({required this.rest, required this.lift, required this.scale, this.widen = 0, this.stretch = 0});
+  const _Drop({
+    required this.rest,
+    required this.lift,
+    required this.scale,
+    this.widen = 0,
+    this.stretch = 0,
+    this.focused = false,
+  });
 
   final Size rest;
 
@@ -135,6 +160,9 @@ class _Drop extends StatelessWidget {
   /// The deformation along x, already scaled by [lift]: see
   /// [GlassDropStretch.apply].
   final double stretch;
+
+  /// Whether the resting knob wears the focus ring.
+  final bool focused;
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +189,12 @@ class _Drop extends StatelessWidget {
             // The white knob is the surface's content, so it is drawn over the
             // glass and kept out of every capture — nothing under a drop is ever
             // the knob it replaced.
-            child: lift >= 1 ? null : Opacity(opacity: 1 - lift, child: const _Knob()),
+            child: lift >= 1
+                ? null
+                : Opacity(
+                    opacity: 1 - lift,
+                    child: _Knob(focused: focused),
+                  ),
           ),
         ),
       ),
@@ -169,20 +202,117 @@ class _Drop extends StatelessWidget {
   }
 }
 
-/// The resting knob: an opaque white capsule.
+/// The resting knob: an opaque white capsule — ringed, when [focused], from
+/// inside the drop's subtree, which no capture sees.
 class _Knob extends StatelessWidget {
-  const _Knob();
+  const _Knob({this.focused = false});
+
+  final bool focused;
 
   @override
-  Widget build(BuildContext context) => const DecoratedBox(
-    decoration: ShapeDecoration(
-      color: Color(0xFFFFFFFF),
-      shape: StadiumBorder(),
-      shadows: <BoxShadow>[
-        BoxShadow(color: Color(0x26000000), blurRadius: 4, offset: Offset(0, 1)),
-      ],
+  Widget build(BuildContext context) => CustomPaint(
+    foregroundPainter: focused ? const _KnobRing() : null,
+    child: const DecoratedBox(
+      decoration: ShapeDecoration(
+        color: Color(0xFFFFFFFF),
+        shape: StadiumBorder(),
+        shadows: <BoxShadow>[
+          BoxShadow(color: Color(0x26000000), blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
     ),
   );
+}
+
+class _KnobRing extends CustomPainter {
+  const _KnobRing();
+
+  @override
+  void paint(Canvas canvas, Size size) => paintGlassFocusRing(canvas, Offset.zero & size, kGlassCapsule);
+
+  @override
+  bool shouldRepaint(_KnobRing oldDelegate) => false;
+}
+
+/// Overrides whether the switch and the slider claim the pointer on touch-down
+/// — true always, false never — instead of asking whether the nearest
+/// scrollable is horizontal. A `@visibleForTesting` seam: the gesture test's
+/// negative controls are the two answers the scrollable did not give.
+@visibleForTesting
+bool? debugGlassControlsClaimOverride;
+
+/// Whether a control in [context] takes the pointer on touch-down: when the
+/// nearest scrollable scrolls the same way the control drags, and only then.
+bool _claimsPointer(BuildContext context) {
+  final bool? forced = debugGlassControlsClaimOverride;
+  if (forced != null) {
+    return forced;
+  }
+  final ScrollableState? scrollable = Scrollable.maybeOf(context);
+  return scrollable != null && axisDirectionToAxis(scrollable.axisDirection) == Axis.horizontal;
+}
+
+/// A horizontal drag that, when [claim] says so, wins its arena on the pointer
+/// coming down — the way `EagerGestureRecognizer` does — rather than at the
+/// touch slop. Won at once, a drag with `DragStartBehavior.down` starts at
+/// once, so the tap that would have competed with it is the drag's to tell:
+/// an end that travelled under the slop is a tap.
+class _ClaimingDragRecognizer extends HorizontalDragGestureRecognizer {
+  _ClaimingDragRecognizer({super.debugOwner});
+
+  bool claim = false;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    if (claim) {
+      resolvePointer(event.pointer, GestureDisposition.accepted);
+    }
+  }
+}
+
+/// The recognizers of a control: a tap, and a horizontal drag measured from
+/// touch-down that may [claim] the pointer.
+Map<Type, GestureRecognizerFactory> _controlGestures({
+  required Object owner,
+  required bool claim,
+  required DeviceGestureSettings? settings,
+  GestureTapDownCallback? onTapDown,
+  GestureTapUpCallback? onTapUp,
+  GestureTapCallback? onTap,
+  GestureTapCancelCallback? onTapCancel,
+  GestureDragStartCallback? onStart,
+  GestureDragUpdateCallback? onUpdate,
+  GestureDragEndCallback? onEnd,
+  GestureDragCancelCallback? onCancel,
+}) => <Type, GestureRecognizerFactory>{
+  TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+    () => TapGestureRecognizer(debugOwner: owner),
+    (TapGestureRecognizer t) => t
+      ..onTapDown = onTapDown
+      ..onTapUp = onTapUp
+      ..onTap = onTap
+      ..onTapCancel = onTapCancel
+      ..gestureSettings = settings,
+  ),
+  _ClaimingDragRecognizer: GestureRecognizerFactoryWithHandlers<_ClaimingDragRecognizer>(
+    () => _ClaimingDragRecognizer(debugOwner: owner),
+    (_ClaimingDragRecognizer d) => d
+      ..claim = claim
+      ..dragStartBehavior = DragStartBehavior.down
+      ..onStart = onStart
+      ..onUpdate = onUpdate
+      ..onEnd = onEnd
+      ..onCancel = onCancel
+      ..gestureSettings = settings,
+  ),
+};
+
+/// Steps a slider by [steps] of its unit: one per arrow key.
+class _StepIntent extends Intent {
+  const _StepIntent(this.steps);
+
+  final int steps;
 }
 
 /// A disabled control's body: drawn whole at [kGlassDisabledOpacity].
@@ -237,12 +367,14 @@ _Drop _drop({
   required double widen,
   required double lift,
   required double stretch,
+  bool focused = false,
 }) => _Drop(
   rest: rest,
   scale: scale,
   widen: widen,
   lift: Curves.easeOut.transform(lift),
   stretch: stretch * lift.clamp(0.0, 1.0),
+  focused: focused,
 );
 
 /// A switch whose knob becomes a clear glass drop while it is held.
@@ -256,6 +388,9 @@ _Drop _drop({
 ///
 /// The switch holds no value of its own: [onChanged] is told the new one and
 /// the caller passes it back as [value].
+///
+/// Space or Enter toggles a focused switch, and the focus ring is drawn around
+/// its track. Under [TextDirection.rtl] it is mirrored: on is to the left.
 ///
 /// ```dart
 /// MergeSemantics(
@@ -298,8 +433,16 @@ class GlassSwitch extends StatefulWidget {
     this.dropWiden = kGlassSwitchDropWiden,
     this.dropMotion,
     this.semanticLabel,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   }) : assert(dropScale >= 1);
+
+  /// The switch's focus. Null makes one the switch owns.
+  final FocusNode? focusNode;
+
+  /// Whether the switch takes the focus as soon as it is built.
+  final bool autofocus;
 
   /// How much larger the held drop is than the resting knob. See
   /// [kGlassDropScale]; macOS's own switch is 1.6.
@@ -352,10 +495,22 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
     value: widget.value ? 1 : 0,
   );
   bool _dragging = false;
+  bool _focused = false;
+
+  /// Under [TextDirection.rtl]: on is to the left.
+  bool _rtl = false;
+
+  /// How far the drag has gone from where the finger came down, at the most —
+  /// what tells a claimed drag from a tap.
+  double _dragTravel = 0;
+  double _dragFurthest = 0;
+
+  /// Where the knob is drawn for a value position: mirrored under rtl.
+  double _visual(double position) => _rtl ? 1 - position : position;
 
   late final GlassDropStretchDriver _stretch = GlassDropStretchDriver(
     vsync: this,
-    position: () => lerpDouble(_from, _to, _position.value)!,
+    position: () => lerpDouble(_from, _to, _visual(_position.value))!,
   );
   GlassDropMotion _motion = GlassDropMotion.none;
 
@@ -417,47 +572,79 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
     }
   }
 
+  void _dragStart(DragStartDetails _) {
+    _dragging = true;
+    _dragTravel = _dragFurthest = 0;
+    _lift.forward();
+  }
+
+  void _dragUpdate(DragUpdateDetails d) {
+    _dragTravel += d.delta.dx;
+    _dragFurthest = math.max(_dragFurthest, _dragTravel.abs());
+    _position.value += (_rtl ? -d.delta.dx : d.delta.dx) / (_to - _from);
+  }
+
+  void _dragEnd(DragEndDetails _) {
+    _dragging = false;
+    _lift.reverse();
+    // A claimed pointer is a drag from touch-down, taps included: one that
+    // never left the slop is the tap the tap recognizer would have seen.
+    final double slop = MediaQuery.maybeGestureSettingsOf(context)?.touchSlop ?? kTouchSlop;
+    _commit(_dragFurthest < slop && _claimed ? !widget.value : _position.value >= 0.5);
+  }
+
+  void _dragCancel() {
+    _dragging = false;
+    _lift.reverse();
+    _position.animateTo(widget.value ? 1 : 0, curve: Curves.easeOutCubic);
+  }
+
+  bool _claimed = false;
+
   @override
   Widget build(BuildContext context) {
     final double margin = _margin(_kSwitchKnob, widget.dropScale, _motion) + _inset;
+    _rtl = Directionality.maybeOf(context) == TextDirection.rtl;
+    _claimed = _claimsPointer(context);
+    final bool enabled = _enabled;
     return Semantics(
       label: widget.semanticLabel,
       toggled: widget.value,
-      enabled: _enabled,
-      onTap: _enabled ? () => _commit(!widget.value) : null,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: _enabled ? (_) => _lift.forward() : null,
-        onTapCancel: _enabled ? () => _dragging ? null : _lift.reverse() : null,
-        onTap: _enabled
-            ? () {
-                _lift.reverse();
-                _commit(!widget.value);
-              }
-            : null,
-        onHorizontalDragStart: _enabled
-            ? (_) {
-                _dragging = true;
-                _lift.forward();
-              }
-            : null,
-        onHorizontalDragUpdate: _enabled
-            ? (DragUpdateDetails d) {
-                _position.value += d.delta.dx / (_to - _from);
-              }
-            : null,
-        onHorizontalDragEnd: _enabled
-            ? (_) {
-                _dragging = false;
-                _lift.reverse();
-                _commit(_position.value >= 0.5);
-              }
-            : null,
-        child: SizedBox(
-          width: kGlassSwitchSize.width,
-          height: math.max(kGlassSwitchSize.height, kGlassMinTapTarget.height),
-          child: Center(
-            child: SizedBox.fromSize(size: kGlassSwitchSize, child: _switchBody(margin)),
+      enabled: enabled,
+      onTap: enabled ? () => _commit(!widget.value) : null,
+      child: FocusableActionDetector(
+        enabled: enabled,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) => _commit(!widget.value)),
+        },
+        child: RawGestureDetector(
+          behavior: HitTestBehavior.opaque,
+          gestures: _controlGestures(
+            owner: this,
+            claim: _claimed,
+            settings: MediaQuery.maybeGestureSettingsOf(context),
+            onTapDown: enabled ? (_) => _lift.forward() : null,
+            onTapCancel: enabled ? () => _dragging ? null : _lift.reverse() : null,
+            onTap: enabled
+                ? () {
+                    _lift.reverse();
+                    _commit(!widget.value);
+                  }
+                : null,
+            onStart: enabled ? _dragStart : null,
+            onUpdate: enabled ? _dragUpdate : null,
+            onEnd: enabled ? _dragEnd : null,
+            onCancel: enabled ? _dragCancel : null,
+          ),
+          child: SizedBox(
+            width: kGlassSwitchSize.width,
+            height: math.max(kGlassSwitchSize.height, kGlassMinTapTarget.height),
+            child: Center(
+              child: SizedBox.fromSize(size: kGlassSwitchSize, child: _switchBody(margin)),
+            ),
           ),
         ),
       ),
@@ -481,13 +668,14 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
             ),
           ),
         ),
+        GlassFocusRing(visible: _focused && _enabled, radius: kGlassCapsule),
         if (!_enabled)
           AnimatedBuilder(
             animation: _position,
             builder: (BuildContext context, Widget? _) => Positioned.fromRect(
               rect: Rect.fromCenter(
                 center: Offset(
-                  lerpDouble(_from, _to, _position.value)!,
+                  lerpDouble(_from, _to, _visual(_position.value))!,
                   kGlassSwitchSize.height / 2,
                 ),
                 width: _kSwitchKnob.width,
@@ -504,7 +692,7 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
               builder: (BuildContext context, Widget? _) => Positioned.fromRect(
                 rect: Rect.fromCenter(
                   center: Offset(
-                    margin + lerpDouble(_from, _to, _position.value)!,
+                    margin + lerpDouble(_from, _to, _visual(_position.value))!,
                     margin + kGlassSwitchSize.height / 2,
                   ),
                   width: _kSwitchKnob.width,
@@ -535,7 +723,12 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
 /// new one while a finger is down — a tap places the knob, a drag carries it —
 /// and the caller passes it back as [value]. [onChangeStart] and
 /// [onChangeEnd] bracket the gesture. A screen reader's increase and decrease
-/// move it by [semanticStep].
+/// move it by [semanticStep] — or by one division, when [divisions] snaps the
+/// value to `divisions + 1` stops, as Material's `Slider` does.
+///
+/// The arrow keys step a focused slider by the same unit, and the focus ring
+/// is drawn around its knob. Under [TextDirection.rtl] it is mirrored: 0 is
+/// at the right and the fill grows leftward, and the left arrow increases.
 ///
 /// ```dart
 /// GlassSlider(
@@ -575,9 +768,24 @@ class GlassSlider extends StatefulWidget {
     this.dropMotion,
     this.semanticLabel,
     this.semanticStep = 0.1,
+    this.divisions,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   }) : assert(dropScale >= 1),
-       assert(semanticStep > 0 && semanticStep <= 1);
+       assert(semanticStep > 0 && semanticStep <= 1),
+       assert(divisions == null || divisions > 0);
+
+  /// How many equal steps the value snaps to between 0 and 1, or null for a
+  /// continuous slider. A drag, a tap, a key and a screen reader all land on
+  /// a stop, and [onChanged] is told only when the stop changes.
+  final int? divisions;
+
+  /// The slider's focus. Null makes one the slider owns.
+  final FocusNode? focusNode;
+
+  /// Whether the slider takes the focus as soon as it is built.
+  final bool autofocus;
 
   /// How much larger the held drop is than the resting knob. See
   /// [kGlassDropScale]; macOS's own slider is 1.4.
@@ -614,8 +822,9 @@ class GlassSlider extends StatefulWidget {
   /// `MergeSemantics` around the slider and its row's label.
   final String? semanticLabel;
 
-  /// How far a screen reader's increase or decrease moves the value: a tenth,
-  /// as Flutter's own continuous slider does.
+  /// How far a screen reader's increase or decrease — and an arrow key —
+  /// moves the value: a tenth, as Flutter's own continuous slider does.
+  /// Ignored when [divisions] is set: the step is then one division.
   final double semanticStep;
 
   @override
@@ -630,13 +839,33 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
 
   late final GlassDropStretchDriver _stretch = GlassDropStretchDriver(
     vsync: this,
-    position: () => widget.value.clamp(0.0, 1.0) * _span,
+    position: () => _visual(widget.value.clamp(0.0, 1.0)) * _span,
   );
   GlassDropMotion _motion = GlassDropMotion.none;
 
   /// The next change of value is a tap placing the knob, not a drag moving
   /// it: the drop is there without having travelled.
   bool _placing = false;
+
+  bool _focused = false;
+
+  /// Under [TextDirection.rtl]: 0 is at the right.
+  bool _rtl = false;
+
+  /// Where along the track a value is drawn, 0 at the left: mirrored under rtl.
+  double _visual(double value) => _rtl ? 1 - value : value;
+
+  /// [value] on the nearest stop, when there are stops.
+  double _snap(double value) {
+    final int? n = widget.divisions;
+    return n == null ? value : (value * n).round() / n;
+  }
+
+  /// What one step of a key or a screen reader is.
+  double get _unit {
+    final int? n = widget.divisions;
+    return n == null ? widget.semanticStep : 1 / n;
+  }
 
   double get _span {
     final RenderObject? box = context.findRenderObject();
@@ -683,7 +912,16 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
     if (span <= 0) {
       return widget.value;
     }
-    return ((local.dx - _kSliderKnob.width / 2) / span).clamp(0.0, 1.0);
+    return _snap(_visual(((local.dx - _kSliderKnob.width / 2) / span).clamp(0.0, 1.0)));
+  }
+
+  /// Tells [GlassSlider.onChanged] of [v] — on a slider with stops, only when
+  /// it is another stop: a drag across one stop is many events and one value.
+  void _change(double v) {
+    if (widget.divisions != null && v == widget.value) {
+      return;
+    }
+    widget.onChanged?.call(v);
   }
 
   void _start(Offset local) {
@@ -691,7 +929,7 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
     final double v = _valueAt(local);
     _placing = v != widget.value;
     widget.onChangeStart?.call(widget.value);
-    widget.onChanged?.call(v);
+    _change(v);
   }
 
   void _end() {
@@ -710,32 +948,80 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
 
   static String _percent(double v) => '${(v * 100).round()}%';
 
+  /// The value [steps] units from the current one, on a stop and in range.
+  ///
+  /// From between two stops the first step lands on the next stop *that
+  /// way* — not on the stop nearest a whole unit on, which from 0.6 in
+  /// quarters would step down past 0.5 to 0.25 (Material's `Slider` does).
+  double _stepped(int steps) {
+    final double value = widget.value.clamp(0.0, 1.0);
+    final int? n = widget.divisions;
+    if (n == null) {
+      return (value + steps * _unit).clamp(0.0, 1.0);
+    }
+    const double eps = 1e-9;
+    final int from = steps > 0 ? (value * n + eps).floor() : (value * n - eps).ceil();
+    return ((from + steps) / n).clamp(0.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final double margin = _margin(_kSliderKnob, widget.dropScale, _motion);
+    _rtl = Directionality.maybeOf(context) == TextDirection.rtl;
     final double value = widget.value.clamp(0.0, 1.0);
-    final double up = (value + widget.semanticStep).clamp(0.0, 1.0);
-    final double down = (value - widget.semanticStep).clamp(0.0, 1.0);
+    final double up = _stepped(1);
+    final double down = _stepped(-1);
+    final bool enabled = _enabled;
+    // The arrow along the track increases toward its 1: rightward, unless the
+    // track runs the other way.
+    final int right = _rtl ? -1 : 1;
     return Semantics(
       slider: true,
       label: widget.semanticLabel,
-      enabled: _enabled,
+      enabled: enabled,
       value: _percent(value),
-      increasedValue: _enabled && up != value ? _percent(up) : null,
-      decreasedValue: _enabled && down != value ? _percent(down) : null,
-      onIncrease: _enabled && up != value ? () => _step(up) : null,
-      onDecrease: _enabled && down != value ? () => _step(down) : null,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: _enabled ? (DragStartDetails d) => _start(d.localPosition) : null,
-        onHorizontalDragUpdate: _enabled
-            ? (DragUpdateDetails d) => widget.onChanged?.call(_valueAt(d.localPosition))
-            : null,
-        onHorizontalDragEnd: _enabled ? (_) => _end() : null,
-        onTapDown: _enabled ? (TapDownDetails d) => _start(d.localPosition) : null,
-        onTapUp: _enabled ? (_) => _end() : null,
-        onTapCancel: _enabled ? () => _lift.reverse() : null,
-        child: SizedBox(height: kGlassMinTapTarget.height, child: _sliderBody(value, margin)),
+      increasedValue: enabled && up != value ? _percent(up) : null,
+      decreasedValue: enabled && down != value ? _percent(down) : null,
+      onIncrease: enabled && up != value ? () => _step(up) : null,
+      onDecrease: enabled && down != value ? () => _step(down) : null,
+      child: FocusableActionDetector(
+        enabled: enabled,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        shortcuts: <ShortcutActivator, Intent>{
+          const SingleActivator(LogicalKeyboardKey.arrowRight): _StepIntent(right),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): _StepIntent(-right),
+          const SingleActivator(LogicalKeyboardKey.arrowUp): const _StepIntent(1),
+          const SingleActivator(LogicalKeyboardKey.arrowDown): const _StepIntent(-1),
+        },
+        actions: <Type, Action<Intent>>{
+          _StepIntent: CallbackAction<_StepIntent>(
+            onInvoke: (_StepIntent intent) {
+              final double to = _stepped(intent.steps);
+              if (to != widget.value) {
+                _step(to);
+              }
+              return null;
+            },
+          ),
+        },
+        child: RawGestureDetector(
+          behavior: HitTestBehavior.opaque,
+          gestures: _controlGestures(
+            owner: this,
+            claim: _claimsPointer(context),
+            settings: MediaQuery.maybeGestureSettingsOf(context),
+            onStart: enabled ? (DragStartDetails d) => _start(d.localPosition) : null,
+            onUpdate: enabled ? (DragUpdateDetails d) => _change(_valueAt(d.localPosition)) : null,
+            onEnd: enabled ? (_) => _end() : null,
+            onCancel: enabled ? _end : null,
+            onTapDown: enabled ? (TapDownDetails d) => _start(d.localPosition) : null,
+            onTapUp: enabled ? (_) => _end() : null,
+            onTapCancel: enabled ? () => _lift.reverse() : null,
+          ),
+          child: SizedBox(height: kGlassMinTapTarget.height, child: _sliderBody(value, margin)),
+        ),
       ),
     );
   }
@@ -746,7 +1032,7 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
       children: <Widget>[
         Positioned.fill(
           child: RepaintBoundary(
-            child: CustomPaint(painter: _SliderTrack(value, widget.trackColor, widget.activeColor)),
+            child: CustomPaint(painter: _SliderTrack(value, widget.trackColor, widget.activeColor, rtl: _rtl)),
           ),
         ),
         if (!_enabled)
@@ -754,7 +1040,7 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
           // where the enabled one does.
           Positioned.fill(
             child: Align(
-              alignment: Alignment(value * 2 - 1, 0),
+              alignment: Alignment(_visual(value) * 2 - 1, 0),
               child: SizedBox.fromSize(size: _kSliderKnob, child: const _Knob()),
             ),
           )
@@ -770,13 +1056,14 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
                   // `rest / 2 + value * (width - rest)`, which is where
                   // [SliderGeometry.fillEnd] ends the fill.
                   builder: (BuildContext context, Widget? _) => Align(
-                    alignment: Alignment(value * 2 - 1, 0),
+                    alignment: Alignment(_visual(value) * 2 - 1, 0),
                     child: _drop(
                       rest: _kSliderKnob,
                       scale: widget.dropScale,
                       widen: widget.dropWiden,
                       lift: _lift.value,
                       stretch: _stretch.value,
+                      focused: _focused && _enabled,
                     ),
                   ),
                 ),
@@ -790,14 +1077,32 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
 }
 
 class _SliderTrack extends CustomPainter {
-  _SliderTrack(this.value, this.track, this.active);
+  _SliderTrack(this.value, this.track, this.active, {this.rtl = false});
 
   final double value;
   final Color track;
   final Color active;
 
+  /// Drawn mirrored: the fill from the right.
+  final bool rtl;
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (rtl) {
+      // The left-to-right track reflected, so the two directions are the same
+      // pixels mirrored rather than two drawings that could drift apart.
+      canvas
+        ..save()
+        ..translate(size.width, 0)
+        ..scale(-1, 1);
+      _paint(canvas, size);
+      canvas.restore();
+    } else {
+      _paint(canvas, size);
+    }
+  }
+
+  void _paint(Canvas canvas, Size size) {
     final double y = size.height / 2;
     final Rect bar = Rect.fromLTRB(
       _kSliderKnob.width / 2 - _kSliderTrack / 2,
@@ -829,7 +1134,10 @@ class _SliderTrack extends CustomPainter {
 
   @override
   bool shouldRepaint(_SliderTrack oldDelegate) =>
-      oldDelegate.value != value || oldDelegate.track != track || oldDelegate.active != active;
+      oldDelegate.value != value ||
+      oldDelegate.track != track ||
+      oldDelegate.active != active ||
+      oldDelegate.rtl != rtl;
 }
 
 /// Where the slider's fill ends for a value, on a slider `width` wide.
@@ -842,7 +1150,10 @@ class _SliderTrack extends CustomPainter {
 abstract final class SliderGeometry {
   /// The x of the fill's end, logical px from the slider's left edge, for
   /// [value] (0 to 1) on a slider [width] wide: half the resting knob in from
-  /// the left at 0, and half the knob in from the right at 1.
-  static double fillEnd(double value, double width) =>
-      _kSliderKnob.width / 2 + value * math.max(0, width - _kSliderKnob.width);
+  /// the left at 0, and half the knob in from the right at 1 — and the other
+  /// way round under [TextDirection.rtl].
+  static double fillEnd(double value, double width, {TextDirection textDirection = TextDirection.ltr}) {
+    final double ltr = _kSliderKnob.width / 2 + value * math.max(0, width - _kSliderKnob.width);
+    return textDirection == TextDirection.rtl ? width - ltr : ltr;
+  }
 }

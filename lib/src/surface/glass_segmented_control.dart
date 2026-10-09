@@ -37,6 +37,12 @@
 // than let out of it — so no capture either way, and a relayout of the drop on
 // the frames it changes.
 //
+// A keyboard reaches it: the arrow keys select the segment beside the selected
+// one, and the focus ring is drawn around the track behind a boundary of its
+// own (`glass_focus.dart`). Under `TextDirection.rtl` the segments run right to
+// left, and so do the capsule, the drop and the arrows: `_at` is where the
+// capsule is *drawn*, a visual index, and only the selection is logical.
+//
 // A segment is any widget. The selected one is drawn over the white capsule,
 // so it is handed an ink that reads there through [IconTheme] and
 // [DefaultTextStyle] — which is what a custom glyph (an SVG, an image) reads
@@ -47,12 +53,15 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_concentric.dart';
 import 'glass_controls.dart' show kGlassDropOptics;
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_surface.dart';
 import 'glass_travel.dart';
 
@@ -138,7 +147,10 @@ Size _marginFor(GlassDropMotion motion) =>
 /// The track is 32 px tall and takes the whole width it is given, split
 /// evenly between the segments; the control is laid out [kGlassMinTapTarget]
 /// tall so it takes taps above and below the track. A tap selects the segment
-/// pressed; a drag carries the drop and selects where it is let go.
+/// pressed; a drag carries the drop and selects where it is let go. A focused
+/// control selects the segment beside the selected one on an arrow key.
+///
+/// Under [TextDirection.rtl] the first segment is at the right.
 ///
 /// ```dart
 /// GlassSegmentedControl(
@@ -171,8 +183,16 @@ class GlassSegmentedControl extends StatefulWidget {
     this.trackColor = kGlassSegmentTrack,
     this.thumbColor = const Color(0xFFFFFFFF),
     this.dropMotion,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   }) : assert(segments.length >= 2);
+
+  /// The control's focus. Null makes one the control owns.
+  final FocusNode? focusNode;
+
+  /// Whether the control takes the focus as soon as it is built.
+  final bool autofocus;
 
   /// One widget per segment — a `Text`, an `Icon`.
   final List<Widget> segments;
@@ -219,6 +239,13 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   double _downX = 0;
   int _pressed = 0;
   VelocityTracker? _tracker;
+  bool _focused = false;
+
+  /// Under [TextDirection.rtl]; null before the first build has asked.
+  bool? _rtl;
+
+  /// Where segment [i] is drawn, counted from the left; and back.
+  int _visual(int i) => _rtl ?? false ? widget.segments.length - 1 - i : i;
 
   // The tab bar's springs and tolerance (glass_tab_bar.dart), for the same
   // reasons: a feel, and a tail that ends under a device pixel.
@@ -240,6 +267,14 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   void didChangeDependencies() {
     super.didChangeDependencies();
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
+    final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
+    if (rtl != _rtl) {
+      _rtl = rtl;
+      // The capsule is placed, not slid: the segments under it just moved.
+      if (!_down) {
+        _at.value = _visual(widget.selectedIndex).toDouble();
+      }
+    }
   }
 
   @override
@@ -270,12 +305,21 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
         .then((_) => _lift.value = target);
   }
 
+  /// Slides the capsule to segment [index] — a selection, not a place.
   void _slideTo(int index, double velocity) {
+    final double to = _visual(index).toDouble();
     _at
-        .animateWith(
-          SpringSimulation(_slideSpring, _at.value, index.toDouble(), velocity, tolerance: _tolerance),
-        )
-        .then((_) => _at.value = index.toDouble());
+        .animateWith(SpringSimulation(_slideSpring, _at.value, to, velocity, tolerance: _tolerance))
+        .then((_) => _at.value = to);
+  }
+
+  /// Selects the segment [steps] from the selected one, toward the end of the
+  /// list — rightward, unless the control runs the other way.
+  void _select(int steps) {
+    final int to = (widget.selectedIndex + steps).clamp(0, widget.segments.length - 1);
+    if (to != widget.selectedIndex) {
+      widget.onSelected?.call(to);
+    }
   }
 
   void _onDown(PointerDownEvent e) {
@@ -288,7 +332,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     _downX = e.localPosition.dx;
     _tracker = VelocityTracker.withKind(e.kind)..addPosition(e.timeStamp, e.localPosition);
     _liftTo(1);
-    final int i = _pressed = g.indexAt(e.localPosition.dx).round();
+    final int i = _pressed = _visual(g.indexAt(e.localPosition.dx).round());
     _slideTo(i, 0);
   }
 
@@ -312,7 +356,9 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     }
     _down = false;
     final double velocity = _moved ? (_tracker?.getVelocity().pixelsPerSecond.dx ?? 0) / g.pitch : 0;
-    final int i = _moved ? (_at.value + velocity * 0.08).round().clamp(0, widget.segments.length - 1) : _pressed;
+    final int i = _moved
+        ? _visual((_at.value + velocity * 0.08).round().clamp(0, widget.segments.length - 1))
+        : _pressed;
     _slideTo(i, velocity);
     _liftTo(0);
     if (i != widget.selectedIndex) {
@@ -367,6 +413,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
                     decoration: ShapeDecoration(shape: const StadiumBorder(), color: widget.trackColor),
                   ),
                 ),
+                GlassFocusRing(visible: _focused && _enabled, radius: kGlassCapsule),
                 // The capsule: painted, not built, so it moves without a
                 // build — and behind its own boundary.
                 Positioned.fill(
@@ -396,11 +443,27 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
         ),
       ),
     );
+    // The arrow along the row selects toward its end: rightward, unless the
+    // row runs the other way.
+    final int right = _rtl ?? false ? -1 : 1;
     return Semantics(
       container: true,
       enabled: _enabled,
-      // Segment labels are not text to select, as a button's are not.
-      child: SelectionContainer.disabled(child: _enabled ? body : Opacity(opacity: 0.5, child: body)),
+      child: FocusableActionDetector(
+        enabled: _enabled,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        shortcuts: <ShortcutActivator, Intent>{
+          const SingleActivator(LogicalKeyboardKey.arrowRight): _SelectIntent(right),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): _SelectIntent(-right),
+        },
+        actions: <Type, Action<Intent>>{
+          _SelectIntent: CallbackAction<_SelectIntent>(onInvoke: (_SelectIntent intent) => _select(intent.steps)),
+        },
+        // Segment labels are not text to select, as a button's are not.
+        child: SelectionContainer.disabled(child: _enabled ? body : Opacity(opacity: 0.5, child: body)),
+      ),
     );
   }
 
@@ -470,6 +533,13 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
       ),
     ),
   );
+}
+
+/// Selects the segment [steps] from the selected one.
+class _SelectIntent extends Intent {
+  const _SelectIntent(this.steps);
+
+  final int steps;
 }
 
 /// Places the drop in the stage: the stage is the control grown by
@@ -562,7 +632,12 @@ class _CapsulePainter extends CustomPainter {
       width: g.capsule.width,
       height: g.capsule.height,
     );
-    final RRect shape = RRect.fromRectAndRadius(box, Radius.circular(box.shortestSide / 2));
+    // Concentric with the track, 2 in: 14 inside 16. The half side is the
+    // capsule a segment narrower than the capsule is tall still needs.
+    final RRect shape = RRect.fromRectAndRadius(
+      box,
+      Radius.circular(math.min(GlassConcentric.radius(_kHeight / 2, _kInset), box.shortestSide / 2)),
+    );
     canvas
       ..drawRRect(
         shape.shift(const Offset(0, 1)),
