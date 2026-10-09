@@ -40,39 +40,70 @@
 
 #include <flutter/runtime_effect.glsl>
 
-uniform vec2 uTexSize;     // atlas size, texels
-uniform vec2 uMapOrigin;   // draw space -> texels: p * uMapScale + uMapOrigin
-uniform float uMapScale;   // texels per logical pixel
-uniform vec2 uSlotMin;     // the slot's own bounds in texels, inclusive
-uniform vec2 uSlotMax;
-uniform vec2 uHalf;        // half extent of the surface, draw-space px
-uniform vec2 uCenter;      // centre of the surface, draw space
-uniform float uRadius;     // corner radius, px
-uniform float uThickness;  // how far in from the rim refraction reaches, px
-uniform float uStrength;   // peak sample displacement at the rim, px
-uniform float uEdgePower;  // falloff exponent
-uniform float uShoulder;   // shoulder exponent on the depth, 1.0 = no shoulder
-uniform vec4 uTint;        // straight alpha, laid over the refracted sample
-uniform float uRimWidth;   // width of the outline inside the edge, px
-uniform vec4 uRim;         // rgb is the colour, a is how much it *adds*
-uniform float uPixel;      // one device pixel, in this geometry's own units
+// **The block is packed four floats to a `vec4`, in the order Dart has always
+// written it**, and every name below is a macro over a lane. Packed because on
+// Metal a runtime effect binds every declared float uniform as its own buffer —
+// one metadata allocation, one host-buffer slot aligned to 256 bytes on macOS
+// and one `setFragmentBuffer` per declaration per draw
+// (`runtime_effect_contents.cc:316-334`), where Vulkan binds one struct — so
+// nineteen declarations were nineteen binds and are now nine. In Dart's order
+// rather than by meaning, so no `setFloat` index moved: the writers, the probes
+// in the tests and spike 24 all address the same floats, and the bytes drawn
+// are the same bytes (`test/glass_pixels_identity_test.dart`). A vector that
+// straddles two lanes is reassembled here, which is a register move.
+//
+//   uP0  uTexSize.xy  uMapOrigin.xy                  floats  0-3
+//   uP1  uMapScale  uSlotMin.xy  uSlotMax.x                   4-7
+//   uP2  uSlotMax.y  uHalf.xy  uCenter.x                      8-11
+//   uP3  uCenter.y  uRadius  uThickness  uStrength           12-15
+//   uP4  uEdgePower  uShoulder  uTint.rg                     16-19
+//   uP5  uTint.ba  uRimWidth  uRim.r                         20-23
+//   uP6  uRim.gba  uPixel                                    24-27
+//   uP7  uRimMix  uWiden.xy  uFade.x                         28-31
+//   uP8  uFade.yz                                            32-33
+uniform vec4 uP0;
+uniform vec4 uP1;
+uniform vec4 uP2;
+uniform vec4 uP3;
+uniform vec4 uP4;
+uniform vec4 uP5;
+uniform vec4 uP6;
+uniform vec4 uP7;
+uniform vec2 uP8;
+
+#define uTexSize uP0.xy     // atlas size, texels
+#define uMapOrigin uP0.zw   // draw space -> texels: p * uMapScale + uMapOrigin
+#define uMapScale uP1.x     // texels per logical pixel
+#define uSlotMin uP1.yz     // the slot's own bounds in texels, inclusive
+#define uSlotMax vec2(uP1.w, uP2.x)
+#define uHalf uP2.yz        // half extent of the surface, draw-space px
+#define uCenter vec2(uP2.w, uP3.x) // centre of the surface, draw space
+#define uRadius uP3.y       // corner radius, px
+#define uThickness uP3.z    // how far in from the rim refraction reaches, px
+#define uStrength uP3.w     // peak sample displacement at the rim, px
+#define uEdgePower uP4.x    // falloff exponent
+#define uShoulder uP4.y     // shoulder exponent on the depth, 1.0 = no shoulder
+#define uTint vec4(uP4.zw, uP5.xy) // straight alpha, laid over the refracted sample
+#define uRimWidth uP5.z     // width of the outline inside the edge, px
+#define uRim vec4(uP5.w, uP6.xyz)  // rgb is the colour, a is how much it *adds*
+#define uPixel uP6.w        // one device pixel, in this geometry's own units
 // How much the outline *replaces* rather than adds: 0 is the calibrated
 // additive rim, 1 lays uRim.rgb on at the band's coverage — the platform's
 // increase-contrast switch (D203). A uniform rather than a second shader
 // because at 0 the line below is `col * 1.0 + …`, the same bits as before,
 // and that is enforced rather than hoped for.
-uniform float uRimMix;
+#define uRimMix uP7.x
 // The optics' `widen` over the half-box, per axis: the sample walks out from
 // the centre by this fraction of its distance, so the shape shows its box
-// grown by `widen` on every side (D218). Last, so every index above it stays
-// where Dart has always set it; and at zero the term below adds an exact zero.
-uniform vec2 uWiden;
+// grown by `widen` on every side (D218). At zero the term below adds an exact
+// zero.
+#define uWiden uP7.yz
 // A fade across the surface: f = clamp(dot(rel, uFade.xy) + uFade.z), and the
 // glass is drawn at 1 - smoothstep's f — whole where f is 0, gone where it is
 // 1, so what is under the surface shows through by that much. The scroll edge
-// effect's blur ramp is this (spike 31). Last again, and at zero it is
-// `coverage * 1.0`: f is 0, `f * f * (3 - 2f)` is 0, and 1 - 0 is exactly 1.
-uniform vec3 uFade;
+// effect's blur ramp is this (spike 31). At zero it is `coverage * 1.0`: f is
+// 0, `f * f * (3 - 2f)` is 0, and 1 - 0 is exactly 1.
+#define uFade vec3(uP7.w, uP8)
 
 // The ripple: a viscous wave from where the glass was touched (D229). Compiled
 // into `glass_surface_ripple.frag` only, which is this file behind a define,
@@ -93,13 +124,16 @@ uniform vec3 uFade;
 //   uWaveAmp.w 1 / sigma^2 of the dimple
 #ifdef GLASS_RIPPLE
 #define kMaxWaves 4
-uniform float uWaveCount;
 uniform vec4 uWave[kMaxWaves];
 uniform vec4 uWaveAmp[kMaxWaves];
-// The sum of every amplitude above: a bound on the displacement's length.
-uniform float uRippleReach;
-// How much a slope facing up brightens, and one facing down darkens.
-uniform float uRippleLight;
+// The waves alive; the sum of every amplitude above, a bound on the
+// displacement's length; and how much a slope facing up brightens, and one
+// facing down darkens. One declaration for the bind it saves, as above, and
+// after the arrays because an array cannot share a lane.
+uniform vec3 uRipple;
+#define uWaveCount uRipple.x
+#define uRippleReach uRipple.y
+#define uRippleLight uRipple.z
 #endif
 
 uniform sampler2D uTex;

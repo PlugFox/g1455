@@ -61,9 +61,11 @@ const Size kPanel = Size(90, 90);
 const double kTop = 60;
 
 /// The floats the group shader's uniform block holds, counted by hand off the
-/// declaration order in `shaders/glass_group.frag`:
+/// declaration order in `shaders/glass_group.frag` — packed into lanes since
+/// the bind count was priced, in the order the names below always had:
 ///
-///     vec2 + vec2 + float + vec2 + vec2 + float + float  = 11
+///     uTexSize, uMapOrigin, uMapScale, uSlotMin, uSlotMax,
+///     uCount, uBlend: vec4 + vec4 + vec3                 = 11
 ///     vec4[12] + float[12]                               = 60
 ///     4 floats of optics + vec4 tint + float + vec4 + float = 14
 ///     uCullK                                             = 1
