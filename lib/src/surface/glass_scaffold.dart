@@ -28,6 +28,12 @@
 // largest saving. Nothing moves *inside* the bars on a scroll, so there is
 // nothing for a `GlassTravel` to declare here; a [GlassTabBar] declares its own
 // drop's.
+//
+// **The screen is a [GlassTabBarMinimizer]**, because the body's scroll view
+// and the bottom bar are siblings and a scroll notification only travels up:
+// a [GlassTabBar] that collapses on a scroll down
+// ([GlassTabBarMinimizeBehavior.onScrollDown]) is told by it. A bar that does
+// not ask is not told, and the listener costs a comparison per scroll update.
 
 import 'dart:math' as math;
 
@@ -93,6 +99,12 @@ const double kGlassScaffoldActionGap = 16;
 /// which is what lets it scroll under them. A body that is not a scroll view
 /// can read the same padding, or wrap itself in a `SafeArea`. The keyboard is
 /// not handled: the body sees `MediaQuery.viewInsets` as it is.
+///
+/// **A tab bar that collapses on scroll.** The scaffold is a
+/// [GlassTabBarMinimizer]: a [GlassTabBar] in [bottomBar] with
+/// `minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown` collapses to
+/// its selected tab when the body scrolls down and expands when it scrolls up.
+/// Its box keeps its height, so the body's padding does not move.
 ///
 /// > **Note:** every frame of a scroll is one capture of the whole host, for
 /// > every glass on the screen at once, because the content under the bars
@@ -208,7 +220,8 @@ class GlassScaffold extends StatelessWidget {
       ],
     );
     final bool own = host ?? GlassProxyScope.maybeOf(context) == null;
-    return own ? GlassHost(child: screen) : screen;
+    final Widget minimizing = GlassTabBarMinimizer(child: screen);
+    return own ? GlassHost(child: minimizing) : minimizing;
   }
 
   Widget _top(EdgeInsets safe, double extent) {

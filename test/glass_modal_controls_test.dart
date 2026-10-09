@@ -184,42 +184,51 @@ void main() {
     expect(tester.getCenter(find.text('sheet body')).dy, closeTo(rest, 0.5));
   });
 
-  // A dismissible sheet's drag moves the route's controller, whose value goes
-  // through the entrance curve — flat near the top — so 96 px of finger moves
-  // the sheet about 3 px. `_GlassSheetRoute._pull` documents exactly this for
-  // the non-dismissible sheet and fixed it there; the dismissible path still
-  // has it. The sheet only visibly follows once the finger is far down.
-  testWidgets(
-    'a dismissible sheet follows the finger while it is dragged',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(
-        _App(
-          home: Builder(
-            builder: (BuildContext context) => Center(
-              child: GestureDetector(
-                onTap: () => showGlassSheet<void>(
-                  context: context,
-                  builder: (_) => const SizedBox(height: 300, child: Center(child: Text('sheet body'))),
-                ),
-                child: const Text('open sheet'),
+  // The drag used to move the route's controller, whose value the sheet reads
+  // through the entrance curve — flat near the top — so 116 px of finger moved
+  // the sheet 4.5 px. Now the drag is an offset of its own, in pixels: every
+  // pixel of finger after the drag is accepted is a pixel of sheet.
+  //
+  // Break, undone by swapping the string back: in `_GlassSheetRoute._drag`,
+  // `_drop.value += rest;` -> `_drop.value += rest / 4;` — the sheet lags the
+  // finger and this arm fails while the release arms above still pass.
+  testWidgets('a dismissible sheet follows the finger while it is dragged, pixel for pixel', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _App(
+        home: Builder(
+          builder: (BuildContext context) => Center(
+            child: GestureDetector(
+              onTap: () => showGlassSheet<void>(
+                context: context,
+                builder: (_) => const SizedBox(height: 300, child: Center(child: Text('sheet body'))),
               ),
+              child: const Text('open sheet'),
             ),
           ),
         ),
-      );
-      await tester.tap(find.text('open sheet'));
-      await tester.pumpAndSettle();
-      final double rest = tester.getCenter(find.text('sheet body')).dy;
-      final TestGesture finger = await tester.startGesture(tester.getCenter(find.text('sheet body')));
-      await finger.moveBy(const Offset(0, 20));
-      await finger.moveBy(const Offset(0, 96));
+      ),
+    );
+    await tester.tap(find.text('open sheet'));
+    await tester.pumpAndSettle();
+    final double rest = tester.getCenter(find.text('sheet body')).dy;
+    final TestGesture finger = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+    // Past the slop, so the drag is accepted; what it delivers of these 20 px
+    // is the recognizer's business, and is read rather than assumed.
+    await finger.moveBy(const Offset(0, 20));
+    await tester.pump();
+    final double accepted = tester.getCenter(find.text('sheet body')).dy;
+    expect(accepted - rest, inInclusiveRange(0, 20));
+    for (final double dy in <double>[24, 48, 24]) {
+      final double before = tester.getCenter(find.text('sheet body')).dy;
+      await finger.moveBy(Offset(0, dy));
       await tester.pump();
-      expect(tester.getCenter(find.text('sheet body')).dy - rest, greaterThan(48));
-      await finger.up();
-      await tester.pumpAndSettle();
-    },
-    skip: true, // The drag goes through the entrance curve; see the comment above.
-  );
+      expect(tester.getCenter(find.text('sheet body')).dy - before, closeTo(dy, 0.01), reason: 'the sheet lags');
+    }
+    await finger.up();
+    await tester.pumpAndSettle();
+  });
 }
 
 class _App extends StatelessWidget {
