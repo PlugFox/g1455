@@ -855,8 +855,11 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                         valueListenable: _collapsed,
                         builder: (BuildContext context, bool collapsed, Widget? listener) =>
                             IgnorePointer(ignoring: collapsed, child: listener),
+                        // Translucent: a sibling over the bar now, not its ancestor,
+                        // and an opaque one would end the hit test here — the bar's
+                        // glass would never hear the touch its ripple answers.
                         child: Listener(
-                          behavior: HitTestBehavior.opaque,
+                          behavior: HitTestBehavior.translucent,
                           onPointerDown: _onDown,
                           onPointerMove: _onMove,
                           onPointerUp: _onUp,

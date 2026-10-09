@@ -158,7 +158,10 @@ class GlassPress {
   /// spring overshoots) with the finger [finger] px from where it came down.
   ///
   /// Pure, so a custom control and a test can ask it. Never outside the
-  /// resting box grown by [margin].
+  /// resting box grown by [margin], and never smaller than the resting box on
+  /// either side: the label is laid out inside the glass, and a spring's
+  /// undershoot or a squash below the resting size overflowed a label that
+  /// fills its button.
   Rect rect(Size rest, double press, Offset finger) {
     final Rect box = Offset.zero & rest;
     if (isNone || rest.isEmpty) {
@@ -173,8 +176,8 @@ class GlassPress {
     final double sy = maxStretch * reach * towards.dy.abs();
     return Rect.fromCenter(
       center: box.center + towards * (maxPull * reach),
-      width: rest.width * k * (1 + sx) / (1 + sy),
-      height: rest.height * k * (1 + sy) / (1 + sx),
+      width: math.max(rest.width, rest.width * k * (1 + sx) / (1 + sy)),
+      height: math.max(rest.height, rest.height * k * (1 + sy) / (1 + sx)),
     );
   }
 
