@@ -3,22 +3,22 @@
 //
 // What it costs: **one surface**, whatever is held. The two halves are not
 // two glasses joined by a blend group: they are one capsule, and a group is a
-// way to get a silhouette, not a price (D169) — two capsules fused into one
+// way to get a silhouette, not a price — two capsules fused into one
 // draw at least what one draws, plus the fold. A held half brightens its own
 // cell of the capsule the way `GlassButtonGroup` does: the finish's rim, added
 // with `plus`, drawn on the surface's own canvas and clipped to the capsule,
 // with nothing between the overlay and the glass that would open a
-// `saveLayer` (D185).
+// `saveLayer`.
 //
 // A press, the autorepeat and the glyph dimming at a limit are all inside the
 // surface's subtree, which is a repaint boundary the capture skips — so none
 // of them is a capture, and none repaints what is under the glass. Asserted,
 // with the control that makes the counter move, in `glass_stepper_test.dart`.
 //
-// **Not measured:** the sizes. S4 and spikes 27-33 read Apple's materials and
-// several controls; the iOS 26 stepper was not among them. 94 is `UIStepper`'s
-// width since iOS 7, and the height is the segmented control's track (spike
-// 32). Both are named as layout, not as readings.
+// **Not measured:** the sizes. Apple's material and several controls were
+// read off the device; the iOS 26 stepper was not among them. 94 is
+// `UIStepper`'s width since iOS 7, and the height is the segmented control's
+// track. Both are named as layout, not as readings.
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -195,7 +195,7 @@ class _GlassStepperState extends State<GlassStepper> {
     // stop. The tap recognizer that was built for the half is disposed with
     // the handlers and calls the `onTapCancel` it had — from inside this
     // build, where a `setState` would throw — so the held state is dropped
-    // here rather than there (the same order as `GlassButton`'s, D221).
+    // here rather than there (the same order as `GlassButton`'s).
     final _Half? held = _held;
     if (held != null && !_canStep(held)) {
       _release();

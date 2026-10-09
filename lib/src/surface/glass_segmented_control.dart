@@ -1,8 +1,7 @@
 // A segmented control whose selection lifts into a glass drop under a finger.
 //
 // Read off Apple's own `UISegmentedControl` on iOS 26.5, pressed by XCUITest
-// on an iPhone 17 Pro simulator (spike 32, `TabBarReferenceTests.testSegments`
-// over spike 27's grid, a 360 pt control):
+// on an iPhone 17 Pro simulator (a 360 pt control over a grid):
 //
 //  - the track is **not glass**: a flat fill of (118, 118, 128) at 0.12 —
 //    iOS's `tertiarySystemFill` — under which the grid's lines stay sharp
@@ -16,13 +15,13 @@
 //    uniform zoom (rms 3.22 px) nor a margin (rms 2.98) explains it well — the
 //    rim's own bend dominates a drop this thin — and the margin is the better
 //    of the two at 8.7 device px, 2.9 pt ([GlassOptics.widen], as the switch's
-//    is: D218);
+//    is);
 //  - dragged, it follows the finger; let go, it settles on the segment under
 //    it, and that is the selection.
 //
 // Not taken: the track grew about 9 pt sideways on the frame held still and
 // not while dragged — one frame, so not read; the drop disperses at its rim
-// and ours does not (D103).
+// and ours does not.
 //
 // What it costs: at rest, nothing — the track and the capsule are paint, and
 // the drop is at presence 0 and captured for nothing. Held, one clear glass
@@ -70,7 +69,7 @@ import 'glass_surface.dart';
 import 'glass_travel.dart';
 
 /// The track's fill: iOS's `tertiarySystemFill`, read off the simulator as
-/// (116–127) at 0.12 (spike 32).
+/// (116–127) at 0.12.
 ///
 /// Not glass: a flat fill, under which what is behind the control stays
 /// sharp. [GlassSegmentedControl.trackColor]'s default.
@@ -79,7 +78,7 @@ import 'glass_travel.dart';
 const Color kGlassSegmentTrack = Color.fromRGBO(118, 118, 128, 0.12);
 
 /// How far past the resting capsule the held drop reaches, across and down,
-/// logical px (spike 32: 86 x 28 -> 110 x 44).
+/// logical px (iOS 26.5: 86 x 28 -> 110 x 44).
 ///
 /// 12 across on each side and 8 above and below, so the held drop stands out
 /// of the 32 px track.
@@ -89,7 +88,7 @@ const Size kGlassSegmentDropGrow = Size(_kGrowX, _kGrowY);
 const double _kGrowX = 12;
 const double _kGrowY = 8;
 
-/// How much of the backdrop past its box the held drop shows (spike 32: a
+/// How much of the backdrop past its box the held drop shows (iOS 26.5: a
 /// margin of 2.9 pt is the better of two poor fits).
 ///
 /// The held drop's [GlassOptics.widen], which slightly minifies the segments
@@ -391,8 +390,8 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   // a build scope: every tick of an animation built under it schedules its
   // layout, the boundary it sits in relays out and therefore repaints, and
   // here what that boundary paints is the track — content under the drop —
-  // so every frame of a slide was a capture (30 of 30 in the first run of the
-  // slide arm). The tab bar does not see it because everything its builders
+  // so every frame of a slide was a capture (30 in 30 frames, measured). The
+  // tab bar does not see it because everything its builders
   // repaint is inside the bar's glass. So the width is read where it exists:
   // the capsule is a painter driven by the animations without a build, the
   // drop is placed by a layout delegate, and the gestures read the box.
@@ -681,7 +680,7 @@ class _CapsulePainter extends CustomPainter {
 /// once on the tick it goes. Not `Listenable.merge(lift, at)`, which repaints
 /// on every tick of a slide with the capsule gone — and every repaint mints a
 /// picture the layer watch must call a change, even an empty one: the second
-/// cause of the slide arm's 30 captures in 30 frames.
+/// cause of a slide's 30 captures in 30 frames.
 class _WhileVisible extends ChangeNotifier {
   _WhileVisible(this.lift, this.at) {
     lift.addListener(_tick);

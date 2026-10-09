@@ -1,8 +1,8 @@
 // A text field on glass: the search field of a bar, or any field that is its
 // own glass capsule.
 //
-// **Most of iOS 26's fields are not glass, and that was measured** (spike
-// 33): a standalone `UISearchBar` is a near-opaque white capsule 44 pt tall,
+// **Most of iOS 26's fields are not glass, and that was measured**: a
+// standalone `UISearchBar` is a near-opaque white capsule 44 pt tall,
 // and a `UITextField` a white rounded rectangle of radius 5 — the grid shows
 // through neither as a refraction. A field that sits on a glass card is
 // therefore just a field: put an ordinary `EditableText` on the card. What is
@@ -25,7 +25,7 @@ import 'glass_finish.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
-/// The field's height (spike 33: the standalone search field, 44 pt).
+/// The field's height (iOS 26.5's standalone search field, 44 pt).
 ///
 /// {@category Panels and controls}
 const double kGlassFieldHeight = 44;
@@ -165,7 +165,7 @@ class _GlassTextFieldState extends State<GlassTextField> {
     final GlassThemeData theme = GlassTheme.of(context);
     final GlassFinish finish = widget.finish ?? theme.finish;
     // The label colour the glass is legible under — the same arithmetic as
-    // every component's (D184, D204) — and the placeholder at a third of it,
+    // every component's — and the placeholder at a third of it,
     // iOS's `placeholderText` alpha over its label.
     final Color label = theme.legibility(finish).label;
     final TextStyle base = DefaultTextStyle.of(context).style.copyWith(color: label, fontSize: 17);

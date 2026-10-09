@@ -1,17 +1,16 @@
 // The package's glass, drawn for a *blend group*: N shapes fused into one
 // silhouette by one draw.
 //
-// **Why it is a second binary rather than a mode of `glass_surface.frag`.** B5
-// measured that adding a path to a runtime effect reprices every mode already
-// in it by 52-62%, and the single surface is the overwhelmingly common case —
+// **Why it is a second binary rather than a mode of `glass_surface.frag`.**
+// Adding a path to a runtime effect reprices every mode already
+// in it by 52-62%, measured, and the single surface is the overwhelmingly common case —
 // a loop and a uniform array charged to every panel on every screen would be
-// the whole shader's budget (9% of the addition over the floor, D63) spent on
+// the whole shader's budget (9% of what the glass adds to a frame) spent on
 // a feature most screens do not use. The two programs pay for that separation
 // with an obligation instead: at `uCount = 1` this one must reproduce
-// `glass_surface.frag` **exactly**, and `test/glass/glass_group_test.dart`
-// renders the same geometry through both and requires zero differing pixels.
-// That is the same arrangement `glass_preview.frag` is under, for the same
-// reason: two binaries drifting apart would ship optics nobody graded.
+// `glass_surface.frag` **exactly**, and `test/glass_group_test.dart` renders
+// the same geometry through both and requires zero differing pixels: two
+// binaries drifting apart would ship optics nobody graded.
 //
 // **Why one draw and not N.** The bridge between two fused shapes belongs to
 // neither of them — there is no fragment of either surface's own box where it
@@ -19,7 +18,7 @@
 // all. One draw over the group's box, one distance field, one silhouette.
 // The price is the dead area of that box: fragments outside every shape are
 // shaded and discarded by coverage. Named rather than hidden, because it is the
-// quantity a group trades against the fragmentation excess it saves (D26).
+// quantity a group trades against the fragmentation excess it saves.
 //
 // **The field is a polynomial smooth minimum, and its gradient is exact.**
 // `smin(a, b, k) = min(a, b) - h^2*k/4` with `h = max(k - |a-b|, 0)/k`, whose
@@ -37,7 +36,7 @@
 // the last code value or so, but "only a little, and differently every frame"
 // is the description of a shimmer.
 //
-// M3 warned that `smin` needs *real* distances — it mixes two fields by their
+// `smin` needs *real* distances — it mixes two fields by their
 // values, so an error in either moves the bridge, and the bridge lives where
 // both shapes are far from their own contours, which is where approximations
 // are worst. The single-Newton estimator invents bridges up to 81 px wide
@@ -48,8 +47,8 @@
 
 #include <flutter/runtime_effect.glsl>
 
-// Twelve because that is where the cost corpus stops: the fragmentation excess
-// (D26) is measured at 2 and at 12 surfaces and everything past it is an
+// Twelve because that is where the cost measurements stop: the fragmentation
+// excess is measured at 2 and at 12 surfaces and everything past it is an
 // extrapolation of a curve nobody took. A group larger than this is refused by
 // the caller rather than truncated here — a truncated group would draw a
 // picture with shapes silently missing.
@@ -105,7 +104,7 @@ uniform vec4 uT3;
 
 // How much the outline *replaces* rather than adds: 0 is the calibrated
 // additive rim, 1 lays uRim.rgb on at the band's coverage — the platform's
-// increase-contrast switch (D203). A uniform rather than a second shader
+// increase-contrast switch. A uniform rather than a second shader
 // because at 0 the line below is `col * 1.0 + …`, the same bits as before,
 // and that is enforced rather than hoped for.
 #define uRimMix uT3.w
@@ -128,9 +127,8 @@ float sdRoundedBox(vec2 p, vec2 b, float r) {
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - r;
 }
 
-// Analytic gradient, transliterated from bench/model/refraction.dart together
-// with the SDF above. Kept branchy: D15 measured the branchless rewrite of this
-// exact function 53% dearer, because its branches separate large connected
+// Analytic gradient of the SDF above. Kept branchy: the branchless rewrite of
+// this exact function was measured 53% dearer, because its branches separate large connected
 // regions rather than neighbouring pixels.
 vec2 sdRoundedBoxNormal(vec2 p, vec2 b, float r) {
     vec2 s = vec2(p.x < 0.0 ? -1.0 : 1.0, p.y < 0.0 ? -1.0 : 1.0);
@@ -173,7 +171,7 @@ void main() {
         //
         // Worth a branch because the per-shape term is what the fragment is:
         // 0.0441 cycles per device pixel each against 0.0343 fixed, so at
-        // twelve shapes the fold is 94% of the fragment (D169, Adreno 830).
+        // twelve shapes the fold is 94% of the fragment (Adreno 830).
         if (di - d >= uCullK) {
             continue;
         }
@@ -193,7 +191,7 @@ void main() {
 
     // The rim bends the sample inward; the flat middle reads straight through.
     // Identical to the single-surface path, including the shoulder exponent
-    // (D106) — the whole difference between the two programs is the field.
+    // — the whole difference between the two programs is the field.
     float t = clamp(-d / uThickness, 0.0, 1.0);
     float bend = pow(1.0 - pow(t, uShoulder), uEdgePower);
     vec2 src = p + n * (uStrength * bend);

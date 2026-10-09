@@ -132,7 +132,7 @@ cheap setting is reachable without a fork.
       something else changes. Found while testing `GlassMorph`; look in
       `glass_host.dart`.
 - [ ] `GlassMorph`: carry the spring's velocity through a swap mid-morph, and
-      keep glass inside fading content (an `Opacity` layer drops it, D185).
+      keep glass inside fading content (an `Opacity` layer drops it).
 - [ ] `GlassScaffold`: the keyboard (`viewInsets`), a bottom scroll edge, and
       a top bar shorter than `topBarHeight`.
 - [ ] Tune the drop's stretch and the morph's timing against Apple's devices;
