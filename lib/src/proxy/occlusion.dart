@@ -3,11 +3,10 @@
 //
 // `Overlay` skips entries below an opaque route (`overlay.dart:892-913`) and
 // nothing else does: a modal sheet is not marked opaque, so the page under it is
-// painted in full — into the real frame, and into any proxy we record. M9
-// measured that the hardware does not save us either: an opaque backing over a
-// translucent surface costs its own area and returns nothing on Adreno 830, in
-// five scenes and two seeds. So work under an opaque cover is paid for twice and
-// culled by nobody.
+// painted in full — into the real frame, and into any proxy we record. The
+// hardware does not save us either: on Adreno 830 an opaque backing over a
+// translucent surface costs its own area and returns nothing. So work under an
+// opaque cover is paid for twice and culled by nobody.
 //
 // Three things have to be true for a walk to cut it, and each is a separate
 // failure:
@@ -40,8 +39,8 @@ typedef CoverDeclaration = bool Function(RenderObject node);
 ///
 /// A [declared] node contributes its `paintBounds` and **still goes through the
 /// geometry**: a declaration says "this paints opaquely over itself", not "this
-/// covers the region". Letting it skip the geometry was a real defect here —
-/// every `ColoredBox` in a tree would have become a full-screen cover.
+/// covers the region". Skipping the geometry would make every `ColoredBox` in a
+/// tree a full-screen cover.
 ///
 /// **Two types, and that is the whole list.** `RenderDecoratedBox.decoration`
 /// and `_RenderPhysicalModelBase.color` are public getters on public classes.
@@ -108,16 +107,15 @@ Rect? opaqueLocalRect(RenderObject node, {CoverDeclaration? declared}) {
 /// is exact.
 ///
 /// **`describeApproximatePaintClip` is a superset by contract, which is the
-/// unsafe direction here, and it cost a fixture.** Its documentation says
+/// unsafe direction here.** Its documentation says
 /// "approximate bounding box of the clip rect" and names its purpose: the
 /// semantics phase, which wants to *avoid dropping* a visible child
 /// (`object.dart:3749-3757`). Over-reporting a clip is free there and fatal
 /// here — intersecting a cover with a superset over-states coverage, and
-/// over-stating coverage is how a cull deletes content. Measured: a
+/// over-stating coverage is how a cull deletes content. A
 /// `CustomClipper<Rect>` that clips to half the screen reports the whole box,
 /// because `getApproximateClipRect` defaults to `Offset.zero & size`
-/// (`proxy_box.dart:1426,1567`), and the first version of this file read that
-/// half-screen clipper as a full-screen cover.
+/// (`proxy_box.dart:1426,1567`), so read naively it is a full-screen cover.
 ///
 /// So the value is used only where it is provably the true clip:
 ///
@@ -135,8 +133,8 @@ Rect? opaqueLocalRect(RenderObject node, {CoverDeclaration? declared}) {
 /// **The residual risk, named rather than papered over:** a render object
 /// outside that family that clips to less than its own box while reporting the
 /// box violates nothing in the documented contract, and this would over-cull
-/// under it. The backstop is the pixel comparison, which is run on every
-/// fixture and every scene of the corpus.
+/// under it. The backstop is a pixel comparison of culled against uncut
+/// captures in the tests.
 ({bool known, Rect? clip}) paintClipOf(RenderObject parent, RenderObject child) {
   final Rect? approximate = parent.describeApproximatePaintClip(child);
   if (approximate == null) {
@@ -303,8 +301,7 @@ class OcclusionPlan {
 /// sees the truth: `paintChild` is called for every child, skipped or not, so
 /// the observed sequence of visit indices must be strictly increasing. It is
 /// one integer compare per node, it works in profile — no assert, no
-/// `debugLayer` — and a pass that fails it is discarded rather than trusted,
-/// which is the structural fallback D37 asks for.
+/// `debugLayer` — and a pass that fails it is discarded rather than trusted.
 class OcclusionPolicy {
   /// A policy that culls by [plan] and defers everything else to [inner].
   OcclusionPolicy(this.plan, {this.inner = paintEverything, this.enabled = true});
@@ -312,12 +309,12 @@ class OcclusionPolicy {
   /// Which subtrees are painted before the cover.
   final OcclusionPlan plan;
 
-  /// What to do with a node the cull does not remove. The mandatory skips of
-  /// step 2 compose here rather than replacing this.
+  /// What to do with a node the cull does not remove. The mandatory skips
+  /// compose here rather than replacing this.
   final WalkPolicy inner;
 
-  /// Off, to measure the same walk without the cut. The negative control lives
-  /// here rather than in a second code path.
+  /// Off, to run the same walk without the cut, for comparison, without a
+  /// second code path.
   final bool enabled;
 
   /// Nodes this pass skipped as occluded.

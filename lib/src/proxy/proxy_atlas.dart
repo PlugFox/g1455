@@ -1,13 +1,12 @@
-// The atlas: N glass surfaces, one recording, one texture, one snapshot (D24).
+// The atlas: N glass surfaces, one recording, one texture, one snapshot.
 //
-// This is why the walk was built. `OffsetLayer.toImageSync` hands back one
+// This is why the walk exists. `OffsetLayer.toImageSync` hands back one
 // rectangle per call, so N surfaces are either N passes at `C_pass` each or one
 // bounding box carrying dead area. A pass we drive ourselves is neither: one
 // recording of the scene, N clipped `drawPicture` calls placing it into one
-// texture, one `toImageSync`. Arrived here from `spikes/13_own_walk/` with the
-// surface register (D121) as its input, which is what the roadmap means by
-// "the capture's area and layout are a function of the glass surfaces and of
-// nothing else" — Impeller's render target pool is keyed by size
+// texture, one `toImageSync`. Its input is the surface register: the capture's
+// area and layout are a function of the glass surfaces and of nothing else,
+// because Impeller's render target pool is keyed by size
 // (`render_target_cache.cc:69-74`), so a region that moved with the content
 // would miss the pool on every frame the content moved.
 //
@@ -25,7 +24,7 @@
 //    away by construction. How much context that takes is [bleedFor], and it is
 //    measured rather than assumed.
 //  - **Merging**, which is a lever wherever atlas area is charged — and that
-//    is every family measured. See [pack], and the gate it used to have.
+//    is every family measured. See [pack].
 
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -53,10 +52,9 @@ class AtlasSlot {
 
   /// Which input surfaces sample from this slot.
   ///
-  /// More than one when merging is on. That is not a detail: on the corpus's
-  /// clustered scenes an atlas of one slot per surface pays for the overlap
-  /// between neighbours as many times as they overlap, and a merged slot pays
-  /// once.
+  /// More than one when merging is on. That is not a detail: with clustered
+  /// surfaces an atlas of one slot per surface pays for the overlap between
+  /// neighbours as many times as they overlap, and a merged slot pays once.
   final List<int> members;
 
   /// What is captured for it: [surface] inflated by the blur's support and
@@ -76,9 +74,7 @@ class AtlasSlot {
 
   /// The three numbers a fragment shader needs to sample this slot: where its
   /// source starts on screen, where its slot starts in the texture, and the
-  /// scale between them. Kept as a record rather than a uniform block because
-  /// this spike has no shader — the point is that the map is three numbers and
-  /// not a per-pixel search.
+  /// scale between them: the map is three numbers, not a per-pixel search.
   ({Offset srcOrigin, Offset atlasOrigin, double scale}) get uniforms =>
       (srcOrigin: source.topLeft, atlasOrigin: rect.topLeft, scale: pixelRatio);
 }
@@ -112,15 +108,15 @@ class AtlasLayout {
   /// Device-pixel grid every slot origin and size is a multiple of.
   ///
   /// Not padding, and not a gutter: it is the *downscale factor* of the blur.
-  /// D11 chose an explicit reduction pass over `textureLod` (which does not
-  /// select a level on Vulkan at all), and a reduction by 2^k that lands on
-  /// aligned boundaries reads each output texel from exactly one slot. A gutter
-  /// would cost area and still bleed; alignment costs at most `align - 1` texels
-  /// per side and cannot bleed. Measured in `atlas_test.dart`.
+  /// The blur uses an explicit reduction pass rather than `textureLod` (which
+  /// does not select a level on Vulkan at all), and a reduction by 2^k that
+  /// lands on aligned boundaries reads each output texel from exactly one
+  /// slot. A gutter would cost area and still bleed; alignment costs at most
+  /// `align - 1` texels per side and cannot bleed.
   final int align;
 
   /// Whether this atlas can be rasterized on a GPU whose textures stop at
-  /// [maxTextureSide] device pixels a side (D186).
+  /// [maxTextureSide] device pixels a side.
   ///
   /// **Asked because the engine does not refuse, it rescales — silently, and
   /// then lies about it.** `Picture.toImageSync` on Impeller reaches
@@ -143,7 +139,7 @@ class AtlasLayout {
   /// cannot allocate the texture and leaves an error on the image
   /// (`shell/common/rasterizer.cc:405-413`), which `drawImage` turns into an
   /// exception but a shader sampler never reads (`fragment_shader.cc:63-93`) —
-  /// so the glass samples nothing (D195). One backend loses the map, the other
+  /// so the glass samples nothing. One backend loses the map, the other
   /// loses the frame; neither says so to the code that would notice.
   ///
   /// So the size of the atlas is a quantity the pipeline has to keep inside a
@@ -159,14 +155,13 @@ class AtlasLayout {
   /// The instrument is the question itself: crop a region inflated by `b`,
   /// blur it, and compare the result *inside the surface* against the blur of
   /// the whole screen, which is the ideal the proxy is standing in for. The
-  /// worst case is a full-contrast step just outside the surface's edge, and
-  /// the corpus for it is one: 0 → 255 at four logical pixels out, with bars
-  /// elsewhere so no crop has a uniform neighbourhood.
+  /// worst case is a full-contrast step just outside the surface's edge: 0 → 255
+  /// at four logical pixels out, with bars elsewhere so no crop has a uniform
+  /// neighbourhood.
   ///
-  /// What it says, in worst code values inside the surface, at `TileMode.clamp`
-  /// (which is what the rig uses — a `decal` proxy darkens its own border, and
-  /// the border of a proxy is the screen edge, where half the corpus puts its
-  /// surfaces):
+  /// The worst error in code values inside the surface, at `TileMode.clamp`
+  /// (a `decal` proxy darkens its own border, and the border of a proxy is
+  /// often the screen edge):
   ///
   /// | bleed | sigma 2.6 | sigma 8 |
   /// |---|---|---|
@@ -177,12 +172,12 @@ class AtlasLayout {
   /// | 2.5σ | 0 | 0 |
   ///
   /// So **2.5σ** is where a full-contrast step stops showing at all, and the
-  /// zero at the top of the table is the arm that says this is not a nicety: a
-  /// frosted surface with no bleed is wrong by a third of the range at its own
-  /// edge. `decal` needs half a sigma more for the same error.
+  /// first row says this is not a nicety: a frosted surface with no bleed is
+  /// wrong by a third of the range at its own edge. `decal` needs half a sigma
+  /// more for the same error.
   ///
-  /// ⚠️ **That measurement is Skia's kernel**, because it was taken under
-  /// `flutter_tester`. Impeller truncates its own at
+  /// **That measurement is Skia's kernel**, taken under `flutter_tester`.
+  /// Impeller truncates its own at
   /// `(ScaleSigma(sigma) - 0.5) · sqrt(3)` — `kKernelRadiusPerSigma` is exactly
   /// `sqrt(3)` (`impeller/geometry/sigma.h:24`, `sigma.cc:12`) — which is 1.6σ
   /// at sigma 8 and *narrower* than what is measured here. So this constant
@@ -193,7 +188,7 @@ class AtlasLayout {
   /// own sigma.
   ///
   /// Recording at 1/k is itself a low-pass worth `0.30` logical px of sigma per
-  /// texel (D117), and it composes with the finish's blur in quadrature — so
+  /// texel, and it composes with the finish's blur in quadrature — so
   /// the total sigma the proxy will carry is larger than the finish asked for
   /// and the context it needs is larger with it. Both halves are measured; this
   /// is the one line that puts them together.
@@ -211,31 +206,17 @@ class AtlasLayout {
   /// Tallest first, then widest, then input order — the tie-breakers exist so
   /// that two frames with the same surfaces produce the same atlas. They do
   /// *not* make the layout stable when a surface resizes: that reshuffles
-  /// everything below it on the shelf, and it is left open on purpose (see the
-  /// finding).
+  /// everything below it on the shelf, which retention handles.
+  ///
   /// [merge] is a *request*: a candidate merge is taken only when the packed
-  /// atlas gets strictly smaller ([_mergeGreedy]).
-  ///
-  /// **There used to be a `ProxyCostModel` gate here, and it guarded a budget
-  /// the criterion never spends.** The merge was honoured under `areaCharged`
-  /// alone, on the reading that its budget was the capture's dead area,
-  /// `C_pass / k` (D20), and that neither constant exists for Metal or for
-  /// unknown hardware. But the criterion prices every candidate by packing it
-  /// with `passes: 1` — one `toImageSync` for the whole atlas, whatever the
-  /// grouping — so `C_pass` is the same on both sides of every comparison and
-  /// `k` scales both sides alike: the decision is "did the packed area fall",
-  /// and the constants cancel out of it exactly. Checked by inverting the
-  /// price (`proxy_atlas_test.dart`). A gate on "we do not know `C_pass / k`"
-  /// was therefore a gate on a number the code did not read.
-  ///
-  /// What the gate actually decided was whether area is charged at all, and on
-  /// every family measured it is: the capture on Adreno (D28), 58% of the
-  /// route on Metal (D128), the recording end to end on Xclipse (D134). So a
-  /// merge that shrinks the atlas is a saving everywhere, and it was being
-  /// declined precisely on the family that cannot declare itself — an
-  /// `unmeasured` host got two slots where one fits, which is 38% of the atlas
-  /// on `over_photo` (D135) — on top of a full-resolution proxy from the other
-  /// refusal. The two multiplied (D136).
+  /// atlas gets strictly smaller ([_mergeGreedy]). It does not depend on the
+  /// [ProxyCostModel]: every candidate is priced as one `toImageSync` for the
+  /// whole atlas, so `C_pass` is the same on both sides of every comparison and
+  /// `k` scales both sides alike — the decision is "did the packed area fall",
+  /// and the constants cancel out of it exactly. Area is charged on every
+  /// family measured (the capture on Adreno, 58% of the route on Metal, the
+  /// recording end to end on Xclipse), so a merge that shrinks the atlas is a
+  /// saving everywhere, including on hardware that cannot declare itself.
   ///
   /// What a merge does change everywhere is the number of clipped replays
   /// inside the one recording, and nobody has priced those; it changes it
@@ -243,9 +224,9 @@ class AtlasLayout {
   ///
   /// [fused] is the one thing here that is not an optimisation. Surfaces whose
   /// silhouettes are blended into one shape have to be sampled in one
-  /// coordinate system, so a blend group is *required* to share a slot — the
-  /// one-way invariant of §4.4, and the reason the two kinds of grouping are
-  /// named apart. [merge] still runs over the result and may put a blend group
+  /// coordinate system, so a blend group is *required* to share a slot — a
+  /// one-way invariant, and the reason the two kinds of grouping are named
+  /// apart. [merge] still runs over the result and may put a blend group
   /// together with anything else; what it may not do is take one apart.
   ///
   /// [classes] is the other constraint on the merge, in the opposite
@@ -282,7 +263,7 @@ class AtlasLayout {
         : _seed(fused, surfaces, bleed, pixelRatio);
     if (grouping != null) {
       // Membership decided elsewhere and held — the retained case. Recomputing
-      // the merge every frame costs more than the pass it serves (D41), so the
+      // the merge every frame costs more than the pass it serves, so the
       // grouping outlives the rectangles it was computed from.
       groups = <_Group>[
         for (final List<int> members in grouping)
@@ -426,7 +407,7 @@ class AtlasLayout {
     // rather than being dropped: losing a surface silently is the one outcome
     // this must not have. That is right for a *packing preference* and it is
     // what [shelfWidth] is; it would be catastrophic for a hardware limit,
-    // which is why the two are different parameters now (see [fitsTexture]).
+    // which is why the two are different parameters (see [fitsTexture]).
     final int effectiveWidth = sizes.isEmpty
         ? shelfWidth
         : math.max(shelfWidth, sizes.map((s) => s.w).reduce(math.max));
@@ -463,26 +444,23 @@ class AtlasLayout {
   /// rectangles.
   ///
   /// The obvious rule is pairwise: merge when `C_pass` buys more than the dead
-  /// area the union adds, which is M2's dead-area budget (`C_pass / k`, ~102
-  /// thousand device pixels on Adreno at heavy content) applied to two
-  /// rectangles. It is wrong, and the corpus says so: on `over_animation` it
-  /// merges and the atlas gets 5% *dearer*, because the unmerged layout's own
-  /// packing waste was already paying part of what the merge would save. So the
+  /// area the union adds (`C_pass / k`, ~102 thousand device pixels on Adreno
+  /// 830 at heavy content). It is wrong: over an animated backdrop it merges
+  /// and the atlas gets 5% *dearer*, because the unmerged layout's own packing
+  /// waste was already paying part of what the merge would save. So the
   /// candidate is packed and priced, and only a real reduction is taken. At
   /// twelve surfaces that is at most twelve rounds of sixty-six packings of
   /// twelve rectangles, which is nothing.
   ///
-  /// The price is the packed area in device pixels and nothing else. It was
-  /// written as `CaptureCost(passes: 1, area).cycles()`, which is the same
-  /// ordering — one pass on every candidate, so the constant cancels and the
-  /// slope is positive — dressed as a cost model it did not depend on. Stated
-  /// bare so that nobody gates it on those constants again.
+  /// The price is the packed area in device pixels and nothing else: with one
+  /// pass on every candidate, `CaptureCost(passes: 1, area).cycles()` orders
+  /// candidates identically, so no cost model constant enters the decision.
   ///
   /// [maxTextureSide] makes the criterion **lexicographic**: a candidate over
   /// the ceiling is priced at infinity, so fitting comes first and area second.
   /// That is not the same as declining such candidates, and the difference is
   /// visible in both directions — a merge that *costs* area is now taken when
-  /// it is what brings the atlas under the limit, and the same merge is still
+  /// it is what brings the atlas under the limit, and the same merge is
   /// declined when the unmerged layout already fits.
   ///
   /// It also buys the lemma the divisor search rests on. If the unmerged layout
@@ -552,9 +530,10 @@ class AtlasLayout {
   /// replays each clipped to its own slot — which is the cost we wanted to pay,
   /// since the clip is what makes a replay cost its slot's area rather than the
   /// screen's (`canvas.cc:2307`).
-  /// [jitter] displaces one slot's *content* without moving its rectangle — the
-  /// negative control. Without it the pixel test would pass for any map that is
-  /// merely self-consistent, and self-consistency is not what a shader needs.
+  ///
+  /// [jitter] displaces one slot's *content* without moving its rectangle, for
+  /// tests: without it a pixel test would pass for any map that is merely
+  /// self-consistent, and self-consistency is not what a shader needs.
   ui.Picture record(
     ui.Picture scene, {
     Offset Function(AtlasSlot)? jitter,
@@ -593,7 +572,8 @@ class AtlasLayout {
   double get waste => size.width * size.height - slotArea;
 
   /// What one capture of the enclosing rectangle would have cost, in device
-  /// pixels, and how much of it no surface needs. The alternative D24 is against.
+  /// pixels, and how much of it no surface needs: the alternative the atlas
+  /// replaces.
   ({double area, double dead}) get boundingBoxRoute {
     if (slots.isEmpty) {
       return (area: 0, dead: 0);
@@ -622,12 +602,11 @@ class _Placement {
   final Size size;
 }
 
-/// What the three routes cost, on M2's measured constants.
+/// What a capture route costs, on constants measured on Adreno 830.
 ///
 /// Arithmetic, not measurement — and the constants belong to one device
-/// (SM-S938B / Adreno 830) and to the sides the fit was taken on. It is here so
-/// the corpus's real surface rectangles decide the comparison instead of the
-/// two round numbers D24 was written with.
+/// (SM-S938B / Adreno 830) and to the sizes the fit was taken on, so real
+/// surface rectangles decide a comparison rather than round numbers.
 @immutable
 class CaptureCost {
   /// A route of [passes] captures covering [areaDevicePx] in total.
@@ -639,7 +618,7 @@ class CaptureCost {
   /// Device pixels captured, summed over the passes.
   final double areaDevicePx;
 
-  /// `C_pass` from M2, heavy content, Adreno 830.
+  /// Fixed cycles per capture pass, heavy content, Adreno 830.
   static const double cPass = 27600;
 
   /// Marginal cycles per device pixel: flat content and heavy content.
@@ -654,14 +633,12 @@ class CaptureCost {
 
 /// [r] snapped outward to the grid of texels at [pixelRatio] per logical pixel.
 ///
-/// The grid, not whole logical pixels, which is what this was until a phone
-/// with a fractional density ran the identity arm: at dpr 1.875 a slot starting
-/// at logical 100 starts at device 187.5, so every texel of the slot straddles
-/// two screen pixels and the bilinear tap averages them — 9682 px of a still
-/// identity glass differing by up to 72 code values on the S908B, where dpr 2
-/// and 3 had read zero because a whole logical pixel is a whole device pixel
-/// there. On the grid a texel's centre is a screen pixel's centre at divisor 1,
-/// and the start of a block of them at any other.
+/// The grid, not whole logical pixels: at a fractional density such as dpr
+/// 1.875 a slot starting at logical 100 starts at device 187.5, so every texel
+/// of the slot would straddle two screen pixels and the bilinear tap would
+/// average them (up to 72 code values off on a Galaxy S22 Ultra). On the grid a
+/// texel's centre is a screen pixel's centre at divisor 1, and the start of a
+/// block of them at any other.
 ///
 /// A millionth of a texel of tolerance each way, because the edges arrive as
 /// products of the layout's own floats: a left edge one ULP under a grid line

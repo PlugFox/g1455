@@ -1,30 +1,24 @@
 // The proxy pipeline, assembled: register -> resolution -> atlas -> one walk ->
 // one texture.
 //
-// Every piece of this has existed and been measured on its own since M12, and
-// none of them had ever run in the same frame. That is what phase A is for —
-// the roadmap's words are "expose the integration problems the spikes cannot
-// reach" — and the assembly is where the pieces stop being independent:
+// The assembly is where the pieces stop being independent:
 //
-//  - the **register** (D121) decides the geometry, because Impeller's render
-//    target pool is keyed by size and a region that follows the content misses
-//    it on every frame the content moves (D115);
-//  - the **resolution policy** (D120) decides the texel scale, from the finish,
-//    the screen's density and the hardware — and on Metal it decides not to
-//    lower it at all (D119);
-//  - the **atlas** (D24) decides the layout, and its bleed is a function of the
-//    finish's blur *and* of the divisor, because a divisor is itself a blur
-//    (D117, D122);
-//  - the **walk** (M12) does the drawing, subtracting what the roles and the
+//  - the **register** decides the geometry, because Impeller's render target
+//    pool is keyed by size and a region that follows the content misses it on
+//    every frame the content moves;
+//  - the **resolution policy** decides the texel scale, from the finish, the
+//    screen's density and the damage budget;
+//  - the **atlas** decides the layout, and its bleed is a function of the
+//    finish's blur *and* of the divisor, because a divisor is itself a blur;
+//  - the **walk** does the drawing, subtracting what the roles and the
 //    occlusion plan say to subtract;
-//  - **retention** (D41) is what keeps the previous four from being recomputed
-//    every frame, which would cost more than the pass they serve.
+//  - **retention** is what keeps the previous four from being recomputed every
+//    frame, which would cost more than the pass they serve.
 //
-// What is deliberately *not* here is the finish and the shader. The pipeline
-// produces the proxy and the map into it; blurring it and refracting through it
-// is the surface's job, and the budget puts that last at 9% (D63). The sigma is
-// an input all the same, because the bleed has to be sized for a blur that has
-// not happened yet.
+// What is deliberately *not* here is the shader. The pipeline produces the
+// proxy, blurred by what the finish still owes, and the map into it; refracting
+// through it is the surface's job. The sigma is an input because the bleed has
+// to be sized for the blur.
 //
 // **The one structural assumption, and it is checked rather than trusted:** the
 // atlas replays *one picture* N times, so the walk has to produce exactly one.
@@ -59,15 +53,13 @@ import 'shadow_filter.dart';
 /// frame's, and the feedback compounds. The whole subtree goes, not just the
 /// surface: what sits *on* a nav bar is on top of the glass, not behind it.
 ///
-/// **A blend group draws glass too, and it took a failing arm to notice.** The
-/// rule is about the *draw*, not about the type that used to be the only one
-/// making it: a `RenderGlassGroup` paints the fused shape itself, so a group
-/// left in the walk puts last frame's glass into this frame's proxy. It showed
-/// up as a group of one disagreeing with a lone surface by up to 39 code
-/// values, which reads exactly like a shader that drifted — and the two
-/// programs were byte-identical all along.
+/// **A blend group draws glass too.** The rule is about the *draw*, not about
+/// one type: a `RenderGlassGroup` paints the fused shape itself, so a group
+/// left in the walk would put last frame's glass into this frame's proxy (a
+/// group of one would then disagree with a lone surface by up to 39 code
+/// values, which reads exactly like a shader that drifted).
 ///
-/// **And the rule stays about the draw when the ladder turns the draw off.** A
+/// **And the rule stays about the draw when the tier turns the draw off.** A
 /// surface below [GlassTier.full] paints a flat fill and reads nothing, so it
 /// is not capturing itself — it is ordinary content, and a neighbour's glass
 /// has to show it. `excludedFromProxy` is that predicate, said once and read by
@@ -83,7 +75,6 @@ WalkAction skipGlassSurfaces(RenderObject child) {
   return WalkAction.paint;
 }
 
-/// One frame of proxy: the texture, and the map from the screen into it.
 /// What glass samples: a texture, and where each surface's backdrop is in it.
 ///
 /// The captured atlas ([GlassProxyFrame]) is one; a texture a `GlassBackdrop`
@@ -100,6 +91,7 @@ abstract interface class GlassSampleSource {
   AtlasSlot? slotForKey(Object key);
 }
 
+/// One frame of proxy: the texture, and the map from the screen into it.
 class GlassProxyFrame implements GlassSampleSource {
   GlassProxyFrame._({
     required this.image,
@@ -173,17 +165,17 @@ class GlassProxyFrame implements GlassSampleSource {
 ///
 /// One axis rather than two booleans, because the three values are three
 /// spellings of one decision and the fourth combination ("no blur, folded")
-/// does not exist. [none] is here for the same reason [split] is: it is an arm
-/// of a measurement, not a mode a surface may ship in.
+/// does not exist. [none] is for measurement, not a mode a surface may ship
+/// in.
 ///
 /// An application normally leaves this alone: [GlassHost.blurPass] is null by
 /// default and takes [defaultFor] the declared [GlassHardware]. Naming it is
-/// for a benchmark arm, or for a host that has measured its own device:
+/// for a benchmark, or for a host that has measured its own device:
 ///
 /// ```dart
 /// GlassHost(
 ///   hardware: GlassHardware.adrenoVulkan,
-///   blurPass: ProxyBlurPass.split, // the arm D140 and D141 measured
+///   blurPass: ProxyBlurPass.split,
 ///   child: const MyScreen(),
 /// )
 /// ```
@@ -198,9 +190,8 @@ class GlassProxyFrame implements GlassSampleSource {
 /// {@category Cost and policy}
 enum ProxyBlurPass {
   /// Two snapshots: rasterize the packed atlas, then draw that image back
-  /// through `ImageFilter.blur` into a second one. What D140 and D141 measured
-  /// (M2 iPad Pro, Impeller/Metal), and what every recorded number about the
-  /// pass is a number about.
+  /// through `ImageFilter.blur` into a second one. The default on Apple
+  /// platforms.
   split,
 
   /// One snapshot: the filter rides on a `saveLayer` inside the atlas picture,
@@ -212,29 +203,28 @@ enum ProxyBlurPass {
   /// this texture will outlive a particular frame"
   /// (`dl_dispatcher.cc:1228-1233`) — so the second snapshot is an atlas-sized
   /// MSAA target allocated outside the pool on every frame, and the Gaussian is
-  /// only part of what it costs. Measured pixel for pixel against [split] on
-  /// Skia (spike #21): worst 1 code value on all four divisors, mean 0.041 at
-  /// the largest sigma and 0.134 at the smallest, which is the round trip
-  /// through eight bits that [split] takes and this does not.
+  /// only part of what it costs. Pixel for pixel against [split] on Skia: worst
+  /// 1 code value on all four divisors, mean 0.041 at the largest sigma and
+  /// 0.134 at the smallest, which is the round trip through eight bits that
+  /// [split] takes and this does not.
   ///
-  /// **Its price is now measured on both families, and they disagree in sign**,
-  /// which is why the default is [defaultFor] rather than a constant. On Metal
-  /// the fold is 17.4% *dearer* (D145) and the engine says why: a `SaveLayer`
+  /// **Its price differs in sign between the two families measured**, which is
+  /// why the default is [defaultFor] rather than a constant. On Metal (M2 iPad
+  /// Pro) the fold is 17.4% *dearer*, and the engine says why: a `SaveLayer`
   /// carrying an image filter cannot take the collapse peephole and allocates
   /// its own MSAA target (`display_list/canvas.cc:1902,147-193`), so what the
   /// fold removes is one `toImageSync` *call* and not one render pass. On
-  /// Adreno 830 (Galaxy S25 Ultra, Impeller/Vulkan) it is **cheaper** — 9.1% and 17.1% of the addition at the divisor
-  /// the policy picks, and worth 57% and 70% more frames at full resolution,
-  /// where the split arm sits off vsync. The mechanism offered for the flip
-  /// beforehand (a tiler pays less for MSAA) does **not** survive: Apple
-  /// silicon is tile-based too. What the data shows beside the sign is that at
-  /// full resolution the fold raises the GPU's busy fraction from 0.424 to
-  /// 0.621 while producing 57% more frames, so it is removing a stall and not
-  /// only work — but no mechanism is claimed.
+  /// Adreno 830 (Galaxy S25 Ultra, Impeller/Vulkan) it is **cheaper**: 9.1% to
+  /// 17.1% of what the glass adds to a frame at the default divisor, and 57% to
+  /// 70% more frames at full resolution, where [split] misses vsync. At full
+  /// resolution there the fold raises the GPU's busy fraction from 0.424 to
+  /// 0.621 while producing 57% more frames, so it removes a stall and not only
+  /// work. "A tiler pays less for MSAA" does not explain the difference: Apple
+  /// silicon is tile-based too; no mechanism is claimed.
   folded,
 
   /// No blur at all. Draws a wrong picture by construction, and exists so the
-  /// pass can be subtracted from the route's price (D140).
+  /// blur pass can be subtracted from the route's price.
   ///
   /// **Except at a finish of sigma zero**, where there is no residual to blur
   /// and this is what the pipeline does anyway — so a `clear` finish already
@@ -243,29 +233,25 @@ enum ProxyBlurPass {
 
   /// The pass a host of [hardware] gets when it does not name one.
   ///
-  /// Keyed on the declaration rather than fixed, because the sign is measured
-  /// on both families and differs: Metal is 17.4% better on [split] (D145),
-  /// Adreno 9.1…17.1% of the addition better on [folded]. The two spellings
-  /// draw the same picture to within a code value (spike #21), so a wrong guess
-  /// here costs cycles and never pixels — which is what makes it safe to key on
-  /// a declaration at all, and is exactly the property the resolution policy
-  /// lacked when the same shape of gate cost it D135.
+  /// Keyed on the declaration rather than fixed, because the sign differs by
+  /// family: Metal is 17.4% better on [split], Adreno 830 9.1…17.1% better on
+  /// [folded]. The two spellings draw the same picture to within a code value,
+  /// so a wrong guess here costs cycles and never pixels — which is what makes
+  /// it safe to key on a declaration at all.
   ///
   /// Everything that is not Apple gets Adreno's answer, and that is an
-  /// extrapolation from one GPU: Xclipse has never run this axis, and neither
-  /// has a desktop Impeller target. It is the *pulled* end of a lever whose
-  /// sign is measured on the family that matters most for this package (D136),
-  /// and its worst case is the 17.4% Metal measured in the other direction.
+  /// extrapolation from one GPU: Xclipse and desktop Impeller targets are
+  /// unmeasured here. Its worst case is the 17.4% Metal measured in the other
+  /// direction.
   static ProxyBlurPass defaultFor(GlassHardware hardware) => hardware == GlassHardware.appleMetal ? split : folded;
 }
 
 /// Runs the proxy pipeline for one screen.
 ///
 /// Not a widget and not a render object: it is driven by whoever owns the
-/// frame, which for now is a test and later is the surface host. Holding it
-/// across frames is the point — [RetainedAtlas] is inside it, and a pipeline
-/// rebuilt every frame would repack every frame, which D41 measured as the
-/// dominant cost of the whole route.
+/// frame — the surface host, or a test. Holding it across frames is the point:
+/// [RetainedAtlas] is inside it, and a pipeline rebuilt every frame would
+/// repack every frame, the dominant CPU cost of the whole route.
 class GlassProxyPipeline {
   /// A pipeline for one screen. [blurPass] defaults to
   /// [ProxyBlurPass.defaultFor] and [maxTextureSide] to
@@ -288,9 +274,8 @@ class GlassProxyPipeline {
 
   /// The divisor the host named, or null to let the policy pick one.
   ///
-  /// See [ProxyDivisorReason.pinnedByHost]: the route's price is known at two
-  /// divisors on one platform, and a third point cannot come from a chooser
-  /// whose job is to return the best divisor rather than an unpriced one.
+  /// See [ProxyDivisorReason.pinnedByHost]: a divisor the chooser would not
+  /// pick can only come from the host.
   final ProxyResolution? pinnedResolution;
 
   /// The blur the finish will apply, in logical pixels. Decides the bleed and,
@@ -300,19 +285,15 @@ class GlassProxyPipeline {
   /// The whole quality allowance, in ΔE against the same finish at full
   /// quality — the one the divisor is chosen against.
   ///
-  /// The same number the retake oracle is given, and it has to be: D124
-  /// measured that damage on two axes composes rather than adds, so the two are
-  /// drawing on one allowance. For one release this was not passed at all and
-  /// the policy used its own default, which meant a host that raised or lowered
-  /// its budget moved the staleness ceiling and not the resolution — half an
-  /// effect, and silent.
+  /// The same number the retake oracle is given, and it has to be: damage on
+  /// two axes composes rather than adds ([GlassDamage.compose]), so the two
+  /// draw on one allowance.
   final double damageBudgetDeltaE;
 
   /// Whose measurements apply. Decides what the chosen divisor is *priced* at
   /// ([ProxyResolutionChoice.routeCostFactor]) and nothing about the choice
-  /// itself: for one release it also decided whether the divisor and the merge
-  /// were levers at all, and a host that declared nothing got a full-resolution,
-  /// unmerged atlas larger than its screen (D135, D136).
+  /// itself: the divisor and the merge are levers on every family, declared or
+  /// not.
   final GlassHardware hardware;
 
   /// Key into the measured damage table, for the resolution policy.
@@ -323,9 +304,9 @@ class GlassProxyPipeline {
   /// 1 is right for a blur applied to the atlas in one pass: the bleed is
   /// already at least the blur's support, so a pixel a surface samples cannot
   /// reach its neighbour's slot. It stops being right when the blur becomes a
-  /// **reduction** pass (D11), because a reduction block straddling two slots
-  /// mixes them at the reduced resolution and no amount of bleed prevents that;
-  /// there the alignment has to be the reduction factor (D39).
+  /// **reduction** pass, because a reduction block straddling two slots mixes
+  /// them at the reduced resolution and no amount of bleed prevents that;
+  /// there the alignment has to be the reduction factor.
   final int align;
 
   /// Logical pixels of headroom given to each slot on top of the bleed, so a
@@ -375,13 +356,11 @@ class GlassProxyPipeline {
   /// **Expected to be zero for the life of this package**, and counted for
   /// exactly that reason. Two mechanisms can drop an oversized frame: the
   /// search, which fixes it, and the check after the pack, which only refuses.
-  /// An arm that asserts "an impossible ceiling produces no frame" is satisfied
-  /// by either of them and therefore distinguishes neither — the rule this
-  /// project keeps is that a mechanism subsuming another has to be visible as
-  /// such. This counter is how: it stays at zero while the search is right, and
-  /// deliberately breaking the search (swap the comparison in [_fitToTexture]
-  /// for `false && ...`) moves it, which is what says the backstop is a
-  /// backstop rather than dead code.
+  /// A test that asserts "an impossible ceiling produces no frame" is satisfied
+  /// by either of them and distinguishes neither. This counter does: it stays
+  /// at zero while the search is right, and moves when the search is broken
+  /// (swap the comparison in [_fitToTexture] for `false && ...`), which shows
+  /// the backstop is a backstop rather than dead code.
   int get ceilingOverruns => _ceilingOverruns;
   int _ceilingOverruns = 0;
 
@@ -403,16 +382,16 @@ class GlassProxyPipeline {
   ///
   /// One blur over the whole atlas rather than one per slot, and the bleed is
   /// what makes that correct: every pixel a surface samples has at least the
-  /// blur's own support of real content inside its own slot (D122), so no
-  /// slot's blur can reach its neighbour's.
+  /// blur's own support of real content inside its own slot, so no slot's blur
+  /// can reach its neighbour's.
   ///
   /// The sigma asked for is the **residual**, not the finish's own: recording
   /// at 1/k is itself a low-pass worth 0.30 logical px of sigma per texel and
-  /// the two compose in quadrature (D117), so blurring by the whole sigma
-  /// over-blurs. ⚠️ D118 measured that correcting it is not uniformly an
-  /// improvement — it wins up to 34% on smooth scenes and loses up to 7% on
-  /// text — and the package corrects anyway, on the argument that a finish
-  /// calibrated at 2.6 should render 2.6.
+  /// the two compose in quadrature, so blurring by the whole sigma over-blurs.
+  /// Correcting it is not uniformly an improvement — it wins up to 34% on
+  /// smooth scenes and loses up to 7% on text — and the package corrects
+  /// anyway, on the argument that a finish calibrated at 2.6 should render
+  /// 2.6.
   final ProxyBlurPass blurPass;
 
   /// Where the descent may stop. Computed by the caller, because it is a
@@ -524,8 +503,8 @@ class GlassProxyPipeline {
     }
     _current?.dispose();
     _current = frame;
-    // What the divisor cost comes out of the same allowance staleness draws on
-    // (D124), and it is only knowable here: the density arrives with the frame.
+    // What the divisor cost comes out of the same allowance staleness draws on,
+    // and it is only knowable here: the density arrives with the frame.
     oracle.noteResolutionDamage(frame.resolution.damage?.deltaE ?? 0);
     oracle.noteCapture(watched ?? surfaces);
     return (frame: frame, reason: reason);
@@ -642,7 +621,7 @@ class GlassProxyPipeline {
 
       final ui.Picture scene = _singlePictureOf(handle.layer!);
       final ui.Picture packed = update.layout.record(scene);
-      // The folded arm draws the packed atlas once more, inside a layer that
+      // The folded pass draws the packed atlas once more, inside a layer that
       // carries the filter. One extra `Picture` object and no extra
       // rasterization — `drawPicture` splices the ops in — against one whole
       // snapshot saved.
@@ -685,24 +664,17 @@ class GlassProxyPipeline {
     }
   }
 
-  /// Every rasterization the route asks the engine for, counted.
-  ///
-  /// The trace [ProxyBlurPass] would otherwise not have: `split` and `folded`
-  /// draw the same picture at the same divisor with the same sigma, so a run
-  /// that recorded only the label would be saying "we asked for the fold". Two
-  /// per published proxy on `split`, one on `folded` and on `none`.
   /// The divisor the quality walk asked for, deepened until the atlas it packs
   /// fits in a texture — or null when no divisor does.
   ///
   /// **Re-derived from the policy's own answer on every frame, holding no
-  /// state.** The alternative was remembering the deepened divisor so the
-  /// search could be skipped, and it buys a defect rather than time: a sheet
-  /// that opens and closes would leave the proxy permanently coarser than the
-  /// budget allows, because nothing would ever ask to go back. What that
-  /// costs instead is one [AtlasLayout.probeSize] per frame — a sort and a
-  /// single pass over at most twelve rectangles, against the 173…187 us the
-  /// merge costs when retention lets it run (D41) — and the search is exact
-  /// rather than hysteretic.
+  /// state.** Remembering the deepened divisor so the search could be skipped
+  /// buys a defect rather than time: a sheet that opens and closes would leave
+  /// the proxy permanently coarser than the budget allows, because nothing
+  /// would ever ask to go back. What this costs instead is one
+  /// [AtlasLayout.probeSize] per frame — a sort and a single pass over at most
+  /// twelve rectangles, far below what the merge costs when retention lets it
+  /// run — and the search is exact rather than hysteretic.
   ///
   /// The probe is unmerged and the real atlas is merged, which is the right
   /// direction: a merge is taken only when the packed area falls and never when
@@ -749,6 +721,10 @@ class GlassProxyPipeline {
   /// How many snapshots this pipeline has rasterized: one per recorded frame
   /// on [ProxyBlurPass.folded] and [ProxyBlurPass.none], two on
   /// [ProxyBlurPass.split] when a residual is left to blur.
+  ///
+  /// The observable trace of [blurPass]: `split` and `folded` draw the same
+  /// picture at the same divisor with the same sigma, so without this count a
+  /// run could not show which one actually ran.
   int get snapshots => _snapshots;
   int _snapshots = 0;
 
@@ -782,7 +758,7 @@ class GlassProxyPipeline {
   }
 
   /// Wraps the packed atlas in the layers that carry the residual blur, or
-  /// returns it unchanged when this arm blurs some other way or not at all.
+  /// returns it unchanged when [blurPass] blurs some other way or not at all.
   ///
   /// One layer per blur class, each clipped to its own slots. With one class
   /// that is the single layer over the whole atlas it always was.
@@ -836,14 +812,13 @@ class GlassProxyPipeline {
 
   /// The box around blur class [c]'s slots.
   ///
-  /// **What a class is blurred over, and the reason a second finish on a
-  /// screen is no longer a second atlas.** Each class used to blur the whole
-  /// atlas and keep its own slots — so a scroll edge (σ 1.6) over a screen of
-  /// cards (the host's 2.6) blurred every card twice: on the iPad 6.40 ms a
-  /// scrolling frame against 3.11 without the edge (D227). Its own slots are
-  /// all it is read in, and each slot carries its own context (`bleedFor`,
-  /// 2.5 σ), so what lies past them is a neighbour's bleed that no sample of
-  /// this class reaches.
+  /// **What a class is blurred over, and why a second finish on a screen does
+  /// not cost a second atlas.** Blurring the whole atlas per class would blur
+  /// every card twice under a scroll edge (σ 1.6) over a screen of cards (the
+  /// host's 2.6): 6.40 ms a scrolling frame on an M2 iPad Pro against 3.11
+  /// without the edge. A class is only read in its own slots, and each slot
+  /// carries its own context (`bleedFor`, 2.5 σ), so what lies past them is a
+  /// neighbour's bleed that no sample of this class reaches.
   static Rect _classBounds(AtlasLayout layout, _Blurs blurs, int c) {
     Rect? out;
     for (final AtlasSlot slot in layout.slots) {
@@ -866,14 +841,13 @@ class GlassProxyPipeline {
   }
 
   /// `TileMode.clamp` rather than the default `decal`: the border of the atlas
-  /// is the border of a slot, and a decal there darkens it — which is the one
-  /// place a surface at the screen's edge samples, and where half the corpus
-  /// puts its surfaces.
+  /// is the border of a slot, and a decal there darkens it — which is where a
+  /// surface at the screen's edge samples.
   static ui.ImageFilter _blurFilter(double sigmaTexels) =>
       ui.ImageFilter.blur(sigmaX: sigmaTexels, sigmaY: sigmaTexels, tileMode: TileMode.clamp);
 
-  /// The sigma the pass still owes for a finish of [sigma], or null when this
-  /// arm asks for none.
+  /// The sigma the pass still owes for a finish of [sigma], or null when
+  /// [blurPass] asks for none.
   ///
   /// Shared by both spellings so they cannot drift apart: a fold that blurred
   /// by a different sigma than the split would be a different material, and the
@@ -884,14 +858,13 @@ class GlassProxyPipeline {
     }
     final double? residual = resolution.residualSigmaFor(sigma, devicePixelRatio);
     // The divisor has already spent the whole sigma — past this point the proxy
-    // is blurrier than the material and no blur can undo it. Refusing to add
-    // more is the honest half; the other half used to be
-    // [ProxyResolution.maxDivisorFor] stopping the policy from getting here, and
-    // since D164 that is true only where the material has blur of its own. A
-    // blurless finish reaches this line whenever the host's budget allows a
-    // divisor, returns null, and shows the proxy's own softness — which is not a
-    // silent overshoot: the damage table's `clear` rungs were measured on this
-    // exact path, so the budget that allowed the divisor priced this.
+    // is blurrier than the material and no blur can undo it, so add none.
+    // [ProxyResolution.maxDivisorFor] keeps the policy from getting here only
+    // where the material has blur of its own. A blurless finish reaches this
+    // line whenever the host's budget allows a divisor, returns null, and shows
+    // the proxy's own softness — which is not a silent overshoot: the damage
+    // table's `clear` rows were measured on this exact path, so the budget that
+    // allowed the divisor priced this.
     return residual == null || residual <= 0 ? null : residual;
   }
 
@@ -985,10 +958,9 @@ class GlassProxyPipeline {
 ///
 /// A finish decides two things the pipeline does rather than the shader: how
 /// much the proxy is blurred, and — through its name — which damage table
-/// prices the divisor. Until this class the host's finish decided both for
-/// every surface, so `GlassSurface(finish: GlassFinish.clear)` under a
-/// `regular` host drew a backdrop blurred at σ 2.6 and a `frosted` one was
-/// `regular` with a different tint.
+/// prices the divisor. Each surface's own finish decides both for its slot;
+/// otherwise `GlassSurface(finish: GlassFinish.clear)` under a `regular` host
+/// would draw a backdrop blurred at σ 2.6.
 class _Blurs {
   _Blurs._(this.materials, this.sigmas, this.classes, this.maxSigma);
 
@@ -1033,8 +1005,8 @@ class _Blurs {
   /// Every distinct sigma; a class is an index into this.
   final List<double> sigmas;
 
-  /// Each surface's class, or null when there is one — which is the path every
-  /// screen took before, bit for bit.
+  /// Each surface's class, or null when there is one class — the single-blur
+  /// path.
   final List<int>? classes;
 
   final double maxSigma;
