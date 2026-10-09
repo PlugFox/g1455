@@ -5,7 +5,7 @@
 // ([GlassThemeData.richBackdrop]), the platform's appearance. A declaration is
 // one number for a whole screen, and a screen is not one level: a bar over a
 // photograph's sky and a button over its shadow are on different branches of
-// Apple's own material, which picks per glass, from what is under it (D230).
+// Apple's own material, which picks per glass, from what is under it.
 //
 // The host already holds that: the atlas is the pixels under every surface.
 // This file is the price of looking at them, and the machinery that keeps the
@@ -134,9 +134,9 @@ class GlassAdaptive {
   /// How far, in code values of luma ([GlassFinish.levelOf]), a reading must
   /// be from the one the verdict was taken from to move it. 12 by default.
   ///
-  /// **Taste, not a measurement**, and named so: D230 read Apple's switch
-  /// between greys four codes apart, fresh from launch, and did not read its
-  /// hysteresis. 12 is three of those steps — wider than the noise of a mean
+  /// **Taste, not a measurement**, and named so: Apple's material was seen to
+  /// switch between greys four codes apart, fresh from launch; its hysteresis
+  /// was not read. 12 is three of those steps — wider than the noise of a mean
   /// over a scrolling list of text, and narrow against the 200 codes between
   /// the two appearances' thresholds.
   final double band;

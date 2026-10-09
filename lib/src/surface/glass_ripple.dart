@@ -1,4 +1,4 @@
-// A viscous wave from where the glass was touched (D229). Not Apple's: iOS 26
+// A viscous wave from where the glass was touched. Not Apple's: iOS 26
 // answers a touch with light and a springy scale, and never deforms the
 // material. Opt-in, and off under the platform's reduce-motion switch.
 //
@@ -8,7 +8,7 @@
 // draw is already recorded at composite time (`glass_draw_layer.dart`), and a
 // frame of a wave only invalidates that picture. And it is a separate binary
 // (`glass_surface_ripple.frag`) rather than a mode of the surface's, because
-// B5 measured a path a program carries and does not take at 52-62% of the
+// a path a program carries and does not take was measured at 52-62% of the
 // modes that do not take it: the ripple program is drawn on exactly the frames
 // a wave is alive, and a still panel runs the program it always ran.
 //

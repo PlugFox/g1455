@@ -2,8 +2,8 @@
 //
 // Read off nothing — a feel, like the drop's springs. Apple's held drops in the
 // tab bar and the segmented control lean into a fast slide and bulge as they
-// stop; what is taken here is the shape of that and not its numbers, which no
-// spike has measured. So it is a spec with a zero, not a constant.
+// stop; what is taken here is the shape of that and not its numbers, which
+// have not been measured. So it is a spec with a zero, not a constant.
 //
 // The input is the drop's **acceleration** along its travel, the second
 // derivative of where it is, smoothed: a drop gliding at a constant speed is

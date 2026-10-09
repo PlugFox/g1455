@@ -1,17 +1,16 @@
 // Controls whose knob turns into a glass drop while it is held: a switch and a
 // slider.
 //
-// What the drop is was read off Apple's own controls rather than chosen
-// (spike 27). A held `NSSwitch` / `NSSlider` on macOS 27 is a **clear** drop —
+// What the drop is was read off Apple's own controls rather than chosen. A held `NSSwitch` / `NSSlider` on macOS 27 is a **clear** drop —
 // no tint, no blur — that bends the backdrop in a band at its rim and leaves the
 // middle exactly where it was: the grid lines through the centre of the drop
 // sat on the undisplaced grid to the half pixel, so there is no magnification
 // and nothing here needs an optics axis the finish does not have. It is
 // 1.4–1.6x the resting knob. At rest the knob is an opaque white capsule and
-// not glass at all. On iOS, pressed by a finger (D217), both drops are 1.57x;
+// not glass at all. On iOS, pressed by a finger, both drops are 1.57x;
 // the slider's does not magnify either, but the **switch's minifies** — ×0.85
 // across and ×0.79 down, which is one margin of 5 pt drawn into the drop
-// rather than one zoom (D218), and is `GlassOptics.widen` on its finish.
+// rather than one zoom, and is `GlassOptics.widen` on its finish.
 //
 // Three mechanisms carry it, each built and tested on its own:
 //
@@ -64,8 +63,8 @@ import 'glass_travel.dart';
 /// How much larger a held drop is than the resting knob, by default.
 ///
 /// iOS 26: 1.57x for both the switch and the slider, read off the device's own
-/// screenshots under a finger (D217). macOS 27 differs per control — 1.4x the
-/// slider, 1.6x the switch (D210) — which is why the controls take it as
+/// screenshots under a finger. macOS 27 differs per control — 1.4x the
+/// slider, 1.6x the switch — which is why the controls take it as
 /// `dropScale`.
 ///
 /// {@category Panels and controls}
@@ -73,7 +72,7 @@ const double kGlassDropScale = 1.57;
 
 /// How far past its own box the held switch's drop shows, logical px — the
 /// iOS switch's drop minifies what is under it (×0.85 across, ×0.79 down on a
-/// 58 × 38 pt drop), which is this one margin rather than one zoom (D218). The
+/// 58 × 38 pt drop), which is this one margin rather than one zoom. The
 /// slider's drop, read the same way, does not minify, and its default is 0.
 /// See [GlassOptics.widen].
 ///
@@ -82,7 +81,7 @@ const double kGlassSwitchDropWiden = 5;
 
 /// The optics of a held drop, which are not the material's.
 ///
-/// Read off iOS's slider drop under a finger (D217's frames, D218): the grid
+/// Read off iOS's slider drop under a finger: the grid
 /// moves 2.1–2.5 device px — 1.15 pt — at 2.7–3 pt in from the rim and not
 /// at all from 10 pt in. The material's optics move it ~28 pt at 3 pt in,
 /// which on a drop 38 pt tall is the whole drop folded: a tab bar's label
@@ -109,9 +108,8 @@ const Duration kGlassDropDuration = Duration(milliseconds: 180);
 /// How opaque a disabled switch or slider is, drawn as one group.
 ///
 /// iOS 26 draws a disabled `UISwitch` and `UISlider` whole at alpha 0.502 —
-/// knob, track and fill alike, in both appearances, their colours unchanged
-/// (D221). One group, not each part at a half: the knob reads pure white at
-/// that alpha, so the track under it does not show through. macOS does
+/// knob, track and fill alike, in both appearances, their colours unchanged.
+/// One group, not each part at a half: the knob reads pure white at that alpha, so the track under it does not show through. macOS does
 /// something else per part (the switch's accent ×0.69, the slider's fill
 /// gone); these controls are iOS's, as their sizes are.
 ///
@@ -183,7 +181,7 @@ class _Drop extends StatelessWidget {
             borderRadius: kGlassCapsule,
             finish: GlassFinish.clear.copyWith(optics: kGlassDropOptics.copyWith(widen: widen)),
             // Arrives by its optics, not its shape: `presence` would erode
-            // the capsule to its medial axis, a bright stripe (spike 30).
+            // the capsule to its medial axis, a bright stripe.
             materialize: lift,
             labelled: false,
             // The white knob is the surface's content, so it is drawn over the
@@ -236,8 +234,8 @@ class _KnobRing extends CustomPainter {
 
 /// Overrides whether the switch and the slider claim the pointer on touch-down
 /// — true always, false never — instead of asking whether the nearest
-/// scrollable is horizontal. A `@visibleForTesting` seam: the gesture test's
-/// negative controls are the two answers the scrollable did not give.
+/// scrollable is horizontal. A `@visibleForTesting` seam: the gesture test
+/// forces the two answers the scrollable did not give.
 @visibleForTesting
 bool? debugGlassControlsClaimOverride;
 
@@ -542,7 +540,7 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
       // Disabled mid-drag: the drag's end will never arrive. A finger held
       // still needs none of this — the disposed tap recognizer calls the
       // `onTapCancel` it was built with — but a drag has already won its arena
-      // and is dropped without a word (D221).
+      // and is dropped without a word.
       _dragging = false;
       _lift.value = 0;
       _position.animateTo(widget.value ? 1 : 0, curve: Curves.easeOutCubic);
@@ -794,7 +792,7 @@ class GlassSlider extends StatefulWidget {
   final double dropScale;
 
   /// See [GlassSwitch.dropWiden]. 0, because iOS's slider drop does not
-  /// minify (D218).
+  /// minify.
   final double dropWiden;
 
   /// See [GlassSwitch.dropMotion].
@@ -1116,7 +1114,7 @@ class _SliderTrack extends CustomPainter {
     canvas.drawRRect(whole, Paint()..color = track);
     // The fill is a capsule of its own, not the track clipped: a clip cuts
     // its end square, and the lifted drop is clear and magnifies exactly that
-    // end (Apple's held slider rounds it, spike 27 `held/`). Shorter than the
+    // end (Apple's held slider rounds it). Shorter than the
     // track is thick, it cannot be a capsule ending at `end`, so it is the
     // track's own cap cut there, which the resting knob covers anyway.
     final double end = SliderGeometry.fillEnd(value, size.width);

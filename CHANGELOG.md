@@ -54,7 +54,7 @@ Components:
 - Their sizes (`kGlassStepperSize`, `kGlassPageDot`, `kGlassPageDotGap`,
   `kGlassPageControlHeight`, `kGlassBadgeHeight`, `kGlassBadgeDot`) are
   layout, not Apple measurements: none of the four was among the controls
-  the spikes read. The stepper, the page control and the search bar are laid
+  measured. The stepper, the page control and the search bar are laid
   out at least `kGlassMinTapTarget` tall.
 
 iOS 26 behaviours:
@@ -269,7 +269,7 @@ The package page and the README:
   tiles by `tool/showcase.sh screen`. How it works is four cards. The quick
   start is a whole app that runs as pasted. New sections give the values of
   every `GlassFinish` preset, five common patterns, and what is not here and
-  why: no dispersion, because Apple's material has none to measure (D103),
+  why: no dispersion, because Apple's material has none to measure,
   and one shape, `RSuperellipse`. A test keeps the README's code identical to
   files that are analyzed and pumped, and its finish table equal to the
   constants. Every image is linked relatively.
@@ -331,16 +331,16 @@ Documented:
 ## 0.1.0
 
 First release on pub.dev, as `g1455`. The package was `glass` while it lived
-beside the research application that measures it: the library is now
+beside the benchmark application that measures it: the library is now
 `package:g1455/g1455.dart`, the shader asset keys are
 `packages/g1455/shaders/...`, and `glass_diagnostics.dart` keeps its name.
 Everything since the first cut:
 
 **Breaking:** `GlassFinish.regular` is now `GlassFinish.regularDark`, and its
-damage-table key is `'regularDark'` (D230). It was always the dark branch of
-Apple's `.regular`, because S4's iPad was in dark mode. The light branch is the
-new `GlassFinish.regularLight`: transmission 0.282, tint 252 at 0.718, and its
-own rows in the resolution and staleness tables.
+damage-table key is `'regularDark'`. It was always the dark branch of Apple's
+`.regular`, because the iPad it was measured on was in dark mode. The light
+branch is the new `GlassFinish.regularLight`: transmission 0.282, tint 252 at
+0.718, and its own rows in the resolution and staleness tables.
 `GlassFinish.regular(appearance:, backdrop:)` picks the branch Apple's
 material would. It switches at a backdrop level of 54 in light mode and 222 in
 dark mode. `GlassHost.finish` is now optional. Null means that choice,
@@ -351,7 +351,7 @@ hold its capture one frame (0.284 ΔE against 0.348).
 Drops and lone panels no longer appear through `presence`, which eroded a
 capsule to a bright line about 2 pt tall for ~50 ms on the way out. The
 tab bar's, switch's, slider's and segmented control's drops, and the alert and
-the menu, now come and go through `materialize`, as Apple's do (D216, D230).
+the menu, now come and go through `materialize`, as Apple's do.
 
 `showGlassDialog` and `showGlassSheet` carry the caller's `InheritedTheme`s
 to the navigator's overlay, as `showDialog` does. Their content used to
@@ -365,7 +365,7 @@ panel around any content, open until a tap outside it. Opening a menu over an
 anchor with a semantics node of its own no longer trips the framework's
 `!semantics.parentDataDirty` on close.
 
-New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
+New components, read off Apple's own on iOS 26.5 simulators:
 
 - `GlassScrollEdge`: the scroll edge effect under a bar, soft or hard, top or
   bottom. It carries the bar and lifts it. The soft top is a blur of σ 1.6
@@ -381,7 +381,7 @@ New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
 - `GlassTextField` and `GlassTextField.search`: a glass capsule holding an
   `EditableText`. The caret and typing take no capture.
 - `showGlassDialog` with `GlassAlert`, `showGlassSheet` and `GlassMenuAnchor`.
-  The menu is placed as Apple places a button's menu (D228): over the anchor,
+  The menu is placed as Apple places a button's menu: over the anchor,
   corner on corner, with the anchor hidden. It is 250 wide with rows of 42 and
   a 31.5 corner. When it opens upward, its items are reversed.
   These need the `GlassHost` above the navigator (`MaterialApp.builder`), and
@@ -389,7 +389,7 @@ New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
 - `GlassSurface.fade` (`GlassFade`): the glass fades across itself. It is a
   smoothstep, and an exact `1.0` when unused.
 
-- `GlassRipple` (D229), optional and not Apple's: a viscous wave from where the
+- `GlassRipple`, optional and not Apple's: a viscous wave from where the
   glass was touched. A dimple sinks under the finger, a front travels out, and
   the dimple springs back on release. `viscosity` goes from water to honey. Set
   it on `GlassHost.ripple`, `GlassThemeData.ripple` or `GlassSurface.ripple`. It
@@ -400,26 +400,26 @@ New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
 Fixed:
 
 - The slider's fill ended in a square cut that the clear drop magnified. It is
-  now a capsule, as Apple's is (D222).
+  now a capsule, as Apple's is.
 - A screen whose only glass was a resting drop (switches, segments) never
   stopped drawing. `publishUpper` notified listeners on every frame even when
-  nothing had changed (D224).
+  nothing had changed.
 - Under glass on glass, a still screen recorded on every frame when the lower
   glass held content that was not behind a `RepaintBoundary`, such as a plain
   `Text`. The publish repainted the content, and the new pictures read as a
-  change. A surface now re-adds its content layer when only the proxy changed
-  (D224).
+  change. A surface now re-adds its content layer when only the proxy
+  changed.
 - With two finishes on one screen, each blur class blurred the whole atlas.
   It now blurs only the box around its own slots. On the iPad this was 0.8 ms
-  of a scrolling frame with a scroll edge over cards (D227).
+  of a scrolling frame with a scroll edge over cards.
 
 ## 0.1.0-dev.1
 
 Not published.
 
-First cut of the package, moved out of the research application that measured
-it. Behaviour is unchanged from that application's `lib/`, with one exception:
-a debug assertion. The changes:
+First cut of the package, moved out of the benchmark application that
+measured it. Behaviour is unchanged from that application's `lib/`, with one
+exception: a debug assertion. The changes:
 
 - Shaders moved under `lib/shaders/` and are declared through `packages/glass/`.
   The asset key is now `packages/glass/shaders/...` whether the package is the
@@ -437,7 +437,7 @@ a debug assertion. The changes:
   everything that repainted is glass content. Example: a label inside a
   `GlassBar` changing, when the bar's height follows the label. That case is
   not a hole, because glass content is not part of the proxy. The check now
-  reads a second walk that excludes only the glass draws (D219).
+  reads a second walk that excludes only the glass draws.
 - The same check no longer fires when the host's boundary was repainted but
   drew nothing of its own. `RenderObject.layout` marks paint unconditionally,
   so an application's `setState` that re-runs a `Scaffold`'s layout at the same
@@ -459,4 +459,4 @@ a debug assertion. The changes:
   disabled `GlassButton` keeps its glass, and its label becomes
   `kGlassDisabledDarkLabel` or `kGlassDisabledLightLabel` (iOS's
   `tertiaryLabel`), chosen by the polarity of the label it would have drawn
-  enabled (D221). A control disabled mid-press or mid-drag lets go.
+  enabled. A control disabled mid-press or mid-drag lets go.

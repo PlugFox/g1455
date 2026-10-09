@@ -20,7 +20,7 @@
 //
 // Both ends are exact, which is why the bud and not the body is the shape that
 // comes and goes. At the start the bud is at presence zero, which changes no
-// pixel of a fold (D209). After that it is never less than `k` inside its own
+// pixel of a fold. After that it is never less than `k` inside its own
 // outline (`GlassSurface.presence` is a field offset, so that is a presence),
 // and a shape `k` inside another changes no pixel either — so where it shares
 // the held corner's edges with the body it never swells them, and at the end,
@@ -44,7 +44,7 @@ import 'glass_travel.dart';
 /// The spacing a morph's union is folded at, in logical pixels — the default
 /// of [GlassMorph.spacing].
 ///
-/// Sixteen, the spacing the presence arms were measured at (D209), which is a
+/// Sixteen, the spacing `presence` was measured at, which is a
 /// blend radius of 32: a neck of a few dozen pixels between a 44-pt button and
 /// the panel it opens, thick enough to read as liquid and short of the swell a
 /// wider fold puts on every edge (`k / 4` where two edges coincide).
@@ -211,8 +211,8 @@ class GlassMorphMotion {
 /// body changes size on every frame of the spring, so the capture's input
 /// changes on every frame — the same price as animating
 /// [GlassSurface.materialize], and the reason the motion is short. The fused
-/// draw adds about 0.030 cycles per device pixel per shape over the pixels it
-/// covers (D169, see [GlassGroup]) — two shapes, while the morph lasts, plus
+/// draw adds about 0.030 GPU cycles per device pixel per shape over the pixels
+/// it covers on Adreno 830 (see [GlassGroup]) — two shapes, while the morph lasts, plus
 /// the capture's own reach for the bridge (`k` times the fold's depression,
 /// a quarter of `k` for two shapes).
 ///
@@ -237,7 +237,7 @@ class GlassMorphMotion {
 /// neighbours in an enclosing [GlassGroup] while it moves; at rest it is a
 /// member of that group like any surface. Content under an [Opacity] mid-fade
 /// is composited through a layer, which glass inside the content does not
-/// survive (D185) — the content is meant to be labels and icons. Hit testing
+/// survive — the content is meant to be labels and icons. Hit testing
 /// follows the body: mid-morph only the new child is hit, and only where the
 /// body has reached.
 ///

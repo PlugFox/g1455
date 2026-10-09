@@ -1,8 +1,8 @@
 // A tab bar whose selection lifts into a glass drop while a finger is on it —
-// a drop over another glass, which is what level capture is for (D214).
+// a drop over another glass, which is what level capture is for.
 //
 // What it does was read off Apple's own `UITabBar` on iOS 26.5, pressed by
-// XCUITest on an iPhone 17 Pro and an iPad Pro simulator (spike 30, D218):
+// XCUITest on an iPhone 17 Pro and an iPad Pro simulator:
 //
 //  - at rest the selected item sits on a grey capsule, its icon and label in
 //    the accent colour; nothing about it is glass;
@@ -16,8 +16,8 @@
 //    colour while the one it left gives it up; let go, it settles on the item
 //    and that is the selection.
 //
-// Not taken: Apple's drop disperses at its rim and ours does not (D103 found
-// none in the material; the drop is another material), and the bar's items
+// Not taken: Apple's drop disperses at its rim and ours does not (Apple's
+// material showed none; the drop is another material), and the bar's items
 // grow with it by ~1.05 where ours stay put.
 //
 // What it costs, by construction rather than by hope:
@@ -25,7 +25,7 @@
 //  - at rest: the bar, one surface; the drop is at materialize 0 and captured
 //    for nothing;
 //  - held: the drop is glass on glass, so the frames that record take a second
-//    snapshot (D214) — while it lifts and the bar grows, every frame; while it
+//    snapshot — while it lifts and the bar grows, every frame; while it
 //    moves, **only the frames where the highlighted item changes**, because the
 //    highlight is an item, not a blend, and the drop moves inside its own
 //    `GlassTravel` behind its own boundary;
@@ -192,7 +192,7 @@ class GlassTabItem {
   final GlassTabItemBuilder? labelBuilder;
 }
 
-/// How much the held drop magnifies the bar under it (D218).
+/// How much the held drop magnifies the bar under it.
 ///
 /// Read off iOS 26.5's own tab bar on a phone and an iPad, both at 1.17x once
 /// the bar's own growth under the drop is taken out. [GlassTabBar.dropZoom]'s
@@ -202,7 +202,7 @@ class GlassTabItem {
 const double kGlassTabDropZoom = 1.17;
 
 /// How much larger than the resting capsule the held drop is, on every side,
-/// logical px (D218).
+/// logical px.
 ///
 /// Read off iOS 26.5: 73 x 53 -> 94 x 72 on the phone, 85 x 36 -> 110 x 56.5
 /// on the iPad, so the held drop stands out of the bar above and below.
@@ -210,7 +210,7 @@ const double kGlassTabDropZoom = 1.17;
 /// {@category Panels and controls}
 const double kGlassTabDropGrow = 10.5;
 
-/// How much the bar grows while held, logical px per side (D218).
+/// How much the bar grows while held, logical px per side, read off iOS 26.5.
 const Size _kBarGrow = Size(8.5, 2.5);
 
 /// When a [GlassTabBar] collapses to its selected tab — iOS 26's
@@ -245,8 +245,8 @@ const double kGlassTabAccessoryHeight = 48;
 const double _kAccessoryGap = 8;
 
 /// Whether the bar's and the accessory's collapse moves inside a declared
-/// travel region. The default and the measured arm; a test turns it off to see
-/// what it saves.
+/// travel region. The default, and what was measured; a test turns it off to
+/// see what it saves.
 @visibleForTesting
 bool debugGlassTabMinimizeTravel = true;
 
@@ -369,7 +369,7 @@ const double _kInlinePitch = 80;
 class _TabGeometry {
   factory _TabGeometry(double width, int count) {
     final bool inline = (width - 16) / count >= _kInlinePitch;
-    // Read off the simulators (D218): the phone's bar is 60 tall with items
+    // Read off the simulators: the phone's bar is 60 tall with items
     // 66 apart and 7 in from its ends, the capsule 3.5 in from the bar all
     // round; the iPad's is 44 tall, 8 in, the capsule 3 narrower than the
     // pitch. Layout taste where a device had nothing to say.
@@ -1115,7 +1115,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   /// No boundary of its own, unlike the switch's: moving the drop repaints the
   /// bar, whose draw the watch excludes and whose content sits behind its own
   /// boundaries, so nothing the watch reads changes either way — a boundary
-  /// here was tried and broke no arm when removed (D218).
+  /// here was tried and broke no test when removed.
   Widget _dropStage(_TabGeometry g, Size margin) => GlassTravel(
     child: AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[_lift, _at, _stretch]),

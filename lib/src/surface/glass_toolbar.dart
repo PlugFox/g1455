@@ -1,6 +1,6 @@
 // A toolbar's group of buttons: several actions in one glass capsule.
 //
-// Read off Apple's own `UIToolbar` on iOS 26.5, iPhone 17 Pro (spike 33):
+// Read off Apple's own `UIToolbar` on iOS 26.5, iPhone 17 Pro:
 // a toolbar of four items, the first alone and three after a flexible space,
 // comes out as **two** glass shapes — a 48 pt circle for the one and a
 // 159 x 48 pt capsule for the three. Apple groups adjacent items into one
@@ -8,12 +8,12 @@
 //
 // That is also the cheap way to build it here, and it is why this is a widget
 // and not advice: a surface is charged per draw, and the fragmentation excess
-// grows as the square of the surface count (D26) — three buttons as three
+// grows as the square of the surface count — three buttons as three
 // [GlassButton]s are three surfaces where Apple draws one. So a group is one
 // [GlassSurface], and pressing an item brightens that item's part of it the
 // way [GlassButton] brightens its whole: the finish's rim, added, over the
-// item's cell clipped to the capsule (D185's rule about `plus` holds — nothing
-// between the overlay and the glass opens a `saveLayer`).
+// item's cell clipped to the capsule (with `plus`; nothing between the
+// overlay and the glass opens a `saveLayer`).
 //
 // Each item takes the keyboard's focus and Space or Enter presses it; its
 // focus ring is drawn inside its cell, concentric with the capsule, on the
@@ -30,13 +30,13 @@ import 'glass_focus.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
-/// The group's height, and the circle a group of one is (spike 33).
+/// The group's height, and the circle a group of one is, as iOS 26.5 draws it.
 ///
 /// {@category Panels and controls}
 const double kGlassToolbarHeight = 48;
 
-/// Each item's width in a group of more than one: 159 pt for three
-/// (spike 33).
+/// Each item's width in a group of more than one: 159 pt for three on
+/// iOS 26.5.
 ///
 /// A group of n items is n times this wide; a group of one is a circle of
 /// [kGlassToolbarHeight] instead.
@@ -91,7 +91,7 @@ class GlassToolbarItem {
 /// ```
 ///
 /// > **Note:** three [GlassButton]s are three surfaces, and the fragmentation
-/// > excess grows as the square of the count (D26). Three items here are one.
+/// > excess grows as the square of the count. Three items here are one.
 ///
 /// See also:
 ///

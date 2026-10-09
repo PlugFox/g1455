@@ -8,8 +8,8 @@
 // moves is not painted, its layer is re-offset (`PaintingContext._compositeChild`).
 // So a glass that moved drew the backdrop of the place it had left, for one
 // frame until the next publish repainted it — and for ever, once a declared
-// travel region stopped the publish from happening (the arm in
-// `glass_travel_test.dart` measured 4538 px of it at 37 px of motion).
+// travel region stopped the publish from happening (`glass_travel_test.dart`
+// measured 4538 px of it at 37 px of motion).
 //
 // The framework's own answer to "this layer depends on where it ends up" is a
 // layer that reads it at composite time — `FollowerLayer`. This is the same
@@ -134,7 +134,7 @@ class GlassDrawLayer extends Layer {
   /// How many times the picture was recorded, and how many of those were
   /// forced by the owner moving rather than by a paint.
   ///
-  /// The trace the mechanism would otherwise not have: an arm that only checks
+  /// The trace the mechanism would otherwise not have: a test that only checks
   /// the pixels passes as well on a surface that happened to be repainted by
   /// something else on the frame it moved.
   int records = 0;

@@ -14,7 +14,7 @@
 // the page following the dot under the finger (iOS 14's interaction).
 //
 // **Not measured:** the sizes. iOS 26's page control was not among the
-// controls spikes 27-33 read. The dot, the gap and the current dot's width
+// controls read off the device. The dot, the gap and the current dot's width
 // are layout, named as such.
 
 import 'dart:math' as math;

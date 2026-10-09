@@ -1,8 +1,7 @@
 // The modal layer: an alert, a sheet, a menu.
 //
-// What was read off Apple's own (spike 33, iOS 26.5, iPhone 17 Pro, each put
-// up programmatically over spike 27's grid and photographed against the bare
-// grid):
+// What was read off Apple's own (iOS 26.5, iPhone 17 Pro, each put up
+// programmatically over a grid and photographed against the bare grid):
 //
 //  - **the dim** behind an alert and behind a sheet is the same: black at
 //    0.20 (0.201–0.203 over three channels, solved from the grid's two
@@ -23,8 +22,8 @@
 //
 // Not read, and named where it is used: the alert's action fill, the menu's
 // size and radius, and every animation. The glass of all three is the theme's
-// finish — what Apple's material is was measured once (S4), and a modal is
-// the same material.
+// finish — Apple's material was measured once, and a modal is the same
+// material.
 //
 // **Where these must be built.** A glass surface is captured by the
 // `GlassHost` above it, and an overlay is wherever its `Overlay` is — for
@@ -52,7 +51,7 @@ import 'glass_theme.dart';
 import 'glass_tier.dart';
 import 'glass_travel.dart';
 
-/// The dim behind an alert and a sheet (spike 33): black at 0.20, read off
+/// The dim behind an alert and a sheet: black at 0.20, read off
 /// iOS 26.5 over a grid of two known levels.
 ///
 /// A menu and a popover put up no dim; their barrier is transparent.
@@ -60,7 +59,7 @@ import 'glass_travel.dart';
 /// {@category Modals}
 const Color kGlassModalDim = Color.fromRGBO(0, 0, 0, 0.20);
 
-/// The alert's width, logical px (spike 33).
+/// The alert's width, logical px, as iOS 26.5 draws it.
 ///
 /// On a window narrower than this plus 16 px a side, [GlassAlert] takes the
 /// window's width less those margins instead.
@@ -68,19 +67,19 @@ const Color kGlassModalDim = Color.fromRGBO(0, 0, 0, 0.20);
 /// {@category Modals}
 const double kGlassAlertWidth = 320;
 
-/// The alert's corner radius, logical px (spike 33: `layer.cornerRadius`, a
+/// The alert's corner radius, logical px (iOS 26.5's `layer.cornerRadius`, a
 /// continuous corner).
 ///
 /// {@category Modals}
 const double kGlassAlertRadius = 34;
 
 /// How far the sheet stands in from the window's sides and bottom, and below
-/// the top safe area, logical px (spike 33, the medium detent).
+/// the top safe area, logical px (iOS 26.5, the medium detent).
 ///
 /// {@category Modals}
 const double kGlassSheetInset = 8;
 
-/// The sheet's corner radius, logical px (spike 33: the engine's
+/// The sheet's corner radius, logical px (iOS 26.5; the engine's
 /// `RSuperellipse` of 36, fitted at 0.54 device px rms).
 ///
 /// {@category Modals}
@@ -121,7 +120,7 @@ CapturedThemes _capture(BuildContext context, NavigatorState navigator) =>
     InheritedTheme.capture(from: context, to: navigator.context);
 
 /// Wraps a modal's glass: lifted, and materializing with [progress] —
-/// Apple's `.materialize` (D216), blur first and tint last, the content fading
+/// Apple's `.materialize`, blur first and tint last, the content fading
 /// in on top.
 class _Materializing extends StatelessWidget {
   const _Materializing({required this.progress, required this.builder});
@@ -308,7 +307,7 @@ class GlassAlert extends StatelessWidget {
           borderRadius: const BorderRadius.all(Radius.circular(kGlassAlertRadius)),
           finish: finish,
           // Materialized, not grown: Apple's frame is whole from the first
-          // frame (D216), and `presence` erodes a lone panel to its medial
+          // frame, and `presence` erodes a lone panel to its medial
           // axis — a bright horizontal line for the first frames.
           materialize: t,
           child: Opacity(
@@ -433,7 +432,7 @@ class _AlertButtonState extends State<_AlertButton> {
 enum GlassSheetDetent {
   /// The sheet at its content's height, never taller than the window less its
   /// margins, floating [kGlassSheetInset] in from the window's sides and
-  /// bottom (spike 33). What every sheet was before there were detents.
+  /// bottom. What every sheet was before there were detents.
   ///
   /// Apple's medium detent is half the window whatever the content; this one
   /// is the content's height, so a content half the window tall is Apple's.
@@ -446,7 +445,7 @@ enum GlassSheetDetent {
   /// taken all the way, and which stops the sheet reading its backdrop at all.
   ///
   /// The top gap and keeping the corner radius at the bottom are layout taste:
-  /// spike 33 read the medium detent only.
+  /// only the medium detent was read off iOS.
   large,
 }
 
@@ -459,7 +458,7 @@ const Duration _kSheetSettle = Duration(milliseconds: 300);
 const double _kSheetFlick = 700;
 
 /// Whether a sheet declares the area it can move in while it moves. The
-/// default and the measured arm; a test turns it off to see what it saves.
+/// default, and what was measured; a test turns it off to see what it saves.
 @visibleForTesting
 bool debugGlassSheetTravel = true;
 
@@ -1026,19 +1025,19 @@ class GlassMenuController {
   void close() => _state?._hide();
 }
 
-/// A menu's width, logical px (spike 34: iOS 26.5's `UIMenu` from a button,
+/// A menu's width, logical px (iOS 26.5's `UIMenu` from a button,
 /// 250 wide). The default of [GlassMenuAnchor.width].
 ///
 /// {@category Modals}
 const double kGlassMenuWidth = 250;
 
-/// The height of one [GlassMenuItem], logical px (spike 34: rows of 42, with
+/// The height of one [GlassMenuItem], logical px (iOS 26.5: rows of 42, with
 /// 10 above the first and below the last).
 ///
 /// {@category Modals}
 const double kGlassMenuRowHeight = 42;
 
-/// A menu's corner radius, logical px (spike 34: the engine's `RSuperellipse`
+/// A menu's corner radius, logical px (iOS 26.5; the engine's `RSuperellipse`
 /// of 31.5, fitted at 0.23 pt rms). The default of
 /// [GlassPopoverAnchor.radius].
 ///
@@ -1051,7 +1050,7 @@ const double _kMenuPad = 10;
 ///
 /// {@macro g1455.modal.host}
 ///
-/// Placed as Apple places a button's menu (spike 34): **over** the anchor, not
+/// Placed as Apple places a button's menu: **over** the anchor, not
 /// beside it — its corner on the anchor's matching corner, the anchor hidden
 /// while it is open — opening downward from the anchor's top when there is
 /// room and upward from its bottom when not, and then with **its items in
@@ -1063,7 +1062,7 @@ const double _kMenuPad = 10;
 /// reference's screenshots were apart. This one grows out of the anchor —
 /// from the anchor's size and capsule to its own, about the corner it shares
 /// with the anchor, so the button reads as turning into the menu — while it
-/// materializes (D216); never through `presence`, which erodes a lone panel to
+/// materializes; never through `presence`, which erodes a lone panel to
 /// a line.
 ///
 /// A tap on a row runs its [GlassMenuItem.onPressed] and closes the menu; a
@@ -1270,7 +1269,7 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
     overlayChildBuilder: _overlay,
     // Hidden while the panel stands over it, as Apple's button is: the panel
     // is what it turned into. `Visibility`, not `Opacity` — an anchor that is
-    // a glass button must not go under a `saveLayer` (D185). Its semantics
+    // a glass button must not go under a `saveLayer`. Its semantics
     // are dropped by `ExcludeSemantics` rather than by `Visibility`: in 3.47.1
     // `_RenderVisibility.visible=` marks paint and not semantics, though what
     // it visits for semantics depends on it, and closing over an anchor with

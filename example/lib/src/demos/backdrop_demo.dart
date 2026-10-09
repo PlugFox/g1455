@@ -228,7 +228,7 @@ class _BackdropDemoState extends State<BackdropDemo> with SingleTickerProviderSt
   );
 }
 
-/// A [GlassProxyPainter] as a [CustomPainter], so the captured arm paints the
+/// A [GlassProxyPainter] as a [CustomPainter], so the captured side paints the
 /// very pixels the declared one declares.
 class _Adapter extends CustomPainter {
   const _Adapter(this.painter);

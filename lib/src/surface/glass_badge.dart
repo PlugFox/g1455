@@ -17,7 +17,7 @@ import 'package:flutter/widgets.dart';
 
 /// iOS's `systemRed` in the light appearance, (255, 59, 48): the badge's
 /// fill by default. The dark appearance's is (255, 69, 58); the package has
-/// no appearance (D179), so pass that one where yours is dark.
+/// no appearance of its own, so pass that one where yours is dark.
 ///
 /// {@category Panels and controls}
 const Color kGlassBadgeRed = Color(0xFFFF3B30);

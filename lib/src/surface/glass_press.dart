@@ -1,9 +1,9 @@
 // A glass control that swells under the finger, leans toward it while the
 // finger drags, and springs back when it lets go.
 //
-// **Read off nothing.** iOS 26's interactive glass does this and no spike here
-// has measured it: S4 photographed the material at rest, and the held frames
-// D217 took are the switch's and the slider's drops, not a button's. Another
+// **Read off nothing.** iOS 26's interactive glass does this and it has not
+// been measured: Apple's material was photographed at rest, and the held
+// frames read are the switch's and the slider's drops, not a button's. Another
 // package grows the longest side by a fixed ~17 logical px (1.3x a 56 circle,
 // 1.13x a 132 pill), which is a hypothesis about the *shape* of the law — a
 // fixed growth, not a fixed ratio — and that shape is what is taken here. The
@@ -18,7 +18,7 @@
 //  - **two captures a press, and none while it moves.** The glass grows
 //    inside a travel region declared around it, whose capture is the region
 //    and not the glass's box, so the capture input does not move while the
-//    glass does (D208's mechanism). The region is the resting box grown by
+//    glass does (`GlassTravel`'s mechanism). The region is the resting box grown by
 //    [GlassPress.margin] — the most the spec can reach — so nothing it draws
 //    leaves it. It is declared **from touch-down until the spring settles**,
 //    and its coming and going are a capture each;
@@ -40,9 +40,9 @@
 //    of the swell is drawn from the old slot: the spring's first tick is at
 //    rest, so the frame that declares the region draws the glass at its box
 //    and the capture taken after it is in place before the glass grows —
-//    checked pixel for pixel against the always-declared arm, frame by frame;
+//    checked pixel for pixel against the always-declared region, frame by frame;
 //  - the rim reads a little past the box's bleed, so a larger slot changes it
-//    by a few code values on a few pixels: the always-declared arm drew a
+//    by a few code values on a few pixels: the always-declared region drew a
 //    resting button differently from one with no press (22 channels over 2 at
 //    dpr 2). On demand it does not;
 //  - a ticker while the spring moves, none at rest or while a finger holds
@@ -248,14 +248,13 @@ class GlassPress {
 
 /// Builds a pressed control's glass inside a travel region of its own; with
 /// it off, nothing but the glass. A `@visibleForTesting` seam: the press
-/// test's negative control turns the region off and watches the capture count
-/// move.
+/// test turns the region off and watches the capture count move.
 @visibleForTesting
 bool debugGlassPressTravel = true;
 
 /// Declares a pressed control's region while it is at rest too, rather than
 /// only from touch-down until its spring settles. A `@visibleForTesting` seam:
-/// the arm the on-demand default was measured against.
+/// the variant the on-demand default was measured against.
 @visibleForTesting
 bool debugGlassPressRegionAtRest = false;
 
@@ -484,7 +483,7 @@ class RenderGlassPressBody extends RenderProxyBox {
 
   /// How many times this box was laid out for the press alone — the trace of
   /// the boundary, without which a press that relaid out the whole screen
-  /// would pass every pixel arm.
+  /// would pass every pixel check.
   @visibleForTesting
   int pressLayouts = 0;
 
