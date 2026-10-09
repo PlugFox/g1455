@@ -1521,25 +1521,28 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
     releaseGlassShader(shader);
   }
 
-  /// The ripple program's tail, from index 34: the count, `uWave[4]`,
-  /// `uWaveAmp[4]`, the reach and the light. Every slot is written, the unused
-  /// ones as zeros, because a short write leaves whatever was there.
+  /// The ripple program's tail, from index 34: `uWave[4]`, `uWaveAmp[4]`, then
+  /// the count, the reach and the light in one `vec3` after the arrays (an
+  /// array cannot share a lane). Every slot is written, the unused ones as
+  /// zeros, because a short write leaves whatever was there.
   void _writeWaves(ui.FragmentShader shader, List<GlassRippleWave> waves) {
+    const int amps = 34 + kMaxRippleWaves * 4;
+    const int tail = 34 + kMaxRippleWaves * 8;
     final GlassRipple ripple = _rippleField!.ripple;
-    shader.setFloat(34, waves.length.toDouble());
     for (var i = 0; i < kMaxRippleWaves; i++) {
       final List<double> w = i < waves.length ? waves[i].uniforms() : const <double>[0, 0, 0, 1, 0, 0, 0, 0];
       for (var j = 0; j < 4; j++) {
         shader
-          ..setFloat(35 + i * 4 + j, w[j])
-          ..setFloat(35 + kMaxRippleWaves * 4 + i * 4 + j, w[4 + j]);
+          ..setFloat(34 + i * 4 + j, w[j])
+          ..setFloat(amps + i * 4 + j, w[4 + j]);
       }
     }
     // Never zero: it divides. A wave at birth is all zeros.
     final double reach = _rippleField!.reach;
     shader
-      ..setFloat(35 + kMaxRippleWaves * 8, reach > 1e-3 ? reach : 1e-3)
-      ..setFloat(36 + kMaxRippleWaves * 8, ripple.light);
+      ..setFloat(tail, waves.length.toDouble())
+      ..setFloat(tail + 1, reach > 1e-3 ? reach : 1e-3)
+      ..setFloat(tail + 2, ripple.light);
   }
 
   @override

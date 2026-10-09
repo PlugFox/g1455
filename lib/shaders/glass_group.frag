@@ -55,23 +55,45 @@
 // picture with shapes silently missing.
 #define kMaxShapes 12
 
-uniform vec2 uTexSize;     // atlas size, texels
-uniform vec2 uMapOrigin;   // draw space -> texels: p * uMapScale + uMapOrigin
-uniform float uMapScale;   // texels per logical pixel
-uniform vec2 uSlotMin;     // the slot's own bounds in texels, inclusive
-uniform vec2 uSlotMax;
-uniform float uCount;      // shapes in force, 1..kMaxShapes
-uniform float uBlend;      // smin radius k, draw-space px; 0 is a plain union
+// Packed into `vec4`s in the order Dart writes it, every name a macro over a
+// lane, for the reason `glass_surface.frag` gives: on Metal each declaration is
+// a bind per draw. The arrays keep their own declarations — an array is one
+// bind already — and the head ends in a `vec3` so they start where they always
+// did. Nineteen declarations, now nine, and no `setFloat` index moved.
+//
+//   uH0  uTexSize.xy  uMapOrigin.xy                  floats  0-3
+//   uH1  uMapScale  uSlotMin.xy  uSlotMax.x                   4-7
+//   uH2  uSlotMax.y  uCount  uBlend                           8-10
+//   uBox[12], uRadius[12]                                    11-70
+//   uT0  uThickness  uStrength  uEdgePower  uShoulder        71-74
+//   uT1  uTint                                               75-78
+//   uT2  uRimWidth  uRim.rgb                                 79-82
+//   uT3  uRim.a  uPixel  uCullK  uRimMix                     83-86
+uniform vec4 uH0;
+uniform vec4 uH1;
+uniform vec3 uH2;
 uniform vec4 uBox[kMaxShapes];     // centre.xy, half extent.xy, draw space
 uniform float uRadius[kMaxShapes]; // corner radius, px
-uniform float uThickness;  // how far in from the rim refraction reaches, px
-uniform float uStrength;   // peak sample displacement at the rim, px
-uniform float uEdgePower;  // falloff exponent
-uniform float uShoulder;   // shoulder exponent on the depth, 1.0 = no shoulder
-uniform vec4 uTint;        // straight alpha, laid over the refracted sample
-uniform float uRimWidth;   // width of the outline inside the edge, px
-uniform vec4 uRim;         // rgb is the colour, a is how much it *adds*
-uniform float uPixel;      // one device pixel, in this geometry's own units
+uniform vec4 uT0;
+uniform vec4 uT1;
+uniform vec4 uT2;
+uniform vec4 uT3;
+
+#define uTexSize uH0.xy     // atlas size, texels
+#define uMapOrigin uH0.zw   // draw space -> texels: p * uMapScale + uMapOrigin
+#define uMapScale uH1.x     // texels per logical pixel
+#define uSlotMin uH1.yz     // the slot's own bounds in texels, inclusive
+#define uSlotMax vec2(uH1.w, uH2.x)
+#define uCount uH2.y        // shapes in force, 1..kMaxShapes
+#define uBlend uH2.z        // smin radius k, draw-space px; 0 is a plain union
+#define uThickness uT0.x    // how far in from the rim refraction reaches, px
+#define uStrength uT0.y     // peak sample displacement at the rim, px
+#define uEdgePower uT0.z    // falloff exponent
+#define uShoulder uT0.w     // shoulder exponent on the depth, 1.0 = no shoulder
+#define uTint uT1           // straight alpha, laid over the refracted sample
+#define uRimWidth uT2.x     // width of the outline inside the edge, px
+#define uRim vec4(uT2.yzw, uT3.x) // rgb is the colour, a is how much it *adds*
+#define uPixel uT3.y        // one device pixel, in this geometry's own units
 
 // The distance past which a shape is skipped. `k` in every draw the package
 // makes, and a uniform rather than `k` itself for one reason: skipping is
@@ -79,14 +101,14 @@ uniform float uPixel;      // one device pixel, in this geometry's own units
 // same fragment twice with the branch present and the threshold out of reach.
 // A constant would have made the claim unfalsifiable from outside the shader.
 // It costs a register; the comparison it feeds was going to be there anyway.
-uniform float uCullK;
+#define uCullK uT3.z
 
 // How much the outline *replaces* rather than adds: 0 is the calibrated
 // additive rim, 1 lays uRim.rgb on at the band's coverage — the platform's
 // increase-contrast switch (D203). A uniform rather than a second shader
 // because at 0 the line below is `col * 1.0 + …`, the same bits as before,
 // and that is enforced rather than hoped for.
-uniform float uRimMix;
+#define uRimMix uT3.w
 
 uniform sampler2D uTex;
 
