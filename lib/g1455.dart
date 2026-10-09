@@ -25,7 +25,7 @@
 /// | Topic | What is in it |
 /// |---|---|
 /// | Foundations | [GlassHost], [GlassSurface], [GlassFinish], [GlassTheme], [GlassRipple], [GlassAdaptive] |
-/// | Panels and controls | [GlassBar], [GlassButton], [GlassCard], [GlassSwitch], [GlassSlider], [GlassTabBar], [GlassSegmentedControl], [GlassButtonGroup], [GlassTextField], [GlassScrollEdge], [GlassScaffold] |
+/// | Panels and controls | [GlassBar], [GlassButton], [GlassCard], [GlassSwitch], [GlassSlider], [GlassTabBar], [GlassSegmentedControl], [GlassButtonGroup], [GlassTextField], [GlassSearchBar], [GlassStepper], [GlassPageControl], [GlassBadge], [GlassScrollEdge], [GlassScaffold] |
 /// | Modals | [showGlassDialog], [GlassAlert], [showGlassSheet], [GlassMenuAnchor], [GlassPopoverAnchor] |
 /// | Composition | [GlassGroup], [GlassTravel], [GlassMorph], [GlassAbove] |
 /// | Capture control | [GlassProxy], [GlassProxyPainter], [GlassBackdrop] |
@@ -136,6 +136,17 @@ export 'src/surface/glass_modal.dart'
 export 'src/surface/glass_tab_bar.dart'
     show GlassTabBar, GlassTabItem, GlassTabItemBuilder, GlassTabItemLook, kGlassTabDropGrow, kGlassTabDropZoom;
 export 'src/surface/glass_text_field.dart' show GlassTextField, kGlassFieldHeight;
+// The search field with its clear button and the Cancel that slides in on
+// focus: one surface, the field's.
+export 'src/surface/glass_search_bar.dart' show GlassSearchBar;
+// A minus and a plus in one capsule, and page dots on one: one surface each,
+// everything that moves drawn inside it.
+export 'src/surface/glass_stepper.dart'
+    show GlassStepper, kGlassStepperRepeatDelay, kGlassStepperRepeatInterval, kGlassStepperSize;
+export 'src/surface/glass_page_control.dart'
+    show GlassPageControl, kGlassPageControlHeight, kGlassPageDot, kGlassPageDotGap;
+// Not glass: Apple's badge is an opaque red capsule on the glass.
+export 'src/surface/glass_badge.dart' show GlassBadge, kGlassBadgeDot, kGlassBadgeHeight, kGlassBadgeRed;
 export 'src/surface/glass_toolbar.dart'
     show GlassButtonGroup, GlassToolbarItem, kGlassToolbarHeight, kGlassToolbarItemWidth;
 export 'src/surface/glass_finish.dart'
