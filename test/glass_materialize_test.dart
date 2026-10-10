@@ -1,7 +1,7 @@
 // Materializing: the finish arriving, as Apple's `.materialize` does — blur
-// first, level last, shape whole throughout (spike 27, `mac_materialize.swift`).
+// first, level last, shape whole throughout (read off macOS).
 //
-// `flutter test test/glass/glass_materialize_test.dart`
+// `flutter test test/glass_materialize_test.dart`
 //
 // Breaks, each undone by swapping the string back:
 //  - `if (!listEquals(blurs, _lastBlurs))` -> `if (false)` in `GlassHost._capture`:

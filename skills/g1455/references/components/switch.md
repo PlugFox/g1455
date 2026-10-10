@@ -58,6 +58,15 @@ MergeSemantics(
 
 The switch is never smaller than 44 px tall, so it stays easy to hit.
 
+## Keyboard, right to left, and a PageView
+
+- The switch takes the focus from the keyboard (`focusNode`, `autofocus`), and Space or Enter flips it. The ring is
+  drawn around the track behind a boundary of its own; on a switch that sits under other glass, showing or hiding it is
+  one capture.
+- Under a right-to-left `Directionality` it is mirrored: on is at the left.
+- The knob is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves the switch and
+  not the page, and a vertical swipe that starts on the switch still scrolls the vertical list around it.
+
 ## The drop
 
 - `dropScale` (default [`kGlassDropScale`](https://pub.dev/documentation/g1455/latest/g1455/kGlassDropScale-constant.html),
@@ -145,6 +154,8 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
 | `dropWiden` | `double` | `kGlassSwitchDropWiden` | How many px of the surroundings the drop pulls in (a slight zoom-out). 0 for none. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](../foundations/drop-motion.md). |
 | `semanticLabel` | `String?` | `null` | Screen-reader label. Or wrap the row in `MergeSemantics` with a `Text`. |
+| `focusNode` | `FocusNode?` | `null` | The switch's focus. Null makes one the switch owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the switch is built. |
 | `key` | `Key?` | `null` | |
 
 ### Constants

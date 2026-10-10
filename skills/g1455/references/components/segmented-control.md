@@ -52,6 +52,17 @@ Each segment is a button for a screen reader, with the selected one marked as se
 segments read their text. For icon segments, wrap each icon in `Semantics(label: ...)` or use
 `Icon(..., semanticLabel: ...)`.
 
+## Keyboard, right to left, and a PageView
+
+- The control takes the focus from the keyboard (`focusNode`, `autofocus`), and the arrow keys move the selection. The
+  ring is drawn around the track behind a boundary of its own; on a control under other glass, showing or hiding it is
+  one capture.
+- Under a right-to-left `Directionality` the first segment is at the right, and the arrows follow.
+- The drop is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves it and
+  not the page, and a vertical swipe that starts on it still scrolls the vertical list around it.
+- The capsule's corner is concentric with the track's, by `GlassConcentric` (see
+  [GlassSurface](../foundations/surface.md)): 14 inside a 16 track inset 2.
+
 ## Complete example
 
 ```dart
@@ -125,6 +136,8 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
 | `trackColor` | `Color` | `kGlassSegmentTrack` | The track's fill. |
 | `thumbColor` | `Color` | `Color(0xFFFFFFFF)` | The capsule under the selected segment at rest. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](../foundations/drop-motion.md). |
+| `focusNode` | `FocusNode?` | `null` | The control's focus. Null makes one the control owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the control is built. |
 | `key` | `Key?` | `null` | |
 
 ### Constants

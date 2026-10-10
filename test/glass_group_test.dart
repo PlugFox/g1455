@@ -1,16 +1,16 @@
-// Phase B, step 1 — the blend group: N surfaces drawn as one silhouette.
+// The blend group: N surfaces drawn as one silhouette.
 //
-// `flutter test test/glass/glass_group_test.dart`
+// `flutter test test/glass_group_test.dart`
 //
 // Four things have to hold, and each of them is a different way of being wrong:
 //
 //  1. **A group of one is the lone surface.** Two binaries draw glass in this
-//     package now, and a second one that drifted would ship optics the M13
+//     package now, and a second one that drifted would ship optics the quality
 //     ladder never graded. So the fused program at `uCount = 1` is required to
 //     reproduce `glass_surface.frag` byte for byte — not "closely", because
 //     every expression in the two is meant to be the same expression and a
 //     tolerance would hide the day one of them stops being.
-//  2. **Shapes that do not touch do not fuse.** M3's warning about `smin` was
+//  2. **Shapes that do not touch do not fuse.** The known hazard of `smin` is
 //     that a bad distance invents bridges between shapes that are far apart —
 //     up to 81 px of them — and it is the failure this arm exists to catch: a
 //     group of two far-apart surfaces must be the same frame as two ungrouped
@@ -19,17 +19,17 @@
 //     `spacing`, and it is not a mood: the bridge appears when the edge-to-edge
 //     gap falls below it, which is arithmetic with a known answer, so the arm
 //     sweeps the gap and reads where the picture changes.
-//  4. **A blend group shares one atlas slot.** The one-way invariant of SS4.4.
+//  4. **A blend group shares one atlas slot.** A one-way invariant.
 //     Counted rather than asserted after the fact, and the counter is on the
 //     mechanism (`splitSlots`) so that a caller who packs without the grouping
 //     is caught by a number rather than by somebody looking at a screenshot.
 //  5. **The quad is the members, not the box.** Where a group is laid out is a
 //     fact about the page; what it shades must not be. The arm is the same
 //     members inside a full-screen group and inside one shrunk to hug them,
-//     and it exists because the first pair of arms put both halves in a
-//     full-screen group and neither was wrong relative to the other.
+//     because a pair of arms that put both halves in a full-screen group
+//     would find neither wrong relative to the other.
 //  6. **Skipping a far shape is bit-identical.** The fold is 94% of the
-//     fragment at twelve shapes (D169), and a shape at least `k` farther than
+//     fragment at twelve shapes, and a shape at least `k` farther than
 //     the field so far cannot move it. "Cannot" is arithmetic — `h` is exactly
 //     zero and `mix(x, y, 0)` is exactly `x` — so the arm renders the same
 //     fragment twice with the branch compiled into both and the threshold out
@@ -61,13 +61,15 @@ const Size kPanel = Size(90, 90);
 const double kTop = 60;
 
 /// The floats the group shader's uniform block holds, counted by hand off the
-/// declaration order in `shaders/glass_group.frag`:
+/// declaration order in `shaders/glass_group.frag` — packed into lanes since
+/// the bind count was priced, in the order the names below always had:
 ///
-///     vec2 + vec2 + float + vec2 + vec2 + float + float  = 11
+///     uTexSize, uMapOrigin, uMapScale, uSlotMin, uSlotMax,
+///     uCount, uBlend: vec4 + vec4 + vec3                 = 11
 ///     vec4[12] + float[12]                               = 60
 ///     4 floats of optics + vec4 tint + float + vec4 + float = 14
 ///     uCullK                                             = 1
-///     uRimMix (D203)                                     = 1
+///     uRimMix                                            = 1
 ///
 /// Checked rather than trusted, because it is the one constant in `lib/` that
 /// nothing else would notice going wrong: a shifted uniform block draws a
@@ -177,7 +179,7 @@ void main() {
     // 150 logical pixels of clear air between the panels, and a spacing of 8.
     // `smin` reaches `k = 16`, so the fields never meet; an estimator that
     // understated distance far from its own contour would put a bridge here,
-    // which is exactly what M3 measured the single-Newton form doing.
+    // which is exactly what the single-Newton form was measured doing.
     const panels = <_Panel>[_Panel(left: 30), _Panel(left: 270)];
     final ui.Image apart = await _shot(tester, panels);
     final ui.Image grouped = await _shot(tester, panels, spacing: 8);
@@ -335,8 +337,8 @@ void main() {
     const panels = <_Panel>[_Panel(left: 60), _Panel(left: 200)];
     const double spacing = 12;
     // The bound this arm is about is the *one* quad's, so it is priced with the
-    // split off — which is where it ships on Metal (D190) and not on Adreno
-    // (D192), so it is named: this arm has to say the same thing on every host.
+    // split off, named explicitly: this arm has to say the same thing on every
+    // host, whatever the shipped default.
     final bool wasSplit = debugGlassFusedSplit;
     debugGlassFusedSplit = false;
     addTearDown(() => debugGlassFusedSplit = wasSplit);
@@ -373,7 +375,7 @@ void main() {
     WidgetTester tester,
   ) async {
     // The fold evaluates every declared shape at every fragment, and at twelve
-    // shapes that is 94% of the fragment (D169). A shape at least `k` farther
+    // shapes that is 94% of the fragment. A shape at least `k` farther
     // than the field so far cannot move the result — `h` is exactly zero, so
     // the fold keeps `d` and `mix(n, ni, 0)` is exactly `n` — so it is skipped.
     // "Exactly" is the claim, and this is the only arm that can see it: the
@@ -449,7 +451,7 @@ void main() {
   testWidgets('a group split into tiles is the one quad, pixel for pixel', (
     WidgetTester tester,
   ) async {
-    // The lever phase B left open: the fused draw covers the *bounding box* of
+    // The fused draw covers the *bounding box* of
     // its members grown by the bridges' reach, and on a scattered layout that
     // is the screen. The same bound applied per member is a union of small
     // rectangles instead, and each of them only has to fold the shapes that can
@@ -640,12 +642,10 @@ void main() {
   testWidgets('a group splits by default, whatever hardware the host declares', (
     WidgetTester tester,
   ) async {
-    // D194. Both GPUs timed charge for fragments, so the split ships on and
-    // reads no declaration. The loop over every declaration is what says the
-    // group does not: between D192 and D194 the quad went to `appleMetal`
-    // through the host's handle, and a key that came back that way would fail
-    // here on one row. The desktop exception D199 added is gone (D200); the
-    // platforms are crossed in the arm below.
+    // Both GPUs timed charge for fragments, so the split ships on and reads no
+    // declaration. The loop over every declaration is what says the group does
+    // not: a key on `appleMetal` through the host's handle would fail here on
+    // one row. The platforms are crossed in the arm below.
     const panels = <_Panel>[_Panel(left: 40), _Panel(left: 150), _Panel(left: 260)];
     final bool wasSplit = debugGlassFusedSplit;
     addTearDown(() => debugGlassFusedSplit = wasSplit);
@@ -675,10 +675,10 @@ void main() {
   testWidgets('the split on every platform, desktop included, and every tile aliased', (
     WidgetTester tester,
   ) async {
-    // D200: D199 keyed the quad to the desktop because a tile there cost three
-    // offscreen passes, and it did because the tiles' `isAntiAlias = false`
-    // never reached Impeller. Primed, the split is cheaper there too, so the
-    // key went. Every platform is crossed with every declaration, because a
+    // On the desktop a tile costs three offscreen passes when the tiles'
+    // `isAntiAlias = false` does not reach Impeller. With it reaching, the
+    // split is cheaper there too, so nothing is keyed to the desktop. Every
+    // platform is crossed with every declaration, because a
     // key that came back through either would fail here on one row; and every
     // tile must be counted aliased, because an antialiased tile is exactly the
     // draw that made the desktop dear.
@@ -721,7 +721,7 @@ void main() {
   testWidgets('a bridge past the members\' boxes samples captured pixels, not a clamped edge', (
     WidgetTester tester,
   ) async {
-    // D200's A2 found it on four backends alike: the identity finish over a
+    // Seen on four backends alike: the identity finish over a
     // fused pair differed from the bare backdrop in the rows just outside the
     // panels, by up to 132 code values. The bridge bulges past the members'
     // boxes by up to `delta(n) * k`, and the shared slot was their union grown
@@ -901,7 +901,7 @@ void main() {
   });
 
   test('what the split saves on Adreno is what the tracked digests say', () {
-    // D192, and the Adreno half of `debugGlassFusedSplit`'s dartdoc. Read
+    // The Adreno half of `debugGlassFusedSplit`'s dartdoc. Read
     // glass against glass inside one scene first — the same rule as the Metal
     // arm below — and the addition over the floor second, because seed b's
     // scattered floor carried a 42% spread across repeats while its median
@@ -1018,8 +1018,8 @@ void main() {
       expect(ungrouped / fused, inInclusiveRange(4.5, 6.0));
     }
 
-    // And the same comparison on Adreno, out of the digest that has been in this
-    // repository since D169 — because the claim `GlassGroup`'s dartdoc now makes
+    // And the same comparison on Adreno, out of the digest tracked in this
+    // repository — because the claim `GlassGroup`'s dartdoc now makes
     // is that the **sign** flips, and a sign asserted on one backend is not a
     // sign. There the fused arm is the dearer one, by more than three times.
     final adreno = json.decode(File('provenance/digest/s938-fuse-a.json').readAsStringSync()) as Map<String, Object?>;
@@ -1080,10 +1080,10 @@ void main() {
   });
 
   test('what the split saves on the iPad is what the tracked digests say', () {
-    // D194, and the reason the split ships on everywhere rather than keyed
+    // The reason the split ships on everywhere rather than keyed
     // on `appleMetal`. The same arms read by two instruments: the engine's GPU
     // tracer (`ipad-fs-*`) and the raster thread's wall time
-    // (`ipad-fs-*-raster`, the only instrument D190 had). They disagree in
+    // (`ipad-fs-*-raster`, the only instrument the Mac reading used). They disagree in
     // sign, and the test holds both halves — a GPU saving alone would not say
     // why the Mac read the other way.
     Map<String, Object?> cell(String label, String scene, String variant) {
@@ -1131,7 +1131,7 @@ void main() {
           inInclusiveRange(1.05, 1.30),
           reason:
               'the raster thread is supposed to read the split as dearer here, which is '
-              "the Mac's sign; if it does not, D190 is not explained by the instrument",
+              "the Mac's sign; if it does not, the Mac's reading is not explained by the instrument",
         );
       }
 
@@ -1160,11 +1160,12 @@ void main() {
     // the right run. `GlassGroup`'s dartdoc tells an application what a shape
     // costs it, and the three digests below are where that came from.
     //
-    // The arithmetic is the second implementation of `bench/tool/fuse.py`'s,
-    // deliberately: writing the addition as `R + c(n) * A` and subtracting two
-    // scenes that place the same members behind quads of very different size
-    // removes `R` without ever knowing it. Two independent spellings agreeing
-    // on the tracked bytes is the control the tool's own synthetic one is not.
+    // The arithmetic is a second, independent implementation of the offline
+    // analysis tool's, deliberately: writing the addition as `R + c(n) * A` and
+    // subtracting two scenes that place the same members behind quads of very
+    // different size removes `R` without ever knowing it. Two independent
+    // spellings agreeing on the tracked bytes is the control the tool's own
+    // synthetic one is not.
     final before = <({double c1, double c12})>[];
     late ({double c1, double c12}) after;
     for (final String path in kFusionDigests) {

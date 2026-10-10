@@ -146,15 +146,22 @@ class LibraryScreen extends StatelessWidget {
     title: 'Button',
     icon: 'smart_button',
     summary:
-        'GlassButton is a tappable glass capsule that brightens while held, with a 44 × 44 minimum tap target '
-        'and dimmed labels when disabled.',
-    api: <String>['GlassButton', 'kGlassMinTapTarget', 'kGlassDisabledDarkLabel', 'kGlassDisabledLightLabel'],
+        'GlassButton is a tappable glass capsule that brightens and swells while held, with a 44 × 44 minimum tap '
+        'target, keyboard focus and dimmed labels when disabled.',
+    api: <String>[
+      'GlassButton',
+      'GlassPress',
+      'kGlassMinTapTarget',
+      'kGlassDisabledDarkLabel',
+      'kGlassDisabledLightLabel',
+      'kGlassFocusRingColor',
+    ],
     source: 'lib/src/surface/glass_components.dart',
     guide: r'''
 `GlassButton` is a glass capsule that takes a tap. While a finger is on it, the whole shape
 brightens by the finish's rim colour, so the material itself changes rather than a highlight being
-laid on top. The label (text, icon, or both) is centred and gets a legible colour, like a
-[Bar](/components/bar).
+laid on top, and the glass swells a little and leans toward a finger that drags. The label (text,
+icon, or both) is centred and gets a legible colour, like a [Bar](/components/bar).
 
 The whole capsule is the tap target, and it is never smaller than
 [`kGlassMinTapTarget`](https://pub.dev/documentation/g1455/latest/g1455/kGlassMinTapTarget-constant.html)
@@ -197,12 +204,43 @@ Pass `onPressed: null`. The glass stays exactly as it is and the label dims: to
 where it would be white. That follows iOS 26, which also leaves the glass alone and only dims the
 title. Semantics report the button as disabled.
 
+## The press
+
+Held, the glass grows by 12 px on its longest side, the shorter side by the same factor, and leans up to 3 px toward a
+finger that drags, stretched a little along the drag. Let go, and it springs back. That is
+[`GlassPress`](https://pub.dev/documentation/g1455/latest/g1455/GlassPress-class.html), read from the theme unless the
+button names its own:
+
+```dart
+// One button that keeps its box, and a gentler swell for the rest of the app.
+GlassButton(press: GlassPress.none, onPressed: save, child: const Text('Save'))
+
+GlassHost(press: const GlassPress(grow: 8), child: navigator!)
+```
+
+- **A feel, not a measurement.** iOS 26's interactive glass does this, and Apple's press has not been measured here.
+  The shape of the law, a fixed growth rather than a ratio, comes from another package; its 17 px would be 1.39× a
+  44 px button, more than any held drop the package has read, so the default is 12.
+- **What it costs:** two captures a press, one as the region the glass grows in is declared at touch-down and one as it
+  goes when the spring settles, and none while it moves. Nothing at rest: declared always, the region took a 44 px
+  button's slot from 3,600 to 7,056 px².
+- Off under reduced motion, on a disabled button, and with `GlassPress.none`, which builds no region at all.
+- A [toolbar](/components/toolbar)'s cells brighten but do not swell: the group is one surface.
+
+## Keyboard
+
+The button takes the focus from the keyboard (`focusNode`, `autofocus`), and Space or Enter presses it. The focus ring,
+[`kGlassFocusRingColor`](https://pub.dev/documentation/g1455/latest/g1455/kGlassFocusRingColor-constant.html) 3 px wide
+and 2 px outside the glass, concentric with its corners, is drawn from inside the glass's own subtree, which no capture
+sees: focusing a button costs nothing.
+
 ## Gotchas
 
 - Don't wrap a button in `Opacity`, `ColorFilter` or `ImageFilter`. The press highlight is added
   onto the glass, and those widgets make it add onto transparency instead, which looks wrong.
   A `RepaintBoundary` is fine.
-- `pressedOverlay: Color(0x00000000)` turns the highlight off. Any other colour replaces the rim's.
+- `pressedOverlay: Color(0x00000000)` turns the highlight off. Any other colour replaces the rim's. The swell is
+  `press`, a separate thing.
 - A button inside a bar or a card is glass on glass. It works, but it is one more surface and one
   more capture level. See [Performance](/foundations/performance).
 ''',
@@ -264,9 +302,26 @@ class _PhotoActionsState extends State<PhotoActions> {
 | `padding` | `EdgeInsets` | `EdgeInsets.symmetric(horizontal: 20, vertical: 10)` | Space between the glass and the label. |
 | `minSize` | `Size` | `kGlassMinTapTarget` | The smallest the button may be. |
 | `pressedOverlay` | `Color?` | `null` | Added over the whole shape while held. Null takes the finish's `rim`; `Color(0x00000000)` disables it. |
+| `press` | `GlassPress?` | `null` | How the glass swells and leans while held. Null takes the theme's; `GlassPress.none` keeps the box. |
 | `finish` | `GlassFinish?` | `null` | The material. Null takes the theme's. |
 | `semanticLabel` | `String?` | `null` | What a screen reader says instead of the child. Set it on icon-only buttons. |
+| `focusNode` | `FocusNode?` | `null` | The button's focus. Null makes one the button owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the button is built. |
 | `key` | `Key?` | `null` | |
+
+## GlassPress
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `grow` | `double` | `12` | How much longer the longest side is while held, in px; the shorter side grows by the same factor. |
+| `maxStretch` | `double` | `0.05` | The most the glass stretches along a drag, as a fraction; the area is kept. 0 to 0.25. |
+| `maxPull` | `double` | `3` | The most the glass's centre moves toward a dragging finger, in px. |
+| `pullReach` | `double` | `12` | How far the finger drags, in px, for the lean and the stretch to reach three quarters of their most. |
+| `stiffness` | `double` | `500` | The spring, at unit mass. |
+| `damping` | `double` | `26` | The spring's damping, at unit mass. |
+
+`GlassPress.none` responds to nothing. `rect(Size rest, double press, Offset finger)` and `margin(Size rest)` are the
+geometry, pure, for a control of your own.
 
 ## Constants
 
@@ -275,6 +330,9 @@ class _PhotoActionsState extends State<PhotoActions> {
 | `kGlassMinTapTarget` | `Size(44, 44)` | Apple's minimum tap target; the default `minSize`. |
 | `kGlassDisabledDarkLabel` | `Color(0x4D3C3C43)` | Disabled label where the enabled one is black. |
 | `kGlassDisabledLightLabel` | `Color(0x4DEBEBF5)` | Disabled label where the enabled one is white. |
+| `kGlassFocusRingColor` | `Color(0xFF0A84FF)` | The keyboard's focus ring, on every control that takes the focus. |
+| `kGlassFocusRingWidth` | `3` | The ring's stroke, in px. |
+| `kGlassFocusRingGap` | `2` | The gap between the control's edge and the ring, in px. |
 ''',
   ),
   Entry(
@@ -468,6 +526,15 @@ MergeSemantics(
 
 The switch is never smaller than 44 px tall, so it stays easy to hit.
 
+## Keyboard, right to left, and a PageView
+
+- The switch takes the focus from the keyboard (`focusNode`, `autofocus`), and Space or Enter flips it. The ring is
+  drawn around the track behind a boundary of its own; on a switch that sits under other glass, showing or hiding it is
+  one capture.
+- Under a right-to-left `Directionality` it is mirrored: on is at the left.
+- The knob is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves the switch and
+  not the page, and a vertical swipe that starts on the switch still scrolls the vertical list around it.
+
 ## The drop
 
 - `dropScale` (default [`kGlassDropScale`](https://pub.dev/documentation/g1455/latest/g1455/kGlassDropScale-constant.html),
@@ -551,6 +618,8 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
 | `dropWiden` | `double` | `kGlassSwitchDropWiden` | How many px of the surroundings the drop pulls in (a slight zoom-out). 0 for none. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `semanticLabel` | `String?` | `null` | Screen-reader label. Or wrap the row in `MergeSemantics` with a `Text`. |
+| `focusNode` | `FocusNode?` | `null` | The switch's focus. Null makes one the switch owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the switch is built. |
 | `key` | `Key?` | `null` | |
 
 ## Constants
@@ -571,8 +640,8 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
     title: 'Slider',
     icon: 'tune',
     summary:
-        'GlassSlider is a continuous 0 to 1 slider whose knob turns into a clear glass drop while you drag it, '
-        'for volume, brightness or a scrubber.',
+        'GlassSlider is a 0 to 1 slider, continuous or in steps, whose knob turns into a clear glass drop while you '
+        'drag it, for volume, brightness or a scrubber.',
     api: <String>['GlassSlider', 'SliderGeometry', 'kGlassDropScale', 'kGlassDisabledOpacity'],
     source: 'lib/src/surface/glass_controls.dart',
     guide: r'''
@@ -585,8 +654,9 @@ Tapping anywhere on the track jumps the value there. Screen readers can step it 
 ## When to use
 
 - Continuous values: volume, brightness, a playback scrubber, a blur radius.
-- **Not** for discrete steps. There is no snapping; if you need steps, round the value yourself or
-  use a [segmented control](/components/segmented-control).
+- A value in steps, with `divisions`: a rating out of five, a zoom in quarters.
+- **Not** for a handful of named options. That is a [segmented control](/components/segmented-control). A small whole
+  number changed one at a time is a [stepper](/components/stepper).
 - **Not** for values you need to type exactly. Pair it with a readout, or use a text field.
 
 ## Usage
@@ -613,10 +683,34 @@ Row(
 `onChanged` fires on every frame of a drag. Use `onChangeStart` / `onChangeEnd` for work that should
 happen once, such as saving. `onChanged: null` disables the slider (50% opacity).
 
+## Steps
+
+`divisions` snaps the value to `divisions + 1` stops, as Material's `Slider` does. A drag, a tap, a key and a screen
+reader all land on a stop, and `onChanged` is called only when the stop changes, not on every frame of a drag:
+
+```dart
+GlassSlider(
+  value: _rating / 5,
+  divisions: 5, // 0, 0.2, ... 1
+  semanticLabel: 'Rating',
+  onChanged: (double v) => setState(() => _rating = (v * 5).round()),
+)
+```
+
+Rounding the value yourself in `onChanged` instead leaves the knob between the stops and the callback told every frame.
+
+## Keyboard, right to left, and a PageView
+
+- A focused slider steps by `semanticStep`, or by one division, with the arrow keys. The focus ring is drawn around
+  the knob, inside the drop's glass, so focusing it costs nothing.
+- Under a right-to-left `Directionality` it is mirrored: 0 is at the right, the fill grows leftward, and the left
+  arrow increases.
+- The knob is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves the slider and
+  not the page, and a vertical swipe that starts on the slider still scrolls the vertical list around it.
 ## Accessibility
 
 Give every slider a `semanticLabel` ("Volume", "Brightness"). `semanticStep` (default 0.1) is how far
-one increase or decrease moves it; 0.05 gives a screen reader 20 steps.
+one increase or decrease moves it; 0.05 gives a screen reader 20 steps. With `divisions` the step is one division.
 
 ## Performance
 
@@ -627,7 +721,8 @@ slider over glass. At rest it costs nothing.
 ## Lining things up with the fill
 
 `SliderGeometry.fillEnd(value, width)` returns the x position where the fill ends on a slider of
-that width. Use it to place a tick, a label or a buffered-range bar exactly under the knob's centre.
+that width. Use it to place a tick, a label or a buffered-range bar exactly under the knob's centre. Pass
+`textDirection: TextDirection.rtl` for a mirrored slider, whose fill ends that far from the right.
 ''',
     code: r'''
 import 'package:flutter/material.dart';
@@ -704,14 +799,17 @@ class _DisplayControlsState extends State<DisplayControls> {
 | `dropWiden` | `double` | `0` | How many px of the surroundings the drop pulls in. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `semanticLabel` | `String?` | `null` | Screen-reader label. |
-| `semanticStep` | `double` | `0.1` | How far one accessibility increase or decrease moves the value. Between 0 (exclusive) and 1. |
+| `semanticStep` | `double` | `0.1` | How far one accessibility increase or decrease, or an arrow key, moves the value. Between 0 (exclusive) and 1. Ignored with `divisions`. |
+| `divisions` | `int?` | `null` | How many equal steps the value snaps to, or null for a continuous slider. Above 0. |
+| `focusNode` | `FocusNode?` | `null` | The slider's focus. Null makes one the slider owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the slider is built. |
 | `key` | `Key?` | `null` | |
 
 ## Helpers
 
 | Name | Description |
 |---|---|
-| `SliderGeometry.fillEnd(double value, double width)` | The x position, in px from the slider's left edge, where the fill ends for `value` on a slider `width` wide. |
+| `SliderGeometry.fillEnd(double value, double width, {TextDirection textDirection = TextDirection.ltr})` | The x position, in px from the slider's left edge, where the fill ends for `value` on a slider `width` wide; mirrored under `TextDirection.rtl`. |
 ''',
   ),
   Entry(
@@ -770,6 +868,17 @@ dark one.
 Each segment is a button for a screen reader, with the selected one marked as selected. Text
 segments read their text. For icon segments, wrap each icon in `Semantics(label: ...)` or use
 `Icon(..., semanticLabel: ...)`.
+
+## Keyboard, right to left, and a PageView
+
+- The control takes the focus from the keyboard (`focusNode`, `autofocus`), and the arrow keys move the selection. The
+  ring is drawn around the track behind a boundary of its own; on a control under other glass, showing or hiding it is
+  one capture.
+- Under a right-to-left `Directionality` the first segment is at the right, and the arrows follow.
+- The drop is dragged from touch-down. Inside a horizontal `PageView` or list a horizontal drag moves it and
+  not the page, and a vertical swipe that starts on it still scrolls the vertical list around it.
+- The capsule's corner is concentric with the track's, by `GlassConcentric` (see
+  [GlassSurface](/foundations/surface)): 14 inside a 16 track inset 2.
 ''',
     code: r'''
 import 'package:flutter/material.dart';
@@ -840,6 +949,8 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
 | `trackColor` | `Color` | `kGlassSegmentTrack` | The track's fill. |
 | `thumbColor` | `Color` | `Color(0xFFFFFFFF)` | The capsule under the selected segment at rest. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
+| `focusNode` | `FocusNode?` | `null` | The control's focus. Null makes one the control owns. |
+| `autofocus` | `bool` | `false` | Take the focus as soon as the control is built. |
 | `key` | `Key?` | `null` | |
 
 ## Constants
@@ -857,15 +968,19 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
     title: 'Tab bar',
     icon: 'tab',
     summary:
-        'GlassTabBar is the floating iOS 26 tab bar. The selected tab lifts into a glass drop that magnifies '
-        'the bar and can be dragged from tab to tab.',
+        'GlassTabBar is the floating iOS 26 tab bar. The selected tab lifts into a glass drop you can drag from tab '
+        'to tab, and the bar can collapse to that tab on a scroll down.',
     api: <String>[
       'GlassTabBar',
       'GlassTabItem',
       'GlassTabItemLook',
       'GlassTabItemBuilder',
+      'GlassTabBarMinimizeBehavior',
+      'GlassTabBarMinimizer',
       'kGlassTabDropZoom',
       'kGlassTabDropGrow',
+      'kGlassTabMinimizeScroll',
+      'kGlassTabAccessoryHeight',
     ],
     source: 'lib/src/surface/glass_tab_bar.dart',
     guide: r'''
@@ -922,24 +1037,82 @@ behind it.
 - The held drop stretches as it sets off and squashes as it lands. `dropMotion:` tunes it or turns it off; see
   [Drop motion](/foundations/drop-motion).
 
+## Collapsing on scroll
+
+iOS 26's tab bar shrinks to its selected tab while the content scrolls down, and comes back when it scrolls up. With
+`minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown`, the bar collapses to a circle of its own height at its
+start edge, the selected tab's icon in it, once the content has gone
+[`kGlassTabMinimizeScroll`](https://pub.dev/documentation/g1455/latest/g1455/kGlassTabMinimizeScroll-constant.html)
+(12 px) down, and expands once it has come as far back up or reached its top. A tap on the circle expands it and
+selects nothing.
+
+A scroll reports only upward, and the bar is not inside the scroll view, so both go under one
+`GlassTabBarMinimizer`. [`GlassScaffold`](/components/scaffold) is one already; a screen built by hand puts one above
+its body and its bar:
+
+```dart
+GlassTabBarMinimizer(
+  child: Stack(
+    children: <Widget>[
+      ListView.builder(itemCount: 50, itemBuilder: buildRow),
+      Positioned(
+        left: 16,
+        right: 16,
+        bottom: 24,
+        child: GlassTabBar(
+          items: tabs,
+          selectedIndex: _tab,
+          onSelected: (int i) => setState(() => _tab = i),
+          minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown,
+        ),
+      ),
+    ],
+  ),
+)
+```
+
+By default only the nearest vertical scroll view counts, not one nested in it, nor a horizontal one.
+`notificationPredicate` chooses, as an `AppBar`'s does: a list in a `PageView`, a `TabBarView` or a `NestedScrollView`'s
+body is one deeper, and `(ScrollNotification n) => n.depth == 1` lets it collapse the bar. The direction is the one on the
+screen: a `reverse: true` list collapses the bar when its content moves up, as any list does, and expands at its top
+edge, which is its far end.
+`GlassTabBarMinimizer.maybeOf(context)` is the `ValueNotifier<bool>` it holds: set it `false` to expand the bar when the
+app changes the page.
+
+- **Cost.** The circle is the bar shrunk inside the travel region the bar already grows in, so the collapse is no
+  capture: no record over 60 frames of it, against 60 without the declaration. The bar's box keeps its height, so the
+  body is not laid out again. The scroll that set it off captures on every frame anyway, because the content under the
+  bar moves.
+- Collapsed, a screen reader hears one button named for the selected tab. Under reduced motion it is not animated.
+- The circle's size and the spring are layout taste: Apple's collapse was not measured.
+
+## An accessory
+
+`bottomAccessory` is UIKit's `tabViewBottomAccessory`: a widget on a glass capsule
+[`kGlassTabAccessoryHeight`](https://pub.dev/documentation/g1455/latest/g1455/kGlassTabAccessoryHeight-constant.html)
+(48) tall above the bar, a now-playing row or a status, drawn in the bar's label colour. When the bar collapses it moves
+down beside the circle, inside a travel region of its own, so that is no capture either. The bar's box is taller by the
+accessory and the gap, and stays that height.
+
 ## Custom icons and badges
 
 An `IconData` is drawn by the bar in the right colour: the accent when selected, otherwise the label colour its glass
-chose. For anything else, an SVG, an image, a badge, give `iconBuilder` (or `labelBuilder`), which is handed that
-colour and size in a `GlassTabItemLook`:
+chose. For anything else, an SVG, an image, a [badge](/components/badge), give `iconBuilder` (or `labelBuilder`), which
+is handed that colour and size in a `GlassTabItemLook`:
 
 ```dart
 GlassTabItem(
   label: 'Inbox',
-  iconBuilder: (BuildContext context, GlassTabItemLook look) => Badge(
-    label: const Text('3'),
+  iconBuilder: (BuildContext context, GlassTabItemLook look) => GlassBadge(
+    count: unread,
     child: Icon(Icons.inbox, color: look.color, size: look.iconSize),
   ),
 )
 ```
 
 `label` stays what a screen reader says, whatever the builders draw. The items are built once and again only when
-their colour changes, which is when the drop moves onto them or off them.
+their colour changes, which is when the drop moves onto them or off them; on a bar that can collapse, the selected
+item's icon is built once more, for the circle.
 
 > [!WARNING]
 > If glass cards scroll under the tab bar, wrap it in [`GlassAbove`](/foundations/above), or put a bottom
@@ -947,13 +1120,18 @@ their colour changes, which is when the drop moves onto them or off them.
 
 > [!TIP]
 > [`GlassScaffold`](/components/scaffold) places a tab bar as its `bottomBar`: lifted, at the bottom of the safe area,
-> with the list padded to end above it.
+> with the list padded to end above it, and its scrolls collapse a bar that asks to.
+
+> [!NOTE]
+> A bare `setState` that rebuilds the bar costs one capture, even when nothing it draws changed. A known cost, not yet
+> traced: rebuild the bar when its selection or its items change, not with every change of the screen around it.
 ''',
     code: r'''
 import 'package:flutter/material.dart';
 import 'package:g1455/g1455.dart';
 
-/// An app shell: one page per tab, a floating glass tab bar on top.
+/// An app shell: one page per tab, a floating glass tab bar on top that
+/// collapses while a page scrolls down.
 /// Assumes a GlassHost above the navigator (MaterialApp.builder).
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -976,30 +1154,39 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final double bottom = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
-      body: Stack(
-        children: <Widget>[
-          Positioned.fill(
-            // Keeps every page alive; the bar floats over whichever is shown.
-            child: IndexedStack(
-              index: _tab,
-              children: <Widget>[
-                for (final GlassTabItem tab in _tabs)
-                  ListView.builder(
-                    // Room at the end so the last row is not under the bar.
-                    padding: EdgeInsets.only(bottom: bottom + 96),
-                    itemCount: 40,
-                    itemBuilder: (BuildContext context, int i) => ListTile(title: Text('${tab.label} ${i + 1}')),
-                  ),
-              ],
+      // Above the pages and the bar both: a page's scrolls reach it, and the
+      // bar reads it.
+      body: GlassTabBarMinimizer(
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+              // Keeps every page alive; the bar floats over whichever is shown.
+              child: IndexedStack(
+                index: _tab,
+                children: <Widget>[
+                  for (final GlassTabItem tab in _tabs)
+                    ListView.builder(
+                      // Room at the end so the last row is not under the bar.
+                      padding: EdgeInsets.only(bottom: bottom + 96),
+                      itemCount: 40,
+                      itemBuilder: (BuildContext context, int i) => ListTile(title: Text('${tab.label} ${i + 1}')),
+                    ),
+                ],
+              ),
             ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: bottom + 12,
-            child: GlassTabBar(items: _tabs, selectedIndex: _tab, onSelected: (int i) => setState(() => _tab = i)),
-          ),
-        ],
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: bottom + 12,
+              child: GlassTabBar(
+                items: _tabs,
+                selectedIndex: _tab,
+                onSelected: (int i) => setState(() => _tab = i),
+                minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1014,7 +1201,19 @@ class _AppShellState extends State<AppShell> {
 | `activeColor` | `Color` | `Color(0xFF007AFF)` | Icon and label colour of the selected tab, and of the tab under a held drop. |
 | `dropZoom` | `double` | `kGlassTabDropZoom` | How much the held drop magnifies the bar. `1` for none; must be above 0. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
+| `minimizeBehavior` | `GlassTabBarMinimizeBehavior` | `.never` | `.onScrollDown` collapses the bar to its selected tab while the content scrolls down, under a `GlassTabBarMinimizer`. |
+| `bottomAccessory` | `Widget?` | `null` | A widget on a glass capsule above the bar, which moves beside the collapsed circle. |
 | `key` | `Key?` | `null` | |
+
+## GlassTabBarMinimizer
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `child` | `Widget` | **required** | The subtree whose vertical scrolls collapse the bars in it: the scroll view and the bar both. |
+| `notificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which scroll notifications count. The default takes only `depth == 0`; `n.depth == 1` reaches a list in a `PageView` or `TabBarView`. |
+
+`static ValueNotifier<bool>? maybeOf(BuildContext context)`: whether the bars below are collapsed, or null with no
+minimizer above. Writable: set it `false` to expand them.
 
 ## GlassTabItem
 
@@ -1048,6 +1247,8 @@ What the bar resolved for one item, as it draws it.
 |---|---|---|
 | `kGlassTabDropZoom` | `1.17` | The default `dropZoom`, read off iOS 26. |
 | `kGlassTabDropGrow` | `10.5` | How much larger the held drop is than the resting pill, per side, in px. |
+| `kGlassTabMinimizeScroll` | `12` | How far the content scrolls one way, in px, before the bar collapses or expands. Layout taste. |
+| `kGlassTabAccessoryHeight` | `48` | The accessory's glass height. Layout taste. |
 ''',
   ),
 ];

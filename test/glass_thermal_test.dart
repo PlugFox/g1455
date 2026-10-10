@@ -1,6 +1,6 @@
-// Phase D's remainder: the thermal policy (D205).
+// The thermal policy.
 //
-// `flutter test test/glass/glass_thermal_test.dart`
+// `flutter test test/glass_thermal_test.dart`
 //
 // Thermals act on the retake and not on the ladder, because a frame of
 // staleness has a measured price per finish and the ladder's rungs do not
@@ -44,7 +44,7 @@ void main() {
     const expected = <String, (int, int)>{
       'regularDark': (2, 4),
       // The light branch buys what the dark one does: its stale frames are
-      // cheaper, but not by a whole rung at either allowance (D230).
+      // cheaper, but not by a whole rung at either allowance.
       'regularLight': (2, 4),
       'frosted': (1, 2),
       'thinLight': (0, 1),

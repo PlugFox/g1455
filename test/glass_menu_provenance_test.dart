@@ -1,4 +1,4 @@
-// The menu's constants against the run they came from (spike 34).
+// The menu's constants against the run they came from.
 //
 // `flutter test test/glass_menu_provenance_test.dart`
 //
@@ -6,8 +6,8 @@
 // `UIMenu` open from a button, a line per view with its frame in points. The
 // width and the row height are read off it here, so that a constant edited
 // in `lib/` without a new run fails rather than drifting from its source.
-// The corner (31.5) was fitted on `top_open.png` and is checked by nothing
-// but the record (FINDINGS D228).
+// The corner (31.5) was fitted on `top_open.png` by eye and is checked by
+// nothing here.
 
 import 'dart:io';
 

@@ -1,14 +1,11 @@
-// When to re-record the proxy — the last piece of the skeleton, and the one
-// whose answer is uncomfortable.
+// When to re-record the proxy.
 //
-// The roadmap's shape for it is "re-take on a dirty rect from the D2 oracle,
-// with a threshold and a frequency ceiling", and it says the ceiling is
-// assigned by the finish rather than by taste, because a frame of staleness has
-// a measured price. It has. The price is higher than the shape assumed.
+// The frequency ceiling is assigned by the finish rather than by taste, because
+// a frame of staleness has a measured price — and it is high.
 //
 // **A frame behind costs at least what a quarter of the resolution does**, on
-// every finish the ladder has run (mean over the seven corpus scenes, ΔE
-// against the same finish at full quality) — 1.17x on `clear`, 1.77x on
+// every finish measured (mean over seven test scenes, ΔE against the same
+// finish at full quality) — 1.17x on `clear`, 1.77x on
 // `thinLight`, 1.73x on `regular`, and 0.98x on `frosted`, which is the one
 // place the two are equal:
 //
@@ -26,16 +23,10 @@
 //
 // So at the budget that picks a quarter-resolution proxy — 1% of the distance
 // between two of Apple's own materials, 0.348 ΔE — **no finish may be stale at
-// all**. The ceiling is zero frames, and the lever the roadmap expected to find
-// here is not there. What is left is the other half, which is worth more: a
-// proxy is only stale if something *moved*, and the ladder's latency rungs are
-// a scene that moves every frame at full speed. Retake when the scene changes,
-// and the ceiling is a backstop rather than a schedule.
-//
-// ⚠️ The numbers above are today's optics. D30 quotes 0.43 / 0.80 / 1.51 behind
-// sigma 8, which is the same ladder before M13 recalibrated the shader; the two
-// are close and they are not the same, and the second one is the one this
-// package renders.
+// all**. The ceiling is zero frames. What is left is the other half, which is
+// worth more: a proxy is only stale if something *moved*, and the table above
+// is a scene that moves every frame at full speed. Retake when the scene
+// changes, and the ceiling is a backstop rather than a schedule.
 
 import 'dart:math' as math;
 
@@ -51,8 +42,8 @@ import 'proxy_role.dart';
 abstract final class GlassDamage {
   /// Composes per-axis damage into the damage of doing all of it at once.
   ///
-  /// **The sum is refuted.** Over 56 cells — two combination rungs of the M11
-  /// ladder, seven scenes, four finishes — adding the parts overstates the
+  /// **The sum is wrong.** Over 56 cells — two combinations of axes, seven
+  /// scenes, four finishes — adding the parts overstates the
   /// measured combination by a median of **38%** and by up to 147%. Two models
   /// survive and they bracket the truth: the largest part alone is the better
   /// description (median bias −0.7%, median error 4.1%) and the quadrature is
@@ -61,14 +52,12 @@ abstract final class GlassDamage {
   /// This returns the quadrature, for two reasons that agree. A budget wants
   /// the conservative side of a pair that brackets, and the same rule already
   /// governs the *sigmas* these damages come from: a divisor's low-pass and a
-  /// finish's blur compose in quadrature (D117), so their damages composing the
-  /// same way is one rule rather than two.
+  /// finish's blur compose in quadrature, so their damages composing the same
+  /// way is one rule rather than two.
   ///
-  /// The measurement needed a rung built for it. The ladder's own `mix` is
-  /// three parts of which one is four to seven times the others, so every model
-  /// predicts nearly the same number there; `res8lag2` puts resolution and
-  /// staleness within a factor of two on every finish, which is what let the
-  /// models separate (40% against 7%).
+  /// The models separate only when the parts are of similar size; the
+  /// combination that decided it puts resolution and staleness within a factor
+  /// of two on every finish (40% error for the sum against 7%).
   static double compose(Iterable<double> parts) {
     var sum = 0.0;
     for (final double part in parts) {
@@ -87,12 +76,12 @@ abstract final class GlassDamage {
 
 /// What a frame of staleness costs, per finish.
 abstract final class ProxyStaleness {
-  /// The report these came from — the same ladder the resolution damage is read
+  /// The report these came from — the same run the resolution damage is read
   /// from, and tracked for the same reason.
   static const String source = 'provenance/quality/d117-uncorrected-2026-09-08T06-39-52.json';
 
-  /// The rung that made the composition rule measurable, on the run that took
-  /// it. Its parts are `res8` and `lag2`, chosen to be within a factor of two.
+  /// The measurement behind the composition rule. Its parts are `res8` and
+  /// `lag2`, chosen to be within a factor of two.
   static const String compositionSource = 'provenance/quality/d124-compose';
 
   /// Mean ΔE against the same finish at full quality, by frames behind.
@@ -105,23 +94,24 @@ abstract final class ProxyStaleness {
     'thinLight': <int, double>{0: 0.0, 1: 0.795, 2: 1.489, 4: 2.646},
     'frosted': <int, double>{0: 0.0, 1: 0.488, 2: 0.830, 4: 1.448},
     'regularDark': <int, double>{0: 0.0, 1: 0.384, 2: 0.675, 4: 1.150},
-    // From [ProxyResolution.lightDamageSource], whose `regular` lag arms
+    // From [ProxyResolution.lightDamageSource], whose `regular` lag rows
     // reproduce these to the third decimal.
     'regularLight': <int, double>{0: 0.0, 1: 0.284, 2: 0.493, 4: 0.831},
   };
 
-  /// Damage at a measured number of frames behind, or null for a point the
-  /// ladder never ran.
+  /// Damage at a measured number of frames behind, or null for a point that was
+  /// never measured.
   ///
-  /// Refuses rather than interpolating: the rungs are 1, 2 and 4, three is not
-  /// among them, and the curve's shape between them is nobody's measurement.
+  /// Refuses rather than interpolating: the measured points are 1, 2 and 4,
+  /// three is not among them, and the curve's shape between them is nobody's
+  /// measurement.
   static double? damageAt(String finish, int framesBehind) => _damage[finish]?[framesBehind];
 
   /// The most frames a proxy of [finish] may be behind before it costs more
   /// than [budgetDeltaE].
   ///
-  /// Zero is the common answer and it is the finding rather than a degenerate
-  /// case: at the default budget every finish's first stale frame is already
+  /// Zero is the common answer and not a degenerate case: at the default
+  /// budget every finish's first stale frame is already
   /// over. A caller who wants a ceiling above zero is choosing to spend more
   /// than 1% of the material scale on staleness, which is a decision and should
   /// look like one.
@@ -155,10 +145,9 @@ abstract final class ProxyStaleness {
 /// **Thermals act on the retake, not on the ladder** (`glass_tier.dart`). A
 /// frame of staleness has a measured price per finish (`ProxyStaleness`): 0.384
 /// ΔE behind `regular`, 0.488 behind `frosted`, 1.496 behind `clear`. So the
-/// same allowance buys a heavy finish frames and a clear one none, which is the
-/// sentence the roadmap wrote before the table existed — throttling under a
-/// matte finish is nearly free and under a transparent one it is forbidden —
-/// now as arithmetic instead of advice (D205).
+/// same allowance buys a heavy finish frames and a clear one none: throttling
+/// under a matte finish is nearly free and under a transparent one it is
+/// forbidden.
 ///
 /// What a throttle does: when the screen *under* the glass changes, the proxy
 /// may be up to [throttleFrames] frames old before it is re-recorded, so a
@@ -167,8 +156,8 @@ abstract final class ProxyStaleness {
 /// is reading a different part of the screen, which is not a stale picture but
 /// a wrong one — and never before the first capture.
 ///
-/// The allowances are **the package's choice, in the project's own unit**: 2%
-/// and 4% of the distance between Apple's `.regular` and `.clear` (S4) for
+/// The allowances are **the package's choice, in the package's own unit**: 2%
+/// and 4% of the distance between Apple's `.regular` and `.clear` for
 /// [GlassThermalState.serious] and [GlassThermalState.critical], against the 1%
 /// the resolution policy spends on an ordinary frame. Nothing at
 /// [GlassThermalState.fair], where both platforms say the user notices
@@ -183,7 +172,7 @@ abstract final class ProxyStaleness {
 /// | `clear` | 0 | 0 |
 ///
 /// — before whatever the resolution already spent, which comes off first in
-/// quadrature (D124), so a screen at a coarse divisor gets fewer.
+/// quadrature, so a screen at a coarse divisor gets fewer.
 ///
 /// The host takes the state and the policy side by side; the state is the
 /// application's to read, since the package ships no platform code:
@@ -279,39 +268,27 @@ class GlassThermalPolicy {
 
 /// Whether the host may hold a proxy that nothing it watches has changed.
 ///
-/// It began as the sixth thing on the same list as occlusion (D42), reduced
-/// transparency (D59), the roles (D115), the hardware (D121) and the shadow
-/// policy — something the package cannot work out, so whoever can says it — and
-/// it has stopped being that. Since D152 nothing about *content* is declared
-/// here at all: `ProxyLayerWatch` reads the host's composited subtree, and what
-/// is left in this enum is a permission to use that answer.
+/// Nothing about *content* is declared here: `ProxyLayerWatch` reads the
+/// host's composited subtree, and this enum is a permission to use that
+/// answer.
 ///
-/// **Why it exists at all.** The retake oracle's staleness ceiling is zero on every measured
-/// finish at the default budget, so before this enum the `hold` branch was
-/// unreachable and the proxy was re-recorded on every frame of every
-/// application, a completely still screen included (D142). That zero is not a
-/// defect in the staleness table — the table is about a **moving** scene, and
-/// the branch it gates has just established that nothing the oracle can see
-/// changed, where staleness of unchanged content costs zero rather than 0.384.
-/// The ceiling is a hedge against changes the oracle cannot see.
+/// **Why it exists.** The retake oracle's staleness ceiling is zero on every
+/// measured finish at the default budget, so without a hold the proxy would be
+/// re-recorded on every frame, a completely still screen included. That zero
+/// is not a defect in the staleness table — the table is about a **moving**
+/// scene, and the branch it gates has just established that nothing the oracle
+/// can see changed, where staleness of unchanged content costs nothing.
 ///
-/// **Which side is the default moved on 2026-09-12 (D163), and it took three
-/// findings to move it.** The old default was [undeclared], on the reasoning
-/// that a held proxy over changed content is wrong where a re-recorded proxy
-/// over still content is merely expensive. Both halves of that reasoning are
-/// now measured rather than assumed. What it costs: 79.4% and 66.3% of the
-/// addition on Adreno and 97.8% on Metal (D146), which is most of the price of
-/// the whole route, paid by every application on every still frame. What it
-/// buys: coverage of changes the oracle cannot see — and since D152 the oracle
-/// sees the composited output, where a repaint cannot hide, so the remaining
-/// exposure is a hole in one table of layer types. That table was audited
-/// against `layer.dart` in D162, the one hole in it was closed, and it is now
-/// checked against the SDK in a test rather than by reading. What the walk
-/// costs: under 3 µs a frame, below what a device run can resolve (D160).
+/// **Why [declared] is the default.** Re-recording a still screen costs most
+/// of what the glass adds to a frame: 79.4% and 66.3% on Adreno 830, 97.8% on
+/// an M2 iPad Pro. Holding risks only changes the watch cannot see, and the
+/// watch reads the composited output, where a repaint cannot hide; the
+/// remaining exposure is its table of layer types, which a test checks against
+/// the SDK's `layer.dart`. The watch itself costs under 3 µs a frame.
 ///
 /// Passed to [GlassHost.content]. The default needs nothing written; the
 /// opt-out is for a host that composites through something the watch cannot
-/// read, or for a benchmark arm:
+/// read, or for measuring the capture:
 ///
 /// ```dart
 /// GlassHost(
@@ -332,32 +309,28 @@ class GlassThermalPolicy {
 enum GlassContentDeclaration {
   /// Assume anything may have changed since the last frame, and re-record.
   ///
-  /// No longer the default, and what it now means is "distrust the watch":
-  /// the proxy is re-recorded on every frame regardless of what the composited
-  /// subtree says. It is the most expensive thing this package can be asked to
-  /// do — the capture is 77% of what the route adds at the divisor the policy
-  /// picks on a dpr-2 screen (D141, M2 iPad Pro) — and it is worth asking for in exactly two
-  /// situations: a host that composites through a layer type it has reason to
-  /// think this package misreads, and an arm of a benchmark that wants the
+  /// "Distrust the watch": the proxy is re-recorded on every frame regardless
+  /// of what the composited subtree says. It is the most expensive thing this
+  /// package can be asked to do — the capture is 77% of what the glass adds to
+  /// a frame on a dpr-2 screen (M2 iPad Pro) — and it is worth asking for in
+  /// exactly two situations: a host that composites through a layer type it
+  /// has reason to think this package misreads, and a benchmark that wants the
   /// capture measured on every frame.
   undeclared,
 
   /// Hold a clean proxy, and let the watch decide what "clean" means.
   ///
-  /// **The default since D163.** Under it a clean proxy is held
-  /// **indefinitely**: the ceiling is not consulted at all, because a picture
-  /// that did not change costs nothing to be a frame old, and consulting a
-  /// table measured on a moving scene would return zero and undo the whole
-  /// thing.
+  /// **The default.** Under it a clean proxy is held **indefinitely**: the
+  /// ceiling is not consulted at all, because a picture that did not change
+  /// costs nothing to be a frame old, and consulting a table measured on a
+  /// moving scene would return zero and undo the whole thing.
   ///
-  /// **This is a permission and not a promise, since D152.** For one day it was
-  /// a promise, and the census that established what the application would have
-  /// to keep also measured how often: a realistic screen crosses 8 to 15 nested
-  /// repaint boundaries, and every one of them was a clause nobody could verify.
-  /// What decides now is `ProxyLayerWatch`, which reads the host's composited
-  /// subtree rather than its render tree — a repaint cannot hide from the layer
-  /// that owns it, and the one change that repaints nothing is a property of a
-  /// retained layer.
+  /// **This is a permission and not a promise.** The application does not
+  /// vouch for its content: a realistic screen crosses 8 to 15 nested repaint
+  /// boundaries, and no application could verify all of them. What decides is
+  /// `ProxyLayerWatch`, which reads the host's composited subtree rather than
+  /// its render tree — a repaint cannot hide from the layer that owns it, and
+  /// the one change that repaints nothing is a property of a retained layer.
   ///
   /// **What is left for the application to say is nothing about its content.**
   /// The one input that is still a declaration is what a [GlassProxy] marker
@@ -370,43 +343,31 @@ enum GlassContentDeclaration {
   /// believing anybody: a `Texture`, a platform view and any layer type the
   /// watch's table has never met read as changing on every frame. That refusal
   /// is what makes this a safe default rather than an optimistic one, and it is
-  /// why the table it stands on is checked against the SDK's own `layer.dart`
-  /// (D162) instead of against the scenes in this repository.
+  /// why the table it stands on is checked against the SDK's own `layer.dart`.
   ///
-  /// **Since D174 the watch says *where*, and the hold no longer needs the
-  /// screen to be still — only the glass to be missed.** `ProxyLayerWatch`
-  /// returns a region, and the host compares it against what the atlas actually
-  /// holds; a change that reaches no slot is held through. On a screen with one
-  /// spinner turning 500 logical pixels from a glass bar, that is **one capture
-  /// in a 30-second window** against one per frame, and the glass arm is
-  /// **6.5-10.2% cheaper** for it. The same spinner moved *inside* the bar
-  /// captures on every frame and the two arms then agree to 0.6% — which is the
-  /// control that says the saving belongs to the placement rather than to the
-  /// scene being cheap.
-  ///
-  /// ⚠️ **As a share of what the route adds, it is a range and not a number:**
-  /// two seeds say 94% and 56%, because that share is a small difference of
-  /// large numbers and the per-arm spread on the device it was taken on runs to
-  /// 12.6%. What both seeds and both instruments agree on is that the declared
-  /// arm sits on the floor — indistinguishable from the same screen with no
-  /// glass in it (`provenance/digest/s22u-aside-{a,b}.json`, Xclipse 920,
-  /// one device).
+  /// **The watch says *where*, so the hold does not need the screen to be
+  /// still — only the glass to be missed.** `ProxyLayerWatch` returns a region,
+  /// and the host compares it against what the atlas actually holds; a change
+  /// that reaches no slot is held through. On a screen with one spinner turning
+  /// 500 logical pixels from a glass bar, that is **one capture in a 30-second
+  /// window** against one per frame, and the frame is **6.5-10.2% cheaper** for
+  /// it; the same spinner inside the bar captures on every frame, and the
+  /// saving disappears (Xclipse 920, `provenance/digest/s22u-aside-{a,b}.json`).
+  /// With the spinner away from the glass, the frame costs the same as the
+  /// screen with no glass in it, within the device's noise.
   ///
   /// The bound is never tighter than the nearest enclosing repaint boundary —
   /// `PictureLayer.canvasBounds` is the boundary's bounds and not the picture's
   /// — so this pays where the change sits in a nested boundary that misses the
   /// glass, and not otherwise. How common that is, is a property of the
-  /// application's tree: every scene in this repository's own corpus changes
-  /// what is under its glass on every frame, by construction.
+  /// application's tree.
   declared;
 
   /// What a host uses when the application says nothing.
   ///
-  /// Named rather than spelled out, because two places outside `lib/` have to
-  /// mount *the default* and not a copy of today's value: the playground's
-  /// fallback and the bench's record of what ran. A copied literal in either is
-  /// a run whose default arm measures the arm nobody ships — which is the
-  /// defect D147 cost a day to, in the other direction.
+  /// Named rather than spelled out, so code outside the package that has to
+  /// use *the default* (a benchmark's record of what ran, a demo's fallback)
+  /// follows it rather than a copy of today's value.
   static const GlassContentDeclaration byDefault = declared;
 }
 
@@ -472,19 +433,16 @@ enum RetakeReason {
 ///
 /// Two inputs and neither is a guess. **What changed** is observed where it can
 /// be — the surfaces' own geometry, and every [GlassProxy] marker in the
-/// subtree, which is what `proxyChanges` has been publishing since D115 with
-/// nobody listening — and *declared* where it cannot.
+/// subtree through `proxyChanges` — and *declared* where it cannot.
 ///
-/// Where the line falls turned out to be a property of *which tree is being
-/// watched*. Nothing in the render tree reports that a subtree repainted, and
-/// every observation built on it stops at a nested repaint boundary — of which a
+/// Nothing in the render tree reports that a subtree repainted, and every
+/// observation built on it stops at a nested repaint boundary — of which a
 /// realistic screen has 8 to 15. The composited tree cannot stay silent about
-/// the same events, because it is what was shown, so since D152 the host asks it
-/// once per frame and reports the answer here through [noteChange] like anything
-/// else. What genuinely remains a declaration is not about content at all: it is
-/// what a [GlassProxy] marker says, which changes the *capture* rather than the
-/// screen. That is the same list as occlusion (D42), reduced transparency (D59),
-/// the roles (D115) and the hardware (D121).
+/// the same events, because it is what was shown, so the host asks it once per
+/// frame and reports the answer here through [noteChange] like anything else.
+/// What remains a declaration is not about content at all: it is what a
+/// [GlassProxy] marker says, which changes the *capture* rather than the
+/// screen.
 ///
 /// **How long it may be held** is the measured half, and it is [ProxyStaleness].
 class RetakeOracle {
@@ -495,24 +453,22 @@ class RetakeOracle {
     this.budgetDeltaE = ProxyResolutionPolicy.defaultDamageBudgetDeltaE,
     this.content = GlassContentDeclaration.byDefault,
   });
-  // There was a `spentDeltaE` parameter here, and it never had a caller: what
-  // the resolution spends is a function of the screen's density and so is not
-  // known when the host builds the oracle. That is why it is [noteResolutionDamage]
-  // now — a constructor argument nobody can supply is a budget nobody shares.
+  // What the resolution spends is a function of the screen's density and so is
+  // not known when the host builds the oracle, which is why it arrives through
+  // [noteResolutionDamage] rather than here.
 
   /// Key into the measured staleness table.
   final String finish;
 
   /// The whole quality allowance, in ΔE against the same finish at full
   /// quality. The default is 1% of the distance between `Glass.regular` and
-  /// `Glass.clear` (S4) — literally the resolution policy's own constant, and
+  /// `Glass.clear` — literally the resolution policy's own constant, and
   /// deliberately so: the two axes draw on one budget.
   final double budgetDeltaE;
 
   /// What the host says about content that changes without moving a surface.
   ///
-  /// The only lever the capture has — not taking it — and it is switched off by
-  /// arithmetic unless the host turns it on (D142). See
+  /// The only lever the capture has — not taking it. See
   /// [GlassContentDeclaration].
   final GlassContentDeclaration content;
 
@@ -529,11 +485,10 @@ class RetakeOracle {
   /// Notes what the resolution policy spent, so the ceiling is what is left
   /// rather than the whole allowance.
   ///
-  /// D124: damage on two axes does not add — the composition is between the
-  /// largest part and the quadrature, and the quadrature is the safe side — so
-  /// what staleness may spend is `sqrt(budget² − spent²)`. Without this the
-  /// package charged the *same* allowance to both axes, which is the one model
-  /// the measurement rules out.
+  /// Damage on two axes does not add — the composition is between the largest
+  /// part and the quadrature, and the quadrature is the safe side — so what
+  /// staleness may spend is `sqrt(budget² − spent²)`. Without this both axes
+  /// would draw the *same* allowance twice ([GlassDamage.compose]).
   void noteResolutionDamage(double deltaE) => _spentDeltaE = deltaE;
 
   /// The most frames this proxy may be held when nothing has changed.
@@ -574,8 +529,8 @@ class RetakeOracle {
   /// The escape hatch that keeps this honest, and the one input the host's own
   /// observations arrive through as well: the layer watch's verdict, the host's
   /// own repaint and an application calling `GlassProxyHandle.noteChange` are
-  /// the same event as far as this class is concerned. Since D152 the first of
-  /// those subsumes the rest for anything that reaches a pixel, and what an
+  /// the same event as far as this class is concerned. The first of those
+  /// subsumes the rest for anything that reaches a pixel, and what an
   /// application would still call this for is something it knows that the
   /// composited output does not show.
   void noteChange() => _dirty = true;
@@ -584,9 +539,9 @@ class RetakeOracle {
   ///
   /// Idempotent per call: it drops what it was watching first. Call it when the
   /// tree's *structure* changes rather than every frame — the walk is
-  /// `visitChildren` over the whole subtree, which is the cost M12 measured at
-  /// 24 us per pass on this corpus, and paying it to discover that nothing
-  /// changed is the opposite of the point.
+  /// `visitChildren` over the whole subtree (about 24 us on a typical screen,
+  /// measured in debug on a desktop host), and paying it to discover that
+  /// nothing changed is the opposite of the point.
   void watch(RenderObject root) {
     unwatch();
     void visit(RenderObject node) {

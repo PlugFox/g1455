@@ -1,17 +1,16 @@
 // The package's glass, drawn for a *blend group*: N shapes fused into one
 // silhouette by one draw.
 //
-// **Why it is a second binary rather than a mode of `glass_surface.frag`.** B5
-// measured that adding a path to a runtime effect reprices every mode already
-// in it by 52-62%, and the single surface is the overwhelmingly common case —
+// **Why it is a second binary rather than a mode of `glass_surface.frag`.**
+// Adding a path to a runtime effect reprices every mode already
+// in it by 52-62%, measured, and the single surface is the overwhelmingly common case —
 // a loop and a uniform array charged to every panel on every screen would be
-// the whole shader's budget (9% of the addition over the floor, D63) spent on
+// the whole shader's budget (9% of what the glass adds to a frame) spent on
 // a feature most screens do not use. The two programs pay for that separation
 // with an obligation instead: at `uCount = 1` this one must reproduce
-// `glass_surface.frag` **exactly**, and `test/glass/glass_group_test.dart`
-// renders the same geometry through both and requires zero differing pixels.
-// That is the same arrangement `glass_preview.frag` is under, for the same
-// reason: two binaries drifting apart would ship optics nobody graded.
+// `glass_surface.frag` **exactly**, and `test/glass_group_test.dart` renders
+// the same geometry through both and requires zero differing pixels: two
+// binaries drifting apart would ship optics nobody graded.
 //
 // **Why one draw and not N.** The bridge between two fused shapes belongs to
 // neither of them — there is no fragment of either surface's own box where it
@@ -19,7 +18,7 @@
 // all. One draw over the group's box, one distance field, one silhouette.
 // The price is the dead area of that box: fragments outside every shape are
 // shaded and discarded by coverage. Named rather than hidden, because it is the
-// quantity a group trades against the fragmentation excess it saves (D26).
+// quantity a group trades against the fragmentation excess it saves.
 //
 // **The field is a polynomial smooth minimum, and its gradient is exact.**
 // `smin(a, b, k) = min(a, b) - h^2*k/4` with `h = max(k - |a-b|, 0)/k`, whose
@@ -37,7 +36,7 @@
 // the last code value or so, but "only a little, and differently every frame"
 // is the description of a shimmer.
 //
-// M3 warned that `smin` needs *real* distances — it mixes two fields by their
+// `smin` needs *real* distances — it mixes two fields by their
 // values, so an error in either moves the bridge, and the bridge lives where
 // both shapes are far from their own contours, which is where approximations
 // are worst. The single-Newton estimator invents bridges up to 81 px wide
@@ -48,30 +47,52 @@
 
 #include <flutter/runtime_effect.glsl>
 
-// Twelve because that is where the cost corpus stops: the fragmentation excess
-// (D26) is measured at 2 and at 12 surfaces and everything past it is an
+// Twelve because that is where the cost measurements stop: the fragmentation
+// excess is measured at 2 and at 12 surfaces and everything past it is an
 // extrapolation of a curve nobody took. A group larger than this is refused by
 // the caller rather than truncated here — a truncated group would draw a
 // picture with shapes silently missing.
 #define kMaxShapes 12
 
-uniform vec2 uTexSize;     // atlas size, texels
-uniform vec2 uMapOrigin;   // draw space -> texels: p * uMapScale + uMapOrigin
-uniform float uMapScale;   // texels per logical pixel
-uniform vec2 uSlotMin;     // the slot's own bounds in texels, inclusive
-uniform vec2 uSlotMax;
-uniform float uCount;      // shapes in force, 1..kMaxShapes
-uniform float uBlend;      // smin radius k, draw-space px; 0 is a plain union
+// Packed into `vec4`s in the order Dart writes it, every name a macro over a
+// lane, for the reason `glass_surface.frag` gives: on Metal each declaration is
+// a bind per draw. The arrays keep their own declarations — an array is one
+// bind already — and the head ends in a `vec3` so they start where they always
+// did. Nineteen declarations, now nine, and no `setFloat` index moved.
+//
+//   uH0  uTexSize.xy  uMapOrigin.xy                  floats  0-3
+//   uH1  uMapScale  uSlotMin.xy  uSlotMax.x                   4-7
+//   uH2  uSlotMax.y  uCount  uBlend                           8-10
+//   uBox[12], uRadius[12]                                    11-70
+//   uT0  uThickness  uStrength  uEdgePower  uShoulder        71-74
+//   uT1  uTint                                               75-78
+//   uT2  uRimWidth  uRim.rgb                                 79-82
+//   uT3  uRim.a  uPixel  uCullK  uRimMix                     83-86
+uniform vec4 uH0;
+uniform vec4 uH1;
+uniform vec3 uH2;
 uniform vec4 uBox[kMaxShapes];     // centre.xy, half extent.xy, draw space
 uniform float uRadius[kMaxShapes]; // corner radius, px
-uniform float uThickness;  // how far in from the rim refraction reaches, px
-uniform float uStrength;   // peak sample displacement at the rim, px
-uniform float uEdgePower;  // falloff exponent
-uniform float uShoulder;   // shoulder exponent on the depth, 1.0 = no shoulder
-uniform vec4 uTint;        // straight alpha, laid over the refracted sample
-uniform float uRimWidth;   // width of the outline inside the edge, px
-uniform vec4 uRim;         // rgb is the colour, a is how much it *adds*
-uniform float uPixel;      // one device pixel, in this geometry's own units
+uniform vec4 uT0;
+uniform vec4 uT1;
+uniform vec4 uT2;
+uniform vec4 uT3;
+
+#define uTexSize uH0.xy     // atlas size, texels
+#define uMapOrigin uH0.zw   // draw space -> texels: p * uMapScale + uMapOrigin
+#define uMapScale uH1.x     // texels per logical pixel
+#define uSlotMin uH1.yz     // the slot's own bounds in texels, inclusive
+#define uSlotMax vec2(uH1.w, uH2.x)
+#define uCount uH2.y        // shapes in force, 1..kMaxShapes
+#define uBlend uH2.z        // smin radius k, draw-space px; 0 is a plain union
+#define uThickness uT0.x    // how far in from the rim refraction reaches, px
+#define uStrength uT0.y     // peak sample displacement at the rim, px
+#define uEdgePower uT0.z    // falloff exponent
+#define uShoulder uT0.w     // shoulder exponent on the depth, 1.0 = no shoulder
+#define uTint uT1           // straight alpha, laid over the refracted sample
+#define uRimWidth uT2.x     // width of the outline inside the edge, px
+#define uRim vec4(uT2.yzw, uT3.x) // rgb is the colour, a is how much it *adds*
+#define uPixel uT3.y        // one device pixel, in this geometry's own units
 
 // The distance past which a shape is skipped. `k` in every draw the package
 // makes, and a uniform rather than `k` itself for one reason: skipping is
@@ -79,14 +100,14 @@ uniform float uPixel;      // one device pixel, in this geometry's own units
 // same fragment twice with the branch present and the threshold out of reach.
 // A constant would have made the claim unfalsifiable from outside the shader.
 // It costs a register; the comparison it feeds was going to be there anyway.
-uniform float uCullK;
+#define uCullK uT3.z
 
 // How much the outline *replaces* rather than adds: 0 is the calibrated
 // additive rim, 1 lays uRim.rgb on at the band's coverage — the platform's
-// increase-contrast switch (D203). A uniform rather than a second shader
+// increase-contrast switch. A uniform rather than a second shader
 // because at 0 the line below is `col * 1.0 + …`, the same bits as before,
 // and that is enforced rather than hoped for.
-uniform float uRimMix;
+#define uRimMix uT3.w
 
 uniform sampler2D uTex;
 
@@ -106,9 +127,8 @@ float sdRoundedBox(vec2 p, vec2 b, float r) {
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - r;
 }
 
-// Analytic gradient, transliterated from bench/model/refraction.dart together
-// with the SDF above. Kept branchy: D15 measured the branchless rewrite of this
-// exact function 53% dearer, because its branches separate large connected
+// Analytic gradient of the SDF above. Kept branchy: the branchless rewrite of
+// this exact function was measured 53% dearer, because its branches separate large connected
 // regions rather than neighbouring pixels.
 vec2 sdRoundedBoxNormal(vec2 p, vec2 b, float r) {
     vec2 s = vec2(p.x < 0.0 ? -1.0 : 1.0, p.y < 0.0 ? -1.0 : 1.0);
@@ -151,7 +171,7 @@ void main() {
         //
         // Worth a branch because the per-shape term is what the fragment is:
         // 0.0441 cycles per device pixel each against 0.0343 fixed, so at
-        // twelve shapes the fold is 94% of the fragment (D169, Adreno 830).
+        // twelve shapes the fold is 94% of the fragment (Adreno 830).
         if (di - d >= uCullK) {
             continue;
         }
@@ -171,7 +191,7 @@ void main() {
 
     // The rim bends the sample inward; the flat middle reads straight through.
     // Identical to the single-surface path, including the shoulder exponent
-    // (D106) — the whole difference between the two programs is the field.
+    // — the whole difference between the two programs is the field.
     float t = clamp(-d / uThickness, 0.0, 1.0);
     float bend = pow(1.0 - pow(t, uShoulder), uEdgePower);
     vec2 src = p + n * (uStrength * bend);

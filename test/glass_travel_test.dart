@@ -1,7 +1,7 @@
 // Moving glass: drawn where it is on the frame it moved, and — inside a
 // declared travel region — drawn from the proxy it already holds.
 //
-// `flutter test test/glass/glass_travel_test.dart`
+// `flutter test test/glass_travel_test.dart`
 //
 // Every arm renders an **identity glass** at dpr 1, so a surface sampling the
 // right place is invisible and one sampling anywhere else is not. That is what

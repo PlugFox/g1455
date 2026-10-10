@@ -28,6 +28,12 @@
 // largest saving. Nothing moves *inside* the bars on a scroll, so there is
 // nothing for a `GlassTravel` to declare here; a [GlassTabBar] declares its own
 // drop's.
+//
+// **The screen is a [GlassTabBarMinimizer]**, because the body's scroll view
+// and the bottom bar are siblings and a scroll notification only travels up:
+// a [GlassTabBar] that collapses on a scroll down
+// ([GlassTabBarMinimizeBehavior.onScrollDown]) is told by it. A bar that does
+// not ask is not told, and the listener costs a comparison per scroll update.
 
 import 'dart:math' as math;
 
@@ -94,6 +100,14 @@ const double kGlassScaffoldActionGap = 16;
 /// can read the same padding, or wrap itself in a `SafeArea`. The keyboard is
 /// not handled: the body sees `MediaQuery.viewInsets` as it is.
 ///
+/// **A tab bar that collapses on scroll.** The scaffold is a
+/// [GlassTabBarMinimizer]: a [GlassTabBar] in [bottomBar] with
+/// `minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown` collapses to
+/// its selected tab when the body scrolls down and expands when it scrolls up.
+/// Its box keeps its height, so the body's padding does not move. A body
+/// whose lists are nested in another scroll view — a `PageView`, a
+/// `TabBarView` — reaches it through [minimizeNotificationPredicate].
+///
 /// > **Note:** every frame of a scroll is one capture of the whole host, for
 /// > every glass on the screen at once, because the content under the bars
 /// > changes; a still screen is held. Over glass cards, the lifted bars add
@@ -121,6 +135,7 @@ class GlassScaffold extends StatelessWidget {
     this.floatingAction,
     this.barMargin = kGlassScaffoldBarMargin,
     this.host,
+    this.minimizeNotificationPredicate = defaultScrollNotificationPredicate,
     super.key,
   }) : assert(topBarHeight >= 0);
 
@@ -162,6 +177,13 @@ class GlassScaffold extends StatelessWidget {
   /// Whether the scaffold mounts a [GlassHost] of its own: null (the default)
   /// when there is none above it, true always, false never.
   final bool? host;
+
+  /// Which of [body]'s scroll notifications collapse a [GlassTabBar] in
+  /// [bottomBar]: the scaffold's [GlassTabBarMinimizer.notificationPredicate].
+  /// By default the body's own scroll view's; a body that is a `PageView` or a
+  /// `TabBarView` of lists, or a `NestedScrollView`, has its lists one deeper,
+  /// and `(ScrollNotification n) => n.depth == 1` reaches them.
+  final ScrollNotificationPredicate minimizeNotificationPredicate;
 
   /// The top bar's extent from the top of the screen, logical px: the safe
   /// area, [barMargin] above and below, and [topBarHeight]. What the body is
@@ -208,7 +230,8 @@ class GlassScaffold extends StatelessWidget {
       ],
     );
     final bool own = host ?? GlassProxyScope.maybeOf(context) == null;
-    return own ? GlassHost(child: screen) : screen;
+    final Widget minimizing = GlassTabBarMinimizer(notificationPredicate: minimizeNotificationPredicate, child: screen);
+    return own ? GlassHost(child: minimizing) : minimizing;
   }
 
   Widget _top(EdgeInsets safe, double extent) {

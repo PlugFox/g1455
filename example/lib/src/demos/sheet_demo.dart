@@ -6,8 +6,9 @@ import '../backdrops.dart';
 import '../widgets/stage.dart';
 import '../widgets/site_icon.dart';
 
-/// A photo with a share button, opening a share sheet on glass; what the
-/// sheet returned is read out underneath.
+/// A photo with a share button, opening a share sheet on glass that can be
+/// pulled up to a large detent; what the sheet returned, and the detent it
+/// last settled at, are read out underneath.
 class SheetDemo extends StatefulWidget {
   const SheetDemo({super.key});
 
@@ -19,7 +20,10 @@ class _SheetDemoState extends State<SheetDemo> {
   String _finish = 'Theme';
   bool _grabber = true;
   bool _tapDim = true;
+  bool _large = true;
+  bool _opaque = true;
   String _result = 'not opened yet';
+  String _detent = 'medium';
 
   GlassFinish? get _glass => switch (_finish) {
     'Light' => GlassFinish.regularLight,
@@ -30,6 +34,7 @@ class _SheetDemoState extends State<SheetDemo> {
 
   Future<void> _share() async {
     final GlassFinish? finish = _glass;
+    setState(() => _detent = 'medium');
     final String? done = await showGlassSheet<String>(
       context: context,
       finish: finish,
@@ -37,6 +42,11 @@ class _SheetDemoState extends State<SheetDemo> {
       barrierDismissible: _tapDim,
       // The content's width, centred, rather than the window's.
       constraints: const BoxConstraints(maxWidth: 520),
+      detents: <GlassSheetDetent>[GlassSheetDetent.medium, if (_large) GlassSheetDetent.large],
+      // Null is the finish laid on opaquely, which reads no backdrop at large;
+      // the finish itself keeps the large sheet glass.
+      largeFinish: _opaque ? null : finish ?? GlassTheme.of(context).finish,
+      onDetentChanged: (GlassSheetDetent d) => setState(() => _detent = d.name),
       builder: (BuildContext context) => _ShareSheet(finish: finish),
     );
     if (mounted) {
@@ -57,8 +67,20 @@ class _SheetDemoState extends State<SheetDemo> {
       ),
       KnobSwitch(label: 'Grabber', value: _grabber, onChanged: (bool v) => setState(() => _grabber = v)),
       KnobSwitch(label: 'Tap outside', value: _tapDim, onChanged: (bool v) => setState(() => _tapDim = v)),
+      KnobSwitch(label: 'Large detent', value: _large, onChanged: (bool v) => setState(() => _large = v)),
+      KnobChoice<bool>(
+        label: 'At large',
+        values: const <bool>[true, false],
+        selected: _opaque,
+        labelOf: (bool o) => o ? 'Opaque' : 'Glass',
+        onChanged: (bool o) => setState(() => _opaque = o),
+      ),
     ],
-    hint: 'The sheet rises from the bottom of the window, as wide as what it holds. Drag it down past a third of its height, or flick it, to close.',
+    hint: _large
+        ? 'The sheet follows the finger: drag it up to the whole height, or down past a third of it to close. '
+              'Opaque at large, it reads no backdrop and drops out of the capture.'
+        : 'The sheet rises from the bottom of the window, as wide as what it holds. Drag it down past a third of its '
+              'height, or flick it, to close.',
     child: Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -80,7 +102,7 @@ class _SheetDemoState extends State<SheetDemo> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Text(
-                'Returned: $_result',
+                'Returned: $_result · detent: $_detent',
                 style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),

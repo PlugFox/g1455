@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../catalog/catalog.dart';
 import 'demos_components_a.dart';
 import 'demos_components_b.dart';
+import 'demos_components_c.dart';
 import 'demos_foundations_a.dart';
 import 'demos_foundations_b.dart';
 import 'demos_start.dart';
@@ -17,6 +18,7 @@ final Map<String, DemoBuilder> _kDemos = <String, DemoBuilder>{
   ...kDemosFoundationsB,
   ...kDemosComponentsA,
   ...kDemosComponentsB,
+  ...kDemosComponentsC,
 };
 
 /// The live demo of [entry]'s page, or null for a page without one.

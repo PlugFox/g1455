@@ -1,21 +1,17 @@
 // The proxy pass: our own paint over the live render tree, recorded into a
 // picture the glass surfaces read as their backdrop.
 //
-// Arrived here from `spikes/13_own_walk/` when phase A opened; M12 is what
-// licenses it. Spike #1 had shown that a custom `PaintingContext` does not
-// propagate by itself inside the normal pipeline — the wall is exactly
-// `isRepaintBoundary` — and that Clarity's active walk goes straight through
-// that wall while silently dropping transparency (Spike #1, Q5). M12 answered
-// the two questions that made the technique usable: a pass that draws
-// *everything* reproduces `toImageSync` byte for byte on 16 constructs of 18
-// and 65 corpus combinations of 91, and it leaves the live render tree exactly
-// as it found it.
+// A custom `PaintingContext` does not propagate by itself inside the normal
+// pipeline — the wall is exactly `isRepaintBoundary` — and a walk that simply
+// calls `paint` through that wall silently drops transparency. This pass handles
+// both: drawing *everything*, it reproduces `toImageSync` byte for byte on 16
+// constructs of 18 tested, and it leaves the live render tree exactly as it
+// found it.
 //
-// Everything built on top of it — the atlas (D24), stopping the descent on an
+// Everything built on top of it — the atlas, stopping the descent on an
 // opaque cover, substituting platform views, the roles the app declares through
-// `GlassProxy` — is a *subtraction* from that pass. A pass that already lost
-// content silently would make every later number a measurement of the loss
-// rather than of the optimisation.
+// `GlassProxy` — is a *subtraction* from that pass, so the pass itself must not
+// lose content silently.
 //
 // Deliberately observable: every subtraction and every construct this pass
 // cannot reproduce is counted in [WalkLog] rather than assumed away.
@@ -29,17 +25,17 @@ import 'shadow_filter.dart';
 
 /// What a node is allowed to become in the pass.
 ///
-/// M11 removed the middle step this enum was going to have. Simplifying content
-/// saves 24…28% (D28) and costs 0.95…9.6 ΔE (D29), while lowering the proxy
-/// resolution saves 47…73% and costs 0.47 — so "simplify" loses to a knob that
-/// already exists, on both axes. What survives is binary, plus the substitution
-/// the engine forces on us for content we cannot read.
+/// There is no "simplify" step: simplifying content saves 24…28% and costs
+/// 0.95…9.6 ΔE, while lowering the proxy resolution saves 47…73% and costs
+/// 0.47, so it loses to a knob that already exists, on both axes. What remains
+/// is binary, plus the substitution the engine forces for content that cannot
+/// be read.
 enum WalkAction {
   /// Run the node's own `paint`.
   paint,
 
   /// Draw nothing and do not descend. Our own glass surfaces (self-capture) and
-  /// shadows (D31, 0.00 ΔE) are the two mandatory members.
+  /// shadows (0.00 ΔE behind the blur) are the two mandatory members.
   skip,
 
   /// Draw a placeholder rectangle and do not descend. Platform views and
@@ -71,7 +67,7 @@ class WalkLog {
 
   /// Effects recovered from `updateCompositedLayer` — the ones a direct
   /// `paint()` call cannot see. Zero here on a tree containing an `Opacity`
-  /// means the pass has Clarity's bug.
+  /// means the pass dropped its transparency.
   int compositedEffectsApplied = 0;
 
   /// Layers this pass had to create because a `push*` return type is
@@ -139,8 +135,7 @@ class WalkLog {
 /// A `PaintingContext` that walks *through* repaint boundaries instead of
 /// compositing them, and flattens every layer effect onto its own canvas.
 ///
-/// Three hazards, all named in `FINDINGS.md` ("Свой обход дерева") and all
-/// handled here rather than hoped about:
+/// Three hazards, all handled here rather than hoped about:
 ///
 /// - **`push*` with `oldLayer` writes back into somebody else's field.**
 ///   `RenderClipRect.paint` does `layer = context.pushClipRect(..., oldLayer:
@@ -176,7 +171,7 @@ class ProxyWalkContext extends PaintingContext {
   /// The fill of a [WalkAction.substitute] placeholder.
   final ui.Color placeholderColor;
 
-  /// The one policy step M11 left alive, and it does not fit [WalkPolicy].
+  /// The shadow policy, which does not fit [WalkPolicy].
   ///
   /// A shadow is not a node: it is a `drawShadow` inside a physical model's
   /// `paint`, or a blurred `drawRRect` inside a `BoxDecoration`'s. Skipping the
@@ -321,15 +316,15 @@ class ProxyWalkContext extends PaintingContext {
   ///
   /// `RenderOpacity.paint` is literally `super.paint` (`proxy_box.dart:947-953`);
   /// all of the alpha lives in `updateCompositedLayer` (`:941`), and that method
-  /// is only ever called by `repaintCompositedChild`. Clarity walks past it and
-  /// the transparency simply disappears — measured, `wouldDirty` was 0.
+  /// is only ever called by `repaintCompositedChild`. A walk that calls `paint`
+  /// directly walks past it and the transparency simply disappears.
   ///
   /// The method is public API, so asking the child for a *throwaway* layer and
   /// reading the effect off it needs nothing private, and it covers all three
   /// framework implementations (`RenderOpacity`, `RenderAnimatedOpacityMixin`,
   /// `_RenderImageFiltered`) plus any future one, which a `case RenderOpacity`
   /// would not. The price is one layer allocated and disposed per boundary per
-  /// pass; that is a real entry in M12's CPU budget.
+  /// pass, a real share of the pass's CPU cost.
   _CanvasEffect? _compositedEffect(RenderObject child) {
     final handle = LayerHandle<OffsetLayer>();
     try {
@@ -526,11 +521,12 @@ class ProxyWalkContext extends PaintingContext {
     // Content that never reaches a canvas: `TextureLayer`, `PlatformViewLayer`.
     // There is nothing to read, so the choice is a placeholder or a hole — and
     // it is a hole, because the stock capture gives a hole and the base level
-    // is recorded that way: a level above it that drew a stub showed something
-    // the level below did not. On the web every `SelectionArea` stands on one
-    // — the browser's context menu, a transparent `HtmlElementView` under the
-    // whole selectable region — and a stub there painted a selectable page
-    // grey into the backdrop of every bar over it.
+    // is recorded that way: a level above it that drew a stub would show
+    // something the level below did not. On the web every `SelectionArea`
+    // stands on one — the browser's context menu, a transparent
+    // `HtmlElementView` under the whole selectable region — and a stub there
+    // would paint a selectable page grey into the backdrop of every bar over
+    // it.
     log.addedLayers.add(layer.runtimeType.toString());
     if (layer is! TextureLayer && layer is! PlatformViewLayer) {
       log.unhandledLayers.add(layer.runtimeType.toString());
@@ -643,10 +639,10 @@ class ProxyWalkContext extends PaintingContext {
 /// `paint` and then pushes it: `RenderLeaderLayer` sets `layer.offset`,
 /// `RenderFollowerLayer` the follower's offsets. That layer is the one on
 /// screen, and the walk calls `paint` with the root's offset rather than the
-/// one the layer's parent composites it at — so the write moved the live
-/// layer. A `SelectionArea` in a bar (its `CompositedTransformTarget`) put the
-/// bar's title one sidebar right and one inset down whenever a level above the
-/// bar was captured, a popover's, and left it there until the bar repainted.
+/// one the layer's parent composites it at — so the write moves the live
+/// layer. Unrestored, a `SelectionArea` in a bar (its
+/// `CompositedTransformTarget`) shifts the bar's title whenever a level above
+/// the bar is captured, and leaves it there until the bar repaints.
 final class _LiveOffsets {
   _LiveOffsets._(this._layer, this._offset, this._linked);
 
@@ -701,10 +697,9 @@ class _SaveLayer extends _CanvasEffect {
 
   /// Null bounds on purpose: the recorder then infers the layer's extent from
   /// what is drawn inside it, which is what makes a flattened effect identical
-  /// to the layer it replaces. Explicit bounds were tried and are worse — they
-  /// move a blur's edge by one code value over 18 327 pixels instead of 1 383,
-  /// and they do not fix the opacity/colour-filter fold, which is not a bounds
-  /// problem.
+  /// to the layer it replaces. Explicit bounds are worse: they move a blur's
+  /// edge by one code value over 18 327 pixels instead of 1 383, and they do
+  /// not fix the opacity/colour-filter fold, which is not a bounds problem.
   @override
   void begin(Canvas canvas) => canvas.saveLayer(null, paint);
 

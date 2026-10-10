@@ -2,8 +2,8 @@
 ///
 /// Each of these changes how the glass is drawn or exposes the host's plumbing
 /// so a run can count it — none of them is something an application declares.
-/// They are public because the research application that prices the package
-/// lives in another package and has to reach them; an application that imports
+/// They are public because the benchmarks that price the package live in
+/// another package and have to reach them; an application that imports
 /// this library is running an experiment.
 ///
 /// ## Did this frame capture?
@@ -18,7 +18,7 @@
 /// final bool captured = (handle?.snapshots ?? 0) > before;
 /// ```
 ///
-/// ## The arms a measurement was priced with
+/// ## The variants a measurement was priced with
 ///
 /// - [debugGlassFusedSplit] and [debugGlassFoldCull]: how a [GlassGroup]'s
 ///   fused draw is split and culled.
@@ -37,8 +37,8 @@ library;
 
 import 'g1455.dart' show GlassGroup;
 
-// Which spelling of the blend group's draw runs, and the cull inside its fold:
-// the arms D189 and D170 were priced with. The defaults are the measured ones.
+// Which spelling of the blend group's draw runs, and the cull inside its fold.
+// The defaults are the measured ones.
 export 'src/surface/glass_group.dart'
     show
         GlassFusedTile,
@@ -59,5 +59,5 @@ export 'src/surface/glass_host.dart'
     show GlassProxyHandle, GlassProxyScope, debugGlassShaderLoader, kGlassRippleShaderAsset, kGlassShaderAsset;
 // The ripple's model, which a test drives without a frame.
 export 'src/surface/glass_ripple.dart' show GlassRippleField, GlassRippleWave;
-// The anti-alias flag of the surface's draw, off by default since D200.
+// The anti-alias flag of the surface's draw, off by default.
 export 'src/surface/glass_surface.dart' show debugGlassShaderAntiAlias, debugGlassShaderAntiAliasDefault;

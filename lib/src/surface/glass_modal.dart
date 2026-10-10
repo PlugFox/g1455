@@ -1,8 +1,7 @@
 // The modal layer: an alert, a sheet, a menu.
 //
-// What was read off Apple's own (spike 33, iOS 26.5, iPhone 17 Pro, each put
-// up programmatically over spike 27's grid and photographed against the bare
-// grid):
+// What was read off Apple's own (iOS 26.5, iPhone 17 Pro, each put up
+// programmatically over a grid and photographed against the bare grid):
 //
 //  - **the dim** behind an alert and behind a sheet is the same: black at
 //    0.20 (0.201–0.203 over three channels, solved from the grid's two
@@ -16,10 +15,15 @@
 //    superellipse of exponent 3 and 51 pt reach, fitted at 0.54 device px
 //    rms), with a grabber at its top.
 //
+// The large detent was not read: Apple says only that a sheet at full height
+// loses its inset and "transitions to a more opaque appearance". Taken here
+// as far as it goes — opaque — because that is the one place on this layer a
+// glass can stop reading its backdrop without changing what it shows.
+//
 // Not read, and named where it is used: the alert's action fill, the menu's
 // size and radius, and every animation. The glass of all three is the theme's
-// finish — what Apple's material is was measured once (S4), and a modal is
-// the same material.
+// finish — Apple's material was measured once, and a modal is the same
+// material.
 //
 // **Where these must be built.** A glass surface is captured by the
 // `GlassHost` above it, and an overlay is wherever its `Overlay` is — for
@@ -44,8 +48,10 @@ import 'glass_finish.dart';
 import 'glass_host.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
+import 'glass_tier.dart';
+import 'glass_travel.dart';
 
-/// The dim behind an alert and a sheet (spike 33): black at 0.20, read off
+/// The dim behind an alert and a sheet: black at 0.20, read off
 /// iOS 26.5 over a grid of two known levels.
 ///
 /// A menu and a popover put up no dim; their barrier is transparent.
@@ -53,7 +59,7 @@ import 'glass_theme.dart';
 /// {@category Modals}
 const Color kGlassModalDim = Color.fromRGBO(0, 0, 0, 0.20);
 
-/// The alert's width, logical px (spike 33).
+/// The alert's width, logical px, as iOS 26.5 draws it.
 ///
 /// On a window narrower than this plus 16 px a side, [GlassAlert] takes the
 /// window's width less those margins instead.
@@ -61,19 +67,19 @@ const Color kGlassModalDim = Color.fromRGBO(0, 0, 0, 0.20);
 /// {@category Modals}
 const double kGlassAlertWidth = 320;
 
-/// The alert's corner radius, logical px (spike 33: `layer.cornerRadius`, a
+/// The alert's corner radius, logical px (iOS 26.5's `layer.cornerRadius`, a
 /// continuous corner).
 ///
 /// {@category Modals}
 const double kGlassAlertRadius = 34;
 
 /// How far the sheet stands in from the window's sides and bottom, and below
-/// the top safe area, logical px (spike 33, the medium detent).
+/// the top safe area, logical px (iOS 26.5, the medium detent).
 ///
 /// {@category Modals}
 const double kGlassSheetInset = 8;
 
-/// The sheet's corner radius, logical px (spike 33: the engine's
+/// The sheet's corner radius, logical px (iOS 26.5; the engine's
 /// `RSuperellipse` of 36, fitted at 0.54 device px rms).
 ///
 /// {@category Modals}
@@ -114,7 +120,7 @@ CapturedThemes _capture(BuildContext context, NavigatorState navigator) =>
     InheritedTheme.capture(from: context, to: navigator.context);
 
 /// Wraps a modal's glass: lifted, and materializing with [progress] —
-/// Apple's `.materialize` (D216), blur first and tint last, the content fading
+/// Apple's `.materialize`, blur first and tint last, the content fading
 /// in on top.
 class _Materializing extends StatelessWidget {
   const _Materializing({required this.progress, required this.builder});
@@ -301,7 +307,7 @@ class GlassAlert extends StatelessWidget {
           borderRadius: const BorderRadius.all(Radius.circular(kGlassAlertRadius)),
           finish: finish,
           // Materialized, not grown: Apple's frame is whole from the first
-          // frame (D216), and `presence` erodes a lone panel to its medial
+          // frame, and `presence` erodes a lone panel to its medial
           // axis — a bright horizontal line for the first frames.
           materialize: t,
           child: Opacity(
@@ -419,9 +425,46 @@ class _AlertButtonState extends State<_AlertButton> {
 // ---------------------------------------------------------------------------
 // Sheet
 
+/// The heights a sheet from [showGlassSheet] rests at — UIKit's
+/// `UISheetPresentationController.Detent`, two of them.
+///
+/// {@category Modals}
+enum GlassSheetDetent {
+  /// The sheet at its content's height, never taller than the window less its
+  /// margins, floating [kGlassSheetInset] in from the window's sides and
+  /// bottom. What every sheet was before there were detents.
+  ///
+  /// Apple's medium detent is half the window whatever the content; this one
+  /// is the content's height, so a content half the window tall is Apple's.
+  medium,
+
+  /// The whole height below the top safe area less [kGlassSheetInset], and
+  /// edge to edge: the inset at the sides and the bottom goes to nothing, and
+  /// the glass moves to `largeFinish` — by default the same finish laid on
+  /// opaquely, which is Apple's "transitions to a more opaque appearance"
+  /// taken all the way, and which stops the sheet reading its backdrop at all.
+  ///
+  /// The top gap and keeping the corner radius at the bottom are layout taste:
+  /// only the medium detent was read off iOS.
+  large,
+}
+
+/// How long a sheet takes to settle at a detent, or back from a drag that did
+/// not dismiss it. A feel, not a measurement.
+const Duration _kSheetSettle = Duration(milliseconds: 300);
+
+/// Faster than this, logical px per second, a released drag goes on to the
+/// detent it was heading for rather than the nearer one. A feel.
+const double _kSheetFlick = 700;
+
+/// Whether a sheet declares the area it can move in while it moves. The
+/// default, and what was measured; a test turns it off to see what it saves.
+@visibleForTesting
+bool debugGlassSheetTravel = true;
+
 /// Shows [builder]'s widget in a glass sheet rising from the bottom, over a
-/// dim. Dragged down, it follows the finger and goes past a third of its
-/// height or on a flick.
+/// dim. Dragged, it follows the finger; dragged down, it goes past a third of
+/// its height or on a flick.
 ///
 /// {@macro g1455.modal.host}
 ///
@@ -430,15 +473,42 @@ class _AlertButtonState extends State<_AlertButton> {
 /// [showGrabber] is false. [finish] is its optics; null takes the theme's. The
 /// returned future completes with the value the route is popped with.
 ///
+/// **Detents.** [detents] are the heights it rests at, [initialDetent] the one
+/// it opens at (the first of [detents] when null). By default it has one,
+/// [GlassSheetDetent.medium]: the sheet at its content's height, as it always
+/// was. With [GlassSheetDetent.large] too, a drag up pulls it to the whole
+/// height — its top under the finger the whole way, its inset going to nothing
+/// as it rises — and a release settles it at the nearer detent, or the one a
+/// flick was heading for; [onDetentChanged] is told each time it settles at
+/// another. The content is laid out at the height the sheet has, so a list in
+/// it shows more rows at large.
+///
+/// At large the glass is [largeFinish] — by default [finish] laid on opaquely,
+/// its tint at full alpha, which passes through every level between as the
+/// sheet rises. **An opaque large sheet reads no backdrop**: a glass whose
+/// tint covers at full alpha shows nothing of what it captured, so once it is
+/// all the way up it is drawn on [GlassTier.cheap], which draws the same tint
+/// over nothing and is captured for nothing. Glass in the sheet's content stays
+/// on the theme's rung and sees the sheet behind it. A [largeFinish] whose
+/// tint is translucent keeps the sheet glass, and keeps its capture.
+///
 /// [barrierDismissible] false is a sheet only its own content closes, as
 /// UIKit's `isModalInPresentation`: a tap on the dim, Escape and a drag all
-/// leave it where it is — a drag pulls it a quarter of the way, never more
-/// than half the sheet's height, and it springs back when let go.
+/// leave it where it is — a drag down past its lowest detent pulls it a quarter
+/// of the way, never more than half the sheet's height, and it springs back
+/// when let go. A drag between detents still moves it.
 ///
 /// [constraints] bound the sheet inside the window's margins, as
 /// `showModalBottomSheet`'s do: a `maxWidth` keeps it at its content's width
 /// and centred on a wide window, where a sheet across the whole width leaves
 /// its content in a corner of the glass. Null, it spans the window.
+///
+/// **The keyboard.** The sheet stands on the keyboard rather than the window's
+/// bottom, as Apple's does — at medium [kGlassSheetInset] above it, at large
+/// on it, its content laid out in what is left — so a focused field in it
+/// stays in sight. `showModalBottomSheet` leaves this to the content; here the
+/// content's `MediaQuery.viewInsets` has the bottom inset taken out, so a
+/// content already padded by it the Material way is not padded twice.
 ///
 /// ```dart
 /// showGlassSheet<void>(
@@ -455,8 +525,21 @@ class _AlertButtonState extends State<_AlertButton> {
 /// );
 /// ```
 ///
+/// A sheet that opens at its content's height and can be pulled to the whole
+/// window:
+///
+/// ```dart
+/// showGlassSheet<void>(
+///   context: context,
+///   detents: const <GlassSheetDetent>[GlassSheetDetent.medium, GlassSheetDetent.large],
+///   onDetentChanged: (GlassSheetDetent detent) => debugPrint('now $detent'),
+///   builder: (BuildContext context) => const SizedBox(height: 320, child: Placeholder()),
+/// );
+/// ```
+///
 /// See also:
 ///
+///  * [GlassSheetDetent], the two heights.
 ///  * [showGlassDialog], the same over a centred alert.
 ///  * [kGlassModalDim], the dim behind both.
 ///  * [The sheet on the site](https://g1455.plugfox.dev/components/sheet).
@@ -470,7 +553,13 @@ Future<T?> showGlassSheet<T>({
   bool barrierDismissible = true,
   String barrierLabel = 'Dismiss',
   BoxConstraints? constraints,
+  List<GlassSheetDetent> detents = const <GlassSheetDetent>[GlassSheetDetent.medium],
+  GlassSheetDetent? initialDetent,
+  ValueChanged<GlassSheetDetent>? onDetentChanged,
+  GlassFinish? largeFinish,
 }) {
+  assert(detents.isNotEmpty, 'A sheet needs a detent to rest at.');
+  assert(initialDetent == null || detents.contains(initialDetent), 'initialDetent is not one of detents.');
   final NavigatorState navigator = Navigator.of(context);
   return navigator.push<T>(
     _GlassSheetRoute<T>(
@@ -481,6 +570,10 @@ Future<T?> showGlassSheet<T>({
       dismissible: barrierDismissible,
       dismissLabel: barrierLabel,
       constraints: constraints,
+      detents: detents,
+      initialDetent: initialDetent ?? detents.first,
+      onDetentChanged: onDetentChanged,
+      largeFinish: largeFinish,
     ),
   );
 }
@@ -494,7 +587,12 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
     required this.dismissible,
     required this.dismissLabel,
     required this.constraints,
-  });
+    required this.detents,
+    required GlassSheetDetent initialDetent,
+    required this.onDetentChanged,
+    required this.largeFinish,
+  }) : _detent = initialDetent,
+       _extent = ValueNotifier<double>(initialDetent == GlassSheetDetent.large ? 1 : 0);
 
   final WidgetBuilder builder;
   final CapturedThemes themes;
@@ -503,6 +601,9 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   final bool dismissible;
   final String dismissLabel;
   final BoxConstraints? constraints;
+  final List<GlassSheetDetent> detents;
+  final ValueChanged<GlassSheetDetent>? onDetentChanged;
+  final GlassFinish? largeFinish;
 
   @override
   Color get barrierColor => kGlassModalDim;
@@ -520,64 +621,195 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) =>
       themes.wrap(_GlassSheet(route: this));
 
-  /// How far a sheet a drag cannot close is pulled, in its heights. Its own
-  /// offset rather than the route's controller: the controller's value goes
-  /// through the entrance curve, which is flat near the top, and a pull there
-  /// moved the sheet by a few pixels at most.
+  bool get _between => detents.contains(GlassSheetDetent.medium) && detents.contains(GlassSheetDetent.large);
+
+  /// Where the sheet is between its detents: 0 at medium, 1 at large. Moved
+  /// by a drag, one logical pixel of the sheet's top for one of the finger's.
+  final ValueNotifier<double> _extent;
+  GlassSheetDetent _detent;
+
+  /// How far a dismissible sheet has been dragged below its lowest detent,
+  /// logical px.
+  ///
+  /// **Its own offset, and in pixels, rather than the route's controller.**
+  /// The drag used to move the controller, whose value the sheet's position
+  /// reads through the entrance curve — and `easeOutCubic` is flat at the top,
+  /// so 116 px of finger moved the sheet 4.5 px and it only visibly followed
+  /// once the finger was far down. The controller is the entrance and the
+  /// exit; a drag is neither.
+  final ValueNotifier<double> _drop = ValueNotifier<double>(0);
+
+  /// How far a sheet a drag cannot close is pulled, in its heights: a quarter
+  /// of the finger's travel, never more than half its height.
   final ValueNotifier<double> _pull = ValueNotifier<double>(0);
-  AnimationController? _back;
-  double _pulledFrom = 0;
-  final GlobalKey _sheet = GlobalKey();
 
-  double _sheetHeight() => _sheet.currentContext?.size?.height ?? double.infinity;
+  /// What the last layout said: how far the top travels between medium and
+  /// large, how tall the sheet is, and how tall the area it stands in is.
+  double _span = 1;
+  double _sheetHeight = double.infinity;
+  double _pageHeight = 1;
 
-  /// [fraction] is the drag in the page's heights, [sheet] in the sheet's.
-  void _drag(double fraction, {required double sheet}) {
-    if (!dismissible) {
+  /// Whether a finger or a settle is moving the sheet, which is when it
+  /// declares [_area] as where it travels. Not while it rests: the region is
+  /// the whole area the sheet can stand in, and a resting sheet captured at
+  /// that size would pay for screen it does not cover.
+  final ValueNotifier<bool> _moving = ValueNotifier<bool>(false);
+
+  /// The area below the top margin — everywhere the sheet can be between its
+  /// detents — as a travel region, and a region that is never attached, which
+  /// reads as no declaration.
+  final GlassTravelRegion _area = GlassTravelRegion();
+  final GlassTravelRegion _still = GlassTravelRegion();
+
+  /// The frame laying the sheet out, while it is mounted.
+  _RenderSheetFrame? _frame;
+
+  /// Whether a finger has moved the sheet since it last let go. A tap is not
+  /// a drag: the sheet's recognizer wins a tap on bare content and ends it
+  /// with no velocity, and loses one on a button inside and is cancelled — and
+  /// neither may re-pick a detent under a settle that is heading for another.
+  bool _dragged = false;
+
+  AnimationController? _settle;
+  double _extentFrom = 0;
+  double _extentTo = 0;
+  double _dropFrom = 0;
+  double _pullFrom = 0;
+
+  /// [dy] is the finger's travel since the last update, logical px, down
+  /// positive.
+  void _drag(double dy) {
+    _settle?.stop();
+    _dragged = true;
+    _moving.value = true;
+    final double span = math.max(_span, 1);
+    var rest = dy;
+    if (rest < 0) {
+      // Up: out of a drag below the lowest detent first, then towards large.
+      rest = _raise(rest);
+      if (rest < 0 && _between) {
+        _extent.value = math.min(1, _extent.value - rest / span);
+      }
+      return;
+    }
+    if (_between && _extent.value > 0) {
+      final double room = _extent.value * span;
+      if (rest < room) {
+        _extent.value = _extent.value - rest / span;
+        return;
+      }
+      _extent.value = 0;
+      rest -= room;
+    }
+    if (dismissible) {
+      _drop.value += rest;
+    } else {
       // A quarter of the way, and never more than half its height: a pull
       // that is felt, and goes nowhere.
-      _back?.stop();
-      _pull.value = (_pull.value + sheet / 4).clamp(0.0, 0.5);
-      return;
-    }
-    final AnimationController? c = controller;
-    if (c != null) {
-      c.value = (c.value - fraction).clamp(0.0, 1.0);
+      _pull.value = math.min(0.5, _pull.value + rest / _sheetHeight / 4);
     }
   }
 
-  void _release(double velocityFraction) {
-    if (!dismissible) {
-      _springBack();
+  /// Takes an upward [dy] out of whatever pulls the sheet below its lowest
+  /// detent, and returns what is left of it.
+  double _raise(double dy) {
+    if (dismissible) {
+      final double used = math.min(-dy, _drop.value);
+      _drop.value -= used;
+      return dy + used;
+    }
+    final double pulled = _pull.value * _sheetHeight * 4;
+    final double used = math.min(-dy, pulled);
+    _pull.value = math.max(0, _pull.value - used / _sheetHeight / 4);
+    return dy + used;
+  }
+
+  /// A finger is down on the sheet. Resting at large it has not measured its
+  /// content's medium height since it got there, and a drag down converts the
+  /// finger's pixels into extent by that height: measure it now, before the
+  /// drag is past the slop, so a content or a window that changed since does
+  /// not make the first frame of the drag jump.
+  void _touch() {
+    if (_extent.value >= 1) {
+      _frame?.remeasure();
+    }
+  }
+
+  /// [velocity] is the finger's at release, logical px per second, down
+  /// positive.
+  void _release(double velocity) {
+    if (!_dragged) {
       return;
     }
-    final AnimationController? c = controller;
-    if (c == null) {
+    _dragged = false;
+    // Popped while the finger was on it, the sheet is already leaving, from
+    // where the finger left it: another pop would close whatever is under it.
+    if (!isActive) {
       return;
     }
-    if (velocityFraction > 1.5 || c.value < 2 / 3) {
+    // And with a route pushed over it, a pop would close that one; it settles
+    // back instead.
+    if (dismissible &&
+        isCurrent &&
+        _drop.value > 0 &&
+        (velocity / _pageHeight > 1.5 || _drop.value > _sheetHeight / 3)) {
       navigator?.pop();
-    } else {
-      c.forward();
-    }
-  }
-
-  void _springBack() {
-    final NavigatorState? navigator = this.navigator;
-    if (_pull.value == 0 || navigator == null) {
       return;
     }
-    _pulledFrom = _pull.value;
-    final AnimationController back = _back ??= AnimationController(
-      vsync: navigator,
-      duration: const Duration(milliseconds: 300),
-    )..addListener(() => _pull.value = _pulledFrom * (1 - Curves.easeOutCubic.transform(_back!.value)));
-    back.forward(from: 0);
+    var target = _extent.value;
+    if (_between) {
+      target = velocity.abs() > _kSheetFlick ? (velocity < 0 ? 1 : 0) : (_extent.value >= 0.5 ? 1 : 0);
+      final GlassSheetDetent detent = target == 1 ? GlassSheetDetent.large : GlassSheetDetent.medium;
+      if (detent != _detent) {
+        _detent = detent;
+        onDetentChanged?.call(detent);
+      }
+    }
+    _settleTo(target);
+  }
+
+  void _settleTo(double extent) {
+    final NavigatorState? navigator = this.navigator;
+    if (navigator == null) {
+      return;
+    }
+    if (_extent.value == extent && _drop.value == 0 && _pull.value == 0) {
+      _moving.value = false;
+      return;
+    }
+    _extentFrom = _extent.value;
+    _extentTo = extent;
+    _dropFrom = _drop.value;
+    _pullFrom = _pull.value;
+    final AnimationController settle = _settle ??= AnimationController(vsync: navigator, duration: _kSheetSettle)
+      ..addListener(_settling)
+      ..addStatusListener((AnimationStatus status) {
+        if (status.isCompleted) {
+          _moving.value = false;
+        }
+      });
+    if (MediaQuery.maybeDisableAnimationsOf(navigator.context) ?? false) {
+      settle.value = 1;
+      _settling();
+      _moving.value = false;
+      return;
+    }
+    settle.forward(from: 0);
+  }
+
+  void _settling() {
+    final double t = Curves.easeOutCubic.transform(_settle!.value);
+    _extent.value = lerpDouble(_extentFrom, _extentTo, t)!;
+    _drop.value = _dropFrom * (1 - t);
+    _pull.value = _pullFrom * (1 - t);
   }
 
   @override
   void dispose() {
-    _back?.dispose();
+    _settle?.dispose();
+    _moving.dispose();
+    _extent.dispose();
+    _drop.dispose();
     _pull.dispose();
     super.dispose();
   }
@@ -593,56 +825,232 @@ class _GlassSheet extends StatelessWidget {
     _assertHosted(context, 'A glass sheet');
     final Animation<double> progress = route.animation ?? kAlwaysCompleteAnimation;
     final EdgeInsets safe = MediaQuery.paddingOf(context);
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(kGlassSheetInset, safe.top + kGlassSheetInset, kGlassSheetInset, kGlassSheetInset),
-        child: ConstrainedBox(
-          constraints: route.constraints ?? const BoxConstraints(),
-          child: GlassAbove(
-            lift: kGlassModalLift,
-            child: AnimatedBuilder(
-              animation: Listenable.merge(<Listenable>[progress, route._pull]),
-              builder: (BuildContext context, Widget? child) {
-                final double t = Curves.easeOutCubic.transform(progress.value.clamp(0.0, 1.0));
-                return FractionalTranslation(translation: Offset(0, 1.05 * (1 - t) + route._pull.value), child: child);
-              },
-              child: GestureDetector(
-                onVerticalDragUpdate: (DragUpdateDetails d) {
-                  final double h = context.size?.height ?? 1;
-                  route._drag(d.primaryDelta! / h, sheet: d.primaryDelta! / route._sheetHeight());
-                },
-                onVerticalDragEnd: (DragEndDetails d) {
-                  final double h = context.size?.height ?? 1;
-                  route._release(d.primaryVelocity! / h);
-                },
-                child: GlassSurface(
-                  key: route._sheet,
-                  borderRadius: const BorderRadius.all(Radius.circular(kGlassSheetRadius)),
-                  finish: route.finish,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      if (route.showGrabber)
-                        Center(
-                          child: Container(
-                            margin: const EdgeInsets.only(top: 5, bottom: 4),
-                            width: 36,
-                            height: 5,
-                            decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0x4D3C3C43)),
-                          ),
-                        ),
-                      Flexible(child: Builder(builder: route.builder)),
-                    ],
+    final GlassThemeData theme = GlassTheme.of(context);
+    final GlassFinish base = route.finish ?? theme.finish;
+    final GlassFinish large = route.largeFinish ?? base.copyWith(tint: base.tint.withValues(alpha: 1));
+    // The keyboard is a floor the sheet stands on, as Apple's sheet rises above
+    // it — a sheet at its content's height has no other way to keep a focused
+    // field in sight. Its content is told the inset is taken, so a content
+    // padded for the keyboard is not padded twice.
+    final double keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    // The theme and the travel the sheet was given, put back under its glass:
+    // a rung the sheet takes for itself at large, and the region it declares
+    // while it moves, are the sheet's and not its content's.
+    final Widget content = GlassTravelScope(
+      region: GlassTravelScope.maybeOf(context) ?? route._still,
+      child: GlassTheme(
+        data: theme,
+        child: MediaQuery.removeViewInsets(
+          context: context,
+          removeBottom: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (route.showGrabber)
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 5, bottom: 4),
+                    width: 36,
+                    height: 5,
+                    decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0x4D3C3C43)),
                   ),
                 ),
-              ),
-            ),
+              Flexible(child: Builder(builder: route.builder)),
+            ],
           ),
         ),
       ),
     );
+    return Padding(
+      padding: EdgeInsets.only(top: safe.top + kGlassSheetInset, bottom: keyboard),
+      child: _SheetArea(
+        region: route._area,
+        child: ValueListenableBuilder<double>(
+          valueListenable: route._extent,
+          child: content,
+          builder: (BuildContext context, double extent, Widget? content) {
+            // All the way up, a glass whose tint covers at full alpha shows none
+            // of its capture — so it stops taking one, and draws the same tint
+            // on the rung that reads nothing. Only from the top rung: a host
+            // already below it draws the sheet as it draws everything else.
+            final bool opaque = extent >= 1 && large.tint.a >= 1 && theme.tier.tier == GlassTier.full;
+            return _SheetFrame(
+              route: route,
+              extent: extent,
+              child: GlassAbove(
+                lift: kGlassModalLift,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge(<Listenable>[progress, route._drop, route._pull]),
+                  builder: (BuildContext context, Widget? child) {
+                    final double t = Curves.easeOutCubic.transform(progress.value.clamp(0.0, 1.0));
+                    return Transform.translate(
+                      offset: Offset(0, route._drop.value),
+                      child: FractionalTranslation(
+                        translation: Offset(0, 1.05 * (1 - t) + route._pull.value),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: GestureDetector(
+                    onVerticalDragDown: (_) => route._touch(),
+                    onVerticalDragUpdate: (DragUpdateDetails d) => route._drag(d.primaryDelta!),
+                    onVerticalDragEnd: (DragEndDetails d) => route._release(d.primaryVelocity ?? 0),
+                    onVerticalDragCancel: () => route._release(0),
+                    child: GlassTheme(
+                      data: opaque ? theme.copyWith(tier: _kSheetOpaqueTier) : theme,
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: route._moving,
+                        child: content,
+                        builder: (BuildContext context, bool moving, Widget? content) => GlassTravelScope(
+                          region: moving && debugGlassSheetTravel ? route._area : route._still,
+                          child: GlassSurface(
+                            borderRadius: const BorderRadius.all(Radius.circular(kGlassSheetRadius)),
+                            // Untouched at medium, so a sheet with no large detent
+                            // names exactly the finish it always named.
+                            finish: extent <= 0 ? route.finish : GlassFinish.lerp(base, large, extent),
+                            child: content,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// The area a sheet stands in, as the travel region it declares while it
+/// moves: a [GlassTravel] whose scope the sheet hands its glass only then.
+class _SheetArea extends SingleChildRenderObjectWidget {
+  const _SheetArea({required this.region, super.child});
+
+  final GlassTravelRegion region;
+
+  @override
+  RenderGlassTravel createRenderObject(BuildContext context) => RenderGlassTravel(region);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderGlassTravel renderObject) => renderObject.region = region;
+}
+
+/// The rung an opaque large sheet takes: the one that draws the finish's tint
+/// over whatever is behind and reads nothing. At a tint of full alpha that is
+/// the colour the top rung draws too — `mix(backdrop, tint, 1)` is the tint
+/// whatever the backdrop — so the step costs no picture, and unlike
+/// [GlassTier.opaque] it needs no backdrop declared. Pinned, because it is the
+/// sheet naming the rung outright.
+const GlassTierChoice _kSheetOpaqueTier = GlassTierChoice(GlassTier.cheap, GlassTierReason.pinnedByHost);
+
+/// Lays the sheet out between its detents: at its content's height and
+/// [kGlassSheetInset] in at [extent] 0, the whole area and edge to edge at 1,
+/// and linearly between — so the top moves with the finger.
+class _SheetFrame extends SingleChildRenderObjectWidget {
+  const _SheetFrame({required this.route, required this.extent, super.child});
+
+  final _GlassSheetRoute<Object?> route;
+  final double extent;
+
+  @override
+  _RenderSheetFrame createRenderObject(BuildContext context) =>
+      _RenderSheetFrame(route: route, extent: extent, limits: route.constraints);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderSheetFrame renderObject) => renderObject
+    ..route = route
+    ..extent = extent
+    ..limits = route.constraints;
+}
+
+class _RenderSheetFrame extends RenderShiftedBox {
+  _RenderSheetFrame({required this.route, required this._extent, required this._limits}) : super(null);
+
+  _GlassSheetRoute<Object?> route;
+
+  double _extent;
+  set extent(double value) {
+    if (value != _extent) {
+      _extent = value;
+      markNeedsLayout();
+    }
+  }
+
+  BoxConstraints? _limits;
+  set limits(BoxConstraints? value) {
+    if (value != _limits) {
+      _limits = value;
+      _natural = null;
+      markNeedsLayout();
+    }
+  }
+
+  /// The content's own height at medium, kept while the sheet rests at large,
+  /// where nothing needs it and measuring would lay the content out twice —
+  /// until a finger comes down on the sheet ([remeasure]): a content or a
+  /// window that changed at large has left it stale, and a drag down is about
+  /// to need it.
+  double? _natural;
+
+  /// Forgets [_natural], so the next layout measures it.
+  void remeasure() {
+    if (_natural != null) {
+      _natural = null;
+      markNeedsLayout();
+    }
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    route._frame = this;
+  }
+
+  @override
+  void detach() {
+    if (identical(route._frame, this)) {
+      route._frame = null;
+    }
+    super.detach();
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) => constraints.biggest;
+
+  @override
+  void performLayout() {
+    final Size area = constraints.biggest;
+    size = area;
+    final RenderBox? child = this.child;
+    if (child == null) {
+      return;
+    }
+    BoxConstraints within(double width, double height) => (_limits ?? const BoxConstraints()).enforce(
+      BoxConstraints(maxWidth: math.max(0, width), maxHeight: math.max(0, height)),
+    );
+    final double p = _extent.clamp(0.0, 1.0);
+    if (p < 1 || _natural == null) {
+      child.layout(within(area.width - 2 * kGlassSheetInset, area.height - kGlassSheetInset), parentUsesSize: true);
+      _natural = child.size.height;
+    }
+    final double natural = _natural!;
+    final double inset = kGlassSheetInset * (1 - p);
+    if (p > 0) {
+      final double height = lerpDouble(natural, area.height, p)!;
+      child.layout(within(area.width - 2 * inset, area.height - inset).tighten(height: height), parentUsesSize: true);
+    }
+    (child.parentData! as BoxParentData).offset = Offset(
+      (area.width - child.size.width) / 2,
+      area.height - inset - child.size.height,
+    );
+    route
+      .._span = area.height - kGlassSheetInset - natural
+      .._sheetHeight = math.max(child.size.height, 1)
+      .._pageHeight = math.max(area.height, 1);
   }
 }
 
@@ -694,19 +1102,19 @@ class GlassMenuController {
   void close() => _state?._hide();
 }
 
-/// A menu's width, logical px (spike 34: iOS 26.5's `UIMenu` from a button,
+/// A menu's width, logical px (iOS 26.5's `UIMenu` from a button,
 /// 250 wide). The default of [GlassMenuAnchor.width].
 ///
 /// {@category Modals}
 const double kGlassMenuWidth = 250;
 
-/// The height of one [GlassMenuItem], logical px (spike 34: rows of 42, with
+/// The height of one [GlassMenuItem], logical px (iOS 26.5: rows of 42, with
 /// 10 above the first and below the last).
 ///
 /// {@category Modals}
 const double kGlassMenuRowHeight = 42;
 
-/// A menu's corner radius, logical px (spike 34: the engine's `RSuperellipse`
+/// A menu's corner radius, logical px (iOS 26.5; the engine's `RSuperellipse`
 /// of 31.5, fitted at 0.23 pt rms). The default of
 /// [GlassPopoverAnchor.radius].
 ///
@@ -719,7 +1127,7 @@ const double _kMenuPad = 10;
 ///
 /// {@macro g1455.modal.host}
 ///
-/// Placed as Apple places a button's menu (spike 34): **over** the anchor, not
+/// Placed as Apple places a button's menu: **over** the anchor, not
 /// beside it — its corner on the anchor's matching corner, the anchor hidden
 /// while it is open — opening downward from the anchor's top when there is
 /// room and upward from its bottom when not, and then with **its items in
@@ -731,7 +1139,7 @@ const double _kMenuPad = 10;
 /// reference's screenshots were apart. This one grows out of the anchor —
 /// from the anchor's size and capsule to its own, about the corner it shares
 /// with the anchor, so the button reads as turning into the menu — while it
-/// materializes (D216); never through `presence`, which erodes a lone panel to
+/// materializes; never through `presence`, which erodes a lone panel to
 /// a line.
 ///
 /// A tap on a row runs its [GlassMenuItem.onPressed] and closes the menu; a
@@ -938,7 +1346,7 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
     overlayChildBuilder: _overlay,
     // Hidden while the panel stands over it, as Apple's button is: the panel
     // is what it turned into. `Visibility`, not `Opacity` — an anchor that is
-    // a glass button must not go under a `saveLayer` (D185). Its semantics
+    // a glass button must not go under a `saveLayer`. Its semantics
     // are dropped by `ExcludeSemantics` rather than by `Visibility`: in 3.47.1
     // `_RenderVisibility.visible=` marks paint and not semantics, though what
     // it visits for semantics depends on it, and closing over an anchor with

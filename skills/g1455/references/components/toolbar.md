@@ -64,6 +64,11 @@ surfaces; a group of three is one. Grouping is how Apple draws it, and it's also
 
 - **Always set `label`.** It is what a screen reader says for the item; the icon alone says nothing.
 - `onPressed: null` disables an item: its icon drops to 30% and it is announced as disabled.
+- Each item takes the focus from the keyboard, Space or Enter presses it, and its ring is drawn inside its cell, inside
+  the glass: no capture. A held cell brightens but does not swell as a [button](../components/button.md) does, because the
+  group is one surface.
+- The items run in the reading direction: under a right-to-left `Directionality` the first is at the right.
+- A count on an icon is a [badge](../components/badge.md): `GlassToolbarItem(icon: GlassBadge(count: 3, child: icon))`.
 
 > [!WARNING]
 > Don't wrap a group in `Opacity`, `ColorFilter` or `ImageFilter`. The pressed highlight is added onto what's below, and
@@ -143,7 +148,7 @@ class _PhotoViewerState extends State<PhotoViewer> {
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `items` | `List<GlassToolbarItem>` | **required** | The actions, left to right. Must not be empty. |
+| `items` | `List<GlassToolbarItem>` | **required** | The actions, in the reading direction. Must not be empty. |
 | `finish` | `GlassFinish?` | `null` | The glass. Null takes the theme's. |
 | `pressedOverlay` | `Color?` | `null` | Added over a held item's cell. Null takes the finish's rim colour. |
 

@@ -2,17 +2,16 @@
 //
 // `flutter test test/glass_scroll_edge_test.dart`
 //
-// Apple's frames are in `provenance/scroll_edge/` (spike 31, iOS 26.5, iPhone
-// 17 Pro: bars 116 and 86 pt on 874, dpr 3). The instrument reads a frame row
-// by row against its known answer — the same screen with the effect hidden —
-// for the lines' contrast (the blur) and the flat field's level (the tint),
-// and solves the plateau's `mix(x, C, a)` from the two levels it has.
+// Apple's frames are in `provenance/scroll_edge/` (iOS 26.5, iPhone 17 Pro:
+// bars 116 and 86 pt on 874, dpr 3). The instrument reads a frame row by row
+// against its known answer — the same screen with the effect hidden — for the
+// lines' contrast (the blur) and the flat field's level (the tint), and solves
+// the plateau's `mix(x, C, a)` from the two levels it has.
 //
 // Three arms, in the order that makes each one mean something:
 //
-//  1. the instrument on Apple's frames returns what
-//     `spikes/31_scroll_edge/measure_edge.swift` + `fit_soft.py` returned —
-//     the port is the instrument, not a second one;
+//  1. the instrument on Apple's frames returns what the original Swift and
+//     Python tools returned — the port is the instrument, not a second one;
 //  2. our effect, drawn over the same fixture at the same size and read by
 //     the same instrument, lands on Apple's numbers inside a stated
 //     tolerance per quantity;
@@ -45,7 +44,7 @@ const double kBottom = 86;
 final GlobalKey _shotKey = GlobalKey();
 
 void main() {
-  test('the instrument reads Apple\'s frames as the spike\'s tools did', () async {
+  test('the instrument reads Apple\'s frames as the original tools did', () async {
     final _Fit dark = _fit(await _frame('soft_dark'), await _frame('hidden_dark'));
     final _Fit light = _fit(await _frame('soft_light'), await _frame('hidden_light'));
     // ignore: avoid_print

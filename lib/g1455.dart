@@ -24,11 +24,11 @@
 ///
 /// | Topic | What is in it |
 /// |---|---|
-/// | Foundations | [GlassHost], [GlassSurface], [GlassFinish], [GlassTheme], [GlassRipple], [GlassAdaptive] |
-/// | Panels and controls | [GlassBar], [GlassButton], [GlassCard], [GlassSwitch], [GlassSlider], [GlassTabBar], [GlassSegmentedControl], [GlassButtonGroup], [GlassTextField], [GlassScrollEdge], [GlassScaffold] |
-/// | Modals | [showGlassDialog], [GlassAlert], [showGlassSheet], [GlassMenuAnchor], [GlassPopoverAnchor] |
+/// | Foundations | [GlassHost], [GlassSurface], [GlassFinish], [GlassTheme], [GlassRipple], [GlassAdaptive], [GlassPress], [GlassConcentric] |
+/// | Panels and controls | [GlassBar], [GlassButton], [GlassCard], [GlassSwitch], [GlassSlider], [GlassTabBar], [GlassSegmentedControl], [GlassButtonGroup], [GlassTextField], [GlassSearchBar], [GlassStepper], [GlassPageControl], [GlassBadge], [GlassScrollEdge], [GlassScaffold] |
+/// | Modals | [showGlassDialog], [GlassAlert], [showGlassSheet], [GlassSheetDetent], [GlassMenuAnchor], [GlassPopoverAnchor] |
 /// | Composition | [GlassGroup], [GlassTravel], [GlassMorph], [GlassAbove] |
-/// | Capture control | [GlassProxy], [GlassProxyPainter] |
+/// | Capture control | [GlassProxy], [GlassProxyPainter], [GlassBackdrop] |
 /// | Cost and policy | [GlassTierPolicy], [GlassLedger], [GlassHardware], [GlassThermalState] |
 ///
 /// Each topic has a page of its own in the sidebar, with an overview and
@@ -48,16 +48,16 @@ library;
 
 export 'src/hardware.dart' show GlassHardware;
 // The vocabulary of `GlassHost.thermal`. Reading the device is the
-// application's: the package ships no platform code (D219).
+// application's: the package ships no platform code.
 export 'src/thermal.dart' show GlassThermalState;
 // `ProxyBlurPass` only: the pipeline itself is not API — what an application
 // declares about the blur is which spelling of the pass runs, and the host's
-// two diagnostic arms need a name at the call site.
+// two diagnostic settings need a name at the call site.
 export 'src/proxy/proxy_pipeline.dart' show ProxyBlurPass;
 // `GlassContentDeclaration` and the reason it produces: whether the host may
-// hold a proxy nothing it watches has changed. Since D152 it declares nothing
-// about content — the composited subtree answers that — and since D163 the
-// holding side is the default, so what an application reaches for here is the
+// hold a proxy nothing it watches has changed. It declares nothing about
+// content — the composited subtree answers that — and the holding side is the
+// default, so what an application reaches for here is the
 // opt-out. The oracle itself is not API — the host owns it — but the permission
 // and the decision a report quotes are.
 export 'src/proxy/proxy_retake.dart' show GlassContentDeclaration, GlassThermalPolicy, RetakeReason;
@@ -72,18 +72,21 @@ export 'src/proxy/proxy_resolution.dart'
         ProxyRouteCost;
 export 'src/proxy/proxy_role.dart'
     show GlassProxy, GlassProxyPainter, GlassProxyRole, GradientProxyPainter, RenderGlassProxy, SolidProxyPainter;
-// Level 3 of SS7.2 — and three names over one body, because everything that
-// differs between them in this machine is the shape, the padding and the tap
-// target. What a component adds is the label's colour, which is D178's law spent
-// rather than restated.
+// The components — three names over one body, because everything that differs
+// between them is the shape, the padding and the tap target. What a component
+// adds is the label's colour, which is the finish ladder's law spent rather
+// than restated.
 export 'src/surface/glass_above.dart' show GlassAbove, RenderGlassAbove, kGlassModalLift;
 // Glass that reads its own backdrop: opt-in on the host, and what a reading is
 // — the one input to the label and the branch that is measured on the device
 // rather than declared.
 export 'src/surface/glass_adaptive.dart' show GlassAdaptive, GlassBackdropReading;
+// A backdrop the application declares, so the glass over it samples a texture
+// made once instead of a capture.
+export 'src/surface/glass_backdrop.dart' show GlassBackdrop, GlassBackdropDeclaration;
 export 'src/surface/glass_components.dart'
     show GlassBar, GlassButton, GlassCard, kGlassDisabledDarkLabel, kGlassDisabledLightLabel, kGlassMinTapTarget;
-// Controls whose knob becomes a clear drop while held (spike 27): the drop
+// Controls whose knob becomes a clear drop while held: the drop
 // exists only then, grows through `presence`, and moves inside a travel region.
 export 'src/surface/glass_controls.dart'
     show
@@ -99,6 +102,13 @@ export 'src/surface/glass_controls.dart'
 // How a held drop deforms as it launches and brakes: a theme token, the pure
 // model a custom control can feed, and the ticker that runs it.
 export 'src/surface/glass_drop_motion.dart' show GlassDropMotion, GlassDropStretch, GlassDropStretchDriver;
+// How a pressed button swells and leans toward the finger: a theme token whose
+// geometry is pure, so a custom control can ask it.
+export 'src/surface/glass_press.dart' show GlassPress;
+// Apple's concentric corners, as arithmetic.
+export 'src/surface/glass_concentric.dart' show GlassConcentric;
+// The keyboard's focus ring, which is drawn where no capture sees it.
+export 'src/surface/glass_focus.dart' show kGlassFocusRingColor, kGlassFocusRingGap, kGlassFocusRingWidth;
 export 'src/surface/glass_scroll_edge.dart'
     show
         GlassScrollEdge,
@@ -120,6 +130,7 @@ export 'src/surface/glass_modal.dart'
         GlassMenuController,
         GlassMenuItem,
         GlassPopoverAnchor,
+        GlassSheetDetent,
         kGlassAlertRadius,
         kGlassAlertWidth,
         kGlassMenuRadius,
@@ -131,8 +142,29 @@ export 'src/surface/glass_modal.dart'
         showGlassDialog,
         showGlassSheet;
 export 'src/surface/glass_tab_bar.dart'
-    show GlassTabBar, GlassTabItem, GlassTabItemBuilder, GlassTabItemLook, kGlassTabDropGrow, kGlassTabDropZoom;
+    show
+        GlassTabBar,
+        GlassTabBarMinimizeBehavior,
+        GlassTabBarMinimizer,
+        GlassTabItem,
+        GlassTabItemBuilder,
+        GlassTabItemLook,
+        kGlassTabAccessoryHeight,
+        kGlassTabDropGrow,
+        kGlassTabDropZoom,
+        kGlassTabMinimizeScroll;
 export 'src/surface/glass_text_field.dart' show GlassTextField, kGlassFieldHeight;
+// The search field with its clear button and the Cancel that slides in on
+// focus: one surface, the field's.
+export 'src/surface/glass_search_bar.dart' show GlassSearchBar;
+// A minus and a plus in one capsule, and page dots on one: one surface each,
+// everything that moves drawn inside it.
+export 'src/surface/glass_stepper.dart'
+    show GlassStepper, kGlassStepperRepeatDelay, kGlassStepperRepeatInterval, kGlassStepperSize;
+export 'src/surface/glass_page_control.dart'
+    show GlassPageControl, kGlassPageControlHeight, kGlassPageDot, kGlassPageDotGap;
+// Not glass: Apple's badge is an opaque red capsule on the glass.
+export 'src/surface/glass_badge.dart' show GlassBadge, kGlassBadgeDot, kGlassBadgeHeight, kGlassBadgeRed;
 export 'src/surface/glass_toolbar.dart'
     show GlassButtonGroup, GlassToolbarItem, kGlassToolbarHeight, kGlassToolbarItemWidth;
 export 'src/surface/glass_finish.dart'
@@ -147,8 +179,7 @@ export 'src/surface/glass_finish.dart'
         kRimWidthLogical,
         kTextContrastAA;
 // The blend group: N surfaces drawn as one silhouette. The picture-side half of
-// the grouping pair (roadmap phase B, research SS4.4); the capture-side half is
-// not API at all, because it is a runtime decision about price.
+// grouping; the capture-side half is not API at all, because it is a runtime decision about price.
 export 'src/surface/glass_group.dart'
     show GlassBlendGroup, GlassGroup, GlassGroupScope, GlassUnion, RenderGlassGroup, kMaxFusedShapes, unionBlendRadius;
 // One glass that flows to the size of the child it is given, through the
@@ -157,8 +188,7 @@ export 'src/surface/glass_morph.dart' show GlassMorph, GlassMorphMotion, kGlassM
 export 'src/surface/glass_host.dart' show GlassHost;
 export 'src/surface/glass_scaffold.dart'
     show GlassScaffold, kGlassScaffoldActionGap, kGlassScaffoldBarHeight, kGlassScaffoldBarMargin;
-// The configuration level of the three-level structure (SS7.2), and the finish
-// ladder it carries. Both are API by construction: the ladder has no automatic
+// The configuration level — the theme — and the finish ladder it carries. Both are API by construction: the ladder has no automatic
 // input at all, so the only way onto a rung below the top one is to say so.
 export 'src/surface/glass_theme.dart' show GlassLegibility, GlassTheme, GlassThemeData;
 export 'src/surface/glass_tier.dart' show GlassTier, GlassTierChoice, GlassTierPolicy, GlassTierReason;
@@ -176,7 +206,7 @@ export 'src/surface/glass_ledger.dart'
         GlassSurfaceCostModel,
         GlassSurfaceGeometry,
         GlassSurfaceRecord;
-// A wave from where the glass was touched (D229): opt-in, and not Apple's.
+// A wave from where the glass was touched: opt-in, and not Apple's.
 export 'src/surface/glass_ripple.dart' show GlassRipple, kMaxRippleWaves;
 export 'src/surface/glass_surface.dart'
     show GlassFade, GlassSurface, RenderGlassSurface, debugPaintGlassSurfaces, kGlassCapsule;

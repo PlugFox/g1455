@@ -1,3 +1,201 @@
+## 0.2.0
+
+A minor version rather than a patch: new components, new parameters on the
+sheet, the tab bar and the controls, and a declared backdrop. Existing code
+builds unchanged; the one layout change is in the ripple shader's uniforms
+(see Performance). Three defaults behave differently: a pressed `GlassButton`
+swells (`GlassPress.none` turns it off), a sheet stands on the keyboard
+instead of under it, and a switch, slider or segmented control inside a
+horizontal scrollable takes a horizontal drag from the page.
+
+A backdrop the application declares:
+
+- `GlassBackdrop` declares what is behind the glass in a subtree, and that
+  glass samples a texture made from the declaration instead of a capture of
+  the screen: `GlassBackdrop.color`, `.image` (an `ImageProvider`, placed by
+  `fit` and `alignment`), `.texture` (a `ui.Image` the application holds) and
+  `.gradient` and `.painter` (any `GlassProxyPainter`). The texture is
+  made once per finish blur and size, through the same shader and the same
+  blur arithmetic as a captured slot, and the host leaves those surfaces out
+  of its capture: a screen whose glass is all declared takes no snapshot.
+  Over a declared colour the glass draws what it draws over a captured screen
+  of that colour, to 2 code values.
+- Scoped to the subtree, innermost first: `GlassBackdrop.live` hands a part
+  back to the capture, so a page can declare its wallpaper and still let the
+  bar over its list refract the list. The widget paints what it declares under
+  its child unless `paintBackdrop: false`, and an image that has not loaded
+  leaves the glass on the capture until it has; so does a replaced image,
+  with the old one still painted until the new one arrives.
+- Glass over a declared backdrop is ordinary content for the capture of other
+  glass, as a cheap surface is: a captured bar over declared cards shows them.
+  Fused groups sample the declaration too, and a fused member is left out of
+  the capture exactly when its group is, whatever `GlassBackdrop` sits between
+  them. A draw holds the texture it was recorded with, so glass that moves
+  without repainting keeps drawing while other glass under the same
+  declaration asks for new blurs, and no texture is made while a frame is
+  composited. Adaptive glass does not read a
+  declared backdrop yet, and falls back to its declarations.
+- `RenderGlassSurface.paintsWithDeclaredBackdrop`,
+  `RenderGlassGroup.paintsWithDeclaredBackdrop`,
+  `RenderGlassSurface.readsDeclaredBackdrop` and
+  `GlassBackdropDeclaration.renders` say what was sampled and how many
+  textures were made; `GlassSurfaceRecord.declared` and `readsCapture` say
+  what the ledger priced.
+
+Components:
+
+- `GlassStepper`: a minus and a plus in one glass capsule, as `UIStepper`. A
+  press steps at once; held, a half repeats after
+  `kGlassStepperRepeatDelay` (500 ms) every `kGlassStepperRepeatInterval`
+  (100 ms), and the half that would pass a limit is disabled unless `wraps`.
+  One surface: a press, the repeat and a glyph dimming are drawn inside the
+  glass and are no capture. A screen reader hears one adjustable control.
+  Under right to left it is mirrored, with the minus at the end.
+- `GlassPageControl`: page dots on a glass capsule, as `UIPageControl` on its
+  platter. It follows a `PageController` without a build and turns it; a tap
+  moves one page toward the side tapped, as iOS's does, and a drag scrubs.
+  One surface. A `PageView` beside it is retaken while it scrolls (43 captures
+  a swipe in the package's tests), which belongs to the view: the same 43 with
+  dots that stay put. Under right to left the first dot is at the right, and
+  a `count` that shrinks below the current page clamps it.
+- `GlassSearchBar`: the glass search field with a clear button while there is
+  text, and a Cancel that slides in while it has the focus. One surface, the
+  field's; typing and the clear button are no capture. Cancel's slide narrows
+  the glass, and that is a capture a frame for `cancelDuration` (16 over
+  250 ms at 60 Hz, each way), one frame under reduced motion.
+- `GlassBadge`: a count, a label or a dot on the corner of an icon or a tab,
+  as an opaque `systemRed` capsule. Not glass, as iOS 26's badge is not; it
+  costs no surface, and a count changing on glass is a repaint inside the
+  glass.
+- Their sizes (`kGlassStepperSize`, `kGlassPageDot`, `kGlassPageDotGap`,
+  `kGlassPageControlHeight`, `kGlassBadgeHeight`, `kGlassBadgeDot`) are
+  layout, not Apple measurements: none of the four was among the controls
+  measured. The stepper, the page control and the search bar are laid
+  out at least `kGlassMinTapTarget` tall.
+
+iOS 26 behaviours:
+
+- Sheet detents: `showGlassSheet(detents:, initialDetent:,
+  onDetentChanged:)` with `GlassSheetDetent.medium` (the content's height, as
+  before; Apple's is half the window) and `GlassSheetDetent.large` (the whole
+  height below the top safe area less 8, edge to edge). A drag between them
+  follows the finger and settles at the nearer, or where a flick was heading;
+  a tap on a settling sheet, or on a button in it, leaves the settle alone.
+- A large sheet is `largeFinish`, by default the finish with its tint at full
+  alpha. Once it is all the way up it is drawn on `GlassTier.cheap` and reads
+  no backdrop: headless, with a glass bar under it, one surface of two
+  captured instead of two, and 20,608 px² of capture against 337,408. The
+  other way: the sheet is then content to the capture of the glass around it,
+  so a change inside it is a retake (1 against 0). A translucent
+  `largeFinish` keeps it glass.
+- `GlassTabBar(minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown)`
+  collapses the bar to a circle of the selected tab's icon when the content
+  scrolls down, and expands it on a scroll up or a tap on the circle, which
+  selects nothing. The scroll is read by a `GlassTabBarMinimizer` above both
+  the scroll view and the bar; `GlassScaffold` is one. The collapse moves
+  inside a declared travel region: no record over 60 frames, against 60
+  without the declaration. Collapsed, a screen reader hears one button named
+  for the selected tab. `GlassTabBarMinimizer.notificationPredicate` (and
+  `GlassScaffold.minimizeNotificationPredicate`) lets a list one level down,
+  in a `PageView`, `TabBarView` or `NestedScrollView`, collapse it, and the
+  direction is read on the screen, so a `reverse: true` list collapses it as
+  any list does.
+- `GlassTabBar.bottomAccessory`: a glass capsule `kGlassTabAccessoryHeight`
+  (48) tall above the bar, which moves down beside the collapsed circle. The
+  bar's box keeps its height, so the body is not laid out again for it.
+- The gap above a large sheet, its radius, the circle's size, the accessory's
+  height and gaps, `kGlassTabMinimizeScroll` (12) and the springs are layout
+  taste: none was measured on Apple's devices.
+
+Interaction:
+
+- `GlassPress`: a pressed `GlassButton` swells by 12 px on its longest side
+  and leans up to 3 px toward a dragging finger, then springs back. Declared
+  on `GlassHost.press`, `GlassThemeData.press` or `GlassButton.press`;
+  `GlassPress.none` turns it off, and so do reduced motion and a disabled
+  button. A feel rather than a measurement: Apple's press was not measured,
+  and 17 px, another package's number, would be 1.39× a 44 px button. It
+  costs two captures a press (touch-down and settle) and nothing at rest,
+  because the region it grows in is declared only while it moves; declared
+  always, it doubled a 44 px button's captured area (3,600 to 7,056 px²).
+  Toolbar cells take the focus but do not swell: the group is one surface.
+- `GlassSlider.divisions`: every input, a drag, a tap, a key or a screen
+  reader, lands on a stop, and `onChanged` is called only when the stop
+  changes.
+- The switch, the slider and the segmented control drag from touch-down.
+  Inside a horizontal scrollable such as a `PageView` a horizontal drag that
+  starts on them moves the control and not the page, and a vertical swipe
+  still scrolls the vertical list around them, a carousel row's included.
+- The keyboard: the button, switch, slider, segmented control, stepper, page
+  control and toolbar cells take the focus (`focusNode`, `autofocus`); Space
+  and Enter activate, and the arrows step the slider, the segmented control,
+  the stepper and the page control. The ring
+  (`kGlassFocusRingColor`, `kGlassFocusRingWidth`, `kGlassFocusRingGap`) is
+  drawn inside the glass's own subtree, which no capture sees; a switch's or a
+  segmented control's ring under other glass costs one capture as the focus
+  changes.
+- Right to left: the switch is on at the left, the slider fills from the
+  right, the segmented control's first segment is at the right, the toolbar's
+  first item is at the right, the stepper's minus and the page control's first
+  dot are at the right, and the arrow keys follow.
+  `SliderGeometry.fillEnd` takes a `textDirection`.
+- `GlassConcentric`: Apple's concentric corners as arithmetic, a shape's
+  radius as its container's less the inset, with a floor. The segmented
+  control's capsule (pixel for pixel what it was) and the focus rings use it.
+
+Fixes:
+
+- A dismissible sheet follows the finger: a 116 px drag moved it about
+  4.5 px. It closes past a third of its height or on a flick, and while it
+  moves it declares where it travels: one retake a drag instead of 16.
+- Under right to left, the segmented control's capsule sat under the wrong
+  label, and `GlassButtonGroup` brightened the wrong cell.
+- A sheet stands on the keyboard, as an iOS sheet does: 8 px above it at
+  medium, on it at large. Its content sees no bottom `viewInsets`, so content
+  already padded by them is not padded twice.
+- A sheet popped while a finger drags it no longer pops the page under it when
+  the finger lifts, and a drag down from large after the content or the window
+  changed no longer jumps.
+- `GlassSlider` sends one `onChangeStart` before its changes and one
+  `onChangeEnd` after, carrying the last value it sent, for a tap, a hold, a
+  drag, a cancelled pointer and a slider disabled mid-gesture: a tap used to
+  end before it started, and a hold then a drag started twice.
+- A segmented control in a vertical list no longer selects a segment after the
+  list scrolled away under the finger.
+- `GlassButtonGroup` threw, or kept its ring on a cell that was gone, when the
+  focused or held item was removed.
+
+Performance:
+
+- The shaders' uniforms are packed into `vec4`s: 19 slots to 9 for a surface
+  and a group, 24 to 12 for the ripple. Metal binds each declared float
+  uniform on its own every draw, where Vulkan binds one struct. The pixels are
+  byte-identical; the raster thread spends 0.9 to 1.4 µs less a surface draw
+  and 1.0 to 1.8 µs less a group draw, on macOS under Impeller/Metal. The ripple's
+  `count`, `reach` and `light` moved after its arrays, which matters only to
+  code that writes the uniforms by hand. Every `flutter test` run checks the
+  lane order against an unpacked copy of each shader, with a lane swap as the
+  control that it fails.
+
+Platforms:
+
+- The floor is Flutter 3.47.0 (Dart 3.13.0): `sdk: ^3.13.1` shut 3.47.0 out
+  although the package runs on it unchanged, and CI now tests that exact
+  version rather than the newest 3.47 patch. Below 3.47 the package would need
+  code changes, and on Apple hosts that opt into SDF rendering it would draw
+  differently, so the floor stays there.
+
+Documentation:
+
+- "Misuse and common errors", in the README and on the site: each mistake
+  with what it looks like, the error text where there is one, the cause and
+  the fix.
+- The site has a page with a live demo for the stepper, the page control, the
+  search bar and the badge, and the sheet, tab bar, button, slider and
+  segmented control pages show detents, the collapse, the press, divisions,
+  the keyboard and right to left. The README has a pattern for a tab bar that
+  collapses on scroll, and the agent skill has the same pages and rules.
+
 ## 0.1.4
 
 - `showGlassSheet(barrierDismissible: false)` is a sheet only its content
@@ -111,7 +309,7 @@ The package page and the README:
   tiles by `tool/showcase.sh screen`. How it works is four cards. The quick
   start is a whole app that runs as pasted. New sections give the values of
   every `GlassFinish` preset, five common patterns, and what is not here and
-  why: no dispersion, because Apple's material has none to measure (D103),
+  why: no dispersion, because Apple's material has none to measure,
   and one shape, `RSuperellipse`. A test keeps the README's code identical to
   files that are analyzed and pumped, and its finish table equal to the
   constants. Every image is linked relatively.
@@ -173,16 +371,16 @@ Documented:
 ## 0.1.0
 
 First release on pub.dev, as `g1455`. The package was `glass` while it lived
-beside the research application that measures it: the library is now
+beside the benchmark application that measures it: the library is now
 `package:g1455/g1455.dart`, the shader asset keys are
 `packages/g1455/shaders/...`, and `glass_diagnostics.dart` keeps its name.
 Everything since the first cut:
 
 **Breaking:** `GlassFinish.regular` is now `GlassFinish.regularDark`, and its
-damage-table key is `'regularDark'` (D230). It was always the dark branch of
-Apple's `.regular`, because S4's iPad was in dark mode. The light branch is the
-new `GlassFinish.regularLight`: transmission 0.282, tint 252 at 0.718, and its
-own rows in the resolution and staleness tables.
+damage-table key is `'regularDark'`. It was always the dark branch of Apple's
+`.regular`, because the iPad it was measured on was in dark mode. The light
+branch is the new `GlassFinish.regularLight`: transmission 0.282, tint 252 at
+0.718, and its own rows in the resolution and staleness tables.
 `GlassFinish.regular(appearance:, backdrop:)` picks the branch Apple's
 material would. It switches at a backdrop level of 54 in light mode and 222 in
 dark mode. `GlassHost.finish` is now optional. Null means that choice,
@@ -193,7 +391,7 @@ hold its capture one frame (0.284 ΔE against 0.348).
 Drops and lone panels no longer appear through `presence`, which eroded a
 capsule to a bright line about 2 pt tall for ~50 ms on the way out. The
 tab bar's, switch's, slider's and segmented control's drops, and the alert and
-the menu, now come and go through `materialize`, as Apple's do (D216, D230).
+the menu, now come and go through `materialize`, as Apple's do.
 
 `showGlassDialog` and `showGlassSheet` carry the caller's `InheritedTheme`s
 to the navigator's overlay, as `showDialog` does. Their content used to
@@ -207,7 +405,7 @@ panel around any content, open until a tap outside it. Opening a menu over an
 anchor with a semantics node of its own no longer trips the framework's
 `!semantics.parentDataDirty` on close.
 
-New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
+New components, read off Apple's own on iOS 26.5 simulators:
 
 - `GlassScrollEdge`: the scroll edge effect under a bar, soft or hard, top or
   bottom. It carries the bar and lifts it. The soft top is a blur of σ 1.6
@@ -223,7 +421,7 @@ New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
 - `GlassTextField` and `GlassTextField.search`: a glass capsule holding an
   `EditableText`. The caret and typing take no capture.
 - `showGlassDialog` with `GlassAlert`, `showGlassSheet` and `GlassMenuAnchor`.
-  The menu is placed as Apple places a button's menu (D228): over the anchor,
+  The menu is placed as Apple places a button's menu: over the anchor,
   corner on corner, with the anchor hidden. It is 250 wide with rows of 42 and
   a 31.5 corner. When it opens upward, its items are reversed.
   These need the `GlassHost` above the navigator (`MaterialApp.builder`), and
@@ -231,7 +429,7 @@ New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
 - `GlassSurface.fade` (`GlassFade`): the glass fades across itself. It is a
   smoothstep, and an exact `1.0` when unused.
 
-- `GlassRipple` (D229), optional and not Apple's: a viscous wave from where the
+- `GlassRipple`, optional and not Apple's: a viscous wave from where the
   glass was touched. A dimple sinks under the finger, a front travels out, and
   the dimple springs back on release. `viscosity` goes from water to honey. Set
   it on `GlassHost.ripple`, `GlassThemeData.ripple` or `GlassSurface.ripple`. It
@@ -242,26 +440,26 @@ New components, read off Apple's own on iOS 26.5 simulators (D222–D226):
 Fixed:
 
 - The slider's fill ended in a square cut that the clear drop magnified. It is
-  now a capsule, as Apple's is (D222).
+  now a capsule, as Apple's is.
 - A screen whose only glass was a resting drop (switches, segments) never
   stopped drawing. `publishUpper` notified listeners on every frame even when
-  nothing had changed (D224).
+  nothing had changed.
 - Under glass on glass, a still screen recorded on every frame when the lower
   glass held content that was not behind a `RepaintBoundary`, such as a plain
   `Text`. The publish repainted the content, and the new pictures read as a
-  change. A surface now re-adds its content layer when only the proxy changed
-  (D224).
+  change. A surface now re-adds its content layer when only the proxy
+  changed.
 - With two finishes on one screen, each blur class blurred the whole atlas.
   It now blurs only the box around its own slots. On the iPad this was 0.8 ms
-  of a scrolling frame with a scroll edge over cards (D227).
+  of a scrolling frame with a scroll edge over cards.
 
 ## 0.1.0-dev.1
 
 Not published.
 
-First cut of the package, moved out of the research application that measured
-it. Behaviour is unchanged from that application's `lib/`, with one exception:
-a debug assertion. The changes:
+First cut of the package, moved out of the benchmark application that
+measured it. Behaviour is unchanged from that application's `lib/`, with one
+exception: a debug assertion. The changes:
 
 - Shaders moved under `lib/shaders/` and are declared through `packages/glass/`.
   The asset key is now `packages/glass/shaders/...` whether the package is the
@@ -279,7 +477,7 @@ a debug assertion. The changes:
   everything that repainted is glass content. Example: a label inside a
   `GlassBar` changing, when the bar's height follows the label. That case is
   not a hole, because glass content is not part of the proxy. The check now
-  reads a second walk that excludes only the glass draws (D219).
+  reads a second walk that excludes only the glass draws.
 - The same check no longer fires when the host's boundary was repainted but
   drew nothing of its own. `RenderObject.layout` marks paint unconditionally,
   so an application's `setState` that re-runs a `Scaffold`'s layout at the same
@@ -301,4 +499,4 @@ a debug assertion. The changes:
   disabled `GlassButton` keeps its glass, and its label becomes
   `kGlassDisabledDarkLabel` or `kGlassDisabledLightLabel` (iOS's
   `tertiaryLabel`), chosen by the polarity of the label it would have drawn
-  enabled (D221). A control disabled mid-press or mid-drag lets go.
+  enabled. A control disabled mid-press or mid-drag lets go.

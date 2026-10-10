@@ -1,14 +1,13 @@
-// Phase C, §7.3 — the union: N surfaces drawn as one piece of glass, however
-// far apart they are.
+// The union: N surfaces drawn as one piece of glass, however far apart they
+// are.
 //
-// `flutter test test/glass/glass_union_test.dart`
+// `flutter test test/glass_union_test.dart`
 //
-// The roadmap's standing reason for not writing this type was that it is
-// `GlassGroup(spacing: infinity)` and so has no behaviour of its own. It has,
-// and the reason is that infinity is not a value this machine takes: the quad
-// a fused draw shades is the members' union grown by `delta(n) * k`, and the
-// fold's skip — a quarter of a twelve-shape group's addition on Adreno, 44% on
-// Xclipse (D170, D171) — fires at `k`. So a union **solves** for the smallest
+// A union looks like `GlassGroup(spacing: infinity)` with no behaviour of its
+// own. It has one, and the reason is that infinity is not a value this machine
+// takes: the quad a fused draw shades is the members' union grown by `delta(n)
+// * k`, and the fold's skip — a quarter of a twelve-shape group's addition on
+// Adreno, 44% on Xclipse — fires at `k`. So a union **solves** for the smallest
 // `k` that connects the members instead of being told one, and that solver is
 // what these arms are about.
 //
@@ -65,10 +64,10 @@ void main() {
   test('the bound a moving union is captured for holds wherever its members go', () {
     // `unionBlendRadiusBound` sizes the capture of a union whose members
     // declared travel regions; a bound under the solved `k` anywhere inside the
-    // regions is a capture smaller than the bridges, the clamped band D201
-    // found. Checked against the solved radius at random places, and the
-    // control is the bound taken without the regions — the members' current
-    // places — which must be beaten somewhere, or the regions bought nothing.
+    // regions is a capture smaller than the bridges, which clamps the band.
+    // Checked against the solved radius at random places, and the control is
+    // the bound taken without the regions — the members' current places — which
+    // must be beaten somewhere, or the regions bought nothing.
     final random = math.Random(29);
     var placements = 0;
     var tightest = double.infinity;
@@ -321,7 +320,7 @@ void main() {
 
     // The quad in closed form, from a `k` this file computed: the members'
     // union grown by the deepest the fold can pull the field under the nearest
-    // shape (D173's recurrence), half a device pixel for where coverage
+    // shape (the recurrence in `_depression`), half a device pixel for where coverage
     // reaches zero, and a logical pixel of slack against the rasterizer. An
     // area ratio alone would pass a solver that asked for four times too much
     // and still less than the over-declaration.
@@ -513,7 +512,7 @@ void main() {
 // ---------------------------------------------------------------------------
 
 /// The deepest the sequential fold can pull the field below the nearest shape's
-/// own distance, in units of `k` — D173's recurrence, recomputed here.
+/// own distance, in units of `k`, recomputed here rather than imported.
 double _depression(int count) {
   var delta = 0.0;
   for (var i = 1; i < count; i++) {

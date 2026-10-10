@@ -71,8 +71,9 @@ When `finish` is null the host uses Apple's `.regular`, which is two materials: 
 `regularLight` from `backdrop` and the platform's appearance, and follows appearance changes. With `adaptive:` set it
 picks per glass instead, from what each one reads under it: see [Adaptive glass](/foundations/adaptive).
 
-The host also sets the screen's motion: `ripple:` for a touch wave ([Ripple](/foundations/ripple)) and `dropMotion:`
-for how the held drops of the controls stretch and squash ([Drop motion](/foundations/drop-motion)).
+The host also sets the screen's motion: `ripple:` for a touch wave ([Ripple](/foundations/ripple)), `dropMotion:`
+for how the held drops of the controls stretch and squash ([Drop motion](/foundations/drop-motion)), and `press:` for
+how a pressed [button](/components/button) swells and leans (`GlassPress.none` to keep buttons still).
 
 ## Gotchas
 
@@ -156,6 +157,7 @@ class HomePage extends StatelessWidget {
 | `highContrast` | `bool?` | `null` | Draws an opaque outline instead of the subtle rim. Null reads `MediaQuery.highContrastOf`; on macOS pass it yourself. |
 | `ripple` | `GlassRipple?` | `null` | A touch wave for every surface below. None by default. |
 | `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How the held drop of the switch, slider, segmented control and tab bar stretches and squashes. `GlassDropMotion.none` keeps it round. |
+| `press` | `GlassPress` | `GlassPress()` | How a pressed `GlassButton` swells and leans: two captures a press, none at rest. `GlassPress.none` keeps every button its size. |
 | `adaptive` | `GlassAdaptive?` | `null` | Each bar, card and button reads the backdrop under it and picks its branch and label. Null reads nothing. |
 | `thermal` | `GlassThermalState?` | `null` | The device's thermal state, read by your app. Null is nominal. |
 | `thermalPolicy` | `GlassThermalPolicy` | `GlassThermalPolicy()` | How much staleness each thermal state may spend. `GlassThermalPolicy.never` keeps every frame fresh. |
@@ -181,7 +183,7 @@ out those programs. Completes with a load's error if one fails.
     title: 'GlassSurface',
     icon: 'crop_square',
     summary: 'The primitive: a box of the screen that is glass. It refracts, blurs and tints the backdrop, then paints its child.',
-    api: <String>['GlassSurface', 'kGlassCapsule', 'GlassFade'],
+    api: <String>['GlassSurface', 'kGlassCapsule', 'GlassFade', 'GlassConcentric'],
     source: 'lib/src/surface/glass_surface.dart',
     guide: r'''
 `GlassSurface` says "this box of the screen is glass". It refracts, blurs and tints what is behind it, draws a thin rim
@@ -229,6 +231,41 @@ Two values, from 0 to 1, and they do different things:
 may be dimmed to keep that text readable. Set `labelled: false` on glass that carries no text, such as lenses, drops
 and blobs, so it keeps its finish exactly as named. Inside a raw surface, set the text colour yourself; see
 [Legibility & theme](/foundations/legibility).
+
+## Nested shapes
+
+A shape inside glass, a highlight, a thumb, a ring, an inner panel, looks right when it is concentric with the glass:
+its corner shares the glass's centre of curvature, so its radius is the glass's less the inset between them. That is
+Apple's rule for iOS 26 (SwiftUI's `ConcentricRectangle`), and `GlassConcentric` is it as arithmetic, with a floor so a
+deep inset does not square the corner off:
+
+```dart
+// A highlight 6 px inside a card of radius 24: radius 18.
+final BorderRadius inner = GlassConcentric.borderRadius(
+  const BorderRadius.all(Radius.circular(24)),
+  const EdgeInsets.all(6),
+  min: 4,
+);
+
+GlassCard(
+  borderRadius: const BorderRadius.all(Radius.circular(24)),
+  padding: const EdgeInsets.all(6),
+  child: DecoratedBox(
+    // The glass's own shape, so the corners agree all the way round.
+    decoration: ShapeDecoration(color: const Color(0x33FFFFFF), shape: RoundedSuperellipseBorder(borderRadius: inner)),
+    child: const SizedBox(height: 64),
+  ),
+)
+```
+
+- `GlassConcentric.radius(outer, inset, min: 0)` is the rule for one corner: `outer - inset`, never below `min`.
+- `GlassConcentric.borderRadius(outer, insets, min: 0)` applies it per corner, each corner less the two insets beside it.
+- `GlassConcentric.outset(inner, distance)` goes the other way, for a ring drawn outside a shape: 3 px outside a radius
+  of 12 is 15.
+- A capsule nests as a capsule: `kGlassCapsule` less any inset is still a pill.
+
+The package's own nested shapes go through it: the segmented control's capsule (14 inside a 16 track inset 2) and the
+keyboard's focus rings.
 
 ## Performance
 
@@ -335,6 +372,14 @@ class _NowPlayingState extends State<NowPlaying> with SingleTickerProviderStateM
 |---|---|---|
 | `kGlassCapsule` | `BorderRadius.all(Radius.circular(1e9))` | An over-large radius the engine clamps to half the short side: a stadium at any size. |
 | `debugPaintGlassSurfaces` | `false` | A top-level variable. In debug builds, outlines every surface in cyan. |
+
+## GlassConcentric
+
+| Member | Description |
+|---|---|
+| `static double radius(double outer, double inset, {double min = 0})` | The radius of a shape `inset` px inside a container of radius `outer`: `outer - inset`, never below `min`. |
+| `static BorderRadius borderRadius(BorderRadius outer, EdgeInsets inset, {double min = 0})` | The same per corner, each less the insets of the two sides that meet there. |
+| `static BorderRadius outset(BorderRadius inner, double distance)` | The radii of a shape `distance` px outside `inner`. |
 ''',
   ),
   Entry(
@@ -627,6 +672,7 @@ class LightPanel extends StatelessWidget {
 | `minLabelContrast` | `double?` | `null` | The least label contrast. The glass is dimmed just enough to meet it. |
 | `ripple` | `GlassRipple?` | `null` | The default touch wave. |
 | `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How held drops stretch and squash. See [Drop motion](/foundations/drop-motion). |
+| `press` | `GlassPress` | `GlassPress()` | How a pressed button swells and leans. See [Button](/components/button). |
 | `adaptive` | `GlassAdaptive?` | `null` | Whether glass reads its backdrop. Installed by `GlassHost.adaptive`. See [Adaptive glass](/foundations/adaptive). |
 | `regularAppearance` | `Brightness?` | `null` | The appearance `finish` was picked in when it is `.regular` and nobody named it. Set by an adaptive host. |
 | `reading` | `GlassBackdropReading?` | `null` | What the glass this theme was installed for read of its backdrop. |

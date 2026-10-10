@@ -24,6 +24,7 @@ What's left for you is to not spend that budget by accident.
 - **Keep glass in the navigation and controls layer**, as Apple's guidelines do. Bars, tab bars, toolbars and floating controls, not every card in a feed.
 - **Prefer [`GlassButtonGroup`](../components/toolbar.md)** for rows of actions. It's one surface no matter how many items, where N `GlassButton`s are N surfaces.
 - **Inside a glass bar, plain icons are cheaper** than `GlassButton`s, which are glass on glass.
+- **Declare a backdrop that does not change** with [`GlassBackdrop`](../foundations/backdrop.md): glass over a fixed colour, gradient or wallpaper samples a texture made once and takes no capture.
 - **Wrap moving glass in `GlassTravel`** with `RepaintBoundary`s around the glass and the content.
 - **Offer cheaper [tiers](../foundations/tiers.md)** on low-end devices (`GlassTierPolicy(ceiling: GlassTier.cheap)`), and honour Reduce Transparency.
 - **Measure in profile mode on a real device.** Debug builds are much slower across the board, so their frame times tell you little about glass.

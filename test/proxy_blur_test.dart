@@ -1,8 +1,8 @@
-// Phase A — is the proxy's resolution independent of the finish's blur?
+// Is the proxy's resolution independent of the finish's blur?
 //
-// `flutter test test/glass/proxy_blur_test.dart`
+// `flutter test test/proxy_blur_test.dart`
 //
-// The budget treats them as two line items: capture 40%, blur 17% (D63). But
+// The budget treats them as two line items: capture 40%, blur 17%. But
 // recording at 1/k is itself a low-pass — the detail above the texel grid is
 // never rasterized, and the magnification back is a reconstruction filter — so
 // part of the finish's sigma may already be paid for by the divisor. If that is
@@ -227,7 +227,7 @@ void main() {
     // Two consequences, both against numbers the ladder already quotes.
     //
     // First: a proxy blurred by the finish's whole sigma after a divisor is
-    // *over-blurred*, and the resolution rungs of the M11 ladder carry that
+    // *over-blurred*, and the resolution rungs of the quality ladder carry that
     // over-blur inside their damage. At a quarter it is 12%.
     final double atQuarter = math.sqrt(
       math.pow(kSigmaPerDivisor * 4, 2) + kRegularSigma * kRegularSigma,
@@ -334,7 +334,7 @@ Future<_Fit> _fitDivisor(
     if (thenBlurLogical != null) {
       // Sigma travels in logical pixels and is converted at the texel scale, so
       // every divisor asks for the same amount of blur rather than the same
-      // number of texels — exactly what `playground/quality.dart` does.
+      // number of texels — exactly what the quality ladder does.
       blurred = _blur(reduced, thenBlurLogical * small.scale);
       reduced = blurred;
     }

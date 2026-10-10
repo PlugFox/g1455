@@ -5,13 +5,14 @@ description: >-
   refraction, blur, tint, rim). Use when a Flutter project depends on g1455 or
   imports package:g1455, when code uses GlassHost, GlassSurface, GlassBar,
   GlassCard, GlassButton, GlassTabBar, GlassSwitch, GlassSlider,
+  GlassStepper, GlassSearchBar, GlassPageControl, GlassBadge,
   showGlassDialog, showGlassSheet, GlassMenuAnchor or another Glass* name, or
   when the user asks for liquid glass, glassmorphism, frosted or iOS 26 glass
   in a Flutter app.
 license: MIT
 metadata:
   package: g1455
-  version: 0.1.x
+  version: 0.2.x
   homepage: https://g1455.plugfox.dev
   repository: https://github.com/PlugFox/g1455
 ---
@@ -23,7 +24,7 @@ image, only when something under the glass changed; every glass surface samples
 its slot of that capture. Most rules below follow from that.
 
 Package 0.x: the API changes between minor versions. If the project's
-`pubspec.lock` resolves g1455 to something other than 0.1.x, check the
+`pubspec.lock` resolves g1455 to something other than 0.2.x, check the
 [changelog](https://pub.dev/packages/g1455/changelog) before relying on this
 file. Requires Flutter >= 3.47. Pure Dart and shaders: no platform setup.
 
@@ -134,9 +135,13 @@ Break one of these and the result is wrong, slow or invisible.
     to offsets yourself (or use `GlassScaffold`).
 14. **Controlled widgets.** `GlassSwitch(value:, onChanged:)`,
     `GlassSlider(value: 0..1, onChanged:)` (needs bounded width: `Expanded` in a
-    `Row`; no snapping), `GlassSegmentedControl(segments:, selectedIndex:,
-    onSelected:)` and `GlassTabBar(items:, selectedIndex:, onSelected:)` take
-    2 to 5 items. `onChanged`/`onSelected: null` disables.
+    `Row`; `divisions:` for steps, never rounding in `onChanged`),
+    `GlassStepper(value:, onChanged:, min:, max:, step:)`,
+    `GlassSegmentedControl(segments:, selectedIndex:, onSelected:)` and
+    `GlassTabBar(items:, selectedIndex:, onSelected:)` take 2 to 5 items.
+    `onChanged`/`onSelected: null` disables. The switch, slider and segmented
+    control work inside a `PageView` and a vertical list with no setup, take
+    the keyboard's focus, and mirror under RTL.
 15. **Appearing/leaving:** animate `GlassSurface.materialize` (0..1; blur and
     bend first, tint last; captures every frame while it runs). `presence`
     erodes the shape and is for budding inside a `GlassGroup`; alone it
@@ -158,6 +163,38 @@ Break one of these and the result is wrong, slow or invisible.
     `kMaxFusedShapes` (12) fuse. Never wrap the page background in one.
 20. **Ripple (`GlassRipple`) is opt-in and not Apple's.** Leave it off for an
     iOS-faithful app. A rippling surface is hit-testable over its whole shape.
+21. **Never put glass inside an `Opacity`, `FadeTransition`, `ColorFilter` or
+    `ImageFiltered`.** The layer it opens drops the glass. Fade glass with
+    `materialize`; hide it with `Visibility`.
+22. **A backdrop that does not change is declared, not captured.** Glass over a
+    fixed gradient, wallpaper or colour: wrap the page in
+    `GlassBackdrop.painter` / `.image` / `.color`, and the glass samples a
+    texture made once while the host captures nothing for it. Never over
+    content that moves (a list, a video): the glass shows the declaration, not
+    the screen. `GlassBackdrop.live` hands a subtree back to the capture.
+23. **A minus and a plus are one `GlassStepper`**, not two `GlassButton`s; a
+    count on an icon is a `GlassBadge` (opaque red, not glass, costs no
+    surface), never a glass pill; a search with Cancel is `GlassSearchBar`,
+    placed on its own row (Cancel's slide narrows the glass: 16 captures over
+    250 ms each way; `showsCancelButton: false` costs none); page dots are
+    `GlassPageControl(count:, controller:)` over the `PageView`.
+24. **A tab bar that collapses on scroll** (`minimizeBehavior:
+    GlassTabBarMinimizeBehavior.onScrollDown`) needs a `GlassTabBarMinimizer`
+    above both the scroll view and the bar. `GlassScaffold` is one; a `Stack`
+    built by hand wraps itself in one. Rebuild the bar only when its selection
+    or items change: a bare `setState` on it costs a capture.
+25. **Sheets:** `showGlassSheet(detents: [GlassSheetDetent.medium,
+    GlassSheetDetent.large])` to pull up to the whole height. At large the
+    default is opaque and reads no backdrop (one surface fewer captured), but
+    then a change inside the sheet is a retake; pass a translucent
+    `largeFinish` for content that animates.
+26. **A shape nested in glass** (highlight, thumb, inner panel, ring) takes
+    `GlassConcentric.radius(outer, inset)` / `.borderRadius(outer, insets)`,
+    never a hand-picked radius.
+27. **`GlassButton` swells under a press** (`GlassPress`, 12 px): two captures a
+    press, none at rest. `GlassPress.none` on `GlassHost.press`, a
+    `GlassTheme` or one button turns it off. Never fake a press with a
+    `Transform` or `AnimatedScale` around glass.
 
 ## Pick the widget
 
@@ -165,6 +202,8 @@ Break one of these and the result is wrong, slow or invisible.
 |---|---|---|
 | App-wide capture and config | `GlassHost` | [foundations/host](references/foundations/host.md) |
 | Custom glass shape, lens, panel | `GlassSurface` | [foundations/surface](references/foundations/surface.md) |
+| Radius of a shape nested in glass | `GlassConcentric` | [foundations/surface](references/foundations/surface.md) |
+| Button press swell, or none | `GlassPress` | [components/button](references/components/button.md) |
 | Material: regular, clear, frosted, custom tint | `GlassFinish` | [foundations/finishes](references/foundations/finishes.md) |
 | Label colour, subtree finish/tier/backdrop | `GlassTheme`, `GlassThemeData` | [foundations/legibility](references/foundations/legibility.md) |
 | Glass reads its own backdrop | `GlassAdaptive` | [foundations/adaptive](references/foundations/adaptive.md) |
@@ -175,19 +214,24 @@ Break one of these and the result is wrong, slow or invisible.
 | Moving glass without captures | `GlassTravel` | [foundations/travel](references/foundations/travel.md) |
 | Glass refracting sibling glass | `GlassAbove` | [foundations/above](references/foundations/above.md) |
 | Video, platform view, map under glass | `GlassProxy` | [foundations/capture](references/foundations/capture.md) |
+| Fixed colour, gradient or wallpaper: skip the capture | `GlassBackdrop` | [foundations/backdrop](references/foundations/backdrop.md) |
 | iOS scroll-edge blur under a bar | `GlassScrollEdge` | [foundations/scroll-edge](references/foundations/scroll-edge.md) |
 | Cost, surface count, `GlassLedger` | — | [foundations/performance](references/foundations/performance.md) |
 | Top/bottom navigation capsule | `GlassBar` | [components/bar](references/components/bar.md) |
 | Standalone tappable glass | `GlassButton` | [components/button](references/components/button.md) |
 | Floating content panel | `GlassCard` | [components/card](references/components/card.md) |
 | On/off | `GlassSwitch` | [components/switch](references/components/switch.md) |
-| Continuous 0..1 value | `GlassSlider` | [components/slider](references/components/slider.md) |
+| Continuous or stepped 0..1 value | `GlassSlider` | [components/slider](references/components/slider.md) |
+| Small count, one step at a time | `GlassStepper` | [components/stepper](references/components/stepper.md) |
+| Page dots over a `PageView` | `GlassPageControl` | [components/page-control](references/components/page-control.md) |
 | 2–5 views/filters in one screen | `GlassSegmentedControl` | [components/segmented-control](references/components/segmented-control.md) |
-| 2–5 app sections | `GlassTabBar`, `GlassTabItem` | [components/tab-bar](references/components/tab-bar.md) |
-| Search / single-line input | `GlassTextField`, `.search` | [components/text-field](references/components/text-field.md) |
+| 2–5 app sections, collapsing on scroll | `GlassTabBar`, `GlassTabItem`, `GlassTabBarMinimizer` | [components/tab-bar](references/components/tab-bar.md) |
+| Search with clear and Cancel | `GlassSearchBar` | [components/search-bar](references/components/search-bar.md) |
+| Single-line input | `GlassTextField`, `.search` | [components/text-field](references/components/text-field.md) |
+| Unread count or dot on an icon or tab | `GlassBadge` | [components/badge](references/components/badge.md) |
 | Row of icon actions | `GlassButtonGroup`, `GlassToolbarItem` | [components/toolbar](references/components/toolbar.md) |
 | Confirmation | `showGlassDialog`, `GlassAlert` | [components/alert](references/components/alert.md) |
-| Bottom sheet | `showGlassSheet` | [components/sheet](references/components/sheet.md) |
+| Bottom sheet, medium or large detent | `showGlassSheet`, `GlassSheetDetent` | [components/sheet](references/components/sheet.md) |
 | "More" menu of actions | `GlassMenuAnchor`, `GlassMenuItem` | [components/menu](references/components/menu.md) |
 | Panel of live controls from a button | `GlassPopoverAnchor` | [components/popover](references/components/popover.md) |
 | Glass that flows to a new child's size | `GlassMorph` | [components/morph](references/components/morph.md) |
@@ -196,7 +240,10 @@ Break one of these and the result is wrong, slow or invisible.
 Background: [start/how-it-works](references/start/how-it-works.md) (what
 triggers a capture), [start/declarations](references/start/declarations.md)
 (everything the app declares), [start/platforms](references/start/platforms.md)
-(renderers, web), [start/installation](references/start/installation.md).
+(renderers, web), [start/installation](references/start/installation.md),
+[start/common-errors](references/start/common-errors.md) (symptom, cause and
+fix for missing glass, holes, grey boxes, captures on every frame, and every
+debug message the package prints).
 
 Each reference has the guide, a complete runnable example, and the full
 parameter table. Read the one for the widget you are about to use before
@@ -248,6 +295,10 @@ const SizedBox.square(
 
 ## Verify
 
+- Glass missing, grey, or capturing every frame, or a debug message from the
+  package: look it up in
+  [start/common-errors](references/start/common-errors.md) before changing
+  code.
 - `flutter analyze` must be clean; parameter names come from the references.
 - Widget tests: the first frame of a screen has no glass (the capture lands a
   frame later). Pump at least one more frame before asserting on glass. Glass

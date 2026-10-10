@@ -1,8 +1,7 @@
 // A segmented control whose selection lifts into a glass drop under a finger.
 //
 // Read off Apple's own `UISegmentedControl` on iOS 26.5, pressed by XCUITest
-// on an iPhone 17 Pro simulator (spike 32, `TabBarReferenceTests.testSegments`
-// over spike 27's grid, a 360 pt control):
+// on an iPhone 17 Pro simulator (a 360 pt control over a grid):
 //
 //  - the track is **not glass**: a flat fill of (118, 118, 128) at 0.12 —
 //    iOS's `tertiarySystemFill` — under which the grid's lines stay sharp
@@ -16,13 +15,13 @@
 //    uniform zoom (rms 3.22 px) nor a margin (rms 2.98) explains it well — the
 //    rim's own bend dominates a drop this thin — and the margin is the better
 //    of the two at 8.7 device px, 2.9 pt ([GlassOptics.widen], as the switch's
-//    is: D218);
+//    is);
 //  - dragged, it follows the finger; let go, it settles on the segment under
 //    it, and that is the selection.
 //
 // Not taken: the track grew about 9 pt sideways on the frame held still and
 // not while dragged — one frame, so not read; the drop disperses at its rim
-// and ours does not (D103).
+// and ours does not.
 //
 // What it costs: at rest, nothing — the track and the capsule are paint, and
 // the drop is at presence 0 and captured for nothing. Held, one clear glass
@@ -37,6 +36,20 @@
 // than let out of it — so no capture either way, and a relayout of the drop on
 // the frames it changes.
 //
+// Its gestures are raw pointer events, which are in no arena, so it keeps a
+// drag recognizer in the arena only to learn whether the gesture is still its
+// own: when anything else wins — a vertical list's scroll — the press is
+// cancelled and selects nothing. Under a horizontal scrollable that recognizer
+// also contends for the horizontal drag, as the switch's and the slider's do
+// (`glass_controls.dart`), so a drag across the control is the control's and
+// not the page's.
+//
+// A keyboard reaches it: the arrow keys select the segment beside the selected
+// one, and the focus ring is drawn around the track behind a boundary of its
+// own (`glass_focus.dart`). Under `TextDirection.rtl` the segments run right to
+// left, and so do the capsule, the drop and the arrows: `_at` is where the
+// capsule is *drawn*, a visual index, and only the selection is logical.
+//
 // A segment is any widget. The selected one is drawn over the white capsule,
 // so it is handed an ink that reads there through [IconTheme] and
 // [DefaultTextStyle] — which is what a custom glyph (an SVG, an image) reads
@@ -47,17 +60,20 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_components.dart' show kGlassMinTapTarget;
-import 'glass_controls.dart' show kGlassDropOptics;
+import 'glass_concentric.dart';
+import 'glass_controls.dart' show glassControlClaimsPointer, kGlassDropOptics;
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_surface.dart';
 import 'glass_travel.dart';
 
 /// The track's fill: iOS's `tertiarySystemFill`, read off the simulator as
-/// (116–127) at 0.12 (spike 32).
+/// (116–127) at 0.12.
 ///
 /// Not glass: a flat fill, under which what is behind the control stays
 /// sharp. [GlassSegmentedControl.trackColor]'s default.
@@ -66,7 +82,7 @@ import 'glass_travel.dart';
 const Color kGlassSegmentTrack = Color.fromRGBO(118, 118, 128, 0.12);
 
 /// How far past the resting capsule the held drop reaches, across and down,
-/// logical px (spike 32: 86 x 28 -> 110 x 44).
+/// logical px (iOS 26.5: 86 x 28 -> 110 x 44).
 ///
 /// 12 across on each side and 8 above and below, so the held drop stands out
 /// of the 32 px track.
@@ -76,7 +92,7 @@ const Size kGlassSegmentDropGrow = Size(_kGrowX, _kGrowY);
 const double _kGrowX = 12;
 const double _kGrowY = 8;
 
-/// How much of the backdrop past its box the held drop shows (spike 32: a
+/// How much of the backdrop past its box the held drop shows (iOS 26.5: a
 /// margin of 2.9 pt is the better of two poor fits).
 ///
 /// The held drop's [GlassOptics.widen], which slightly minifies the segments
@@ -138,7 +154,10 @@ Size _marginFor(GlassDropMotion motion) =>
 /// The track is 32 px tall and takes the whole width it is given, split
 /// evenly between the segments; the control is laid out [kGlassMinTapTarget]
 /// tall so it takes taps above and below the track. A tap selects the segment
-/// pressed; a drag carries the drop and selects where it is let go.
+/// pressed; a drag carries the drop and selects where it is let go. A focused
+/// control selects the segment beside the selected one on an arrow key.
+///
+/// Under [TextDirection.rtl] the first segment is at the right.
 ///
 /// ```dart
 /// GlassSegmentedControl(
@@ -171,8 +190,16 @@ class GlassSegmentedControl extends StatefulWidget {
     this.trackColor = kGlassSegmentTrack,
     this.thumbColor = const Color(0xFFFFFFFF),
     this.dropMotion,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   }) : assert(segments.length >= 2);
+
+  /// The control's focus. Null makes one the control owns.
+  final FocusNode? focusNode;
+
+  /// Whether the control takes the focus as soon as it is built.
+  final bool autofocus;
 
   /// One widget per segment — a `Text`, an `Icon`.
   final List<Widget> segments;
@@ -219,6 +246,13 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   double _downX = 0;
   int _pressed = 0;
   VelocityTracker? _tracker;
+  bool _focused = false;
+
+  /// Under [TextDirection.rtl]; null before the first build has asked.
+  bool? _rtl;
+
+  /// Where segment [i] is drawn, counted from the left; and back.
+  int _visual(int i) => _rtl ?? false ? widget.segments.length - 1 - i : i;
 
   // The tab bar's springs and tolerance (glass_tab_bar.dart), for the same
   // reasons: a feel, and a tail that ends under a device pixel.
@@ -240,6 +274,14 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   void didChangeDependencies() {
     super.didChangeDependencies();
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
+    final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
+    if (rtl != _rtl) {
+      _rtl = rtl;
+      // The capsule is placed, not slid: the segments under it just moved.
+      if (!_down) {
+        _at.value = _visual(widget.selectedIndex).toDouble();
+      }
+    }
   }
 
   @override
@@ -270,12 +312,21 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
         .then((_) => _lift.value = target);
   }
 
+  /// Slides the capsule to segment [index] — a selection, not a place.
   void _slideTo(int index, double velocity) {
+    final double to = _visual(index).toDouble();
     _at
-        .animateWith(
-          SpringSimulation(_slideSpring, _at.value, index.toDouble(), velocity, tolerance: _tolerance),
-        )
-        .then((_) => _at.value = index.toDouble());
+        .animateWith(SpringSimulation(_slideSpring, _at.value, to, velocity, tolerance: _tolerance))
+        .then((_) => _at.value = to);
+  }
+
+  /// Selects the segment [steps] from the selected one, toward the end of the
+  /// list — rightward, unless the control runs the other way.
+  void _select(int steps) {
+    final int to = (widget.selectedIndex + steps).clamp(0, widget.segments.length - 1);
+    if (to != widget.selectedIndex) {
+      widget.onSelected?.call(to);
+    }
   }
 
   void _onDown(PointerDownEvent e) {
@@ -288,7 +339,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     _downX = e.localPosition.dx;
     _tracker = VelocityTracker.withKind(e.kind)..addPosition(e.timeStamp, e.localPosition);
     _liftTo(1);
-    final int i = _pressed = g.indexAt(e.localPosition.dx).round();
+    final int i = _pressed = _visual(g.indexAt(e.localPosition.dx).round());
     _slideTo(i, 0);
   }
 
@@ -312,7 +363,9 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     }
     _down = false;
     final double velocity = _moved ? (_tracker?.getVelocity().pixelsPerSecond.dx ?? 0) / g.pitch : 0;
-    final int i = _moved ? (_at.value + velocity * 0.08).round().clamp(0, widget.segments.length - 1) : _pressed;
+    final int i = _moved
+        ? _visual((_at.value + velocity * 0.08).round().clamp(0, widget.segments.length - 1))
+        : _pressed;
     _slideTo(i, velocity);
     _liftTo(0);
     if (i != widget.selectedIndex) {
@@ -320,7 +373,12 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     }
   }
 
-  void _onCancel(PointerCancelEvent e) {
+  void _onCancel(PointerCancelEvent e) => _onLost();
+
+  /// The press ends selecting nothing: its pointer was cancelled, or the arena
+  /// gave the gesture to someone else. Also called for the arena's own end of
+  /// a tap, after the `Listener` has seen the lift — by then nothing is down.
+  void _onLost() {
     if (!_down) {
       return;
     }
@@ -341,14 +399,14 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   // a build scope: every tick of an animation built under it schedules its
   // layout, the boundary it sits in relays out and therefore repaints, and
   // here what that boundary paints is the track — content under the drop —
-  // so every frame of a slide was a capture (30 of 30 in the first run of the
-  // slide arm). The tab bar does not see it because everything its builders
+  // so every frame of a slide was a capture (30 in 30 frames, measured). The
+  // tab bar does not see it because everything its builders
   // repaint is inside the bar's glass. So the width is read where it exists:
   // the capsule is a painter driven by the animations without a build, the
   // drop is placed by a layout delegate, and the gestures read the box.
   @override
   Widget build(BuildContext context) {
-    final Widget body = Listener(
+    Widget body = Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: _onDown,
       onPointerMove: _onMove,
@@ -367,6 +425,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
                     decoration: ShapeDecoration(shape: const StadiumBorder(), color: widget.trackColor),
                   ),
                 ),
+                GlassFocusRing(visible: _focused && _enabled, radius: kGlassCapsule),
                 // The capsule: painted, not built, so it moves without a
                 // build — and behind its own boundary.
                 Positioned.fill(
@@ -396,11 +455,54 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
         ),
       ),
     );
+    // The control follows the raw pointer, and the `Listener` does all the
+    // work; the arena is only asked who has the gesture. Out of it, a press
+    // that a vertical list then scrolled away still selected on the finger's
+    // lift, and under a horizontal scrollable the page won the drag and both
+    // followed the finger. So a horizontal drag sits in the arena and cancels
+    // the press when it loses ([_onLost]). Under a horizontal scrollable it
+    // contends — and, deeper than the page's, wins a horizontal swipe;
+    // elsewhere it never accepts, so it takes nothing from an ancestor. It
+    // never wins on touch-down: a vertical swipe is still a scroll.
+    // Always the detector, an empty one when disabled: a wrapper that came
+    // and went would rebuild the drop's region under it.
+    final bool contend = glassControlClaimsPointer(context);
+    body = RawGestureDetector(
+      behavior: HitTestBehavior.opaque,
+      gestures: _enabled
+          ? <Type, GestureRecognizerFactory>{
+              _SegmentArena: GestureRecognizerFactoryWithHandlers<_SegmentArena>(
+                () => _SegmentArena(debugOwner: this),
+                (_SegmentArena r) => r
+                  ..contend = contend
+                  ..onCancel = _onLost
+                  ..gestureSettings = MediaQuery.maybeGestureSettingsOf(context),
+              ),
+            }
+          : const <Type, GestureRecognizerFactory>{},
+      child: body,
+    );
+    // The arrow along the row selects toward its end: rightward, unless the
+    // row runs the other way.
+    final int right = _rtl ?? false ? -1 : 1;
     return Semantics(
       container: true,
       enabled: _enabled,
-      // Segment labels are not text to select, as a button's are not.
-      child: SelectionContainer.disabled(child: _enabled ? body : Opacity(opacity: 0.5, child: body)),
+      child: FocusableActionDetector(
+        enabled: _enabled,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        shortcuts: <ShortcutActivator, Intent>{
+          const SingleActivator(LogicalKeyboardKey.arrowRight): _SelectIntent(right),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): _SelectIntent(-right),
+        },
+        actions: <Type, Action<Intent>>{
+          _SelectIntent: CallbackAction<_SelectIntent>(onInvoke: (_SelectIntent intent) => _select(intent.steps)),
+        },
+        // Segment labels are not text to select, as a button's are not.
+        child: SelectionContainer.disabled(child: _enabled ? body : Opacity(opacity: 0.5, child: body)),
+      ),
     );
   }
 
@@ -470,6 +572,13 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
       ),
     ),
   );
+}
+
+/// Selects the segment [steps] from the selected one.
+class _SelectIntent extends Intent {
+  const _SelectIntent(this.steps);
+
+  final int steps;
 }
 
 /// Places the drop in the stage: the stage is the control grown by
@@ -562,7 +671,12 @@ class _CapsulePainter extends CustomPainter {
       width: g.capsule.width,
       height: g.capsule.height,
     );
-    final RRect shape = RRect.fromRectAndRadius(box, Radius.circular(box.shortestSide / 2));
+    // Concentric with the track, 2 in: 14 inside 16. The half side is the
+    // capsule a segment narrower than the capsule is tall still needs.
+    final RRect shape = RRect.fromRectAndRadius(
+      box,
+      Radius.circular(math.min(GlassConcentric.radius(_kHeight / 2, _kInset), box.shortestSide / 2)),
+    );
     canvas
       ..drawRRect(
         shape.shift(const Offset(0, 1)),
@@ -582,7 +696,7 @@ class _CapsulePainter extends CustomPainter {
 /// once on the tick it goes. Not `Listenable.merge(lift, at)`, which repaints
 /// on every tick of a slide with the capsule gone — and every repaint mints a
 /// picture the layer watch must call a change, even an empty one: the second
-/// cause of the slide arm's 30 captures in 30 frames.
+/// cause of a slide's 30 captures in 30 frames.
 class _WhileVisible extends ChangeNotifier {
   _WhileVisible(this.lift, this.at) {
     lift.addListener(_tick);
@@ -607,4 +721,18 @@ class _WhileVisible extends ChangeNotifier {
     at.removeListener(_tick);
     super.dispose();
   }
+}
+
+/// The segmented control's seat in the gesture arena: a horizontal drag that
+/// does nothing when it wins, and calls `onCancel` when it leaves without
+/// winning — to the arena, or on the finger's lift. Unless it [contend]s, it
+/// never accepts, and so only learns that someone else did.
+class _SegmentArena extends HorizontalDragGestureRecognizer {
+  _SegmentArena({super.debugOwner});
+
+  bool contend = false;
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(PointerDeviceKind pointerDeviceKind, double? deviceTouchSlop) =>
+      contend && super.hasSufficientGlobalDistanceToAccept(pointerDeviceKind, deviceTouchSlop);
 }

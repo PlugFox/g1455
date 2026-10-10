@@ -148,6 +148,50 @@ class NotesBar extends StatelessWidget {
   );
 }
 
+class Library extends StatefulWidget {
+  const Library({super.key});
+
+  @override
+  State<Library> createState() => _LibraryState();
+}
+
+class _LibraryState extends State<Library> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) => GlassTabBarMinimizer(
+    // Above the list and the bar both: the list's scrolls bubble up to it,
+    // and the bar, which is not inside the list, reads it.
+    child: Stack(
+      children: <Widget>[
+        ListView.builder(
+          padding: const EdgeInsets.only(bottom: 160),
+          itemCount: 60,
+          itemBuilder: (BuildContext context, int i) => ListTile(title: Text('Song $i')),
+        ),
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 0,
+          child: SafeArea(
+            child: GlassTabBar(
+              items: const <GlassTabItem>[
+                GlassTabItem(icon: Icons.library_music, label: 'Library'),
+                GlassTabItem(icon: Icons.search, label: 'Search'),
+              ],
+              selectedIndex: _tab,
+              onSelected: (int i) => setState(() => _tab = i),
+              minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown,
+              // Above the bar, and beside its circle once it collapses.
+              bottomAccessory: const Text('Now playing'),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class Player extends StatelessWidget {
   const Player({super.key, required this.video});
 
@@ -169,6 +213,40 @@ class Player extends StatelessWidget {
       ),
       const Positioned(left: 16, right: 16, bottom: 16, child: GlassBar(child: Text('Live'))),
     ],
+  );
+}
+
+class Lockscreen extends StatelessWidget {
+  const Lockscreen({super.key, required this.wallpaper, required this.feed});
+
+  /// The wallpaper, which does not change while the screen is up.
+  final ImageProvider wallpaper;
+
+  /// A list that scrolls under the bar.
+  final Widget feed;
+
+  @override
+  Widget build(BuildContext context) => GlassBackdrop.image(
+    wallpaper,
+    // Painted under the child, then sampled by every glass below: the cards
+    // capture nothing at all.
+    child: Column(
+      children: <Widget>[
+        const GlassCard(child: Text('12:45')),
+        const GlassCard(child: Text('2 notifications')),
+        Expanded(
+          // The bar over the list has to refract the list, so it captures.
+          child: GlassBackdrop.live(
+            child: Stack(
+              children: <Widget>[
+                feed,
+                const Positioned(left: 16, right: 16, top: 8, child: GlassBar(child: Text('Feed'))),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 

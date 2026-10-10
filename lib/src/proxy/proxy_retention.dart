@@ -1,15 +1,13 @@
 // Holding the atlas layout still between frames.
 //
-// The atlas leaves this as a question about *quality*: shelf packing is
-// deterministic for a given input, but one surface changing size reshuffles
-// everything below it, and a proxy whose texture coordinates move on a frame
-// where nothing else did is a rewrite of the whole atlas.
-//
-// The measurement turned it into a question about *price*, which is a different
-// and sharper thing (D41). The merge criterion evaluates a candidate by packing it,
-// so twelve surfaces cost 173…187 us of greedy search — twice the walk the
-// atlas serves and seven times the rest of the route put together. Recomputing
-// it per frame is not an inefficiency, it is the dominant cost.
+// Two reasons. Quality: shelf packing is deterministic for a given input, but
+// one surface changing size reshuffles everything below it, and a proxy whose
+// texture coordinates move on a frame where nothing else did is a rewrite of the
+// whole atlas. And price: the merge criterion evaluates a candidate by packing
+// it, so twelve surfaces cost 173…187 us of greedy search on the CPU (debug, on
+// a desktop host) — twice the walk the atlas serves and seven times the rest of
+// the route's CPU work put together. Recomputing it per frame would be the
+// dominant cost.
 //
 // So retention has two halves, and they fail differently:
 //
@@ -20,8 +18,6 @@
 //    fits in it. A surface that only *moves* fits by construction — the map is
 //    `source.topLeft -> rect.topLeft`, so translation is free. Only growth
 //    forces a repack.
-//
-// Arrived from `spikes/13_own_walk/` with the atlas it retains.
 
 import 'package:flutter/rendering.dart';
 
@@ -88,11 +84,6 @@ class RetainedAtlas {
   /// over it; the layout that comes back is still the caller's to check,
   /// because retention has no lever on the texel scale either.
   final int? maxTextureSide;
-
-  // There was a `ProxyCostModel model` here, held so that a repack merged
-  // under the same model as the first pack. The gate it fed is gone from
-  // [AtlasLayout.pack] — the merge criterion never read the model's constants
-  // (D136) — and with it the only thing this retained.
 
   AtlasLayout? _layout;
   List<List<int>>? _grouping;

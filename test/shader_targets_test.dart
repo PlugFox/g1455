@@ -1,17 +1,13 @@
-// M8. Supporting Skia costs nothing at runtime and everything at authoring
-// time — and this is the half of that cost which can be enforced.
-//
-// The package's copy of the research application's gate
-// (`test/bench/shader_targets_test.dart` there), cut to the two shaders this
-// package ships, so the rule travels with them.
+// Supporting Skia costs nothing at runtime and everything at authoring time —
+// and this is the half of that cost which can be enforced.
 //
 // Every shader this package registers is compiled for five targets, and the
-// SkSL one is the odd one out: it refuses `textureLod` (D11) and every
-// screen-space derivative (B11), and it refuses them **after** the build has
+// SkSL one is the odd one out: it refuses `textureLod` and every screen-space
+// derivative, and it refuses them **after** the build has
 // decided whether to care. On Android and macOS the tool retries without
 // `--sksl`, prints a warning nobody reads and ships an asset with no SkSL
 // stage; the application finds out at the user's first `FragmentProgram.
-// fromAsset` (D60). For web the target list is `['--sksl']` alone and the
+// fromAsset`. For web the target list is `['--sksl']` alone and the
 // retry has nowhere to fall back to, so the build dies instead
 // (`shader_compiler.dart:205-206`, `:270-292`). Either way the author who broke
 // it sees green.
@@ -20,7 +16,7 @@
 // builds, over the list the bundle actually carries, with impellerc's own
 // verdict. The escape from a refusal is compile-time — `#ifdef
 // SKIA_GRAPHICS_BACKEND` for the fallback, `IMPELLER_GRAPHICS_BACKEND` for the
-// real technique (spike #19) — so a refusal here is a shader to guard, not a
+// real technique — so a refusal here is a shader to guard, not a
 // platform to drop.
 //
 // **The known answer is in the same arm**, because "everything compiled" is
@@ -76,7 +72,7 @@ const ({String asset, String file}) kPackageShader = (
 /// **0**, while SkSL rejecting an explicit level of detail prints `There was a
 /// compiler error: …` and exits **1** with no `Compilation failed` in it. Read
 /// by exit code alone the first refusal passes; read by text alone the second
-/// does. Spike #19 found that the hard way, on a harness copied from B11.
+/// does.
 ({bool ok, String message}) _compile(
   String input,
   List<String> targets, {
@@ -237,7 +233,7 @@ void main() {
           '$s does not build for every target.\n'
           '${failed.isEmpty ? all.message : failed.join('\n')}\n'
           'The escape is compile-time: #ifdef SKIA_GRAPHICS_BACKEND for the '
-          'fallback, IMPELLER_GRAPHICS_BACKEND for the real technique (spike #19). '
+          'fallback, IMPELLER_GRAPHICS_BACKEND for the real technique. '
           'Left unguarded, a SkSL refusal kills the web build and ships every '
           'other platform an asset that throws on Skia at runtime.',
         );
@@ -300,9 +296,9 @@ void main() {
   });
 
   test('the ripple is not in the surface binary: deleting every GLASS_RIPPLE block changes no byte', () {
-    // D229's cost claim at the compiler. The ripple program is the surface's
-    // source behind a define, and B5 measured a path a program carries and
-    // does not take at 52-62% of the modes that do not take it — so the claim
+    // The ripple's cost claim at the compiler. The ripple program is the
+    // surface's source behind a define, and a path a program carries and does
+    // not take was measured at 52-62% of the modes that do not take it — so the claim
     // that a still panel pays nothing is the claim that this binary has no
     // ripple in it, which is a comparison of bytes, not of timings.
     final String source = File(kPackageShader.file).readAsStringSync();
@@ -344,7 +340,7 @@ void main() {
       // The same question as the compile matrix, asked the way a user's app
       // asks it. `flutter test` builds for `TargetPlatform.tester` — SkSL and
       // vulkan — and draws on Skia, so a missing SkSL stage arrives here as the
-      // throw it would arrive as in production (D60).
+      // throw it would arrive as in production.
       await tester.runAsync(() async {
         var loaded = 0;
         for (final (asset: String s, file: _) in shaders) {

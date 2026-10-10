@@ -1,17 +1,15 @@
 // The thing that runs the pipeline on a real screen.
 //
-// Everything under it has existed for several steps and been driven by tests.
-// A host is what drives it in an application: it owns the register, the
-// pipeline and the retake oracle, records after the frame that has just been
-// painted, and publishes the result to the surfaces, which draw it on the
-// frame after that.
+// A host owns the register, the pipeline and the retake oracle, records after
+// the frame that has just been painted, and publishes the result to the
+// surfaces, which draw it on the frame after that.
 //
 // **The one-frame delay is structural, not a bug to be fixed later.** A capture
 // reads the tree that was just painted, so the earliest a surface can show it
-// is the following frame; that is what the roadmap prices as staleness (D30,
-// D124) and it is why the first frame of any screen paints without a proxy.
-// Both facts are counted rather than hoped for — a surface that never gets a
-// proxy and one that gets a stale one look identical on a screenshot.
+// is the following frame; that is the staleness the retake budget prices, and
+// it is why the first frame of any screen paints without a proxy. Both facts
+// are counted rather than hoped for — a surface that never gets a proxy and one
+// that gets a stale one look identical on a screenshot.
 //
 // What this deliberately does not do is choose *when* the frame happens. It
 // records in a post-frame callback, because that is the only place the tree is
@@ -39,6 +37,7 @@ import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_group.dart';
 import 'glass_ledger.dart';
+import 'glass_press.dart';
 import 'glass_ripple.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
@@ -53,7 +52,7 @@ import 'glass_tier.dart';
 /// {@category Diagnostics}
 const String kGlassShaderAsset = 'packages/g1455/shaders/glass_surface.frag';
 
-/// The surface's shader with the ripple compiled in (D229).
+/// The surface's shader with the ripple compiled in.
 ///
 /// Loaded the first time a surface under a host declares a [GlassRipple], or
 /// by [GlassHost.precache].
@@ -105,8 +104,8 @@ class GlassProxyHandle extends ChangeNotifier {
   /// The compiled *group* shader, once it has arrived.
   ///
   /// A second program rather than a mode of the first, because adding a path to
-  /// a runtime effect reprices every mode already in it by 52-62% (B5) and the
-  /// lone surface is the common case. Loaded whether or not the screen has a
+  /// a runtime effect reprices every mode already in it by 52-62% and the lone
+  /// surface is the common case. Loaded whether or not the screen has a
   /// group: a host that compiled it lazily would put the first frame of a
   /// fused toolbar on a different code path from every frame after it.
   ui.FragmentProgram? get groupProgram => _groupProgram;
@@ -122,8 +121,8 @@ class GlassProxyHandle extends ChangeNotifier {
   /// The surface's program with the ripple compiled in, once something asked
   /// for it ([wantRippleProgram]) and it arrived.
   ///
-  /// A third program for B5's reason, and loaded on demand rather than with
-  /// the other two: a ripple is opt-in, and a screen that never declares one
+  /// A third program for the same reason, and loaded on demand rather than
+  /// with the other two: a ripple is opt-in, and a screen that never declares one
   /// should not compile it. Until it arrives a touched surface draws the base
   /// program, which is the picture without the wave.
   ui.FragmentProgram? get rippleProgram => _rippleProgram ??= _cachedRippleProgram;
@@ -159,8 +158,8 @@ class GlassProxyHandle extends ChangeNotifier {
   /// What the host declared its hardware to be.
   ///
   /// Carried here for the one choice a group makes at paint time that the host
-  /// cannot make for it: whether the fused draw is split (D192). The sign of that
-  /// lever differs between the families measured, so a group has to be told
+  /// cannot make for it: whether the fused draw is split. Splitting is cheaper
+  /// on some GPU families and dearer on others, so a group has to be told
   /// which one it is on, and the handle is what every group below a host holds.
   GlassHardware get hardware => _hardware;
   GlassHardware _hardware = GlassHardware.detect();
@@ -189,42 +188,31 @@ class GlassProxyHandle extends ChangeNotifier {
   /// How many times the atlas layout has been repacked.
   ///
   /// Set from `GlassProxyPipeline.repacks` for the same reason [snapshots] is:
-  /// the counter exists inside the pipeline and reached no report, so the one
-  /// thing a retained layout is *for* was unobservable from outside. D41
-  /// measured repacking every frame as the dominant cost of the whole route,
-  /// and the ratio to [generation] is the reading — 1.0 means nothing is
-  /// retained.
-  ///
-  /// It has a question waiting for it: on Adreno the route's UI-thread cost
-  /// *grows* with the divisor (1005 µs at 1 against 1665 at 8, where the GPU's
-  /// goes the other way, D156), and a layout that churns at small slot sizes
-  /// would explain it. Nothing here claims that — the counter is what makes the
-  /// claim checkable.
+  /// without it, the one thing a retained layout is *for* would be
+  /// unobservable from outside. Repacking every frame is the dominant cost of
+  /// the whole route, and the ratio to [generation] is the reading — 1.0 means
+  /// nothing is retained.
   int repacks = 0;
 
   /// How many entries the layer watch's last signature had, or 0 if it never
   /// ran.
   ///
-  /// The trace the watch would otherwise not have, and without it a run that
-  /// never walked would report as a walk that costs nothing — which is the
-  /// shape `Picture.toImageSync(targetFormat:)` already cost this project once.
-  /// Non-zero says the composited subtree was described; its size says how much
-  /// of one.
+  /// The trace the watch would otherwise not have: without it a run that never
+  /// walked would report as a walk that costs nothing. Non-zero says the
+  /// composited subtree was described; its size says how much of one.
   int watchedLayers = 0;
 
   /// How many frames the watch saw a change that missed every slot of the atlas.
   ///
-  /// The trace of §4.2's question, and the reason it is a counter and not a
-  /// boolean in a log: "a shared texture is a shared dirty flag" is an argument
-  /// about a *rate*, and a mechanism that pays on 3% of frames and one that
-  /// pays on 90% call for different designs. It is separately readable from
-  /// [generation] on purpose — a report that only counted publishes could not
-  /// tell a screen where nothing moved from one where everything moved away
-  /// from the glass, and those are the two ends of the axis.
+  /// A counter rather than a flag because "a shared texture is a shared dirty
+  /// flag" is an argument about a *rate*: a mechanism that pays on 3% of
+  /// frames and one that pays on 90% call for different designs. It is
+  /// separately readable from [generation] on purpose — a report that only
+  /// counted publishes could not tell a screen where nothing moved from one
+  /// where everything moved away from the glass.
   int changesOutsideCapture = 0;
 
-  /// Frames on which the GPU's texture limit moved the divisor, and frames on
-  /// which nothing fit and no proxy was produced (D186).
+  /// Frames on which the GPU's texture limit moved the divisor.
   ///
   /// Set from `GlassProxyPipeline.ceilingDeepenings` and `ceilingRefusals`, and
   /// here for the reason every other counter on this handle is: the ceiling
@@ -247,8 +235,8 @@ class GlassProxyHandle extends ChangeNotifier {
   /// under. Should stay at zero; see [ceilingDeepenings].
   int ceilingOverruns = 0;
 
-  /// Frames held across a change because thermal pressure bought the lag
-  /// (D205), mirrored from the host so a report can read it beside
+  /// Frames held across a change because thermal pressure bought the lag,
+  /// mirrored from the host so a report can read it beside
   /// [generation]: the two reset together, with the tree, and a throttle that
   /// never fired and one that fired every frame are otherwise the same run.
   int throttled = 0;
@@ -270,11 +258,9 @@ class GlassProxyHandle extends ChangeNotifier {
 
   /// Declares a change nothing above the content is painted for.
   ///
-  /// The escape hatch that makes [GlassContentDeclaration.declared] usable, and
-  /// it is now the *last* resort rather than the first: the host observes a
-  /// scroll (D147) and its own repaint, which between them cover every change
-  /// that is not behind a nested repaint boundary. What is left is content that
-  /// repaints inside one.
+  /// The last resort under [GlassContentDeclaration.declared]: the host
+  /// observes a scroll, its own repaint and the composited layers on its own.
+  /// What is left is a change none of those can see.
   ///
   /// Reach it with `GlassProxyScope.maybeOf(context)?.noteChange()`.
   ///
@@ -415,7 +401,7 @@ class GlassProxyScope extends InheritedWidget {
 ///  * the accessibility the platform does not relay everywhere:
 ///    [highContrast], and a floor for the labels, [minLabelContrast];
 ///  * the device: [hardware], and its [thermal] state;
-///  * the look: [finish], [tier], [ripple], [dropMotion], and whether the
+///  * the look: [finish], [tier], [ripple], [dropMotion], [press], and whether the
 ///    glass reads its own backdrop, [adaptive].
 ///
 /// Each is installed into a [GlassThemeData] for the screen, which an inner
@@ -479,6 +465,7 @@ class GlassHost extends StatefulWidget {
     this.minLabelContrast,
     this.ripple,
     this.dropMotion = const GlassDropMotion(),
+    this.press = const GlassPress(),
     this.thermal,
     this.thermalPolicy = const GlassThermalPolicy(),
     this.budgetDeltaE = ProxyResolutionPolicy.defaultDamageBudgetDeltaE,
@@ -499,9 +486,9 @@ class GlassHost extends StatefulWidget {
   final Widget child;
 
   /// Whose measurements apply. Defaults to what the platform can be asked —
-  /// Apple platforms answer, everything else is [GlassHardware.unmeasured]
-  /// (D121), which gets the same divisor and the same merging as a declared
-  /// family and a null where the price would be (D136).
+  /// Apple platforms answer, everything else is [GlassHardware.unmeasured],
+  /// which gets the same divisor and the same merging as a declared family and
+  /// a null where the price would be.
   final GlassHardware? hardware;
 
   /// The optics every surface under this host wears unless it names its own.
@@ -511,7 +498,7 @@ class GlassHost extends StatefulWidget {
   /// ceiling. So a finish nobody has graded gets refusals rather than numbers,
   /// which is the intended behaviour.
   ///
-  /// Null is Apple's `.regular`, which is two materials (D230):
+  /// Null is Apple's `.regular`, which is two materials:
   /// [GlassFinish.regular] picks [GlassFinish.regularDark] or
   /// [GlassFinish.regularLight] from [backdrop] and the platform's appearance,
   /// and the host follows the appearance as it changes. Name either branch to
@@ -519,7 +506,7 @@ class GlassHost extends StatefulWidget {
   /// does not make, and this is where an application makes it.
   final GlassFinish? finish;
 
-  /// Which rung of phase D's ladder every surface under this host draws.
+  /// Which rung of the finish ladder every surface under this host draws.
   ///
   /// [GlassTier.full] and its reasons are in `glass_tier.dart`; the short
   /// version is that the ladder has no automatic input, so this is a
@@ -529,8 +516,8 @@ class GlassHost extends StatefulWidget {
   /// reads a proxy, so nothing is captured, no atlas is packed and no shader is
   /// sampled. The host still mounts — its register still counts the glass,
   /// because the translucency tax does not care which rung drew it — and
-  /// `recorded` stays at zero, which is the observable the requirement is
-  /// stated in (D58: the cheap finish reads no backdrop at all).
+  /// `recorded` stays at zero, which is the observable that says the lower
+  /// rungs read no backdrop at all.
   final GlassTierChoice tier;
 
   /// What is behind the glass on this screen, on average.
@@ -544,7 +531,7 @@ class GlassHost extends StatefulWidget {
   /// `MediaQuery.highContrastOf` — which the engine sets on iOS and on Android
   /// 34+, and **never on macOS**, where the application has to read
   /// `NSWorkspace.accessibilityDisplayShouldIncreaseContrast` itself and pass
-  /// it (D202). See [GlassThemeData.highContrast] for what it draws.
+  /// it. See [GlassThemeData.highContrast] for what it draws.
   final bool? highContrast;
 
   /// Whether the screen under the glass is an image rather than a colour. See
@@ -594,12 +581,18 @@ class GlassHost extends StatefulWidget {
   /// capture; see [GlassThemeData.dropMotion] and [GlassDropMotion].
   final GlassDropMotion dropMotion;
 
+  /// How a pressed [GlassButton] swells and leans toward a dragging finger,
+  /// unless it declares its own. [GlassPress.none] keeps every button its
+  /// size. It costs two captures a press and nothing at rest; see
+  /// [GlassThemeData.press] and [GlassPress].
+  final GlassPress press;
+
   /// The device's thermal state, as the application read it — the package
-  /// ships no platform code to read it (D219). Null is nominal.
+  /// ships no platform code to read it. Null is nominal.
   ///
   /// Spent by [thermalPolicy] on the retake, never on the ladder: under
   /// pressure a changing screen may be captured less often, by as many frames
-  /// as the finish's own staleness price allows (D205).
+  /// as the finish's own staleness price allows.
   final GlassThermalState? thermal;
 
   /// What each thermal state may spend on staleness. [GlassThermalPolicy.never]
@@ -607,38 +600,31 @@ class GlassHost extends StatefulWidget {
   final GlassThermalPolicy thermalPolicy;
 
   /// The whole quality allowance, in ΔE against the same finish at full
-  /// quality. 1% of the distance between two of Apple's own materials (S4).
+  /// quality. 1% of the distance between two of Apple's own materials.
   ///
-  /// One number for both axes, because D124 measured that they compose rather
-  /// than add: the divisor is chosen against it and the retake ceiling is what
-  /// is left afterwards. It reached only the second of those for one release,
-  /// which made a raised budget hold the proxy longer without ever recording it
-  /// smaller.
+  /// One number for both axes, because the resolution's error and the
+  /// staleness's compose rather than add: the divisor is chosen against it and
+  /// the retake ceiling is what is left afterwards.
   final double budgetDeltaE;
 
   /// Whether this screen may hold a proxy nothing under it has changed.
   ///
-  /// **The default holds, since D163** — which is the largest lever this
-  /// package has anywhere (79.4% and 66.3% of the addition on Adreno, 97.8% on
-  /// Metal, D146) and the only one the capture has at all, the capture being
-  /// 77% of what the route adds at the divisor the policy picks on a dpr-2
-  /// screen (D141) where the proxy's resolution buys the other 23% (D140).
+  /// **The default holds.** That is the largest lever this package has: holding
+  /// a still screen saves 66…79% of the glass's added cost on Adreno and 98% on
+  /// Metal, because the capture is most of what the route adds.
   ///
-  /// It was the other way round for three days, and what moved it is not a new
-  /// measurement of the lever but the two things that used to stand against it:
-  /// the application was being asked to promise something nobody can verify
-  /// (D152 replaced the promise with a walk of the composited subtree), and the
-  /// walk's own price was unknown (D160 put it under 3 µs a frame, below what a
-  /// device run resolves). What is left of the risk lives in one table of layer
-  /// types, and that table is now checked against the SDK's `layer.dart`
-  /// (D162).
+  /// Holding is safe without any promise from the application: the host walks
+  /// the composited subtree each frame (under 3 µs) and retakes on any change
+  /// it sees. What is left of the risk lives in one table of layer types, and a
+  /// test checks that table against the SDK's `layer.dart`.
   ///
   /// Pass [GlassContentDeclaration.undeclared] to go back to re-recording every
   /// frame — for a host compositing through something it thinks this package
-  /// misreads, or for a benchmark arm that wants the capture on every frame.
+  /// misreads, or for a benchmark that wants the capture on every frame.
   final GlassContentDeclaration content;
 
-  /// The one content policy M11 left alive: shadows cost 0.00 ΔE to skip (D31).
+  /// Which shadows the capture may skip. Of the quality degradations measured,
+  /// this is the cheapest by a wide margin: under 0.2 ΔE behind the glass.
   ///
   /// Null means "draw them", which is the conservative default rather than the
   /// cheap one — half of `ShadowFilter` is a heuristic (anything painted
@@ -662,15 +648,11 @@ class GlassHost extends StatefulWidget {
   /// Stops recording after this many captures. Null records for ever, which is
   /// the only shipping behaviour.
   ///
-  /// **A diagnostic seam, and it exists because of one measurement.** On
-  /// Xclipse our glass step spends 28.5 ms per frame *waiting* while its raster
-  /// thread takes 1.68 ms and the GPU sits at 54% busy — idle nearly half the
-  /// time while dropping more than half the frames (D133). Three things could
-  /// do that and only one of them is the capture: the capture's own submission,
-  /// the shader sampling a proxy texture sixteen times larger at a divisor of 1,
-  /// and the governor never ramping. Pinning the count separates the first from
-  /// the second, because a held proxy is still sampled every frame at exactly
-  /// the same size — the shader's work does not change, the recording stops.
+  /// **A diagnostic seam.** It separates the capture's own cost from the cost
+  /// of sampling its result: a held proxy is still sampled every frame at
+  /// exactly the same size, so the shader's work does not change and only the
+  /// recording stops — which is how a frame on Xclipse that spent 28.5 ms
+  /// waiting with the GPU 54% busy can be traced to its cause.
   ///
   /// Setting it makes the picture wrong on purpose: the proxy goes stale for
   /// ever, which is a cost experiment and never a mode. `held` and `recorded`
@@ -683,20 +665,16 @@ class GlassHost extends StatefulWidget {
   /// purpose, so it is a cost experiment and never a mode.
   ///
   /// [ProxyBlurPass.folded] is the exception — it draws the same picture to
-  /// within a code value (spike #21) — and since 2026-09-11 it is not held back
-  /// either: its price is measured on both families, the sign differs between
-  /// them, and null here takes [ProxyBlurPass.defaultFor], which reads the
-  /// hardware declaration. Naming one overrides that.
+  /// within a code value. Its price differs in sign between GPU families, so
+  /// null here takes [ProxyBlurPass.defaultFor], which reads the hardware
+  /// declaration. Naming one overrides that.
   ///
-  /// The axis exists because D139 found a knee the route's price has no model for —
-  /// the addition falls 0.94 and 0.65 ms across the first two intervals of the
-  /// divisor and then **0.05** across the third — and the only mechanism anyone
-  /// has for it is arithmetic rather than a measurement: on Metal the capture is
-  /// scale-free (D119), so the divisor buys only what happens after it, and this
-  /// pass's sigma in texels falls to 0.58 at a divisor of 8, where Impeller's
-  /// truncation radius `(σ − 0.5)·√3` is 0.13 of a texel. Turning it off splits
-  /// "the blur ran out" from "the bandwidth ran out"; nothing else does, because
-  /// both follow the proxy and neither has a counter.
+  /// [ProxyBlurPass.none] exists to explain why the cost stops falling with the
+  /// divisor (on the M2 iPad Pro, 0.94 and 0.65 ms saved across the first two
+  /// steps, then 0.05): at a divisor of 8 this pass's sigma in texels falls to 0.58, where
+  /// Impeller's truncation radius `(σ − 0.5)·√3` is 0.13 of a texel. Turning it
+  /// off splits "the blur ran out" from "the bandwidth ran out"; nothing else
+  /// does, because both follow the proxy and neither has a counter.
   ///
   /// Not a finish of sigma 0, which would be a different material and would
   /// change the shader as well as the pass.
@@ -788,10 +766,10 @@ class _GlassHostState extends State<GlassHost> {
   ///
   /// The observations above it — a scroll, this host's own repaint, a marker —
   /// are cheap and correct and *incomplete*: each of them stops at a nested
-  /// repaint boundary, and the corpus says a realistic screen crosses 8 to 15
-  /// of those. This one cannot be hidden from, because a repaint mints new
-  /// pictures in whichever layer owns it and the one change that repaints
-  /// nothing (D151) is a property of a retained layer. It runs only where
+  /// repaint boundary, and a realistic screen crosses 8 to 15 of those. This
+  /// one cannot be hidden from, because a repaint mints new pictures in
+  /// whichever layer owns it, and a change that repaints nothing (a moved
+  /// retained layer) is a property of that layer. It runs only where
   /// holding is possible: under the default declaration the proxy is re-recorded
   /// anyway and the walk would be pure cost.
   final ProxyLayerWatch _watch = ProxyLayerWatch();
@@ -805,9 +783,7 @@ class _GlassHostState extends State<GlassHost> {
   /// pictures wherever its dirty children paint, and when every one of them is
   /// inside glass — a label in a bar changing, with nothing of the boundary's
   /// own painted outside the glass — the oracle's walk is right to see nothing:
-  /// none of it is in the proxy. The first application built on the package did
-  /// exactly that on its first tap, after a corpus of scenes that never had
-  /// (D219).
+  /// none of it is in the proxy. A label changing on a tap is exactly that.
   ///
   /// Not a walk with nothing excluded, which is the obvious version and has no
   /// teeth: a draw layer is a type the table does not read, so it reports a
@@ -834,7 +810,7 @@ class _GlassHostState extends State<GlassHost> {
   int held = 0;
 
   /// Of [held], the frames held across a change because thermal pressure bought
-  /// the staleness (D205). Counted apart because it is the one hold that knows
+  /// the staleness. Counted apart because it is the one hold that knows
   /// its picture is out of date.
   int throttled = 0;
 
@@ -842,15 +818,13 @@ class _GlassHostState extends State<GlassHost> {
   ///
   /// Exposed for the same reason [recorded] and [held] are: a subscription that
   /// never happened and one that found nothing to subscribe to look identical
-  /// from outside, and until 2026-09-09 the first was the truth — the host built
-  /// an oracle, handed it to the pipeline every frame, and never called
-  /// [RetakeOracle.watch]. Every marker in every application was inert.
+  /// from outside.
   int get watchedMarkers => _oracle.watchedMarkers;
 
   /// Whether the marker subscription has to be rebuilt before the next capture.
   ///
-  /// The walk is `visitChildren` over the whole subtree — 24 us per pass on the
-  /// corpus (M12) — so it runs when the tree's *structure* changes rather than
+  /// The walk is `visitChildren` over the whole subtree — about 24 µs per pass
+  /// on a typical screen — so it runs when the tree's *structure* changes rather than
   /// every frame. The ledger is the signal: it notifies exactly when a surface
   /// arrives or leaves and never on geometry, because it stores surfaces rather
   /// than their rects.
@@ -1074,16 +1048,13 @@ class _GlassHostState extends State<GlassHost> {
   ///
   /// A post-frame callback rather than anything inside `paint`: the tree has to
   /// be laid out *and* painted before a capture means anything, and driving a
-  /// pass from inside another node's paint is the reentrancy the walk was
-  /// deliberately kept out of (M12).
+  /// pass from inside another node's paint is reentrancy the walk is
+  /// deliberately kept out of.
   ///
-  /// **Re-armed from inside the callback, not from `build`**, and the first
-  /// version did the latter. `build` runs when something rebuilds the host, not
-  /// when a frame is produced — so a screen that scrolls without rebuilding the
-  /// host, which is most of them, got exactly one capture and then a proxy
-  /// frozen forever. What caught it was not a test: it was a **deliberate break
-  /// that failed to break**. Deleting the self-capture rule left every arm
-  /// passing, because with only one capture there is no second one to feed on.
+  /// **Re-armed from inside the callback, not from `build`.** `build` runs when
+  /// something rebuilds the host, not when a frame is produced — so a screen
+  /// that scrolls without rebuilding the host, which is most of them, would get
+  /// exactly one capture and then a proxy frozen forever.
   ///
   /// Re-arming costs nothing when the app is idle: `addPostFrameCallback` does
   /// not request a frame, it waits for the next one that happens anyway. And
@@ -1128,7 +1099,7 @@ class _GlassHostState extends State<GlassHost> {
     }
     final List<GlassSurfaceGeometry> keys = _ledger.registered.toList();
     // A fused silhouette reaches past its members' boxes, so each member is
-    // captured with that much more around it (D201). Per member rather than
+    // captured with that much more around it. Per member rather than
     // as the cluster's quad: the silhouette lies within the reach of *some*
     // member's shape, and the quad of a scattered group is mostly empty.
     final reachOf = <GlassSurfaceGeometry, double>{
@@ -1147,16 +1118,19 @@ class _GlassHostState extends State<GlassHost> {
     for (final GlassSurfaceGeometry surface in keys) {
       final GlassSurfaceRecord? record = surface.readGeometry();
       // A surface below the top rung is in the register and not in the capture:
-      // it pays the translucency tax like any other translucent fill (D21, D26)
-      // and reads nothing, so charging the atlas for it would pay for a
+      // it pays the translucency tax like any other translucent fill and reads
+      // nothing, so charging the atlas for it would pay for a
       // snapshot no shader will ever sample.
+      //
+      // Nor is glass over a declared backdrop (`GlassBackdrop`), which samples
+      // a texture of its own: the declaration is what makes it free.
       //
       // Nor is a surface at presence zero, which draws nothing: capturing it
       // would size the atlas — and, for a finish of its own, the divisor — for
       // glass that is not there (a control's drop at rest).
-      if (record != null && record.tier.readsBackdrop && record.presence > 0 && record.materialize > 0) {
+      if (record != null && record.readsCapture && record.presence > 0 && record.materialize > 0) {
         final GlassFinish finish = record.finish ?? _finish;
-        // A widened or minifying glass samples past its box (D218); by its
+        // A widened or minifying glass samples past its box; by its
         // full reach rather than the presence-scaled one, so a drop lifting in
         // does not change the capture's input on every frame of it.
         rects.add(
@@ -1171,7 +1145,7 @@ class _GlassHostState extends State<GlassHost> {
     }
     if (rects.isEmpty) {
       // Nothing reads a proxy, so nothing is recorded — which is how "the cheap
-      // finish does not read the backdrop at all" (D58) is enforced rather than
+      // finish does not read the backdrop at all" is enforced rather than
       // promised: there is no image for a surface to sample even by mistake.
       _handle.publish(null);
       _publishUpper(const <GlassProxyFrame?>[]);
@@ -1215,8 +1189,8 @@ class _GlassHostState extends State<GlassHost> {
       // The levels above are recorded on this decision, so it watches them too.
       // Not where glass that bears glass actually is: a bar resized inside its
       // travel is already seen by the layer watch — its relayout repaints the
-      // content it bears or moves the layers it positions — and watching its
-      // rect as well broke no arm when removed (D218).
+      // content it bears or moves the layers it positions — so watching its
+      // rect as well would add nothing.
       watched: levels.top > 0 ? rects : null,
     );
     // Read whether or not anything was published: a held frame takes no
@@ -1344,8 +1318,8 @@ class _GlassHostState extends State<GlassHost> {
 
   /// The blend groups, as indices into [present].
   ///
-  /// The one-way invariant of §4.4 said in the only place it can be enforced:
-  /// the packer is *given* these and may merge them with anything, but cannot
+  /// The one-way invariant — a blend group is never split across the atlas —
+  /// said in the only place it can be enforced: the packer is *given* these and may merge them with anything, but cannot
   /// take one apart. Asserting it after the fact would be a check on a layout
   /// that had already been recorded.
   ///
@@ -1373,16 +1347,12 @@ class _GlassHostState extends State<GlassHost> {
 
   /// The framework repainted the screen under the glass, so its pixels changed.
   ///
-  /// This was the mechanism for one day (D150) and is now the *control* on the
-  /// mechanism, which is the only reason it survives. `ProxyLayerWatch` sees
-  /// everything this sees and a great deal more — deleting this observation
-  /// entirely fails no arm anywhere, which is how its redundancy was
-  /// established rather than argued — but the implication runs one way and is
-  /// exact: the framework cannot paint this subtree without minting a new
-  /// `ui.Picture` in the layer that owns it, so "painted, and the watch saw
-  /// nothing" is a hole in the watch's table and nothing else. Asserted every
-  /// frame of every debug run of every application, which is a great many more
-  /// screens than this repository will ever hold.
+  /// Redundant as a mechanism — `ProxyLayerWatch` sees everything this sees and
+  /// a great deal more — and kept as the *check* on it. The implication runs
+  /// one way and is exact: the framework cannot paint this subtree without
+  /// minting a new `ui.Picture` in the layer that owns it, so "painted, and the
+  /// watch saw nothing" is a hole in the watch's table and nothing else.
+  /// Asserted every frame of every debug run of every application.
   ///
   /// It still reports the change in profile, where the assert is stripped. That
   /// costs nothing (the watch is consulted either way) and errs towards
@@ -1474,7 +1444,7 @@ class _GlassHostState extends State<GlassHost> {
     if (!change.changed) {
       return;
     }
-    // §4.2, asked of the one thing that can answer it exactly: the proxy holds
+    // Whether the change reaches the capture at all: the proxy holds
     // the inside of the slots and nothing else, so a change that misses every
     // source rect has missed every texel of the atlas. It is still a change —
     // the assertion above is about that, and folding the region into it would
@@ -1498,8 +1468,7 @@ class _GlassHostState extends State<GlassHost> {
   /// re-running its layout — repaints the host's boundary, and when every pixel
   /// under it belongs to a nested boundary (list items, a control's track, the
   /// glass) the repaint re-appends retained layers and mints nothing. The
-  /// screen is still, the watch is right, and the example application's slider
-  /// tripped the assertion on its first press.
+  /// screen is still, and the watch is right.
   ///
   /// A picture outside every nested boundary is one this repaint recorded
   /// afresh, so with one present a silent watch is still a hole. Debug only,
@@ -1548,10 +1517,9 @@ class _GlassHostState extends State<GlassHost> {
       ledger: _ledger,
       child: GlassTheme(
         // The host installs the theme rather than reading one, so that the
-        // finish has exactly one home. It used to travel on `GlassProxyHandle`,
-        // which is the pipeline — and a surface below the top rung has no
-        // pipeline, so a cheap panel with no host above it would have had no
-        // finish to draw.
+        // finish has exactly one home — and not on `GlassProxyHandle`, which is
+        // the pipeline: a surface below the top rung needs its finish without
+        // one.
         data: GlassThemeData(
           finish: _finish,
           tier: widget.tier,
@@ -1561,6 +1529,7 @@ class _GlassHostState extends State<GlassHost> {
           minLabelContrast: widget.minLabelContrast,
           ripple: widget.ripple,
           dropMotion: widget.dropMotion,
+          press: widget.press,
           adaptive: widget.adaptive,
           // Only for a reader: off, the theme is the one it always was.
           regularAppearance: widget.adaptive == null ? null : _regularAppearance,
@@ -1607,8 +1576,8 @@ class _RenderGlassRepaintObserver extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     // The capture pass paints this same subtree through its own context every
     // time it records. Counting that would declare a change on the frame after
-    // every capture — a loop that records for ever and holds nothing — and the
-    // arm that catches it is a still screen, which must still be held.
+    // every capture — a loop that records for ever and holds nothing, which a
+    // still screen, one that must be held, would show at once.
     if (context is! ProxyWalkContext) {
       onRepaint();
     }

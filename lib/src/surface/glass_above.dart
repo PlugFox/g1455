@@ -2,7 +2,7 @@
 // list of glass cards, a scroll edge over that list, a menu or a sheet over a
 // page that has glass of its own.
 //
-// Levels are counted by the tree (D214): a lens refracts the bar it is written
+// Levels are counted by the tree: a lens refracts the bar it is written
 // *inside*, and two sibling panels that overlap are one level over one
 // backdrop. Both rules are right for what they were built for and both are
 // blind to the commonest screen there is — glass cards scrolling under a glass
@@ -15,7 +15,7 @@
 // position in the tree says, and its walk draws the glass below it through
 // that glass's own frame, exactly as a lens's walk draws its bar.
 //
-// What it costs is what a level costs (D214): one more snapshot on every frame
+// What it costs is what a level costs: one more snapshot on every frame
 // that records, and nothing on a screen with no glass under the lifted one —
 // the host numbers the levels that are occupied, so a lifted bar over plain
 // content is level 0 and is captured with everything else.

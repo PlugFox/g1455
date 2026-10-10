@@ -1,70 +1,60 @@
-// Level 3 of the three-level structure (research SS7.2): components over the
-// primitive, the way `FilledButton` and `Card` sit over `Material`.
+// Components over the primitive, the way `FilledButton` and `Card` sit over
+// `Material`.
 //
-// **And the first thing building them established is that SS7.2's third level is
-// one component with three default sets.** The sketch named
-// `GlassButton / GlassBar / GlassCard` as if they were three things; in this
-// machine everything that differs between them is the shape, the padding and the
-// tap target. The glass is the same glass, the label arithmetic is the same
-// arithmetic, and exactly one of the three has behaviour of its own — the
-// button, because a press changes the *material* and therefore cannot be a
-// layer laid over it. So the body is private, the three names are its presets,
-// and this comment is the record rather than three files pretending otherwise.
+// Bar, card and button are one private body with three sets of defaults: what
+// differs between them is the shape, the padding and the tap target. Only the
+// button has behaviour of its own, because a press changes the material itself
+// and so cannot be a layer laid over it.
 //
-// **What a component adds that `GlassSurface` does not, and it is one thing:
-// the label's colour.** A label has to be legible against what is under it, and
-// what is under it is not the tint — all three rungs put `mix(backdrop, tint, a)`
-// there (D178), so one colour is right at every rung and the only input it needs
-// is the declaration the ladder already asks for. That arithmetic lives on
-// [GlassFinish.foregroundOver]; what lives here is spending it — and, since
-// D204, spending its worst-case twin when nobody has said what is behind the
-// glass or the screen is an image, where a mean says nothing about the
+// What a component adds over `GlassSurface` is the label's colour. Every rung
+// of the ladder puts `mix(backdrop, tint, a)` under the label, so one colour is
+// right at every rung, chosen against the declared backdrop
+// ([GlassFinish.foregroundOver]) — or against every backdrop when none is
+// declared or the screen is an image, where a mean says nothing about the
 // brightest corner ([GlassThemeData.legibility]).
 //
-// **Three things these deliberately do not do.**
+// Three things these deliberately do not do:
 //
-//  - **No group.** A blend group is a way to get a picture and not a way to get
-//    a price, and there is no count at which it pays for itself: twelve panels
-//    declared one group came out at 2.25x stock Material where the same twelve
-//    ungrouped were 1.19x (D169). A bar that wrapped its items in one would be
-//    charging for a silhouette nobody asked for.
-//  - **No repaint boundary between the glass and the content.** Considered and
-//    rejected on the numbers rather than on taste: it would keep a content
-//    change from re-running the panel's shader, and that shader is 9% of the
-//    route's whole addition over the floor (D63) — about 17 000 cycles for a
-//    400x60 bar at dpr 3 on D169's per-fragment coefficients, against millions
-//    in a frame. A layer per component for an unmeasured saving is exactly what
-//    `proxy_role.dart` refuses to sell.
-//  - **No safe area.** `SafeArea` exists and an application already has it. A
-//    second way to say the same thing is what SS7.3's `GlassId` turned out to be.
+//  - No blend group. A group buys a silhouette, not a saving: twelve panels as
+//    one group cost 2.25x stock Material where the same twelve ungrouped cost
+//    1.19x (Adreno 830). A bar that grouped its items would charge for a shape
+//    nobody asked for.
+//  - No repaint boundary between the glass and the content. It would keep a
+//    content change from re-running the panel's shader, but that shader is
+//    about 9% of the glass's cost over a plain frame — some 17 000 GPU cycles
+//    for a 400x60 bar at dpr 3 on Adreno 830, against millions in a frame. Not
+//    worth a layer per component.
+//  - No safe area. `SafeArea` already exists.
 //
-// **And one number these cannot avoid handing to the application: a component
-// is a surface, and surfaces are charged per draw.** The translucency tax
-// follows area (D21) with an excess for fragmentation that grows as the square
-// of the count (D26, `GlassLoad.fragmentationExcessCycles`), so a bar holding
-// five [GlassButton]s is **six** surfaces and thirty-six times one surface's
-// excess term. That is not a defect and not forbidden — Apple does put glass
-// controls on glass bars — but it is the largest lever left in the package and
-// it is decided by whoever writes the tree, so the register counts it.
+// One cost these cannot hide: a component is a surface, and surfaces are
+// charged per draw. The cost follows area, plus a fragmentation excess that
+// grows as the square of the surface count
+// (`GlassLoad.fragmentationExcessCycles`), so a bar holding five [GlassButton]s
+// is six surfaces and thirty-six times one surface's excess term. Apple does
+// put glass controls on glass bars; the ledger counts it.
 
+import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_adaptive.dart';
 import 'glass_finish.dart';
+import 'glass_focus.dart';
 import 'glass_host.dart';
+import 'glass_press.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
 /// The smallest a control may be, logical px — Apple's Human Interface
 /// Guidelines, 44 x 44 pt.
 ///
-/// An external documented constant rather than one of ours, which is why it has
-/// a name at all: the padding defaults in this file are layout taste and say so,
-/// and this is not.
+/// Unlike the padding defaults in this file, which are layout taste, this is
+/// an external documented constant.
 ///
 /// Every control in the package — [GlassButton], [GlassSwitch], [GlassSlider],
-/// [GlassSegmentedControl], [GlassTabBar], each item of a [GlassButtonGroup] and
-/// [GlassTextField] — is at least this tall, whatever it draws.
+/// [GlassSegmentedControl], [GlassTabBar], each item of a [GlassButtonGroup],
+/// [GlassTextField] and the [GlassSearchBar] built on it with its Cancel,
+/// [GlassStepper] and [GlassPageControl] — is at least this tall, whatever it
+/// draws.
 ///
 /// {@category Panels and controls}
 const Size kGlassMinTapTarget = Size(44, 44);
@@ -74,13 +64,13 @@ const Size kGlassMinTapTarget = Size(44, 44);
 ///
 /// iOS 26's glass `UIButton` leaves its glass as it is and draws a disabled
 /// title in `tertiaryLabel`: (60, 60, 67) at 0.3 in light, (235, 235, 245) at
-/// 0.3 in dark — which predicts the simulator's frames over black, grey and
-/// white to 0.004 of full scale (D221). Apple picks between the two by the
+/// 0.3 in dark — which matches the iOS simulator's frames over black, grey and
+/// white to 0.004 of full scale. Apple picks between the two by the
 /// appearance and stops adapting to the backdrop, so its disabled title over
-/// glass of the other polarity is all but invisible. The package has no
-/// appearance — the platform brightness was measured the wrong guess (D179) —
-/// so it picks by the polarity of the label it would have drawn enabled, which
-/// is the same choice wherever Apple's is legible.
+/// glass of the other polarity is all but invisible. The package does not use
+/// the platform brightness, which predicts poorly what is behind the glass, so
+/// it picks by the polarity of the label it would have drawn enabled, which is
+/// the same choice wherever Apple's is legible.
 ///
 /// This one is `tertiaryLabel` in light: (60, 60, 67) at 0.3, for a label that
 /// would have been dark. [kGlassDisabledLightLabel] is its twin.
@@ -89,7 +79,7 @@ const Size kGlassMinTapTarget = Size(44, 44);
 const Color kGlassDisabledDarkLabel = Color(0x4D3C3C43);
 
 /// The label of a disabled [GlassButton] whose enabled label is white:
-/// `tertiaryLabel` in dark, (235, 235, 245) at 0.3 (D221).
+/// `tertiaryLabel` in dark, (235, 235, 245) at 0.3.
 ///
 /// See [kGlassDisabledDarkLabel] for how the two are chosen between.
 ///
@@ -99,14 +89,12 @@ const Color kGlassDisabledLightLabel = Color(0x4DEBEBF5);
 /// A glass bar: the navigation layer, which is where Apple's guidelines put this
 /// material.
 ///
-/// A capsule by default, because that is what a floating bar is in iOS 26 and
-/// because SS5.3's rule — Apple uses a pill for controls, never a squircle — is
-/// about exactly this shape. See [kGlassCapsule] for how a capsule is declared
-/// and what declaring one found.
+/// A capsule by default, because that is what a floating bar is in iOS 26:
+/// Apple uses a pill for controls, never a squircle. See [kGlassCapsule] for
+/// how a capsule is declared.
 ///
 /// One surface, and its items are content rather than glass. Putting
-/// [GlassButton]s in it is allowed and costs what the file comment says it
-/// costs.
+/// [GlassButton]s in it is allowed, but each is another surface to pay for.
 ///
 /// ```dart
 /// GlassBar(
@@ -155,10 +143,9 @@ class GlassBar extends StatelessWidget {
 
   /// Space between the glass and the items.
   ///
-  /// **Layout taste, not a measurement**, and named as such wherever it appears
-  /// in this file: S4 read Apple's *material* — its transmission, its blur, its
-  /// rim — and no metric of its metrics. A number here dressed as a calibration
-  /// would be the one kind of constant this project does not allow.
+  /// **Layout taste, not a measurement**: the package's optics were calibrated
+  /// against Apple's material — its transmission, its blur, its rim — but none
+  /// of its layout metrics were.
   final EdgeInsets padding;
 
   /// The optics. Null takes the theme's.
@@ -182,15 +169,14 @@ class GlassBar extends StatelessWidget {
 /// **The same body and different advice, and the advice is Apple's own:** the
 /// HIG puts Liquid Glass in the navigation and functional layers and keeps it
 /// out of the content layer, and a card is the content layer. The package has no
-/// way to detect which layer it is in — the same shape of gap as the ladder's
-/// (D175) — so this is a component with a warning rather than a refusal.
+/// way to detect which layer it is in, so this is a component with a warning
+/// rather than a refusal.
 ///
-/// The measured half of the warning points the same way. A card is the widget
-/// that multiplies: the translucency tax follows area (D21) and the
-/// fragmentation excess grows as the square of the surface count (D26), so a
-/// list of glass cards walks up the only large lever the package has left. The
-/// register says so — `GlassLedger.read` returns the count, the area and a
-/// verdict — and a screen of these is what it is for.
+/// Cost points the same way. A card is the widget that multiplies: the cost
+/// follows area and the fragmentation excess grows as the square of the
+/// surface count, so a list of glass cards gets expensive fast.
+/// `GlassLedger.read` returns the count, the area and a verdict for such a
+/// screen.
 ///
 /// ```dart
 /// GlassCard(
@@ -229,7 +215,7 @@ class GlassCard extends StatelessWidget {
   });
 
   /// The corner radii. 24 by default, which is [GlassSurface]'s own default and
-  /// the middle of the range the reference material was read at.
+  /// the middle of the range Apple's material was calibrated at.
   final BorderRadius borderRadius;
 
   /// Space between the glass and the content. Layout taste — see
@@ -254,29 +240,37 @@ class GlassCard extends StatelessWidget {
 
 /// A glass control: a capsule that takes a tap and brightens while held.
 ///
-/// The one component of the three with behaviour rather than defaults, and the
-/// reason is the press: **Apple's glass brightens while it is held, which means
-/// the material changes rather than something being laid over it.** So the
-/// overlay is drawn onto the surface's own canvas with [BlendMode.plus], and the
-/// press therefore re-runs the panel's shader — which is named rather than
-/// avoided: the shader is 9% of the route's addition over the floor (D63) and a
-/// control is one small panel.
+/// The one component with behaviour rather than defaults, because of the
+/// press: **Apple's glass brightens while it is held, which means the material
+/// changes rather than something being laid over it.** So the overlay is drawn
+/// onto the surface's own canvas with [BlendMode.plus], and the press re-runs
+/// the panel's shader — acceptable, since the shader is about 9% of the glass's
+/// cost and a control is one small panel.
 ///
 /// **`plus` is scoped by a `saveLayer` and by nothing else.** A
 /// `RepaintBoundary` does not open one — it lowers to
 /// `SceneBuilder.pushOffset`, and that engine layer paints its children onto the
 /// same canvas — so the overlay reaches the glass through one; an [Opacity], a
 /// `ColorFilter` or an `ImageFilter` between the two does open one, and then the
-/// press adds to transparency and comes out wrong. Both halves of that were
-/// measured, one of them by a break that failed to break (D185).
+/// press adds to transparency and comes out wrong.
 ///
-/// **What it brightens by is the rim's own measured amount and nothing new.**
+/// **What it brightens by is the rim's own measured amount.**
 /// [pressedOverlay] defaults to the finish's [GlassFinish.rim] — 50.2 code
-/// values of neutral white, fitted across seven rims of two Apple materials
-/// (D86-D88) — spent over the whole shape instead of along its edge. Apple's own
-/// press step was never measured here (S4 captured static bands), so a fraction
-/// of this would be a guess where this is at least a quantity somebody read off
-/// the reference. Pass your own to disagree.
+/// values of neutral white, fitted across seven rims of two Apple materials —
+/// spent over the whole shape instead of along its edge. Apple's own press step
+/// has not been measured, so this is the closest quantity read off Apple's
+/// material rather than a guessed fraction. Pass your own to disagree.
+///
+/// **And it swells.** While held the glass grows by [GlassPress.grow] and
+/// leans toward a finger that drags ([press], [GlassThemeData.press]) — inside
+/// a travel region of its own and behind a boundary of its own, so the press
+/// costs two captures — the region declared at touch-down and let go at the
+/// settle — and repaints nothing but the glass. The button's layout
+/// is its resting box throughout; the glass is drawn past it.
+///
+/// A keyboard reaches it: it takes the focus, Space or Enter presses it, and
+/// while the focus is shown a ring ([kGlassFocusRingColor]) is drawn around
+/// the glass from inside its own subtree — which no capture sees.
 ///
 /// The tap target is [kGlassMinTapTarget] at the smallest, and the whole capsule
 /// takes the tap rather than only where the label is: the gesture handler is
@@ -314,8 +308,11 @@ class GlassButton extends StatefulWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
     this.minSize = kGlassMinTapTarget,
     this.pressedOverlay,
+    this.press,
     this.finish,
     this.semanticLabel,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   });
 
@@ -341,8 +338,19 @@ class GlassButton extends StatefulWidget {
   /// control that draws nothing.
   final Color? pressedOverlay;
 
+  /// How the glass swells and leans while held. Null takes
+  /// [GlassThemeData.press]; [GlassPress.none] keeps the button its size and
+  /// builds no travel region for it. Off under reduced motion either way.
+  final GlassPress? press;
+
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
+
+  /// The button's focus. Null makes one the button owns.
+  final FocusNode? focusNode;
+
+  /// Whether the button takes the focus as soon as it is built.
+  final bool autofocus;
 
   /// What a screen reader says in place of [child] — for a button that is
   /// only an icon, which says nothing. Null lets [child]'s own semantics speak.
@@ -356,19 +364,69 @@ class GlassButton extends StatefulWidget {
   State<GlassButton> createState() => _GlassButtonState();
 }
 
-class _GlassButtonState extends State<GlassButton> {
+class _GlassButtonState extends State<GlassButton> with TickerProviderStateMixin {
   bool _held = false;
+  bool _focused = false;
+
+  /// 0 at rest, 1 held — on a spring, so past either end for a moment.
+  late final AnimationController _press = AnimationController.unbounded(vsync: this);
+
+  /// What the finger's drag is scaled by: 1 while held, sprung to 0 after.
+  late final AnimationController _release = AnimationController.unbounded(vsync: this, value: 1);
+
+  /// The finger from where it came down, while it is down.
+  final ValueNotifier<Offset> _finger = ValueNotifier<Offset>(Offset.zero);
+  Offset? _downAt;
+  int? _pointer;
+
+  GlassPress _spec = GlassPress.none;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _spec = GlassPress.resolve(context, widget.press);
+  }
 
   @override
   void didUpdateWidget(GlassButton oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _spec = GlassPress.resolve(context, widget.press);
     // Disabled under a finger: the framework cancels the tap from inside the
     // build that removed the handlers, through the `onTapCancel` it was built
     // with, and a `setState` there is one during build. Let go first and that
-    // cancel finds nothing to do (D221).
+    // cancel finds nothing to do.
     if (widget.onPressed == null) {
       _held = false;
+      _press.value = 0;
+      _release.value = 0;
+      _pointer = null;
     }
+  }
+
+  @override
+  void dispose() {
+    _press.dispose();
+    _release.dispose();
+    _finger.dispose();
+    super.dispose();
+  }
+
+  void _spring(AnimationController c, double to) {
+    final GlassPress spec = _spec;
+    c
+        .animateWith(
+          SpringSimulation(
+            SpringDescription(mass: 1, stiffness: spec.stiffness, damping: spec.damping),
+            c.value,
+            to,
+            c.velocity,
+            tolerance: const Tolerance(distance: 1e-3, velocity: 1e-2),
+          ),
+        )
+        // The spring settles within its tolerance, not on the target: a glass
+        // left a thousandth larger than its rest would be a box that never
+        // returns, and a region that differs from the one captured.
+        .then((_) => c.value = to);
   }
 
   void _setHeld(bool value) {
@@ -376,46 +434,128 @@ class _GlassButtonState extends State<GlassButton> {
       return;
     }
     setState(() => _held = value);
+    if (_spec.isNone) {
+      return;
+    }
+    if (value) {
+      _release
+        ..stop()
+        ..value = 1;
+      _spring(_press, 1);
+    } else {
+      _spring(_press, 0);
+      _spring(_release, 0);
+    }
+  }
+
+  void _onPointerDown(PointerDownEvent e) {
+    if (_pointer != null) {
+      return;
+    }
+    _pointer = e.pointer;
+    _downAt = e.localPosition;
+    _finger.value = Offset.zero;
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    final Offset? at = _downAt;
+    // Only while held: a finger that a scroll took is not pressing anything.
+    if (e.pointer != _pointer || at == null || !_held) {
+      return;
+    }
+    _finger.value = e.localPosition - at;
+  }
+
+  void _onPointerEnd(PointerEvent e) {
+    if (e.pointer == _pointer) {
+      _pointer = null;
+      _downAt = null;
+    }
+  }
+
+  void _activate() {
+    widget.onPressed?.call();
   }
 
   @override
   Widget build(BuildContext context) {
     final GlassFinish finish = widget.finish ?? GlassTheme.of(context).finish;
     final Color overlay = widget.pressedOverlay ?? finish.rim;
+    final bool enabled = widget.onPressed != null;
+    Widget glass = _GlassPanel(
+      borderRadius: widget.borderRadius,
+      padding: widget.padding,
+      finish: widget.finish,
+      overlay: _held ? overlay : null,
+      focusRing: _focused && enabled,
+      enabled: enabled,
+      // Factors of one: centred inside the minimum size, and no larger
+      // than the label otherwise. A bare `Center` takes every pixel it is
+      // offered, so a button in a `Wrap` or a `Column` was a bar.
+      child: Center(
+        widthFactor: 1,
+        heightFactor: 1,
+        // A label is not text to select: a drag across a page that
+        // selects would otherwise take it along.
+        child: SelectionContainer.disabled(
+          child: ExcludeSemantics(excluding: widget.semanticLabel != null, child: widget.child),
+        ),
+      ),
+    );
+    // Only while it can be pressed: a disabled button takes no press, and
+    // pays for no region.
+    if (enabled && !_spec.isNone) {
+      final GlassPress spec = _spec;
+      glass = AnimatedBuilder(
+        animation: Listenable.merge(<Listenable>[_press, _release, _finger]),
+        child: glass,
+        builder: (BuildContext context, Widget? panel) => GlassPressStage(
+          press: spec,
+          value: _press.value,
+          finger: _finger.value * _release.value,
+          // From touch-down until the spring has settled: at rest the glass is
+          // its box, and its slot no larger.
+          active:
+              _held ||
+              _press.isAnimating ||
+              _release.isAnimating ||
+              _press.value != 0 ||
+              _finger.value * _release.value != Offset.zero,
+          child: panel!,
+        ),
+      );
+    }
     return Semantics(
       button: true,
-      enabled: widget.onPressed != null,
+      enabled: enabled,
       label: widget.semanticLabel,
-      child: GestureDetector(
-        // Opaque, so the whole capsule takes the tap and not only the part the
-        // label covers. Outside the surface for the same reason.
-        behavior: HitTestBehavior.opaque,
-        onTapDown: widget.onPressed == null ? null : (_) => _setHeld(true),
-        onTapUp: widget.onPressed == null ? null : (_) => _setHeld(false),
-        onTapCancel: widget.onPressed == null ? null : () => _setHeld(false),
-        onTap: widget.onPressed,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: widget.minSize.width,
-            minHeight: widget.minSize.height,
-          ),
-          child: _GlassPanel(
-            borderRadius: widget.borderRadius,
-            padding: widget.padding,
-            finish: widget.finish,
-            overlay: _held ? overlay : null,
-            enabled: widget.onPressed != null,
-            // Factors of one: centred inside the minimum size, and no larger
-            // than the label otherwise. A bare `Center` takes every pixel it is
-            // offered, so a button in a `Wrap` or a `Column` was a bar.
-            child: Center(
-              widthFactor: 1,
-              heightFactor: 1,
-              // A label is not text to select: a drag across a page that
-              // selects would otherwise take it along.
-              child: SelectionContainer.disabled(
-                child: ExcludeSemantics(excluding: widget.semanticLabel != null, child: widget.child),
+      child: FocusableActionDetector(
+        enabled: enabled,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onShowFocusHighlight: (bool on) => setState(() => _focused = on),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) => _activate()),
+        },
+        child: Listener(
+          onPointerDown: enabled ? _onPointerDown : null,
+          onPointerMove: enabled ? _onPointerMove : null,
+          onPointerUp: _onPointerEnd,
+          onPointerCancel: _onPointerEnd,
+          child: GestureDetector(
+            // Opaque, so the whole capsule takes the tap and not only the part the
+            // label covers. Outside the surface for the same reason.
+            behavior: HitTestBehavior.opaque,
+            onTapDown: enabled ? (_) => _setHeld(true) : null,
+            onTapUp: enabled ? (_) => _setHeld(false) : null,
+            onTapCancel: enabled ? () => _setHeld(false) : null,
+            onTap: widget.onPressed,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: widget.minSize.width,
+                minHeight: widget.minSize.height,
               ),
+              child: glass,
             ),
           ),
         ),
@@ -432,6 +572,7 @@ class _GlassPanel extends StatefulWidget {
     required this.finish,
     required this.child,
     this.overlay,
+    this.focusRing = false,
     this.enabled = true,
   });
 
@@ -439,6 +580,10 @@ class _GlassPanel extends StatefulWidget {
   final EdgeInsets padding;
   final GlassFinish? finish;
   final Color? overlay;
+
+  /// Whether the keyboard's focus ring is drawn around the glass — from here,
+  /// inside the surface's subtree, where no capture sees it.
+  final bool focusRing;
   final bool enabled;
   final Widget child;
 
@@ -571,12 +716,13 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
           // that transparency instead of the glass. A `RepaintBoundary` is **not**
           // one — it lowers to `SceneBuilder.pushOffset`, whose engine layer
           // paints its children onto the same canvas — so one here changes
-          // nothing, which is measured rather than assumed (the break that failed
-          // to break, D185). An `Opacity`, a `ColorFilter` or an `ImageFilter`
+          // nothing. An `Opacity`, a `ColorFilter` or an `ImageFilter`
           // does open one, and then the press adds to nothing; that is a hazard
           // for whoever wraps a control, and it is why this sits directly over the
           // surface rather than under anything convenient.
-          painter: widget.overlay == null ? null : _GlassOverlay(widget.borderRadius, widget.overlay!),
+          painter: widget.overlay == null && !widget.focusRing
+              ? null
+              : _GlassOverlay(widget.borderRadius, widget.overlay, focusRing: widget.focusRing),
           child: Padding(
             padding: widget.padding,
             child: _labelled(theme, shown, widget.child),
@@ -590,13 +736,11 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
   ///
   /// Against the declared backdrop when it is flat, and against **every**
   /// backdrop when it is rich or undeclared ([GlassThemeData.legibility]). The
-  /// second case used to leave the colour alone (D184), because the two
-  /// available guesses — the tint, and the platform brightness — were both
-  /// measured wrong (D179). The worst case is not a third guess: it is a bound
-  /// that needs nothing but the finish, and on [GlassFinish.regularDark] it is
-  /// white at 6.05, AA over any image there is (D204). What remains worth
-  /// saying is when even the bound is below AA — a light, thin finish over an
-  /// undeclared screen — and that is what the report says now.
+  /// worst case is not a guess at the backdrop — the tint and the platform
+  /// brightness both predict it poorly — but a bound that needs nothing but the
+  /// finish: on [GlassFinish.regularDark] it is white at 6.05, AA over any
+  /// image. When even the bound is below AA — a light, thin finish over an
+  /// undeclared screen — debug builds report it.
   ///
   /// Under a host that reads its backdrop the reading is a third way, and not
   /// a guess either: it stands in for the declared backdrop for this glass
@@ -650,7 +794,7 @@ void _reportIllegible(double worst) {
           'not legible over every backdrop: the best label reaches a contrast of '
           '${worst.toStringAsFixed(2)} in the worst case, under WCAG AA (4.5).\n'
           'The label was chosen against every backdrop because nothing said which '
-          'one is behind the glass (D204). Declare the screen background on '
+          'one is behind the glass. Declare the screen background on '
           'GlassHost or GlassTheme if it is flat — then the label is chosen '
           'against it — or set richBackdrop and minLabelContrast if it is an '
           'image, and the glass is dimmed until the label reaches the floor.',
@@ -663,16 +807,24 @@ void _reportIllegible(double worst) {
   }());
 }
 
-/// Adds a colour over the whole shape, in the layer it is recorded in.
+/// Adds a colour over the whole shape, in the layer it is recorded in — and
+/// draws the focus ring around it.
 class _GlassOverlay extends CustomPainter {
-  const _GlassOverlay(this.borderRadius, this.color);
+  const _GlassOverlay(this.borderRadius, this.color, {this.focusRing = false});
 
   final BorderRadius borderRadius;
-  final Color color;
+  final Color? color;
+  final bool focusRing;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (color.a <= 0) {
+    final Color? color = this.color;
+    if (focusRing) {
+      // Past the shape, and drawn here — on the surface's own canvas — so the
+      // capture, which skips this subtree, never holds it.
+      paintGlassFocusRing(canvas, Offset.zero & size, borderRadius);
+    }
+    if (color == null || color.a <= 0) {
       return;
     }
     canvas.drawRSuperellipse(
@@ -688,5 +840,5 @@ class _GlassOverlay extends CustomPainter {
 
   @override
   bool shouldRepaint(_GlassOverlay oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
+      oldDelegate.color != color || oldDelegate.borderRadius != borderRadius || oldDelegate.focusRing != focusRing;
 }

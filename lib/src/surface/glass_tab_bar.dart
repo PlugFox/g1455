@@ -1,8 +1,8 @@
 // A tab bar whose selection lifts into a glass drop while a finger is on it —
-// a drop over another glass, which is what level capture is for (D214).
+// a drop over another glass, which is what level capture is for.
 //
 // What it does was read off Apple's own `UITabBar` on iOS 26.5, pressed by
-// XCUITest on an iPhone 17 Pro and an iPad Pro simulator (spike 30, D218):
+// XCUITest on an iPhone 17 Pro and an iPad Pro simulator:
 //
 //  - at rest the selected item sits on a grey capsule, its icon and label in
 //    the accent colour; nothing about it is glass;
@@ -16,8 +16,8 @@
 //    colour while the one it left gives it up; let go, it settles on the item
 //    and that is the selection.
 //
-// Not taken: Apple's drop disperses at its rim and ours does not (D103 found
-// none in the material; the drop is another material), and the bar's items
+// Not taken: Apple's drop disperses at its rim and ours does not (Apple's
+// material showed none; the drop is another material), and the bar's items
 // grow with it by ~1.05 where ours stay put.
 //
 // What it costs, by construction rather than by hope:
@@ -25,7 +25,7 @@
 //  - at rest: the bar, one surface; the drop is at materialize 0 and captured
 //    for nothing;
 //  - held: the drop is glass on glass, so the frames that record take a second
-//    snapshot (D214) — while it lifts and the bar grows, every frame; while it
+//    snapshot — while it lifts and the bar grows, every frame; while it
 //    moves, **only the frames where the highlighted item changes**, because the
 //    highlight is an item, not a blend, and the drop moves inside its own
 //    `GlassTravel` behind its own boundary;
@@ -35,12 +35,29 @@
 //    inside its own region, grown by the most the motion reaches: no capture
 //    of either level, and a repaint of the bar's draw while it changes.
 //
+// **Minimized** (iOS 26's `tabBarMinimizeBehavior(.onScrollDown)`), the bar
+// collapses to a circle of its own height at its start edge, showing the
+// selected item's icon, and an accessory above it
+// (`tabViewBottomAccessory`) moves down beside the circle. Read off nothing
+// but Apple's description and screenshots — the sizes and the spring are
+// layout taste. What it costs is the point:
+//
+//  - the circle is the bar, shrunk inside the same `GlassTravel` the bar
+//    grows in, and the accessory moves inside one of the whole box: so the
+//    animation is **no capture**, only the bars' draws repainted;
+//  - the bar's box does not change size, so the body under it is not told a
+//    new padding and is neither laid out nor repainted for it;
+//  - the scroll that set it off is a capture on every frame anyway (the
+//    content under the bar moves), so what the travel saves is the frames the
+//    spring runs on after the finger lets go.
+//
 // The items are drawn once, under the drop, and the drop shows them magnified:
 // there is no second copy of an item over the glass. A custom icon or label
 // ([GlassTabItem.iconBuilder], [GlassTabItem.labelBuilder]) is therefore built
 // once per item for each look the bar gives the row: every item's builder runs
 // again when the drop moves onto an item or off one, not only the two whose
-// colour changed. A builder that is dear to run should cache what it builds.
+// colour changed — and, on a bar that can collapse, the selected item's icon
+// once more, for the collapsed circle. A builder that is dear to run should cache what it builds.
 
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
@@ -175,7 +192,7 @@ class GlassTabItem {
   final GlassTabItemBuilder? labelBuilder;
 }
 
-/// How much the held drop magnifies the bar under it (D218).
+/// How much the held drop magnifies the bar under it.
 ///
 /// Read off iOS 26.5's own tab bar on a phone and an iPad, both at 1.17x once
 /// the bar's own growth under the drop is taken out. [GlassTabBar.dropZoom]'s
@@ -185,7 +202,7 @@ class GlassTabItem {
 const double kGlassTabDropZoom = 1.17;
 
 /// How much larger than the resting capsule the held drop is, on every side,
-/// logical px (D218).
+/// logical px.
 ///
 /// Read off iOS 26.5: 73 x 53 -> 94 x 72 on the phone, 85 x 36 -> 110 x 56.5
 /// on the iPad, so the held drop stands out of the bar above and below.
@@ -193,8 +210,170 @@ const double kGlassTabDropZoom = 1.17;
 /// {@category Panels and controls}
 const double kGlassTabDropGrow = 10.5;
 
-/// How much the bar grows while held, logical px per side (D218).
+/// How much the bar grows while held, logical px per side, read off iOS 26.5.
 const Size _kBarGrow = Size(8.5, 2.5);
+
+/// When a [GlassTabBar] collapses to its selected tab — iOS 26's
+/// `TabBarMinimizeBehavior`, two of its cases.
+///
+/// {@category Panels and controls}
+enum GlassTabBarMinimizeBehavior {
+  /// The bar stays as it is. The default.
+  never,
+
+  /// The bar collapses to the selected tab when the content under it scrolls
+  /// down and expands when it scrolls back up, as told by the nearest
+  /// [GlassTabBarMinimizer] above it — which a [GlassScaffold] puts there.
+  onScrollDown,
+}
+
+/// How far the content has to scroll one way, logical px, before a
+/// [GlassTabBarMinimizer] says so: past this down, the bars collapse; past it
+/// up, they expand. Layout taste — enough to ignore a finger settling, short
+/// enough that a deliberate scroll is answered at once.
+///
+/// {@category Panels and controls}
+const double kGlassTabMinimizeScroll = 12;
+
+/// The height of [GlassTabBar.bottomAccessory]'s glass, logical px. Layout
+/// taste: the bar's minimum tap target and a little.
+///
+/// {@category Panels and controls}
+const double kGlassTabAccessoryHeight = 48;
+
+/// Between the accessory and the bar, or the collapsed circle.
+const double _kAccessoryGap = 8;
+
+/// Whether the bar's and the accessory's collapse moves inside a declared
+/// travel region. The default, and what was measured; a test turns it off to
+/// see what it saves.
+@visibleForTesting
+bool debugGlassTabMinimizeTravel = true;
+
+/// Says whether the content below has scrolled down, for the
+/// [GlassTabBar]s below it that collapse on a scroll
+/// ([GlassTabBarMinimizeBehavior.onScrollDown]).
+///
+/// It listens to the vertical scrolls of its subtree — by default the nearest
+/// scroll view of each, not one nested in another; [notificationPredicate]
+/// reaches deeper — and holds one value, [maybeOf]: true once the content has
+/// moved [kGlassTabMinimizeScroll] up the screen, false once it has come as far
+/// back down or reached its top. On the screen, so a `reverse: true` list
+/// collapses the bars on the same motion of the finger as any other. The bar
+/// is not inside the scroll
+/// view, so both are put under one of these: a [GlassScaffold] does that, and
+/// a screen laid out by hand puts one above its body and its bar.
+///
+/// ```dart
+/// GlassTabBarMinimizer(
+///   child: Stack(
+///     children: <Widget>[
+///       ListView.builder(itemCount: 50, itemBuilder: buildRow),
+///       Positioned(
+///         left: 12,
+///         right: 12,
+///         bottom: 24,
+///         child: GlassTabBar(
+///           items: items,
+///           selectedIndex: tab,
+///           onSelected: select,
+///           minimizeBehavior: GlassTabBarMinimizeBehavior.onScrollDown,
+///         ),
+///       ),
+///     ],
+///   ),
+/// )
+/// ```
+///
+/// {@category Panels and controls}
+class GlassTabBarMinimizer extends StatefulWidget {
+  /// Watches the scrolls in [child] for the tab bars in it.
+  const GlassTabBarMinimizer({
+    required this.child,
+    this.notificationPredicate = defaultScrollNotificationPredicate,
+    super.key,
+  });
+
+  /// The subtree whose scrolls collapse the bars in it.
+  final Widget child;
+
+  /// Which of [child]'s scroll notifications count, as `AppBar`'s does: by
+  /// default only those of a scroll view with none between it and the
+  /// minimizer (`depth == 0`). A list in a `PageView`, a `TabBarView` or the
+  /// body of a `NestedScrollView` is nested one deeper; a predicate of
+  /// `(ScrollNotification n) => n.depth == 1` lets its scrolls collapse the
+  /// bars. Only vertical scrolls count, whatever it says.
+  final ScrollNotificationPredicate notificationPredicate;
+
+  /// Whether the bars below [context] are collapsed, or null with no
+  /// minimizer above. Writable: a bar sets it false when its collapsed circle
+  /// is tapped, and an application may set either value — to expand the bars
+  /// when it changes the page, say.
+  static ValueNotifier<bool>? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_GlassTabBarMinimizerScope>()?.minimized;
+
+  @override
+  State<GlassTabBarMinimizer> createState() => _GlassTabBarMinimizerState();
+}
+
+class _GlassTabBarMinimizerState extends State<GlassTabBarMinimizer> {
+  final ValueNotifier<bool> _minimized = ValueNotifier<bool>(false);
+
+  /// How far the content has gone in the direction it is going, logical px.
+  double _run = 0;
+
+  @override
+  void dispose() {
+    _minimized.dispose();
+    super.dispose();
+  }
+
+  bool _onScroll(ScrollUpdateNotification n) {
+    final ScrollMetrics m = n.metrics;
+    if (m.axis != Axis.vertical || !widget.notificationPredicate(n)) {
+      return false;
+    }
+    // On the screen, not in the offset: a reversed list grows its offset
+    // upward, so its content moving up the screen — what collapses the bars on
+    // any list — is its offset going down, and its top edge is its far end.
+    final bool reversed = m.axisDirection == AxisDirection.up;
+    if (reversed ? m.pixels >= m.maxScrollExtent : m.pixels <= m.minScrollExtent) {
+      _run = 0;
+      _minimized.value = false;
+      return false;
+    }
+    // A bounce past the end is not the reader going back up.
+    final double delta = (reversed ? -1 : 1) * (n.scrollDelta ?? 0);
+    if (m.outOfRange || delta == 0) {
+      return false;
+    }
+    if (delta.sign != _run.sign) {
+      _run = 0;
+    }
+    _run += delta;
+    if (_run > kGlassTabMinimizeScroll) {
+      _minimized.value = true;
+    } else if (_run < -kGlassTabMinimizeScroll) {
+      _minimized.value = false;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) => NotificationListener<ScrollUpdateNotification>(
+    onNotification: _onScroll,
+    child: _GlassTabBarMinimizerScope(minimized: _minimized, child: widget.child),
+  );
+}
+
+class _GlassTabBarMinimizerScope extends InheritedWidget {
+  const _GlassTabBarMinimizerScope({required this.minimized, required super.child});
+
+  final ValueNotifier<bool> minimized;
+
+  @override
+  bool updateShouldNotify(_GlassTabBarMinimizerScope oldWidget) => !identical(minimized, oldWidget.minimized);
+}
 
 /// The resting capsule: iOS's fill on a light material.
 const Color _kPill = Color(0x33787880);
@@ -209,7 +388,7 @@ const double _kInlinePitch = 80;
 class _TabGeometry {
   factory _TabGeometry(double width, int count) {
     final bool inline = (width - 16) / count >= _kInlinePitch;
-    // Read off the simulators (D218): the phone's bar is 60 tall with items
+    // Read off the simulators: the phone's bar is 60 tall with items
     // 66 apart and 7 in from its ends, the capsule 3.5 in from the bar all
     // round; the iPad's is 44 tall, 8 in, the capsule 3 narrower than the
     // pitch. Layout taste where a device had nothing to say.
@@ -281,6 +460,20 @@ class _TabGeometry {
 /// > is held take a second snapshot. While it moves, only the frames where
 /// > the highlighted item changes record at all.
 ///
+/// **Minimized on scroll.** With [minimizeBehavior]
+/// [GlassTabBarMinimizeBehavior.onScrollDown], under a
+/// [GlassTabBarMinimizer] (a [GlassScaffold] is one), the bar collapses to a
+/// circle of its own height at its start edge when the content scrolls down —
+/// the selected item's icon in it — and expands when the content scrolls back
+/// up; a tap on the circle expands it too, and selects nothing. The collapse
+/// is a shape changing inside a declared travel region, so it takes no
+/// capture; under reduced motion it is not animated at all.
+///
+/// **An accessory** ([bottomAccessory], UIKit's `tabViewBottomAccessory`) is
+/// a glass capsule [kGlassTabAccessoryHeight] tall above the bar, which moves
+/// down beside the collapsed circle. The bar's box is the same height either
+/// way, so a body told the bar's height is not laid out again for it.
+///
 /// See also:
 ///
 ///  * [GlassTabItem] and [GlassTabItemLook], for an icon or a label the bar
@@ -301,6 +494,8 @@ class GlassTabBar extends StatefulWidget {
     this.activeColor = const Color(0xFF007AFF),
     this.dropZoom = kGlassTabDropZoom,
     this.dropMotion,
+    this.minimizeBehavior = GlassTabBarMinimizeBehavior.never,
+    this.bottomAccessory,
     super.key,
   }) : assert(items.length >= 2),
        assert(dropZoom > 0);
@@ -327,6 +522,16 @@ class GlassTabBar extends StatefulWidget {
   /// Off under reduced motion either way.
   final GlassDropMotion? dropMotion;
 
+  /// Whether the bar collapses to the selected tab when the content scrolls
+  /// down. [GlassTabBarMinimizeBehavior.never] by default; see the class
+  /// comment.
+  final GlassTabBarMinimizeBehavior minimizeBehavior;
+
+  /// A widget on a glass capsule above the bar — a now-playing row, a status —
+  /// that moves down beside the bar's collapsed circle when it is minimized.
+  /// Drawn in the bar's label colour. Null for none.
+  final Widget? bottomAccessory;
+
   @override
   State<GlassTabBar> createState() => _GlassTabBarState();
 }
@@ -351,6 +556,23 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   );
   GlassDropMotion _motion = GlassDropMotion.none;
 
+  /// 0 expanded, 1 collapsed to the selected tab.
+  late final AnimationController _minimize = AnimationController.unbounded(vsync: this);
+
+  /// What says whether to collapse, and what it last said.
+  ValueNotifier<bool>? _minimizer;
+
+  /// Whether the bar is collapsed, or collapsing. A notifier rather than
+  /// state: what follows it — where a press lands, what a screen reader is
+  /// offered — is a few small widgets, and a rebuild of the whole bar costs a
+  /// capture even when nothing it draws changed. Measured, not traced: one
+  /// record per bare `setState` on the bar, before the collapse existed as
+  /// after; through `setState` the collapse took one on the first frame of
+  /// each direction, through this none.
+  final ValueNotifier<bool> _collapsed = ValueNotifier<bool>(false);
+  bool get _minimized => _collapsed.value;
+  bool _reduceMotion = false;
+
   _TabGeometry? _geometry;
   bool _down = false;
   bool _moved = false;
@@ -362,6 +584,9 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   // would be no overshoot; this lifts a few percent past and settles.
   static const SpringDescription _liftSpring = SpringDescription(mass: 1, stiffness: 520, damping: 34);
   static const SpringDescription _slideSpring = SpringDescription(mass: 1, stiffness: 380, damping: 36);
+  // Critically damped near enough: a shape that overshot would pass through
+  // a circle narrower than the bar's height.
+  static const SpringDescription _minimizeSpring = SpringDescription(mass: 1, stiffness: 300, damping: 36);
 
   @override
   void initState() {
@@ -378,6 +603,8 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   void didChangeDependencies() {
     super.didChangeDependencies();
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
+    _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    _listen();
   }
 
   @override
@@ -387,10 +614,57 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
       _slideTo(widget.selectedIndex, 0);
     }
+    if (widget.minimizeBehavior != oldWidget.minimizeBehavior) {
+      _listen();
+    }
   }
+
+  /// Follows the minimizer above, if this bar collapses at all.
+  void _listen() {
+    final ValueNotifier<bool>? next = widget.minimizeBehavior == GlassTabBarMinimizeBehavior.onScrollDown
+        ? GlassTabBarMinimizer.maybeOf(context)
+        : null;
+    if (!identical(next, _minimizer)) {
+      _minimizer?.removeListener(_follow);
+      _minimizer = next?..addListener(_follow);
+    }
+    _minimizeTo(next?.value ?? false);
+  }
+
+  void _follow() {
+    final bool target = _minimizer?.value ?? false;
+    _minimizeTo(target);
+  }
+
+  void _minimizeTo(bool target) {
+    if (target == _minimized) {
+      return;
+    }
+    _collapsed.value = target;
+    if (target && _down) {
+      // Collapsed under a finger: the hold is over, and selects nothing.
+      _down = false;
+      _slideTo(widget.selectedIndex, 0);
+      _liftTo(0);
+    }
+    final double to = target ? 1 : 0;
+    if (_reduceMotion) {
+      _minimize.value = to;
+      return;
+    }
+    _minimize
+        .animateWith(SpringSimulation(_minimizeSpring, _minimize.value, to, _minimize.velocity, tolerance: _tolerance))
+        .then((_) => _minimize.value = to);
+  }
+
+  /// A tap on the collapsed circle: the bar expands, and nothing is selected.
+  void _expand() => _minimizer?.value = false;
 
   @override
   void dispose() {
+    _minimizer?.removeListener(_follow);
+    _minimize.dispose();
+    _collapsed.dispose();
     _stretch.dispose();
     _lift.dispose();
     _at.dispose();
@@ -432,7 +706,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
 
   void _onDown(PointerDownEvent e) {
     final _TabGeometry? g = _geometry;
-    if (!_enabled || g == null || _down) {
+    if (!_enabled || g == null || _down || _minimized || _minimize.value != 0) {
       return;
     }
     _down = true;
@@ -504,80 +778,134 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
           final double width = constraints.maxWidth;
           final _TabGeometry g = _geometry = _TabGeometry(width, widget.items.length);
           final Size margin = g.margin(widget.items.length, _motion);
+          final double slot = math.max(g.height, kGlassMinTapTarget.height);
+          final Widget? accessory = widget.bottomAccessory;
+          final double above = accessory == null ? 0 : kGlassTabAccessoryHeight + _kAccessoryGap;
+          final bool rtl = Directionality.of(context) == TextDirection.rtl;
+          // The collapsed circle, in the box: the bar's own height, at its
+          // start edge.
+          final Rect circle = Rect.fromLTWH(
+            rtl ? width - g.height : 0,
+            above + (slot - g.height) / 2,
+            g.height,
+            g.height,
+          );
+          Widget travel(Widget child) => debugGlassTabMinimizeTravel ? GlassTravel(child: child) : child;
           return SizedBox(
             width: width,
-            height: math.max(g.height, kGlassMinTapTarget.height),
+            height: above + slot,
             child: RepaintBoundary(
               child: LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints _) => Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerDown: _onDown,
-                  onPointerMove: _onMove,
-                  onPointerUp: _onUp,
-                  onPointerCancel: _onCancel,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: <Widget>[
-                      // The bar's whole growth is declared, so growing does not retake
-                      // the bar's own capture.
-                      Positioned(
-                        left: -_kBarGrow.width,
-                        right: -_kBarGrow.width,
-                        top: -_kBarGrow.height,
-                        bottom: -_kBarGrow.height,
-                        child: GlassTravel(
-                          // A boundary of its own, so the bar resizing repaints this
-                          // and not the screen it sits on.
-                          child: RepaintBoundary(
-                            child: Center(
-                              child: AnimatedBuilder(
-                                animation: _lift,
-                                builder: (BuildContext context, Widget? child) {
-                                  // In whole device pixels: the drop on the bar shows
-                                  // the bar, so a growth under a pixel is a capture that
-                                  // changes nothing anybody can see.
-                                  final double dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
-                                  double px(double v) => (v * dpr).round() / dpr;
-                                  final double t = _lift.value.clamp(0.0, 1.2);
-                                  final double gx = px(_kBarGrow.width * t);
-                                  final double gy = px(_kBarGrow.height * t);
-                                  return SizedBox(
-                                    width: width + 2 * gx,
-                                    height: g.height + 2 * gy,
-                                    child: GlassBar(
-                                      padding: EdgeInsets.zero,
-                                      // Content stays where it was laid out at rest: the
-                                      // bar grows around it.
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: <Widget>[
-                                          Positioned(
-                                            left: gx,
-                                            top: gy,
-                                            width: width,
-                                            height: g.height,
-                                            child: child!,
-                                          ),
-                                          Positioned(
-                                            left: gx - margin.width,
-                                            top: gy - margin.height,
-                                            width: width + 2 * margin.width,
-                                            height: g.height + 2 * margin.height,
-                                            child: _dropStage(g, margin),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: _content(g),
-                              ),
+                builder: (BuildContext context, BoxConstraints _) => Stack(
+                  clipBehavior: Clip.none,
+                  children: <Widget>[
+                    // The bar's whole growth is declared, so growing does not retake
+                    // the bar's own capture — and so is its collapse, which is inside
+                    // the same box.
+                    Positioned(
+                      left: -_kBarGrow.width,
+                      right: -_kBarGrow.width,
+                      top: above - _kBarGrow.height,
+                      height: slot + 2 * _kBarGrow.height,
+                      child: travel(
+                        // A boundary of its own, so the bar resizing repaints this
+                        // and not the screen it sits on.
+                        RepaintBoundary(
+                          child: AnimatedBuilder(
+                            animation: Listenable.merge(<Listenable>[_lift, _minimize]),
+                            builder: (BuildContext context, Widget? child) => _bar(
+                              context,
+                              g,
+                              margin,
+                              slot,
+                              circle.translate(_kBarGrow.width, _kBarGrow.height - above),
+                              child!,
+                            ),
+                            child: ValueListenableBuilder<bool>(
+                              valueListenable: _collapsed,
+                              child: _content(g),
+                              builder: (BuildContext context, bool collapsed, Widget? content) =>
+                                  ExcludeSemantics(excluding: collapsed, child: content),
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    if (accessory != null)
+                      Positioned.fill(
+                        child: travel(
+                          RepaintBoundary(
+                            child: AnimatedBuilder(
+                              animation: _minimize,
+                              builder: (BuildContext context, Widget? child) {
+                                final double m = _minimize.value.clamp(0.0, 1.0);
+                                final open = Rect.fromLTWH(0, 0, width, kGlassTabAccessoryHeight);
+                                final inline = Rect.fromLTRB(
+                                  rtl ? 0 : circle.right + _kAccessoryGap,
+                                  circle.center.dy - kGlassTabAccessoryHeight / 2,
+                                  rtl ? circle.left - _kAccessoryGap : width,
+                                  circle.center.dy + kGlassTabAccessoryHeight / 2,
+                                );
+                                return Stack(
+                                  children: <Widget>[
+                                    Positioned.fromRect(
+                                      rect: _snap(context, Rect.lerp(open, inline, m)!),
+                                      child: GlassBar(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        child: child!,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                              child: Align(alignment: AlignmentDirectional.centerStart, child: accessory),
+                            ),
+                          ),
+                        ),
+                      ),
+                    // The press, over the bar's slot only: an accessory above it
+                    // takes its own taps, and a collapsed bar takes none here.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: above,
+                      height: slot,
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _collapsed,
+                        builder: (BuildContext context, bool collapsed, Widget? listener) =>
+                            IgnorePointer(ignoring: collapsed, child: listener),
+                        // Translucent: a sibling over the bar now, not its ancestor,
+                        // and an opaque one would end the hit test here — the bar's
+                        // glass would never hear the touch its ripple answers.
+                        child: Listener(
+                          behavior: HitTestBehavior.translucent,
+                          onPointerDown: _onDown,
+                          onPointerMove: _onMove,
+                          onPointerUp: _onUp,
+                          onPointerCancel: _onCancel,
+                        ),
+                      ),
+                    ),
+                    // Always in the tree, and live only while collapsed.
+                    Positioned.fromRect(
+                      rect: circle,
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _collapsed,
+                        builder: (BuildContext context, bool collapsed, Widget? circle) => IgnorePointer(
+                          ignoring: !collapsed,
+                          child: ExcludeSemantics(excluding: !collapsed, child: circle),
+                        ),
+                        child: Semantics(
+                          button: true,
+                          label: widget.items[widget.selectedIndex].label,
+                          selected: true,
+                          enabled: true,
+                          onTap: _expand,
+                          child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: _expand),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -586,6 +914,101 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       ),
     ),
   );
+
+  /// [rect] with its edges on whole device pixels: a change under a pixel is a
+  /// repaint of the glass that nobody can see.
+  static Rect _snap(BuildContext context, Rect rect) {
+    final double dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+    double px(double v) => (v * dpr).round() / dpr;
+    return Rect.fromLTRB(px(rect.left), px(rect.top), px(rect.right), px(rect.bottom));
+  }
+
+  /// The bar in its travel region — grown while held, collapsed to [circle]
+  /// (in the region's coordinates) while minimized — with [content] in it.
+  Widget _bar(BuildContext context, _TabGeometry g, Size margin, double slot, Rect circle, Widget content) {
+    // In whole device pixels: the drop on the bar shows the bar, so a growth
+    // under a pixel is a capture that changes nothing anybody can see.
+    final double dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+    double px(double v) => (v * dpr).round() / dpr;
+    final double t = _lift.value.clamp(0.0, 1.2);
+    final double m = _minimize.value.clamp(0.0, 1.0);
+    final double gx = px(_kBarGrow.width * t);
+    final double gy = px(_kBarGrow.height * t);
+    final double width = g.pad * 2 + g.pitch * widget.items.length;
+    // Where the items sit at rest, in the region: the bar's growth goes round
+    // them.
+    final Offset row = Offset(_kBarGrow.width, _kBarGrow.height + (slot - g.height) / 2);
+    final open = Rect.fromLTWH(row.dx - gx, row.dy - gy, width + 2 * gx, g.height + 2 * gy);
+    final Rect bar = m == 0 ? open : _snap(context, Rect.lerp(open, circle, m)!);
+    // Collapsing, the items slide so the selected one ends in the circle, and
+    // fade as the circle's own icon comes in.
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    final double selected = g.centre(widget.selectedIndex.toDouble());
+    final double slide = m * (circle.center.dx - (row.dx + (rtl ? width - selected : selected)));
+    final Offset items = row.translate(slide, 0) - bar.topLeft;
+    final Offset drop = row.translate(-margin.width, -margin.height) - bar.topLeft;
+    return Stack(
+      children: <Widget>[
+        Positioned.fromRect(
+          rect: bar,
+          child: GlassBar(
+            padding: EdgeInsets.zero,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                // The same widgets at every stage of the collapse, so it changes
+                // properties and never the tree: clipped to the bar only while it
+                // collapses — at rest the items are inside it anyway — and the
+                // fades at 1 and 0 paint as if they were not there.
+                Positioned.fill(
+                  child: ClipRect(
+                    clipBehavior: m > 0 ? Clip.hardEdge : Clip.none,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: <Widget>[
+                        Positioned(
+                          left: items.dx,
+                          top: items.dy,
+                          width: width,
+                          height: g.height,
+                          child: Opacity(opacity: 1 - (2 * m).clamp(0.0, 1.0), child: content),
+                        ),
+                        // Only on a bar that can collapse, which is fixed for its
+                        // lifetime as far as the tree is concerned: a bar that never
+                        // does draws exactly what it drew before it could.
+                        if (widget.minimizeBehavior != GlassTabBarMinimizeBehavior.never)
+                          Positioned.fill(
+                            child: Opacity(
+                              opacity: (2 * m - 1).clamp(0.0, 1.0),
+                              child: Center(child: _glyph(context, g)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: drop.dx,
+                  top: drop.dy,
+                  width: width + 2 * margin.width,
+                  height: g.height + 2 * margin.height,
+                  child: _dropStage(g, margin),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The selected item's icon, as the collapsed circle shows it.
+  Widget _glyph(BuildContext context, _TabGeometry g) {
+    final int i = widget.selectedIndex;
+    final GlassTabItem item = widget.items[i];
+    final GlassTabItemLook look = _look(context, g, i, highlighted: true);
+    return item.iconBuilder?.call(context, look) ?? Icon(item.icon, size: look.iconSize, color: look.color);
+  }
 
   /// The capsule and the items: everything the drop magnifies.
   Widget _content(_TabGeometry g) => Stack(
@@ -711,7 +1134,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   /// No boundary of its own, unlike the switch's: moving the drop repaints the
   /// bar, whose draw the watch excludes and whose content sits behind its own
   /// boundaries, so nothing the watch reads changes either way — a boundary
-  /// here was tried and broke no arm when removed (D218).
+  /// here was tried and broke no test when removed.
   Widget _dropStage(_TabGeometry g, Size margin) => GlassTravel(
     child: AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[_lift, _at, _stretch]),

@@ -1,13 +1,13 @@
 // The whitelist, audited against the SDK it is a whitelist of.
 //
-// `flutter test test/glass/proxy_layer_watch_test.dart`
+// `flutter test test/proxy_layer_watch_test.dart`
 //
 // `ProxyLayerWatch` is the only thing standing between a held proxy and a
-// stale picture, and D160 made it the thing a decision rests on: the cost of
+// stale picture, and the retention default rests on it: the cost of
 // walking the layer tree is below what a device run can resolve, so the retention
 // default stops being a question about price and becomes a question about this
 // table. The lever is 79.4% and 66.3% of the addition on Adreno and 97.8% on
-// Metal (D146); the cost of the error is the whole frame being wrong, silently,
+// Metal; the cost of the error is the whole frame being wrong, silently,
 // for as long as the screen keeps moving. So the error's probability is the
 // probability of a hole in this table, and that is what this file measures.
 //
@@ -30,10 +30,10 @@
 // destroy the whole mechanism, and it is exactly what a mistake in the guard
 // produces.
 //
-// What the audit found when it was first run (D162): `BackdropFilterLayer`
-// handed `backdropKey` to the engine and the signature did not read it, and the
-// whitelist was matching subtypes where it meant to match types. Both are fixed
-// in `lib/src/proxy/proxy_layer_watch.dart`; this file is what keeps them fixed.
+// Two defects this audit exists to keep out: `BackdropFilterLayer` handing
+// `backdropKey` to the engine without the signature reading it, and a whitelist
+// matching subtypes where it means to match types. Both are handled in
+// `lib/src/proxy/proxy_layer_watch.dart`; this file is what keeps them handled.
 
 import 'dart:convert';
 import 'dart:io';
@@ -166,8 +166,8 @@ void main() {
     });
 
     test('and the same check, given a known wrong answer, finds it', () {
-      // The control for the check itself, and the record of what the first run of
-      // it found. Drop the property D162 added and the audit must name it — an
+      // The control for the check itself. Drop `backdropKey` from the signature
+      // and the audit must name it — an
       // audit that passes a table with a hole in it is prose with a test around
       // it.
       final Map<String, Set<String>> holed = <String, Set<String>>{
@@ -241,11 +241,11 @@ void main() {
   });
 
   group('where it changed, and not only that it did', () {
-    // D174. §4.2 of the research document is one sentence — "a shared texture
-    // is a shared dirty flag: a spinner behind button A invalidates the whole
-    // cluster" — and every term of it is about regions. Until this group the
-    // watch answered with a bit, so the package had one dirty flag for the whole
-    // screen and a spinner in a corner re-recorded a proxy of the other corner.
+    // "A shared texture is a shared dirty flag: a spinner behind button A
+    // invalidates the whole cluster" — and every term of that is about regions.
+    // A watch that answered with a bit would give the package one dirty flag for
+    // the whole screen, and a spinner in a corner would re-record a proxy of the
+    // other corner.
     //
     // What the region has to be is *conservative and tight enough to be worth
     // having*, and those pull opposite ways. So each arm below names the rect it
@@ -462,9 +462,9 @@ void main() {
           PerformanceOverlayLayer(overlayRect: const Rect.fromLTWH(0, 0, 8, 8), optionsMask: 0),
       'FollowerLayer': () => FollowerLayer(link: LayerLink()),
       'a ContainerLayer subclass nobody has read': _StrangeContainerLayer.new,
-      // The arm the exactness guard exists for. Before D162 this landed on the
-      // `OpacityLayer` branch, was described by an alpha and an offset, and was
-      // held through whatever else it composited.
+      // The arm the exactness guard exists for. Matched by subtype, this would
+      // land on the `OpacityLayer` branch, be described by an alpha and an
+      // offset, and be held through whatever else it composited.
       'an OpacityLayer subclass nobody has read': () => _StrangeOpacityLayer(alpha: 128),
     };
 
@@ -637,7 +637,7 @@ final List<_Case> _cases = <_Case>[
     mutate: (Layer l) => (l as BackdropFilterLayer).blendMode = ui.BlendMode.plus,
   ),
   _Case(
-    // D162: the property the audit found missing. `RenderBackdropFilter` keeps
+    // The property the audit exists to keep in the signature. `RenderBackdropFilter` keeps
     // its layer and assigns this, so the whole change is one field of one
     // retained layer — which is the class of change this oracle exists for.
     'BackdropFilterLayer.backdropKey',

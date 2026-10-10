@@ -1,80 +1,52 @@
-// The configuration level of the three-level structure (research SS7.2): tokens
-// above, the primitive below, components on top of that.
+// The configuration level of the package: tokens above, the primitive below,
+// components on top of that.
 //
-// §7.1 fixed the shape of this level before anything was built, and the reason
-// it gave is the one that still holds: **configuration is inherited and
-// geometry is not.** A surface moves every frame, so its place travels through
-// [GlassLedger], which is a `Listenable` whose identity never changes and which
-// therefore rebuilds nobody. What is in here changes when a user flips a switch
-// or a screen picks a look — measured in events per session, not per frame — so
-// it can afford to be an `InheritedWidget` and rebuild the subtree when it
-// moves.
-//
-// Two tokens, and both earn their place by having an observable trace:
+// Configuration is inherited and geometry is not. A surface moves every frame,
+// so its place travels through [GlassLedger], a `Listenable` whose identity
+// never changes and which therefore rebuilds nobody. What is in here changes
+// when a user flips a switch or a screen picks a look — events per session, not
+// per frame — so it can afford to be an `InheritedWidget`.
 //
 //  - [GlassThemeData.finish] is the material — blur, tint, rim, optics — and
-//    its `name` is the key into every measured damage table the package holds.
-//    It was already carried down the tree, but by [GlassProxyHandle], which is
-//    the *pipeline*: a surface with no [GlassHost] above it had no finish at
-//    all. That was invisible while every rung read a proxy and stops being
-//    invisible now, because [GlassTier.cheap] is a rung that has no pipeline by
-//    construction and still has to look like the same panel.
-//  - [GlassThemeData.tier] is which rung of phase D's ladder is drawn, and
-//    `glass_tier.dart` has the argument for why it is a declaration.
-//  - [GlassThemeData.backdrop] is the level the screen is on average, and it is
-//    here because it is the one thing the *bottom* rung needs and cannot get:
-//    [GlassTier.opaque] reads no backdrop by construction (D58, D176), so the
-//    mean it stands in for has to arrive from outside. Left out it costs 0.67 of
-//    the material scale over a light screen (D179).
-//
-// Phase D's remainder added three more, each for a reason a reading could not
-// supply (D203, D204):
-//
+//    its `name` keys the package's damage tables. It lives here rather than on
+//    the pipeline because [GlassTier.cheap] has no pipeline and still has to
+//    look like the same panel.
+//  - [GlassThemeData.tier] is which rung of the ladder is drawn;
+//    `glass_tier.dart` says why it is a declaration.
+//  - [GlassThemeData.backdrop] is the screen's average level, the one thing
+//    [GlassTier.opaque] needs and cannot read, since it reads no backdrop.
 //  - [GlassThemeData.highContrast] is the platform's increase-contrast switch.
 //    The host fills it from `MediaQuery.highContrastOf`, which the engine sets
-//    on iOS and on Android 34+ — **the first automatic input any token here
-//    has** — and on macOS the application has to pass it, read from
-//    `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`, because the macOS
-//    embedder relays nothing.
+//    on iOS and on Android 34+; on macOS the application passes it, read from
+//    `NSWorkspace.accessibilityDisplayShouldIncreaseContrast`, because the
+//    macOS embedder relays nothing.
 //  - [GlassThemeData.richBackdrop] says the screen under the glass is an image
-//    rather than a colour, which is HIG's own distinction ("visually rich
-//    backgrounds"). A declared mean is exact over a flat screen and says
+//    rather than a colour (HIG's "visually rich backgrounds"). A mean says
 //    nothing about a photograph's brightest corner, so legibility there is
-//    computed against every backdrop instead — which needs only the finish.
-//  - [GlassThemeData.minLabelContrast] is a floor the application chooses,
-//    and the one place the package will change a colour to reach a number:
-//    it dims under the glass, which is Apple's answer and in this machine a
-//    change of tint, not a new layer.
+//    computed against every backdrop instead.
+//  - [GlassThemeData.minLabelContrast] is a floor the application chooses, and
+//    the one place the package changes a colour to reach a number: it dims the
+//    glass, which is a change of tint, not a new layer.
+//  - [GlassThemeData.dropMotion] and [GlassThemeData.press] are motion: how a
+//    held drop deforms as it speeds up and slows down (`glass_drop_motion.dart`,
+//    no capture), and how a pressed button swells (`glass_press.dart`, two
+//    captures a press, nothing at rest). Both are off under reduced motion.
+//  - [GlassThemeData.adaptive] is opt-in: the host reads the captured backdrop
+//    under each glass, and a component installs [GlassThemeData.adaptedTo]
+//    around its own. A verdict moves a handful of times a session, behind a
+//    band and a hold (`glass_adaptive.dart`), never per frame.
 //
-// And one for motion:
-//
-//  - [GlassThemeData.dropMotion] is how the held drop of the switch, the
-//    slider, the segmented control and the tab bar deforms as it speeds up and
-//    slows down. On by default and subtle, because it costs no capture (see
-//    `glass_drop_motion.dart`); [GlassDropMotion.none] turns it off app-wide,
-//    and the platform's reduced-motion switch turns it off regardless.
-//
-// And one that *is* a reading, opt-in: [GlassThemeData.adaptive]. With it the
-// host reads the captured backdrop back under each glass, and a component
-// installs [GlassThemeData.adaptedTo] around its own — the same tokens with
-// the reading in place of the declared mean, for that glass alone. The theme
-// is still configuration: a verdict moves a handful of times a session, behind
-// a band and a hold (`glass_adaptive.dart`), never per frame.
-//
-// What is deliberately **not** here: a quality tier of its own. SS7.2 sketched
-// `GlassQuality` (minimal / standard / premium, benchmarked at start-up) beside
-// the ladder of SS7.4, as if they were two axes. They are one, and the sketch
-// predates the measurements: the "quality" that is actually chosen at runtime
-// is the proxy divisor and the retake ceiling, and those are already chosen —
-// against a measured damage table, by `ProxyResolutionPolicy`, out of a budget
-// in ΔE (D120, D124). A second quality knob would either duplicate that or
-// overrule it with a name.
+// Deliberately absent: a quality setting of its own. The quality chosen at
+// runtime is the proxy divisor and the retake ceiling, and
+// `ProxyResolutionPolicy` already chooses those against a measured damage
+// table and a ΔE budget. A second knob would duplicate that or overrule it.
 
 import 'package:flutter/widgets.dart';
 
 import 'glass_adaptive.dart';
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
+import 'glass_press.dart';
 import 'glass_ripple.dart';
 import 'glass_tier.dart';
 
@@ -83,7 +55,7 @@ import 'glass_tier.dart';
 /// The material ([finish]), the rung of the ladder ([tier]), what is behind
 /// the glass ([backdrop], [richBackdrop]), the platform's increase-contrast
 /// switch ([highContrast]), a floor for the labels ([minLabelContrast]), and
-/// motion ([ripple], [dropMotion]). A [GlassHost] installs one built from its
+/// motion ([ripple], [dropMotion], [press]). A [GlassHost] installs one built from its
 /// own arguments; a [GlassTheme] below it changes them for a subtree.
 ///
 /// What the glass draws from these — the finish after any dim, the label
@@ -121,6 +93,7 @@ class GlassThemeData {
     this.minLabelContrast,
     this.ripple,
     this.dropMotion = const GlassDropMotion(),
+    this.press = const GlassPress(),
     this.adaptive,
     this.regularAppearance,
     this.reading,
@@ -130,7 +103,7 @@ class GlassThemeData {
   ///
   /// Defaults to [GlassFinish.regularDark] only as a constant: a [GlassHost]
   /// installs the branch of `.regular` the screen is on, and so does
-  /// [GlassTheme.of] when nothing is above (D230).
+  /// [GlassTheme.of] when nothing is above.
   final GlassFinish finish;
 
   /// Which rung of the ladder is drawn, and why.
@@ -144,18 +117,17 @@ class GlassThemeData {
   /// backdrop cannot measure a mean of it. Every other rung ignores this — the
   /// full one samples the real thing and the cheap one still transmits
   /// `1 - a` of it, which is why the cheap rung needs no declaration at all
-  /// (its correction term is 1.7 code values at the calibrated finish, D179).
+  /// (its correction term is 1.7 code values at the calibrated finish).
   ///
-  /// **One value, and one the application already keeps.** The count is the
-  /// test CLAUDE.md sets for closing a hole with a declaration: this is
+  /// **One value, and one the application already keeps:** typically
   /// `ThemeData.colorScheme.surface`, or the `ColoredBox` at the bottom of the
-  /// page — the same shape of claim as [SolidProxyPainter], which is the
-  /// application saying "behind this subtree, this colour" for the same reason.
+  /// page — the same kind of claim as [SolidProxyPainter], which is the
+  /// application saying "behind this subtree, this colour".
   ///
   /// Null means nobody said, and then [GlassTier.opaque] falls back to painting
   /// the finish's tint itself — the colour the material lays on rather than the
   /// level it shows, 29 code values against the 69 the glass shows over a
-  /// mid-grey screen, and 23.3 ΔE wrong over a light one (D179). A debug assert
+  /// mid-grey screen, and 23.3 ΔE wrong over a light one. A debug assert
   /// says so at the moment the rung is painted rather than here, because a
   /// screen that never reaches [GlassTier.opaque] owes nothing.
   ///
@@ -163,7 +135,7 @@ class GlassThemeData {
   /// answers which appearance the platform is in, not what this screen's average
   /// level is, and the gap between those two is exactly the quantity being
   /// fixed. The package has no automatic input to this axis for the same reason
-  /// it has none to the ladder itself (D175) — except the one an application
+  /// it has none to the ladder itself — except the one an application
   /// opts into, [adaptive], which measures the level under each glass instead
   /// of guessing it, and installs it here for that glass ([adaptedTo]).
   final Color? backdrop;
@@ -188,8 +160,8 @@ class GlassThemeData {
   ///
   /// [backdrop] is a mean, and a mean is exact over a flat screen: every pixel
   /// under the glass *is* it. Over a photograph it says nothing about the
-  /// brightest corner, which is where a white label disappears — the gap the
-  /// label arithmetic left open in D184. So when this is set, the label and the
+  /// brightest corner, which is where a white label disappears. So when this is
+  /// set, the label and the
   /// high-contrast outline are chosen against **every** backdrop
   /// ([GlassFinish.foregroundOverAny]), which needs nothing declared at all,
   /// and [minLabelContrast] is met in the worst case rather than on average.
@@ -204,13 +176,13 @@ class GlassThemeData {
   ///
   /// When the finish cannot reach it with either black or white, the glass is
   /// **dimmed** by the least amount that does ([GlassFinish.dimmingFor]):
-  /// Apple's own answer for clear glass over bright content, and in this
-  /// machine the same affine law with less transmission, so it is a change of
+  /// Apple's own answer for clear glass over bright content, and here the
+  /// same affine law with less transmission, so it is a change of
   /// tint and costs nothing to draw. Against a declared flat [backdrop] the
   /// floor is checked there; with [richBackdrop], or with no backdrop at all,
   /// over any backdrop — and there [GlassFinish.regularDark] needs no dim for AA
   /// (6.05 in the worst case), while [GlassFinish.clear] needs 0.682 where
-  /// Apple's suggested 35% reaches 1.98 (D204).
+  /// Apple's suggested 35% reaches 1.98.
   ///
   /// [kTextContrastAA] (4.5) is WCAG's floor for body text; the package picks
   /// no floor of its own, because it cannot see the text's size.
@@ -224,6 +196,11 @@ class GlassThemeData {
   /// declares its own; [GlassDropMotion.none] for a drop that keeps its shape.
   /// Ignored under reduced motion. See [GlassDropMotion].
   final GlassDropMotion dropMotion;
+
+  /// How a pressed [GlassButton] swells and leans toward a dragging finger,
+  /// unless it declares its own; [GlassPress.none] for a button that keeps its
+  /// box. Ignored under reduced motion. See [GlassPress].
+  final GlassPress press;
 
   /// Whether glass under this theme reads its own backdrop, and how; null for
   /// glass that goes by what is declared. Installed by `GlassHost.adaptive`.
@@ -272,6 +249,7 @@ class GlassThemeData {
       minLabelContrast: minLabelContrast,
       ripple: ripple,
       dropMotion: dropMotion,
+      press: press,
       adaptive: adaptive,
       regularAppearance: appearance,
       reading: reading,
@@ -289,13 +267,14 @@ class GlassThemeData {
     minLabelContrast: minLabelContrast,
     ripple: ripple,
     dropMotion: dropMotion,
+    press: press,
     adaptive: adaptive,
     regularAppearance: regularAppearance,
     reading: reading,
   );
 
   /// The finish surfaces draw, and the label and outline colours they use —
-  /// everything the three tokens above decide, in one place, so the surface,
+  /// everything the tokens above decide, in one place, so the surface,
   /// the group and the components cannot disagree.
   ///
   /// [own] is a surface's own finish, when it names one: the dim is applied to
@@ -373,6 +352,7 @@ class GlassThemeData {
     double? minLabelContrast,
     GlassRipple? ripple,
     GlassDropMotion? dropMotion,
+    GlassPress? press,
     GlassAdaptive? adaptive,
     Brightness? regularAppearance,
     GlassBackdropReading? reading,
@@ -385,6 +365,7 @@ class GlassThemeData {
     minLabelContrast: minLabelContrast ?? this.minLabelContrast,
     ripple: ripple ?? this.ripple,
     dropMotion: dropMotion ?? this.dropMotion,
+    press: press ?? this.press,
     adaptive: adaptive ?? this.adaptive,
     // A finish given here is named, and a named finish does not move with a
     // reading unless the caller says in which appearance it was picked.
@@ -403,6 +384,7 @@ class GlassThemeData {
       other.minLabelContrast == minLabelContrast &&
       other.ripple == ripple &&
       other.dropMotion == dropMotion &&
+      other.press == press &&
       other.adaptive == adaptive &&
       other.regularAppearance == regularAppearance &&
       other.reading == reading;
@@ -417,6 +399,7 @@ class GlassThemeData {
     minLabelContrast,
     ripple,
     dropMotion,
+    press,
     adaptive,
     regularAppearance,
     reading,
@@ -430,6 +413,7 @@ class GlassThemeData {
       '${minLabelContrast == null ? '' : ', label >= $minLabelContrast'}'
       '${ripple == null ? '' : ', $ripple'}'
       '${dropMotion == const GlassDropMotion() ? '' : ', $dropMotion'}'
+      '${press == const GlassPress() ? '' : ', $press'}'
       '${adaptive == null ? '' : ', reads its backdrop'}'
       '${reading == null ? '' : ', $reading'})';
 }
@@ -448,7 +432,7 @@ class GlassLegibility {
 
   /// The finish to draw — the declared one, or it dimmed to meet
   /// [GlassThemeData.minLabelContrast]. Same name, so the same damage tables:
-  /// a dim only lowers them (D204).
+  /// a dim only lowers them.
   final GlassFinish finish;
 
   /// The label colour: black or white, whichever stands out more against the
@@ -506,7 +490,7 @@ class GlassTheme extends InheritedWidget {
       context.dependOnInheritedWidgetOfExactType<GlassTheme>()?.data;
 
   /// The theme in force, or the defaults — with the branch of `.regular` the
-  /// platform's appearance gives (D230), as a [GlassHost] would pick it.
+  /// platform's appearance gives, as a [GlassHost] would pick it.
   static GlassThemeData of(BuildContext context) =>
       maybeOf(context) ??
       GlassThemeData(

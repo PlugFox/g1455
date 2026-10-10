@@ -1,13 +1,13 @@
-// Phase C, level 3 — `GlassBar`, `GlassCard`, `GlassButton`.
+// Level 3 — `GlassBar`, `GlassCard`, `GlassButton`.
 //
-// `flutter test test/glass/glass_components_test.dart`
+// `flutter test test/glass_components_test.dart`
 //
 // The components are three default sets over one body, so most of what could go
 // wrong in them is not theirs. What *is* theirs is one piece of arithmetic and
-// one shape, and both of them turn out to have a measurable answer:
+// one shape, and both of them have a measurable answer:
 //
 //  1. **The level under a label is the same at all three rungs, and it is the
-//     declared law.** D178's whole claim, spent rather than restated: over a
+//     declared law.** Over a
 //     declared backdrop the full rung shows `mix(backdrop, tint, a)` because a
 //     low-pass of a level is that level, the cheap rung shows it by
 //     construction, and the opaque one by declaration. Read in pixels at the
@@ -16,7 +16,7 @@
 //  2. **So one label colour is legible at every rung — and it has to be chosen
 //     against that level and not against the tint.** Twelve cells, each
 //     required to clear WCAG AA against the level actually drawn. The break is
-//     D179's error moved up a level: choosing off the tint. It fires on
+//     choosing off the tint. It fires on
 //     `frosted` over a dark screen and **not** on `regular`, which is why the
 //     arm carries two finishes.
 //  3. **The capsule, and what declaring one found.** `RSuperellipse.contains`
@@ -26,29 +26,28 @@
 //     could not have caught it.
 //  4. **A component is one surface, and a component holding components is not.**
 //     The register counts what the tree declares; the fragmentation excess is
-//     charged per draw and grows as the square of the count (D26), so a bar of
+//     charged per draw and grows as the square of the count, so a bar of
 //     five glass buttons carries thirty-six times one panel's excess term. Not
 //     forbidden — counted.
 //  5. **The press adds exactly the rim, and it adds rather than covers** — and
 //     an enclosing `saveLayer` costs it twelve times its size. The rim is the
-//     one additive quantity in the package that was measured (D86-D88), spent
-//     over the shape instead of along its edge; where the sum happens turned out
-//     to matter more than where the overlay sits, and both readings are in the
-//     arm.
+//     one additive quantity in the package that was measured, spent
+//     over the shape instead of along its edge; where the sum happens matters
+//     more than where the overlay sits, and both readings are in the arm.
 //  6. **And the same arithmetic says the cheap rung's rim is not
 //     `saveLayer`-safe, while the full rung's is.** The rim is additive on the
 //     canvas below the top rung and inside the fragment above it, so one
 //     `Opacity` anywhere above a panel takes a cheap panel's edge contrast from
-//     35 code values to 3 and leaves a full panel's at 40. That is D58's "same
-//     shape, same rim" turning out to be conditional on the widget tree, and
-//     the other two rungs are the arm's own control.
+//     35 code values to 3 and leaves a full panel's at 40. "Same shape, same
+//     rim" across the rungs is conditional on the widget tree, and the other
+//     two rungs are the arm's own control.
 //  7. **With nothing declared about the backdrop the label is chosen against
-//     every backdrop, and it says so only where that is not enough.** It was
-//     left alone until D204, because the two available guesses are the two
-//     D179 measured wrong; the worst case over every backdrop is not a guess,
-//     and on `regular` it is white at AA over any image.
+//     every backdrop, and it says so only where that is not enough.** Both
+//     available guesses (the tint, an assumed theme) were measured wrong; the
+//     worst case over every backdrop is not a guess, and on `regular` it is
+//     white at AA over any image.
 //  8. **Disabled, a button keeps its glass and dims its label to iOS's
-//     `tertiaryLabel` of the polarity it would have drawn (D221)** — and takes
+//     `tertiaryLabel` of the polarity it would have drawn** — and takes
 //     no press. Disabled under a finger is the edge: the framework cancels the
 //     tap from inside the build that removed the handlers, and the button has
 //     to have let go already or that cancel is a `setState` during build.
@@ -61,7 +60,7 @@
 // of the worst case (7).
 //
 // **And one break that failed to break, which is a finding rather than a spare
-// test (D185).** The overlay was put behind a `RepaintBoundary` of its own on
+// test.** The overlay was put behind a `RepaintBoundary` of its own on
 // the theory that `plus` would then add to transparency. Every arm passed: a
 // repaint boundary lowers to `SceneBuilder.pushOffset`, and that engine layer
 // paints its children onto the same canvas rather than into a texture of their
@@ -120,7 +119,7 @@ void main() {
           'label ${_hex(foreground)} at ${ratio.toStringAsFixed(2)}:1',
         );
 
-        // The law, in pixels. Two code values is the floor D179 named for this
+        // The law, in pixels. Two code values is the floor for this
         // measurement: an 8-bit composite reads a transmission of 0.307 back as
         // 0.3045 and 0.3023.
         for (final GlassTier tier in GlassTier.values) {
@@ -160,7 +159,7 @@ void main() {
     // The axis is real, and this is what says so: the same arithmetic answers
     // differently for the two finishes. `frosted` transmits 0.78 and therefore
     // follows the theme; `regular` transmits 0.307 and is dark over either
-    // screen, so its label is white on both — which is D70's finding read
+    // screen, so its label is white on both — the measured fact read
     // forward ("`.regular` is dark not because it lays something dark over the
     // backdrop but because it barely transmits it").
     expect(GlassFinish.frosted.foregroundOver(kLight), const Color(0xFF000000));
@@ -272,7 +271,7 @@ void main() {
     );
     expect(plain.surfaceCount, 1);
     expect(nested.surfaceCount, 6);
-    // D26's excess is quadratic in the count, so the ratio is 36 exactly. The
+    // The excess is quadratic in the count, so the ratio is 36 exactly. The
     // point of asserting it is that the number reaches the application at all:
     // the decision is taken in the widget tree and paid for on the GPU.
     expect(
@@ -324,7 +323,7 @@ void main() {
     print('resting $resting, held $pressed (+$added), held with no overlay $inert');
 
     // 50.2 of 255, neutral, and *added*: the rim is the one additive quantity
-    // here that was measured rather than chosen (D86-D88), and the press spends
+    // here that was measured rather than chosen, and the press spends
     // it over the shape instead of along the edge. A `plus` of a premultiplied
     // white at alpha 50.2/255 adds exactly that many code values.
     expect(added, closeTo(50, 2));
@@ -425,9 +424,8 @@ void main() {
   testWidgets('with no backdrop declared the label is chosen against every backdrop', (
     WidgetTester tester,
   ) async {
-    // D184 left the colour alone here, because the two available guesses were
-    // both measured wrong. D204 has a third that is not a guess: the worst case
-    // over every backdrop, which needs only the finish. So the arm asks three
+    // The two available guesses were both measured wrong; the worst case over
+    // every backdrop is not a guess, and needs only the finish. So the arm asks three
     // things — that the bound is spent, that it is quiet where the bound is AA
     // (regular), and that it says so where the bound is not (frosted).
     debugResetGlassBackdropReport();
@@ -494,7 +492,7 @@ void main() {
     WidgetTester tester,
   ) async {
     // The simulator's frames: tertiaryLabel, (60, 60, 67) and (235, 235, 245)
-    // at 0.3 (D221).
+    // at 0.3.
     expect(kGlassDisabledDarkLabel, const Color(0x4D3C3C43));
     expect(kGlassDisabledLightLabel, const Color(0x4DEBEBF5));
 
@@ -577,7 +575,7 @@ final GlobalKey _shotKey = GlobalKey();
 ///
 /// The backdrop is a child of the host and not its sibling: a proxy is a
 /// snapshot of the **host's** subtree, so a fill laid beside it is not in the
-/// capture and every glass panel samples black (the trap D175 paid for).
+/// capture and every glass panel samples black.
 Future<void> _mount(
   WidgetTester tester, {
   required GlassFinish finish,
@@ -608,7 +606,7 @@ Future<void> _mount(
                     // Keyed on the rung: two arms differing in one value get the
                     // **same** render object when the tree is structurally the
                     // same, and then a counter or a retained layer quietly
-                    // belongs to the previous one (D175).
+                    // belongs to the previous one.
                     Center(
                       child: KeyedSubtree(key: ValueKey<GlassTier>(tier), child: content),
                     ),

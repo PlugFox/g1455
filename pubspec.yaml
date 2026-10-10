@@ -3,14 +3,13 @@ description: >-
   Liquid Glass for Flutter: refraction, blur and finishes; bars, tabs,
   switches, sliders, menus, sheets, dialogs and fusing groups, all sampling one
   shared capture.
-version: 0.1.4
+version: 0.2.0
 homepage: https://github.com/PlugFox/g1455
 repository: https://github.com/PlugFox/g1455
 issue_tracker: https://github.com/PlugFox/g1455/issues
 documentation: https://g1455.plugfox.dev
 
-# Five at most. `shader` rather than `shaders`: on pub.dev the singular is the
-# topic with about twice the packages, and neither is an alias of the other.
+# pub.dev allows five topics. `shader` is the more used of `shader`/`shaders`.
 topics:
   - liquid-glass
   - glass
@@ -18,17 +17,9 @@ topics:
   - shader
   - ui
 
-# Half-size loops shot by `tool/showcase.sh` (SHOWCASE_DPR=1): pub ships every
-# file listed here, and the README's full-size ones stay in the repository.
-#
-# The first is the package's picture in pub.dev's search results, which shows
-# one still frame of the first screenshot: so a square, still image leads, the
-# site's 512-px icon (`example/web/icons/Icon-512.png`, drawn by the package
-# itself in `example/tool/brand_test.dart`).
-#
-# Ten at most: pub.dev processes no more, and pana takes the example's ten
-# points for an eleventh. The materialize loop is the one left out; the alert's
-# shows the same arrival, blur first and tint last.
+# Half-size recordings made by `tool/showcase.sh`; the README's full-size ones
+# are not published. The first one is the thumbnail pub.dev shows in search
+# results, so it is the square, still package icon. pub.dev reads at most ten.
 screenshots:
   - description: 'The g1455 icon: a disc of clear glass refracting a grid and a yellow disc behind it.'
     path: doc/screenshots/g1455.png
@@ -52,10 +43,12 @@ screenshots:
     path: doc/screenshots/alert.webp
 
 environment:
-  sdk: ^3.13.1
-  # Every number the package bakes in was measured on 3.47; below that the
-  # engine paths it relies on (D200's anti-alias flag, the uber-SDF split on
-  # desktop) are other code.
+  # The Dart of Flutter 3.47.0. CI runs analyze and the tests on 3.47.0 and on
+  # stable.
+  sdk: ^3.13.0
+  # Earlier versions are not supported: the engine paths the package relies on
+  # are different code before 3.47, its cost constants were measured on 3.47,
+  # and the modals depend on a framework fix from 3.47 (flutter/flutter#185248).
   flutter: '>=3.47.0'
 
 dependencies:
@@ -69,16 +62,11 @@ dev_dependencies:
 
 flutter:
   shaders:
-    # Declared through `packages/g1455/` and kept under `lib/`, so the asset key
-    # is the same string whether this package is the root (its own
-    # `flutter test`) or a dependency: a `packages/<name>/` entry that is not a
-    # file below the pubspec resolves through the package config to that
-    # package's `lib/`, and keeps its URI as the key
-    # (`flutter_tools/lib/src/asset.dart`, `_parseAssetFromFile` →
-    # `_resolvePackageAsset`). A plain `shaders/<file>` would be keyed as
-    # written here and with a `packages/g1455/` prefix in an application — two
-    # names, and a fallback load to paper over them. (No shader file is named
-    # in this comment: the shader gates count the extension across the file.)
+    # Kept under `lib/` and declared with the `packages/g1455/` prefix, so the
+    # asset key is the same whether this package is the root (its own tests) or
+    # a dependency of an application. A plain relative path would get a
+    # different key in each case. (Shader file names appear only in this list:
+    # a test checks that every mention of the extension in this file is in it.)
     - packages/g1455/shaders/glass_surface.frag
     - packages/g1455/shaders/glass_group.frag
     - packages/g1455/shaders/glass_surface_ripple.frag

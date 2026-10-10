@@ -1,25 +1,22 @@
-// Phase C, step 1 — the finish ladder: one mechanism, and who is allowed to
-// pull it.
+// The finish ladder: one mechanism, and who is allowed to pull it.
 //
-// `flutter test test/glass/glass_tier_test.dart`
+// `flutter test test/glass_tier_test.dart`
 //
-// The axis is phase D's ladder — glass, a cheap finish, an opaque fill — and
-// D59 wrote it down as having four reasons. Three of them turn out not to reach
-// it (the argument is at the top of `lib/src/surface/glass_tier.dart`), so what
-// is left is a declaration and one structural claim that this file is here to
-// hold to:
+// The ladder is glass, a cheap finish, an opaque fill. Why it has the rungs it
+// has is argued at the top of `lib/src/surface/glass_tier.dart`; what is left
+// for this file is a declaration and one structural claim:
 //
-//   **Below the top rung the backdrop is not read at all** (D58). Not
-//   "cheaply", not "less often" — not at all, because the rung's whole reason
-//   to exist is Skia, where a `BackdropFilter` grows with the number of
-//   surfaces (0.37 M cycles at 6 against 1.26 M at 36, D55).
+//   **Below the top rung the backdrop is not read at all.** Not "cheaply", not
+//   "less often" — not at all, because the rung's whole reason to exist is
+//   Skia, where a `BackdropFilter` grows with the number of surfaces (0.37 M
+//   cycles at 6 against 1.26 M at 36, on Adreno).
 //
-// That claim has a defect shaped exactly like the ones this project keeps
-// catching: a screen where every surface is cheap draws a plausible picture
-// whether or not the capture underneath it went quiet, and a screenshot cannot
-// tell those apart. So the arms here are counters — captures taken, proxies
-// published, which paint path ran — and every one of them is checked against a
-// twin at the full rung that must move when this one does not.
+// That claim is easy to break silently: a screen where every surface is cheap
+// draws a plausible picture whether or not the capture underneath it went
+// quiet, and a screenshot cannot tell those apart. So the arms here are
+// counters — captures taken, proxies published, which paint path ran — and
+// every one of them is checked against a twin at the full rung that must move
+// when this one does not.
 //
 // The ordering arms are the other half. "Pinned beats accessibility" is a
 // decision with a consequence (a host that pins `full` has overridden the
@@ -40,13 +37,12 @@ final GlobalKey _shotKey = GlobalKey();
 
 void main() {
   test('what the lower rungs cost on Adreno is what the tracked digests say', () {
-    // D193, and the numbers in `GlassTierPolicy.ceiling`'s dartdoc. The share
+    // The numbers in `GlassTierPolicy.ceiling`'s dartdoc. The share
     // of the full rung's addition the cheap rung keeps is read per scene and
     // per seed. Seed b's cheap cells carry repeats refused on a paint counter
-    // that the runner then fixed (a scenario following itself was not
-    // remounted, `runner_mount_test.dart`) — the frame drew them at their other
-    // repeats' price to 0.23% — and its `over_text` cell a 44% outlier that the
-    // median steps over; seed a has neither and agrees.
+    // (a scenario following itself was not remounted) — the frame drew them at
+    // their other repeats' price to 0.23% — and its `over_text` cell a 44%
+    // outlier that the median steps over; seed a has neither and agrees.
     Map<String, Object?> cell(Map<String, Object?> digest, String scene, String variant) {
       for (final Object? c in digest['cells']! as List<Object?>) {
         final m = c! as Map<String, Object?>;
@@ -86,11 +82,11 @@ void main() {
   });
 
   test('what the lower rungs cost on the iPad is what the tracked digests say', () {
-    // D194, the Metal half of `GlassTierPolicy.ceiling`'s dartdoc: GPU time off
+    // The Metal half of `GlassTierPolicy.ceiling`'s dartdoc: GPU time off
     // the engine's tracer, two seeds. The two scenes are Adreno's two ends —
     // the cheap rung kept 15-24% of the full addition on two large surfaces and
     // 69-71% on twelve small ones there — and here both keep under a tenth,
-    // because on this GPU the full rung's price is the capture (D56) and the
+    // because on this GPU the full rung's price is the capture and the
     // rung below takes none. Opaque against cheap is held as *indistinguishable*
     // rather than signed: it moved -4.1…+1.8% of the frame across scenes and
     // seeds, where Adreno's was positive ten times of ten.
@@ -247,7 +243,7 @@ void main() {
     WidgetTester tester,
   ) async {
     // The two sets part company, and this is the arm that says so: the
-    // translucency tax follows any translucent fill (D21, D26) and the capture
+    // translucency tax follows any translucent fill and the capture
     // follows the proxy. A ledger that dropped the cheap surface would report a
     // screen with no glass on it and a tax of zero.
     await _pump(tester, tier: GlassTier.cheap, frames: 4);
@@ -273,7 +269,7 @@ void main() {
   ) async {
     // No new constant is introduced by this rung: drawing a tint of alpha `a`
     // over the backdrop is `mix(backdrop, tint, a)`, which is the affine level
-    // law D70 fitted to Apple's own materials on four backdrops. So the level
+    // law fitted to Apple's own materials on four backdrops. So the level
     // is predictable in closed form from the finish alone, and that is what is
     // checked — against a value read off the pixels, not against itself.
     const GlassFinish finish = GlassFinish.regularDark;
@@ -288,7 +284,7 @@ void main() {
       reason: 'the cheap rung is not mix(backdrop, tint, a): read $read, predicted $expected',
     );
 
-    // The twin, and since phase D it is a stronger claim than it was: the opaque
+    // The twin, and a stronger claim than it looks: the opaque
     // rung on the same backdrop must land on the **same level**, because it
     // paints the same law at the backdrop's declared mean and this backdrop is
     // flat — so its mean is the backdrop. Three rungs, one level, and the
@@ -306,8 +302,7 @@ void main() {
     // And the break that must break, because "lands on the level" is also what a
     // rung that quietly kept reading the backdrop would do: with **nothing**
     // declared the rung falls back to the tint itself, which is a different
-    // number — 29 against 69 here — and which is what the rung painted before
-    // phase D gave it the mean (D179).
+    // number — 29 against 69 here.
     final ui.Image silent = await _shotOf(
       tester,
       tier: GlassTier.opaque,
@@ -395,11 +390,11 @@ void main() {
   // -------------------------------------------------------------------------
 
   testWidgets('a cheap panel is inside the proxy its neighbour reads', (WidgetTester tester) async {
-    // The strongest arm available, and it is the phase A control re-used: an
+    // The strongest arm available, and it is the identity control re-used: an
     // identity glass reproduces whatever is behind it byte for byte, so a full
     // panel laid over a cheap one is invisible **iff the cheap one is in the
-    // proxy**. If the walk skipped it — which it did until this step, because
-    // the skip was keyed on the type rather than on the draw — the identity
+    // proxy**. If the walk skipped it — say, by keying the skip on the type
+    // rather than on the draw — the identity
     // panel would show the scene with the cheap panel missing, exactly where
     // they overlap.
     final ui.Image without = await _shotOf(tester, tier: GlassTier.full, overlay: false);
@@ -628,13 +623,12 @@ Widget _overlayScene({required bool overlay}) => _wrap(
 
 /// A full panel with a cheap panel **under** it, one of them holding a mark.
 ///
-/// Overlapping on purpose. The oracle has answered with a *region* since D174,
-/// and it compares that region with the atlas slots: a change that misses every
-/// slot misses every texel of the proxy, and holding over it is correct rather
-/// than a bug. So a change that is meant to reach the proxy has to land inside
-/// the captured region, and the first rig written here did not — it put the
-/// cheap panel 260 logical pixels away and read D174 working as this step
-/// failing.
+/// Overlapping on purpose. The oracle answers with a *region*, and it compares
+/// that region with the atlas slots: a change that misses every slot misses
+/// every texel of the proxy, and holding over it is correct rather than a bug.
+/// So a change that is meant to reach the proxy has to land inside the captured
+/// region; a cheap panel 260 logical pixels away would read the region oracle
+/// working as this rung failing.
 ///
 /// [markInFullPanel] moves the mark between the two, which is the whole twin:
 /// the same change, at the same place, in the subtree that is in the proxy and

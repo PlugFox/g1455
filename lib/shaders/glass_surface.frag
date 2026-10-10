@@ -1,22 +1,16 @@
-// The package's glass. The optics are M13's, calibrated against Apple's own
-// frames rather than chosen. The displacement is inward and its *shape* is
-// D106 (`(1 - (u/t)^0.6)^1.9`, reach 21, amplitude -58.2 at the rim); the rim
-// is D86-D88 (an additive neutral step 0.79 logical px wide with no light
-// direction); the edge's coverage is one device pixel because that is what the
-// reference measures. Nothing here disperses, and that is measured rather than
-// left out: Apple's own material sends the three channels to the same place to
-// within 0.155 logical px (D103), so one `texture()` is the reference.
+// The package's glass. The optics are calibrated against Apple's own frames
+// rather than chosen. The displacement is inward and its *shape* is
+// `(1 - (u/t)^0.6)^1.9` (reach 21, amplitude -58.2 at the rim); the rim is an
+// additive neutral step 0.79 logical px wide with no light direction; the
+// edge's coverage is one device pixel because that is what the reference
+// measures. Nothing here disperses, and that is measured rather than left out:
+// Apple's own material sends the three channels to the same place to within
+// 0.155 logical px, so one `texture()` is the reference.
 //
-// A separate binary from `bench/shaders/glass_refract.frag` on purpose, and not
-// for tidiness. That one is a *cost probe*: three configurations share it so
-// their timings differ in one thing, and B5 measured that adding a path to a
-// program reprices every mode already in it by 52-62%. It is also a separate
-// binary from `bench/shaders/glass_preview.frag`, which is the instrument the
-// M11 ladder grades through: this one samples an **atlas slot** and that one
-// samples a full-screen proxy, so their uniform blocks differ — and
-// `test/glass/glass_optics_test.dart` renders the same geometry through both
-// and requires them to agree, because otherwise the package would be shipping
-// optics the ladder never graded.
+// The quality grading was done through a twin of this shader that samples a
+// full-screen proxy rather than an **atlas slot**; their uniform blocks differ,
+// and the two were required to agree on the same geometry, so the package
+// ships the optics that were graded.
 //
 // **The sampling map is the whole difference, and it is three numbers.** The
 // proxy is one slot of an atlas, so a draw-space point reaches its texel as
@@ -27,7 +21,7 @@
 // would read the neighbouring surface's backdrop, which is a real picture of
 // somewhere else and looks like a refraction rather than a bug.
 //
-// The coordinate contract, measured rather than assumed (probe, 2026-09-03):
+// The coordinate contract, measured rather than assumed:
 // FlutterFragCoord() is the coordinate of the *geometry as handed to the draw*
 // — `canvas.scale` and `canvas.translate` do not enter it, and a rect drawn at
 // (100, 0) reads x = 100 at its left edge. Same answer on Impeller (where it is
@@ -40,43 +34,74 @@
 
 #include <flutter/runtime_effect.glsl>
 
-uniform vec2 uTexSize;     // atlas size, texels
-uniform vec2 uMapOrigin;   // draw space -> texels: p * uMapScale + uMapOrigin
-uniform float uMapScale;   // texels per logical pixel
-uniform vec2 uSlotMin;     // the slot's own bounds in texels, inclusive
-uniform vec2 uSlotMax;
-uniform vec2 uHalf;        // half extent of the surface, draw-space px
-uniform vec2 uCenter;      // centre of the surface, draw space
-uniform float uRadius;     // corner radius, px
-uniform float uThickness;  // how far in from the rim refraction reaches, px
-uniform float uStrength;   // peak sample displacement at the rim, px
-uniform float uEdgePower;  // falloff exponent
-uniform float uShoulder;   // shoulder exponent on the depth, 1.0 = no shoulder
-uniform vec4 uTint;        // straight alpha, laid over the refracted sample
-uniform float uRimWidth;   // width of the outline inside the edge, px
-uniform vec4 uRim;         // rgb is the colour, a is how much it *adds*
-uniform float uPixel;      // one device pixel, in this geometry's own units
+// **The block is packed four floats to a `vec4`, in the order Dart has always
+// written it**, and every name below is a macro over a lane. Packed because on
+// Metal a runtime effect binds every declared float uniform as its own buffer —
+// one metadata allocation, one host-buffer slot aligned to 256 bytes on macOS
+// and one `setFragmentBuffer` per declaration per draw
+// (`runtime_effect_contents.cc:316-334`), where Vulkan binds one struct — so
+// nineteen declarations were nineteen binds and are now nine. In Dart's order
+// rather than by meaning, so no `setFloat` index moved: the writers, the probes
+// in the tests all address the same floats, and the bytes drawn
+// are the same bytes (`test/glass_pixels_identity_test.dart`). A vector that
+// straddles two lanes is reassembled here, which is a register move.
+//
+//   uP0  uTexSize.xy  uMapOrigin.xy                  floats  0-3
+//   uP1  uMapScale  uSlotMin.xy  uSlotMax.x                   4-7
+//   uP2  uSlotMax.y  uHalf.xy  uCenter.x                      8-11
+//   uP3  uCenter.y  uRadius  uThickness  uStrength           12-15
+//   uP4  uEdgePower  uShoulder  uTint.rg                     16-19
+//   uP5  uTint.ba  uRimWidth  uRim.r                         20-23
+//   uP6  uRim.gba  uPixel                                    24-27
+//   uP7  uRimMix  uWiden.xy  uFade.x                         28-31
+//   uP8  uFade.yz                                            32-33
+uniform vec4 uP0;
+uniform vec4 uP1;
+uniform vec4 uP2;
+uniform vec4 uP3;
+uniform vec4 uP4;
+uniform vec4 uP5;
+uniform vec4 uP6;
+uniform vec4 uP7;
+uniform vec2 uP8;
+
+#define uTexSize uP0.xy     // atlas size, texels
+#define uMapOrigin uP0.zw   // draw space -> texels: p * uMapScale + uMapOrigin
+#define uMapScale uP1.x     // texels per logical pixel
+#define uSlotMin uP1.yz     // the slot's own bounds in texels, inclusive
+#define uSlotMax vec2(uP1.w, uP2.x)
+#define uHalf uP2.yz        // half extent of the surface, draw-space px
+#define uCenter vec2(uP2.w, uP3.x) // centre of the surface, draw space
+#define uRadius uP3.y       // corner radius, px
+#define uThickness uP3.z    // how far in from the rim refraction reaches, px
+#define uStrength uP3.w     // peak sample displacement at the rim, px
+#define uEdgePower uP4.x    // falloff exponent
+#define uShoulder uP4.y     // shoulder exponent on the depth, 1.0 = no shoulder
+#define uTint vec4(uP4.zw, uP5.xy) // straight alpha, laid over the refracted sample
+#define uRimWidth uP5.z     // width of the outline inside the edge, px
+#define uRim vec4(uP5.w, uP6.xyz)  // rgb is the colour, a is how much it *adds*
+#define uPixel uP6.w        // one device pixel, in this geometry's own units
 // How much the outline *replaces* rather than adds: 0 is the calibrated
 // additive rim, 1 lays uRim.rgb on at the band's coverage — the platform's
-// increase-contrast switch (D203). A uniform rather than a second shader
+// increase-contrast switch. A uniform rather than a second shader
 // because at 0 the line below is `col * 1.0 + …`, the same bits as before,
 // and that is enforced rather than hoped for.
-uniform float uRimMix;
+#define uRimMix uP7.x
 // The optics' `widen` over the half-box, per axis: the sample walks out from
 // the centre by this fraction of its distance, so the shape shows its box
-// grown by `widen` on every side (D218). Last, so every index above it stays
-// where Dart has always set it; and at zero the term below adds an exact zero.
-uniform vec2 uWiden;
+// grown by `widen` on every side. At zero the term below adds an exact
+// zero.
+#define uWiden uP7.yz
 // A fade across the surface: f = clamp(dot(rel, uFade.xy) + uFade.z), and the
 // glass is drawn at 1 - smoothstep's f — whole where f is 0, gone where it is
 // 1, so what is under the surface shows through by that much. The scroll edge
-// effect's blur ramp is this (spike 31). Last again, and at zero it is
-// `coverage * 1.0`: f is 0, `f * f * (3 - 2f)` is 0, and 1 - 0 is exactly 1.
-uniform vec3 uFade;
+// effect's blur ramp is this. At zero it is `coverage * 1.0`: f is
+// 0, `f * f * (3 - 2f)` is 0, and 1 - 0 is exactly 1.
+#define uFade vec3(uP7.w, uP8)
 
-// The ripple: a viscous wave from where the glass was touched (D229). Compiled
+// The ripple: a viscous wave from where the glass was touched. Compiled
 // into `glass_surface_ripple.frag` only, which is this file behind a define,
-// and never into this binary — B5 measured that a path a program carries and
+// and never into this binary — it was measured that a path a program carries and
 // does not take reprices the modes that do not take it by 52-62%, so a panel
 // that is not rippling must not be running a program that could. The host
 // swaps programs for exactly the frames a wave is alive.
@@ -93,13 +118,16 @@ uniform vec3 uFade;
 //   uWaveAmp.w 1 / sigma^2 of the dimple
 #ifdef GLASS_RIPPLE
 #define kMaxWaves 4
-uniform float uWaveCount;
 uniform vec4 uWave[kMaxWaves];
 uniform vec4 uWaveAmp[kMaxWaves];
-// The sum of every amplitude above: a bound on the displacement's length.
-uniform float uRippleReach;
-// How much a slope facing up brightens, and one facing down darkens.
-uniform float uRippleLight;
+// The waves alive; the sum of every amplitude above, a bound on the
+// displacement's length; and how much a slope facing up brightens, and one
+// facing down darkens. One declaration for the bind it saves, as above, and
+// after the arrays because an array cannot share a lane.
+uniform vec3 uRipple;
+#define uWaveCount uRipple.x
+#define uRippleReach uRipple.y
+#define uRippleLight uRipple.z
 #endif
 
 uniform sampler2D uTex;
@@ -111,9 +139,8 @@ float sdRoundedBox(vec2 p, vec2 b, float r) {
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - r;
 }
 
-// Analytic gradient, transliterated from bench/model/refraction.dart together
-// with the SDF above. Kept branchy: D15 measured the branchless rewrite of this
-// exact function 53% dearer, because its branches separate large connected
+// Analytic gradient of the SDF above. Kept branchy: the branchless rewrite of
+// this exact function was measured 53% dearer, because its branches separate large connected
 // regions rather than neighbouring pixels.
 vec2 sdRoundedBoxNormal(vec2 p, vec2 b, float r) {
     vec2 s = vec2(p.x < 0.0 ? -1.0 : 1.0, p.y < 0.0 ? -1.0 : 1.0);
@@ -135,7 +162,7 @@ void main() {
 
     // The rim bends the sample inward; the flat middle reads straight through.
     //
-    // The shoulder exponent is M13's ninth arm (D106). `(1 - t)^p` alone is not
+    // The shoulder exponent. `(1 - t)^p` alone is not
     // Apple's curve: it fits the profile inside the reading's floor from 4
     // logical px in and misses by 0.52 px at the rim, with a residual that
     // alternates in sign rather than scattering. Bending the depth as well —
@@ -200,8 +227,7 @@ void main() {
     col += uRippleLight * (rd.y / uRippleReach);
 #endif
 
-    // The outline, measured on Apple's own frames rather than chosen (M13's
-    // fourth arm, D86-D88). Four things about it, and every one of them was a
+    // The outline, measured on Apple's own frames rather than chosen. Four things about it, and every one of them was a
     // guess here until the symmetric half of the inverted pair was read:
     //
     //  * it is a band of **constant** amplitude, not a ramp — a step beats a

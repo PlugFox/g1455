@@ -1,6 +1,6 @@
 // The scroll edge effect: what iOS 26 draws where content scrolls under a bar.
 //
-// Read off Apple's own `UIScrollEdgeEffect` (spike 31): a navigation bar and a
+// Read off Apple's own `UIScrollEdgeEffect`: a navigation bar and a
 // toolbar over a scroll view on iOS 26.5 simulators, iPhone 17 Pro (bars 116 /
 // 86 pt) and iPad Pro 11" (86 / 64 pt), each photographed with the effect
 // `soft`, `hard` and hidden — the hidden frame being the known answer — over a
@@ -52,7 +52,7 @@
 // table is held at full resolution — which is how `identity` is protected.
 // Named `scrollEdge`, the edge's level went to 1/1 while the cards' stayed at
 // 1/4, and on the iPad the edge cost 2.3 ms of a scrolling frame where a plain
-// glass strip of its size cost 0.3 (D227). The soft edge borrows
+// glass strip of its size cost 0.3. The soft edge borrows
 // `thinLight`'s table, the hard one `regular`'s — see each.
 
 import 'dart:math' as math;
@@ -100,7 +100,7 @@ enum GlassScrollEdgeAppearance {
   dark,
 }
 
-/// The soft edge's blur, logical px (spike 31: 1.55–1.67).
+/// The soft edge's blur, logical px (read as 1.55–1.67).
 ///
 /// [GlassScrollEdge.blurSigma]'s default.
 ///
@@ -115,8 +115,7 @@ const double kGlassScrollEdgeSigma = 1.6;
 /// {@category Panels and controls}
 const double kGlassScrollEdgeHardSigma = 2.15;
 
-/// The soft edge's tint at the edge over light content: white at 0.85
-/// (spike 31).
+/// The soft edge's tint at the edge over light content: white at 0.85.
 ///
 /// [GlassScrollEdgeAppearance.light]'s. It falls off as an erf away from the
 /// screen edge.
@@ -125,7 +124,7 @@ const double kGlassScrollEdgeHardSigma = 2.15;
 const Color kGlassScrollEdgeLightTint = Color.fromRGBO(255, 255, 255, 0.85);
 
 /// The soft edge's tint at the edge over dark content: black at 0.25, read
-/// over content whose mean was a mid grey (spike 31).
+/// over content whose mean was a mid grey.
 ///
 /// [GlassScrollEdgeAppearance.dark]'s.
 ///
@@ -133,7 +132,7 @@ const Color kGlassScrollEdgeLightTint = Color.fromRGBO(255, 255, 255, 0.85);
 const Color kGlassScrollEdgeDarkTint = Color.fromRGBO(0, 0, 0, 0.25);
 
 /// The hard edge's band: a near-opaque white, 0.90 over both a dark and a
-/// light field (spike 31). A dark appearance was not photographed.
+/// light field. A dark appearance was not photographed.
 ///
 /// {@category Panels and controls}
 const Color kGlassScrollEdgeHardFill = Color.fromRGBO(255, 255, 255, 0.90);
@@ -320,7 +319,7 @@ class GlassScrollEdge extends StatelessWidget {
     // The tint is the glass's child, not its sibling: a sibling painted over
     // the glass is content to the capture, and the glass then showed it under
     // itself and the tint was laid on twice — 1 - 0.75² = 0.44 against
-    // Apple's 0.25, the first reading of this arm. And the glass ends where
+    // Apple's 0.25, as first drawn. And the glass ends where
     // its fade does, B + 14, with the tint overflowing it to its own reach
     // (B + 40.5): the slot and the shader stop where the glass is zero rather
     // than 27 pt below.
@@ -330,7 +329,7 @@ class GlassScrollEdge extends StatelessWidget {
       child: SizedBox(
         // The whole width, said: under an `Align` the width is loose, and a
         // `CustomPaint` with no child takes the smallest it is offered — the
-        // tint vanished at zero wide the first time this was an `Align`.
+        // tint would vanish at zero wide.
         width: double.infinity,
         height: blurEnd,
         child: GlassSurface(
@@ -338,9 +337,9 @@ class GlassScrollEdge extends StatelessWidget {
           finish: GlassFinish(
             // A measured material's name, because the divisor reads its damage
             // table by name and a name without one is held at full resolution —
-            // which is how `identity` is protected, and what made this edge cost
-            // 1.7 ms of a scrolling frame on the iPad: its level went to 1/1 while
-            // the cards' stayed at 1/4 (D227). `thinLight` (σ 2.6 under a light
+            // which is how `identity` is protected, and what made this edge
+            // costly on the iPad (the file's header has the number): its level
+            // went to 1/1 while the cards' stayed at 1/4. `thinLight` (σ 2.6 under a light
             // 0.22) in both appearances. Borrowed, not measured: this blurs less,
             // which is the direction that underestimates. The light edge passes
             // only 0.15 of the backdrop and was tried on `regular`'s table, which
@@ -388,7 +387,7 @@ class GlassScrollEdge extends StatelessWidget {
 
 /// A tint whose alpha falls as `1 - Φ((d - centre) / sigma)` with the distance
 /// d in from the screen edge — Apple's ramp is an erf to within the reading's
-/// resolution (spike 31: (y75 - y25) / (y90 - y10) of 0.50–0.55, against
+/// resolution ((y75 - y25) / (y90 - y10) of 0.50–0.55, against
 /// 0.526 for an erf and 0.572 for a smoothstep).
 class _ErfTint extends CustomPainter {
   _ErfTint({required this.colour, required this.centre, required this.sigma, required this.fromBottom});

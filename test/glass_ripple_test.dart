@@ -1,4 +1,4 @@
-// The ripple (D229): a viscous wave from where the glass was touched.
+// The ripple: a viscous wave from where the glass was touched.
 //
 // `flutter test test/glass_ripple_test.dart`
 //
@@ -38,7 +38,7 @@ const Rect kGlass = Rect.fromLTWH(60, 50, 280, 200);
 final GlobalKey _shotKey = GlobalKey();
 
 /// The surface program's floats, and the ripple program's: the same block
-/// with the count, `uWave[4]`, `uWaveAmp[4]`, the reach and the light after it.
+/// with `uWave[4]`, `uWaveAmp[4]`, then the count, the reach and the light.
 const int kSurfaceUniformFloats = 34;
 const int kRippleUniformFloats = kSurfaceUniformFloats + 1 + kMaxRippleWaves * 8 + 2;
 
@@ -616,7 +616,6 @@ ui.Image _render(ui.FragmentProgram program, ui.Image backdrop, List<GlassRipple
   }
   expect(i, kSurfaceUniformFloats);
   if (waves != null) {
-    w(waves.length.toDouble());
     final List<List<double>> rows = <List<double>>[
       for (var k = 0; k < kMaxRippleWaves; k++)
         k < waves.length ? waves[k].uniforms() : const <double>[0, 0, 0, 1, 0, 0, 0, 0],
@@ -628,6 +627,7 @@ ui.Image _render(ui.FragmentProgram program, ui.Image backdrop, List<GlassRipple
       r.skip(4).forEach(w);
     }
     final double reach = waves.fold(0, (double s, GlassRippleWave x) => s + x.bound);
+    w(waves.length.toDouble());
     w(reach > 1e-3 ? reach : 1e-3);
     w(0.08);
     expect(i, kRippleUniformFloats);
