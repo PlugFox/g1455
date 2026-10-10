@@ -171,6 +171,17 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('mounts without ambient Directionality', (WidgetTester tester) async {
+    await tester.pumpWidget(const GlassBadge(count: 3, child: SizedBox(width: 28, height: 28)));
+    expect(find.byType(GlassBadge), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.byType(DecoratedBox), findsOneWidget);
+
+    await tester.pumpWidget(const GlassBadge(child: SizedBox(width: 28, height: 28)));
+    expect(find.byType(GlassBadge), findsOneWidget);
+    expect(find.byType(DecoratedBox), findsOneWidget);
+  });
+
   test('debugFillProperties', () {
     final builder = DiagnosticPropertiesBuilder();
     const GlassBadge(count: 7, isVisible: false).debugFillProperties(builder);
