@@ -8,6 +8,13 @@ prefix: g1455
 # each is fetched fresh for its own meta — and not the link previews.
 glob: "*.{html,js,mjs,wasm,json}; assets/**; canvaskit/**; icons/**; favicon.*"
 no-glob: "sw.js; bootstrap.js; 404.html; version.json; **/*.map; **/*.symbols; assets/NOTICES"
+# The shaders are code, and the uniforms main.dart.* writes must match the
+# build they came from. `sw` sorts files by extension and ignores `.frag`, so
+# the worker served the cached main.dart.* of the last visit with shaders
+# fetched fresh from the network: after 0.2.0 repacked the uniforms, a press
+# drew the glass black until the new worker took over. Core, like the code
+# that loads them, so they are precached and swapped with it.
+core: "**.frag"
 title: g1455
 logo: icons/Icon-192.png
 theme: dark
