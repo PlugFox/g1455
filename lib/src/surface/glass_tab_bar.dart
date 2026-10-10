@@ -781,7 +781,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
           final double slot = math.max(g.height, kGlassMinTapTarget.height);
           final Widget? accessory = widget.bottomAccessory;
           final double above = accessory == null ? 0 : kGlassTabAccessoryHeight + _kAccessoryGap;
-          final bool rtl = Directionality.of(context) == TextDirection.rtl;
+          final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
           // The collapsed circle, in the box: the bar's own height, at its
           // start edge.
           final Rect circle = Rect.fromLTWH(
@@ -942,7 +942,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     final Rect bar = m == 0 ? open : _snap(context, Rect.lerp(open, circle, m)!);
     // Collapsing, the items slide so the selected one ends in the circle, and
     // fade as the circle's own icon comes in.
-    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
     final double selected = g.centre(widget.selectedIndex.toDouble());
     final double slide = m * (circle.center.dx - (row.dx + (rtl ? width - selected : selected)));
     final Offset items = row.translate(slide, 0) - bar.topLeft;

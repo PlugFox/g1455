@@ -33,6 +33,19 @@ if ! dart pub global list | grep -q '^sw 0.2.0'; then
 fi
 dart pub global run sw:generate --config=sw.yaml --version="$version"
 
+# Every shader precached with the code, or a returning visitor runs the cached
+# main.dart.* against shaders of another build (see `core:` in sw.yaml).
+if [ -z "$(find build/web -name 'glass_*.frag')" ]; then
+  echo "build_web.sh: no glass shaders under build/web to check" >&2
+  exit 1
+fi
+while IFS= read -r frag; do
+  if ! grep -qE "\"${frag#build/web/}\":\\{[^}]*\"category\":\"core\"" build/web/sw.js; then
+    echo "build_web.sh: $frag is not precached as core by sw.js" >&2
+    exit 1
+  fi
+done < <(find build/web -name '*.frag')
+
 # Skwasm for Safari too. Flutter's loader keeps it to Blink unless told
 # otherwise (`wasmAllowList`, default {blink: true, webkit: false}), so Safari
 # and every iOS browser got dart2js and CanvasKit — where each capture of the

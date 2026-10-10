@@ -130,12 +130,13 @@ class GlassBadge extends StatelessWidget {
     if (!_shown) {
       return child ?? const SizedBox.shrink();
     }
-    final Widget badge = _capsule(context);
+    final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
+    final Widget badge = _capsule(context, rtl: rtl);
     if (child == null) {
       return badge;
     }
-    final bool rtl = Directionality.of(context) == TextDirection.rtl;
     return Stack(
+      alignment: rtl ? Alignment.topRight : Alignment.topLeft,
       clipBehavior: Clip.none,
       children: <Widget>[
         child,
@@ -153,7 +154,7 @@ class GlassBadge extends StatelessWidget {
     );
   }
 
-  Widget _capsule(BuildContext context) {
+  Widget _capsule(BuildContext context, {bool rtl = false}) {
     final String? text = this.text;
     final String? said = semanticLabel ?? text;
     final Widget body = text == null
@@ -174,6 +175,7 @@ class GlassBadge extends StatelessWidget {
                   heightFactor: 1,
                   child: Text(
                     text,
+                    textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
                     maxLines: 1,
                     textAlign: TextAlign.center,
                     // The text is the badge's, not the glass's: a bar's label
@@ -192,6 +194,7 @@ class GlassBadge extends StatelessWidget {
     return Semantics(
       container: said != null,
       label: said,
+      textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
       excludeSemantics: true,
       child: body,
     );

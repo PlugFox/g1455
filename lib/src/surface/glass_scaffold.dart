@@ -198,7 +198,7 @@ class GlassScaffold extends StatelessWidget {
       delegate: _GlassScaffoldLayout(
         safe: safe,
         margin: barMargin,
-        textDirection: Directionality.of(context),
+        textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
       ),
       // In paint order: the body under everything, the top bar over all.
       children: <Widget>[
