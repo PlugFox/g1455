@@ -123,6 +123,63 @@ void main() {
     expect(field.isEmpty, isTrue, reason: 'a cancelled touch was never released');
     expect(tester.binding.hasScheduledFrame, isFalse);
   });
+
+  testWidgets('a rippling glass: unmounting during gesture does not throw on detached surface', (
+    WidgetTester tester,
+  ) async {
+    final show = ValueNotifier<bool>(true);
+    addTearDown(show.dispose);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: kScreen, devicePixelRatio: 2),
+        child: Directionality(
+          textDirection: .ltr,
+          child: Align(
+            alignment: .topLeft,
+            child: GlassHost(
+              hardware: .appleMetal,
+              child: SizedBox.fromSize(
+                size: kScreen,
+                child: Stack(
+                  children: <Widget>[
+                    const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F1EA))),
+                    Positioned.fromRect(
+                      rect: kBar,
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: show,
+                        builder: (context, visible, _) {
+                          if (!visible) {
+                            return const SizedBox.shrink();
+                          }
+                          return const GlassSurface(
+                            ripple: GlassRipple(),
+                            child: SizedBox.expand(),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+
+    final TestGesture finger = await tester.startGesture(kBar.center);
+    await tester.pump();
+
+    show.value = false;
+    await tester.pump();
+
+    await finger.up();
+    await _settle(tester);
+  });
 }
 
 // ---------------------------------------------------------------------------
