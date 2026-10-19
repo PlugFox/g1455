@@ -389,7 +389,7 @@ const double _kInlinePitch = 80;
 /// capsule and the drop are. Pure, so the gesture code and the paint agree.
 @immutable
 class _TabGeometry {
-  factory _TabGeometry(double width, int count) {
+  factory _TabGeometry(double width, int count, {bool rtl = false}) {
     final bool inline = (width - 16) / count >= _kInlinePitch;
     // Read off the simulators: the phone's bar is 60 tall with items
     // 66 apart and 7 in from its ends, the capsule 3.5 in from the bar all
@@ -399,16 +399,21 @@ class _TabGeometry {
     final double pad = inline ? 8 : 7;
     final double pitch = (width - 2 * pad) / count;
     final Size pill = inline ? Size(pitch - 3, height - 8) : Size(pitch + 7, height - 7);
-    return _TabGeometry._(inline, height, pad, pitch, pill);
+    return _TabGeometry._(inline, height, pad, pitch, pill, width, rtl);
   }
 
-  const _TabGeometry._(this.inline, this.height, this.pad, this.pitch, this.pill);
+  const _TabGeometry._(this.inline, this.height, this.pad, this.pitch, this.pill, this.width, this.rtl);
 
   final bool inline;
   final double height;
   final double pad;
   final double pitch;
   final Size pill;
+  final double width;
+
+  /// Whether the items' row runs from the right, as a `Row` does under
+  /// `TextDirection.rtl`: item 0 at the right end.
+  final bool rtl;
 
   Size get drop => pill + const Offset(2 * kGlassTabDropGrow, 2 * kGlassTabDropGrow);
 
@@ -417,6 +422,13 @@ class _TabGeometry {
 
   /// The item index under [x], fractional, clamped to the items.
   double indexAt(double x, int count) => ((x - pad) / pitch - 0.5).clamp(0.0, count - 1.0);
+
+  /// Where item [i]'s centre is drawn, in the bar: [centre] from the start
+  /// edge, which under [rtl] is the right one.
+  double drawn(double i) => rtl ? width - centre(i) : centre(i);
+
+  /// The item under [x] in the bar as drawn: [indexAt] from the start edge.
+  double indexUnder(double x, int count) => indexAt(rtl ? width - x : x, count);
 
   /// How far the drop reaches past the bar's resting box, per side — held,
   /// and stretched or squashed as far as [motion] can.
@@ -725,7 +737,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     _liftTo(1);
     // A press on another item takes the drop there; a press on the selected
     // one lifts it where it is.
-    final int i = _pressed = g.indexAt(e.localPosition.dx, widget.items.length).round();
+    final int i = _pressed = g.indexUnder(e.localPosition.dx, widget.items.length).round();
     _slideTo(i, 0);
   }
 
@@ -745,7 +757,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       return;
     }
     _moved = true;
-    _at.value = g.indexAt(e.localPosition.dx, widget.items.length);
+    _at.value = g.indexUnder(e.localPosition.dx, widget.items.length);
   }
 
   void _onUp(PointerUpEvent e) {
@@ -758,8 +770,9 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     }
     _down = false;
     // The drop keeps the finger's speed into the settle, in item units, and a
-    // flick carries it on to the item it was heading for.
-    final double velocity = _moved ? (_tracker?.getVelocity().pixelsPerSecond.dx ?? 0) / g.pitch : 0;
+    // flick carries it on to the item it was heading for — under rtl a flick
+    // to the left heads for a later item.
+    final double velocity = _moved ? (_tracker?.getVelocity().pixelsPerSecond.dx ?? 0) / g.pitch * (g.rtl ? -1 : 1) : 0;
     // A tap is the item pressed, wherever the drop has got to on its way.
     final int i = _moved ? (_at.value + velocity * 0.08).round().clamp(0, widget.items.length - 1) : _pressed;
     _slideTo(i, velocity);
@@ -794,12 +807,12 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           final double width = constraints.maxWidth;
-          final _TabGeometry g = _geometry = _TabGeometry(width, widget.items.length);
+          final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
+          final _TabGeometry g = _geometry = _TabGeometry(width, widget.items.length, rtl: rtl);
           final Size margin = g.margin(widget.items.length, _motion);
           final double slot = math.max(g.height, kGlassMinTapTarget.height);
           final Widget? accessory = widget.bottomAccessory;
           final double above = accessory == null ? 0 : kGlassTabAccessoryHeight + _kAccessoryGap;
-          final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
           // The collapsed circle, in the box: the bar's own height, at its
           // start edge.
           final Rect circle = Rect.fromLTWH(
@@ -1057,7 +1070,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
               return Stack(
                 children: <Widget>[
                   Positioned(
-                    left: g.centre(_at.value) - g.pill.width / 2,
+                    left: g.drawn(_at.value) - g.pill.width / 2,
                     top: (g.height - g.pill.height) / 2,
                     width: g.pill.width,
                     height: g.pill.height,
@@ -1182,7 +1195,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
           clipBehavior: Clip.none,
           children: <Widget>[
             Positioned(
-              left: margin.width + g.centre(_at.value) - size.width / 2,
+              left: margin.width + g.drawn(_at.value) - size.width / 2,
               top: margin.height + (g.height - size.height) / 2,
               width: size.width,
               height: size.height,
