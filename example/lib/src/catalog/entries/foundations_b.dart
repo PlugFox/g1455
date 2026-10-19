@@ -1421,8 +1421,9 @@ Widget performantHost(Widget child, {required GlassThermalState thermal, bool sn
 
 | Field | Type | Description |
 |---|---|---|
-| `surfaceCount` | `int` | Glass surfaces on the screen. |
-| `capturedSurfaceCount` | `int` | Of those, how many read a capture (full tier). |
+| `surfaceCount` | `int` | Glass surfaces on the screen that draw glass now. |
+| `capturedSurfaceCount` | `int` | Of those, how many read a capture (full tier): the ones the host captures for. |
+| `restingSurfaceCount` | `int` | Registered surfaces that draw nothing now, in none of the counts and areas: a control's drop at rest. |
 | `screensOfGlass` | `double` | Total glass area divided by the screen's area. |
 | `rectAreaLogical` / `shapeAreaLogical` | `double` | Glass area as boxes and as shapes, in logical px². |
 | `taxCycles` | `double?` | Estimated GPU cost, where measured (Adreno only). |
