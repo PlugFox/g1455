@@ -123,8 +123,9 @@ cheap setting is reachable without a fork.
 ## Next — what the branch left open
 
 - [ ] Adaptivity for the rest: a raw `GlassSurface`, `GlassScrollEdge` (still
-      keys its tint off the declared `backdrop`), the tab bar and the
-      segmented control. Fused group members adapt only their labels.
+      keys its tint off the declared `backdrop`) and the segmented control.
+      Fused group members adapt only their labels. The tab bar adapts as one
+      control from 0.3.0: its accessory wears the bar's verdict.
 - [ ] Measure the adaptive read-back on devices, CanvasKit and Skwasm
       included; the band, hold and interval are taste until then.
 - [ ] A host replacing one surface with another at exactly the same rect

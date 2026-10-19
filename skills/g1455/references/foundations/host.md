@@ -155,7 +155,7 @@ class HomePage extends StatelessWidget {
 | `ripple` | `GlassRipple?` | `null` | A touch wave for every surface below. None by default. |
 | `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How the held drop of the switch, slider, segmented control and tab bar stretches and squashes. `GlassDropMotion.none` keeps it round. |
 | `press` | `GlassPress` | `GlassPress()` | How a pressed `GlassButton` swells and leans: two captures a press, none at rest. `GlassPress.none` keeps every button its size. |
-| `adaptive` | `GlassAdaptive?` | `null` | Each bar, card and button reads the backdrop under it and picks its branch and label. Null reads nothing. |
+| `adaptive` | `GlassAdaptive?` | `null` | Each bar, card, button and tab bar reads the backdrop under it and picks its branch and label. Null reads nothing. |
 | `thermal` | `GlassThermalState?` | `null` | The device's thermal state, read by your app. Null is nominal. |
 | `thermalPolicy` | `GlassThermalPolicy` | `GlassThermalPolicy()` | How much staleness each thermal state may spend. `GlassThermalPolicy.never` keeps every frame fresh. |
 | `hardware` | `GlassHardware?` | `null` | Which device family's measurements apply. Null detects: `appleMetal` on Apple, otherwise `unmeasured`. |

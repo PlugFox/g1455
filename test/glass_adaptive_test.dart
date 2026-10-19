@@ -602,6 +602,25 @@ void main() {
     expect(_seen['moving']!.finish, GlassFinish.regularLight, reason: 'the glass kept what it read where it was');
   });
 
+  // The tab bar and its accessory read as one control, and wear one branch:
+  // the bar's. Each built on a GlassBar of its own, they used to read their
+  // own backdrops, so a light bar could sit under a dark accessory (#10).
+  for (final bool accessoryOverLight in <bool>[false, true]) {
+    testWidgets('a tab bar and its accessory wear the bar\'s branch '
+        '(the accessory over ${accessoryOverLight ? 'white' : 'black'}, the bar over '
+        '${accessoryOverLight ? 'black' : 'white'})', (WidgetTester tester) async {
+      final Map<String, GlassThemeData> seen = await _mountTabBar(tester, accessoryOverLight: accessoryOverLight);
+      expect(seen['bar']!.finish, GlassFinish.regularLight, reason: 'the first frames go by what is declared');
+      expect(seen['accessory']!.finish, GlassFinish.regularLight);
+      await _land(tester);
+      final GlassFinish barBranch = accessoryOverLight ? GlassFinish.regularDark : GlassFinish.regularLight;
+      expect(seen['bar']!.finish, barBranch, reason: 'the bar does not follow what is under it');
+      expect(seen['accessory']!.finish, barBranch, reason: 'the accessory is on a branch of its own');
+      expect(seen['accessory']!.reading, seen['bar']!.reading);
+      expect(_label['accessory'], accessoryOverLight ? kWhite : kBlack);
+    });
+  }
+
   testWidgets('a host that goes with a read in flight leaves nothing behind', (WidgetTester tester) async {
     await _mount(tester, adaptive: const GlassAdaptive());
     await tester.pump();
@@ -700,6 +719,73 @@ Future<_Scene> _mount(
     ),
   );
   return _Scene(tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle, _seen, _label);
+}
+
+/// A tab bar with an accessory over a screen cut in two at the gap between
+/// them: one colour under the accessory and the other under the bar. Returns
+/// the theme the content of each sees, keyed 'bar' and 'accessory'.
+Future<Map<String, GlassThemeData>> _mountTabBar(WidgetTester tester, {required bool accessoryOverLight}) async {
+  tester.view
+    ..physicalSize = kScreen
+    ..devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final seen = <String, GlassThemeData>{};
+  Widget spy(String name, Widget child) => Builder(
+    builder: (BuildContext context) {
+      seen[name] = GlassTheme.of(context);
+      _label[name] = DefaultTextStyle.of(context).style.color;
+      return child;
+    },
+  );
+  // Five items on 376 px stack icon over label: a 60-tall bar, the 48-tall
+  // accessory 8 above it. The box ends 12 above the screen's bottom, so the
+  // accessory is 72…120 and the bar 128…188; the cut is at 124.
+  await tester.pumpWidget(
+    MediaQuery(
+      data: const MediaQueryData(size: kScreen, platformBrightness: Brightness.light),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: GlassHost(
+          hardware: GlassHardware.appleMetal,
+          adaptive: const GlassAdaptive(),
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    SizedBox(height: 124, child: ColoredBox(color: accessoryOverLight ? kWhite : kBlack)),
+                    Expanded(child: ColoredBox(color: accessoryOverLight ? kBlack : kWhite)),
+                  ],
+                ),
+              ),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: GlassTabBar(
+                  items: <GlassTabItem>[
+                    GlassTabItem(
+                      label: 'One',
+                      iconBuilder: (BuildContext context, GlassTabItemLook look) =>
+                          spy('bar', const SizedBox.square(dimension: 20)),
+                    ),
+                    for (final String label in <String>['Two', 'Three', 'Four', 'Five'])
+                      GlassTabItem(label: label, iconBuilder: (_, _) => const SizedBox.square(dimension: 20)),
+                  ],
+                  selectedIndex: 0,
+                  onSelected: (_) {},
+                  bottomAccessory: spy('accessory', const Text('Accessory')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  expect(tester.getRect(find.text('Accessory')).center.dy, inExclusiveRange(72, 120));
+  return seen;
 }
 
 /// Lets the engine finish a read-back, and the frames after it apply it.

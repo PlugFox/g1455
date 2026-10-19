@@ -113,8 +113,11 @@ app changes the page.
 `bottomAccessory` is UIKit's `tabViewBottomAccessory`: a widget on a glass capsule
 [`kGlassTabAccessoryHeight`](https://pub.dev/documentation/g1455/latest/g1455/kGlassTabAccessoryHeight-constant.html)
 (48) tall above the bar, a now-playing row or a status, drawn in the bar's label colour. When the bar collapses it moves
-down beside the circle, inside a travel region of its own, so that is no capture either. The bar's box is taller by the
-accessory and the gap, and stays that height.
+down beside the circle, no taller than the circle, inside a travel region of its own, so that is no capture either. The
+bar's box is taller by the accessory and the gap, and stays that height.
+
+Under [adaptive glass](../foundations/adaptive.md) the bar reads what is under it and picks its branch, and the accessory
+wears the same one, whatever is under the accessory: a light bar under a dark capsule would read as two controls.
 
 ## Custom icons and badges
 

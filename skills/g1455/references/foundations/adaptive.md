@@ -57,9 +57,9 @@ it wears what the declarations give, exactly as with adaptive off.
 - **Moves animate.** A glass crossing between branches tweens its tint over `duration` (300 ms), and on every frame
   of it the label is the one that reads on the glass as drawn, so the floor holds halfway too. Under reduced motion it
   is a cut.
-- **What adapts.** `GlassBar`, `GlassCard` and `GlassButton`. A raw `GlassSurface`, the
-  [scroll edge](../foundations/scroll-edge.md), the [tab bar](../components/tab-bar.md) and the
-  [segmented control](../components/segmented-control.md) do not adapt yet.
+- **What adapts.** `GlassBar`, `GlassCard`, `GlassButton` and the [tab bar](../components/tab-bar.md), whose accessory
+  wears the bar's branch: the two are one control. A raw `GlassSurface`, the [scroll edge](../foundations/scroll-edge.md)
+  and the [segmented control](../components/segmented-control.md) do not adapt yet.
 
 The demo above turns adaptive on in the site's own host while the page is open, so the site's top bar and side panel
 follow it too. The site declares a rich backdrop, so the stage nests a `GlassTheme` with `richBackdrop: false` to let
