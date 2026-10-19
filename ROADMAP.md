@@ -97,6 +97,9 @@ cheap setting is reachable without a fork.
 - [x] `GlassLoad` prices only glass that draws; a control's drop at rest is
       `restingSurfaceCount`.
 - [x] Controls removed under a held finger ignore the rest of the gesture.
+- [x] A surface that replaces another at the same rect, or glass back on the
+      top rung where it was, gets a capture: the host compares whose
+      rectangles it captured, not only where they are.
 
 ## Next — what 0.2.0 left open
 
@@ -136,10 +139,6 @@ cheap setting is reachable without a fork.
       control from 0.3.0: its accessory wears the bar's verdict.
 - [ ] Measure the adaptive read-back on devices, CanvasKit and Skwasm
       included; the band, hold and interval are taste until then.
-- [ ] A host replacing one surface with another at exactly the same rect
-      keeps the old capture, and the new surface draws nothing until
-      something else changes. Found while testing `GlassMorph`; look in
-      `glass_host.dart`.
 - [ ] `GlassMorph`: carry the spring's velocity through a swap mid-morph, and
       keep glass inside fading content (an `Opacity` layer drops it).
 - [ ] `GlassScaffold`: the keyboard (`viewInsets`), a bottom scroll edge, and

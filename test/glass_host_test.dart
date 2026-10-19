@@ -185,6 +185,107 @@ void main() {
     expect(newcomer.paintsWithProxy, greaterThan(0));
   });
 
+  testWidgets('a surface that replaces another at the same rect gets a capture of its own', (
+    WidgetTester tester,
+  ) async {
+    // The oracle watches rectangles, and a frame finds its slots by identity:
+    // a surface swapped for another where it stood moves no rectangle, so the
+    // capture was held and the newcomer, missing from it, drew nothing until
+    // something else changed (found on GlassMorph's settle into a plain
+    // surface).
+    Widget scene(String key) => Stack(
+      children: <Widget>[
+        // Behind a boundary of its own, so the swap repaints nothing the
+        // layer watch would see: that change would retake by itself.
+        const Positioned.fill(
+          child: RepaintBoundary(child: ColoredBox(color: Color(0xFF3060C0))),
+        ),
+        Positioned(
+          left: 40,
+          top: 40,
+          width: 120,
+          height: 80,
+          child: RepaintBoundary(
+            child: GlassSurface(key: ValueKey<String>(key), child: const SizedBox.expand()),
+          ),
+        ),
+      ],
+    );
+    final hostKey = GlobalKey();
+    await _pump(tester, scene('old'), hostKey: hostKey, frames: 4);
+    final dynamic settling = hostKey.currentState! as dynamic;
+    final int settled = settling.recorded as int;
+    for (var i = 0; i < 30; i++) {
+      await tester.pump();
+    }
+    expect(settling.recorded as int, settled, reason: 'the host was still recording before the swap');
+    final RenderGlassSurface old = tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface));
+    expect(old.paintsWithProxy, greaterThan(0));
+    final dynamic host = hostKey.currentState! as dynamic;
+    final int recorded = host.recorded as int;
+
+    await tester.pumpWidget(_mount(scene('new'), hostKey: hostKey));
+    final RenderGlassSurface newcomer = tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface));
+    expect(newcomer, isNot(same(old)), reason: 'the arm needs a new render object at the old rect');
+    for (var i = 0; i < 3; i++) {
+      await tester.pump();
+    }
+    expect(host.recorded as int, greaterThan(recorded), reason: 'the swap was held');
+    expect(newcomer.paintsWithProxy, greaterThan(0), reason: 'the newcomer never had a slot to draw from');
+  });
+
+  testWidgets('glass that comes back to the top rung where it was gets a capture again', (
+    WidgetTester tester,
+  ) async {
+    // Every surface on the cheap rung: the host publishes no frame. Back on the
+    // full rung at the same rects, nothing the oracle watches has moved since
+    // the last capture it made — and that capture is gone.
+    final hostKey = GlobalKey();
+    Future<void> at(GlassTier tier) async {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(size: kScreen),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: GlassHost(
+              key: hostKey,
+              hardware: GlassHardware.appleMetal,
+              finish: GlassFinish.identity,
+              tier: GlassTierChoice(tier, GlassTierReason.pinnedByHost),
+              child: const Stack(
+                children: <Widget>[
+                  Positioned.fill(
+                    child: RepaintBoundary(child: ColoredBox(color: Color(0xFF3060C0))),
+                  ),
+                  Positioned(
+                    left: 40,
+                    top: 40,
+                    width: 120,
+                    height: 80,
+                    child: RepaintBoundary(child: GlassSurface(child: SizedBox.expand())),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+    }
+
+    await at(GlassTier.full);
+    final RenderGlassSurface glass = tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface));
+    expect(glass.paintsWithProxy, greaterThan(0));
+    await at(GlassTier.cheap);
+    final GlassProxyHandle handle = tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+    expect(handle.frame, isNull, reason: 'a screen of cheap glass holds no capture');
+    await at(GlassTier.full);
+    expect(tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface)), same(glass));
+    expect(handle.frame, isNotNull, reason: 'back on the top rung, the glass has nothing to sample');
+  });
+
   testWidgets('the host\'s budget reaches the divisor and not only the ceiling', (
     WidgetTester tester,
   ) async {

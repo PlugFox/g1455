@@ -396,10 +396,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump();
     final Uint8List settled = await _image(tester);
-    // On a host of its own: a surface swapped for another at the same rect
-    // is not a change the host's oracle sees, so on the same host the plain
-    // surface would wait for a capture that is held.
-    await _pump(tester, const _Scene(plain: true), hostKey: GlobalKey());
+    // On the same host: a surface swapped for another at the same rect moves
+    // no rectangle, and the host has to see the swap by identity or the plain
+    // surface waits for a capture that is held.
+    await _pump(tester, const _Scene(plain: true));
     final Uint8List plain = await _image(tester);
     expect(_differing(plain, bare), isNotEmpty, reason: 'the plain surface drew nothing');
     expect(_differing(settled, plain), isEmpty, reason: 'a settled morph is not a plain surface');

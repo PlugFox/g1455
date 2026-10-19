@@ -1149,6 +1149,9 @@ class _GlassHostState extends State<GlassHost> {
       // promised: there is no image for a surface to sample even by mistake.
       _handle.publish(null);
       _publishUpper(const <GlassProxyFrame?>[]);
+      // Published empty, so whatever comes back — the same glass at the same
+      // rects included — is a change.
+      _lastPresent = const <GlassSurfaceGeometry>{};
       // Nothing to read, but the surfaces that left still leave: a screen
       // whose last glass went, or whose glass all fell to a rung that reads
       // nothing, would otherwise keep its verdicts, and the render objects
@@ -1163,6 +1166,16 @@ class _GlassHostState extends State<GlassHost> {
     final blurs = <double>[for (final GlassFinish f in finishes) f.blurSigmaLogical];
     if (!listEquals(blurs, _lastBlurs)) {
       _lastBlurs = blurs;
+      _oracle.noteChange();
+    }
+    // Nor whose rectangles they are, and a frame finds its slots by identity: a
+    // surface replaced by another where it stood moves no rectangle, and behind
+    // a repaint boundary of its own the walk sees nothing either — the capture
+    // would be held, and the newcomer, missing from it, would draw nothing until
+    // something else changed. As a set, so a surface that re-registers (a
+    // reparent) and only changes its place in the register retakes nothing.
+    if (!setEquals(present.toSet(), _lastPresent)) {
+      _lastPresent = present.toSet();
       _oracle.noteChange();
     }
     final _Levels levels = _Levels.of(present, root);
@@ -1303,6 +1316,9 @@ class _GlassHostState extends State<GlassHost> {
   final List<GlassProxyPipeline> _upperPipelines = <GlassProxyPipeline>[];
 
   List<double>? _lastBlurs;
+
+  /// The surfaces the last frame was captured for, by identity.
+  Set<GlassSurfaceGeometry>? _lastPresent;
 
   void _readCounters() {
     var snapshots = _pipeline.snapshots;
