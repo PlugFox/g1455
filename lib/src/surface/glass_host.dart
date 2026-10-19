@@ -1174,9 +1174,10 @@ class _GlassHostState extends State<GlassHost> {
     // would be held, and the newcomer, missing from it, would draw nothing until
     // something else changed. As a set, so a surface that re-registers (a
     // reparent) and only changes its place in the register retakes nothing.
-    if (!setEquals(present.toSet(), _lastPresent)) {
-      _lastPresent = present.toSet();
-      _oracle.noteChange();
+    final Set<GlassSurfaceGeometry> presentSet = present.toSet();
+    if (!setEquals(presentSet, _lastPresent)) {
+      _lastPresent = presentSet;
+      _oracle.noteSurfacesChanged();
     }
     final _Levels levels = _Levels.of(present, root);
     if (widget.content != GlassContentDeclaration.undeclared) {

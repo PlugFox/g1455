@@ -535,6 +535,15 @@ class RetakeOracle {
   /// composited output does not show.
   void noteChange() => _dirty = true;
 
+  /// Says the surfaces changed without moving: one replaced by another where
+  /// it stood, which no rectangle shows. A change of geometry, which a
+  /// throttle never holds — the newcomer has no slot in the frame in hand and
+  /// draws nothing until it is recorded, which is worse than a stale frame.
+  void noteSurfacesChanged() {
+    _dirty = true;
+    _geometryDirty = true;
+  }
+
   /// Subscribes to every [GlassProxy] marker in the subtree.
   ///
   /// Idempotent per call: it drops what it was watching first. Call it when the

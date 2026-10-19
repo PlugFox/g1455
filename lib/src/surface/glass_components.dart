@@ -583,7 +583,8 @@ class GlassSharedReading {
 class GlassSharedReadingScope extends InheritedWidget {
   /// The panel below [child] leads [share] or, when [leads] is false, wears its
   /// leader's verdict. A null [share] puts the panel in none.
-  const GlassSharedReadingScope({required this.share, required super.child, this.leads = false, super.key});
+  const GlassSharedReadingScope({required this.share, required super.child, this.leads = false, super.key})
+    : assert(!leads || share != null, 'a scope that leads needs a share to lead');
 
   /// The verdict the panel below is in, or null for its own.
   final GlassSharedReading? share;
@@ -667,8 +668,8 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
       _leaveShare();
       _share = share;
       _leads = scope?.leads ?? false;
-      if (_leads) {
-        share!._lead = context;
+      if (_leads && share != null) {
+        share._lead = context;
       }
       // A follower that joins once the leader has a verdict wears it now: the
       // verdicts will not move again for it.
@@ -691,6 +692,24 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
     } else {
       readings.addListener(_onReadings);
       _reading = _readingOfGlass();
+    }
+  }
+
+  // Out of the share while inactive — a reparent, a route on its way out — as
+  // a follower asking an inactive element for its render object asserts; and
+  // back in when the element is.
+  @override
+  void deactivate() {
+    _leaveShare();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    final GlassSharedReading? share = _share;
+    if (_leads && share != null) {
+      share._lead = context;
     }
   }
 

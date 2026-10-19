@@ -44,7 +44,10 @@
 //    reduced-motion arm of (5) fails.
 //  - in `_GlassPanelState._readingOfGlass`, `share == null || _leads ?
 //    context : share._lead` -> `context`: a tab bar's accessory reads its own
-//    backdrop, and both tab bar arms fail.
+//    backdrop, and both tab bar arms fail;
+//  - `_GlassPanelState.activate` deleted: a bar moved to another parent leaves
+//    the share on its deactivate and never rejoins it, and the moved-bar arm
+//    fails.
 
 import 'package:flutter/foundation.dart';
 
@@ -625,6 +628,24 @@ void main() {
     });
   }
 
+  testWidgets('a tab bar moved to another parent keeps its accessory on the bar\'s branch', (
+    WidgetTester tester,
+  ) async {
+    // The bar's panel leaves the share while it is inactive and has to come
+    // back when it is active again, or the accessory has no verdict to wear.
+    final barKey = GlobalKey();
+    await _mountTabBar(tester, accessoryOverLight: true, barKey: barKey);
+    final Map<String, GlassThemeData> seen = await _mountTabBar(
+      tester,
+      accessoryOverLight: true,
+      barKey: barKey,
+      padded: true,
+    );
+    await _land(tester);
+    expect(seen['bar']!.finish, GlassFinish.regularDark);
+    expect(seen['accessory']!.finish, GlassFinish.regularDark, reason: 'the moved bar no longer leads its accessory');
+  });
+
   testWidgets('a host that goes with a read in flight leaves nothing behind', (WidgetTester tester) async {
     await _mount(tester, adaptive: const GlassAdaptive());
     await tester.pump();
@@ -728,7 +749,12 @@ Future<_Scene> _mount(
 /// A tab bar with an accessory over a screen cut in two at the gap between
 /// them: one colour under the accessory and the other under the bar. Returns
 /// the theme the content of each sees, keyed 'bar' and 'accessory'.
-Future<Map<String, GlassThemeData>> _mountTabBar(WidgetTester tester, {required bool accessoryOverLight}) async {
+Future<Map<String, GlassThemeData>> _mountTabBar(
+  WidgetTester tester, {
+  required bool accessoryOverLight,
+  GlobalKey? barKey,
+  bool padded = false,
+}) async {
   tester.view
     ..physicalSize = kScreen
     ..devicePixelRatio = 1;
@@ -767,19 +793,23 @@ Future<Map<String, GlassThemeData>> _mountTabBar(WidgetTester tester, {required 
                 left: 12,
                 right: 12,
                 bottom: 12,
-                child: GlassTabBar(
-                  items: <GlassTabItem>[
-                    GlassTabItem(
-                      label: 'One',
-                      iconBuilder: (BuildContext context, GlassTabItemLook look) =>
-                          spy('bar', const SizedBox.square(dimension: 20)),
-                    ),
-                    for (final String label in <String>['Two', 'Three', 'Four', 'Five'])
-                      GlassTabItem(label: label, iconBuilder: (_, _) => const SizedBox.square(dimension: 20)),
-                  ],
-                  selectedIndex: 0,
-                  onSelected: (_) {},
-                  bottomAccessory: spy('accessory', const Text('Accessory')),
+                child: _padded(
+                  padded,
+                  GlassTabBar(
+                    key: barKey,
+                    items: <GlassTabItem>[
+                      GlassTabItem(
+                        label: 'One',
+                        iconBuilder: (BuildContext context, GlassTabItemLook look) =>
+                            spy('bar', const SizedBox.square(dimension: 20)),
+                      ),
+                      for (final String label in <String>['Two', 'Three', 'Four', 'Five'])
+                        GlassTabItem(label: label, iconBuilder: (_, _) => const SizedBox.square(dimension: 20)),
+                    ],
+                    selectedIndex: 0,
+                    onSelected: (_) {},
+                    bottomAccessory: spy('accessory', const Text('Accessory')),
+                  ),
                 ),
               ),
             ],
@@ -791,6 +821,10 @@ Future<Map<String, GlassThemeData>> _mountTabBar(WidgetTester tester, {required 
   expect(tester.getRect(find.text('Accessory')).center.dy, inExclusiveRange(72, 120));
   return seen;
 }
+
+/// [child] under a zero padding when [padded], so that flipping it moves a
+/// keyed child to another parent: a deactivate and an activate.
+Widget _padded(bool padded, Widget child) => padded ? Padding(padding: EdgeInsets.zero, child: child) : child;
 
 /// Lets the engine finish a read-back, and the frames after it apply it.
 ///
