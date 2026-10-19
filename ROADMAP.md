@@ -100,6 +100,9 @@ cheap setting is reachable without a fork.
 - [x] A surface that replaces another at the same rect, or glass back on the
       top rung where it was, gets a capture: the host compares whose
       rectangles it captured, not only where they are.
+- [x] Animation controllers are created in `initState`, never first from
+      `dispose` (flutter/flutter#185248): the menu and popover anchors and a
+      page control given a `PageController`.
 
 ## Next — what 0.2.0 left open
 
@@ -126,10 +129,6 @@ cheap setting is reachable without a fork.
       the number to have.
 - [ ] Adaptive glass over a declared backdrop: the texture is in hand, so the
       mean level is a read-back once per texture, not per capture.
-- [ ] `glass_modal.dart` creates a `late` animation controller from `dispose`
-      the first time it is read there; Flutter tolerates it from 3.47 only
-      (flutter/flutter#185248). Creating it in `initState` is the whole fix,
-      and the first step towards any floor below 3.47.
 
 ## Next — what the branch left open
 

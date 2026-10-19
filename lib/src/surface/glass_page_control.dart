@@ -194,10 +194,7 @@ class _TurnIntent extends Intent {
 class _GlassPageControlState extends State<GlassPageControl> with SingleTickerProviderStateMixin {
   /// The dots' own position, without a controller: animated from the old
   /// page to the new one when [GlassPageControl.currentPage] changes.
-  late final AnimationController _own = AnimationController.unbounded(
-    vsync: this,
-    value: widget.currentPage.toDouble(),
-  );
+  late final AnimationController _own;
 
   /// The page the last build said, so the semantics and [onPageChanged]
   /// follow a controller only when the nearest page changes, not per pixel.
@@ -229,6 +226,10 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
   @override
   void initState() {
     super.initState();
+    _own = AnimationController.unbounded(
+      vsync: this,
+      value: widget.currentPage.toDouble(),
+    );
     widget.controller?.addListener(_onScroll);
   }
 

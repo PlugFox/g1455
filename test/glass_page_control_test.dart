@@ -376,4 +376,33 @@ void main() {
         .toList();
     expect(said, containsAll(<String>['count: 4', 'currentPage: 2', 'display']));
   });
+
+  testWidgets('a page control with an external controller creates its own controller in initState', (
+    WidgetTester tester,
+  ) async {
+    final PageController controller = PageController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: GlassTheme(
+          data: const GlassThemeData(),
+          child: GlassPageControl(
+            count: 3,
+            controller: controller,
+          ),
+        ),
+      ),
+    );
+    final State state = tester.state(find.byType(GlassPageControl));
+    final DiagnosticsNode? ticker = state
+        .toDiagnosticsNode()
+        .getProperties()
+        .where((DiagnosticsNode p) => p.name == 'ticker')
+        .firstOrNull;
+    expect(ticker?.value, isNotNull, reason: 'GlassPageControl did not create its controller in initState');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
 }

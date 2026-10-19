@@ -1284,11 +1284,7 @@ typedef _Placement = ({bool down, Alignment corner, double? left, double? right,
 abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with SingleTickerProviderStateMixin<W> {
   final OverlayPortalController _portal = OverlayPortalController();
   late final GlassMenuController _controller = _widgetController ?? GlassMenuController();
-  late final AnimationController _progress = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 280),
-    reverseDuration: const Duration(milliseconds: 200),
-  );
+  late final AnimationController _progress;
   bool _open = false;
 
   GlassMenuController? get _widgetController;
@@ -1307,6 +1303,11 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
   @override
   void initState() {
     super.initState();
+    _progress = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+      reverseDuration: const Duration(milliseconds: 200),
+    );
     _controller._state = this;
   }
 

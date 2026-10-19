@@ -311,6 +311,38 @@ void main() {
     await tester.pump();
     expect(pressed, <int>[1]);
   });
+
+  testWidgets('menu and popover anchors create their animation controller in initState', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _App(
+        home: Center(
+          child: Column(
+            children: <Widget>[
+              GlassMenuAnchor(
+                items: const <GlassMenuItem>[],
+                builder: (BuildContext context, GlassMenuController c) => const Text('menu'),
+              ),
+              GlassPopoverAnchor(
+                popoverBuilder: (BuildContext context) => const SizedBox(),
+                builder: (BuildContext context, GlassMenuController c) => const Text('popover'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    for (final Type type in <Type>[GlassMenuAnchor, GlassPopoverAnchor]) {
+      final State state = tester.state(find.byType(type));
+      final DiagnosticsNode? ticker = state
+          .toDiagnosticsNode()
+          .getProperties()
+          .where((DiagnosticsNode p) => p.name == 'ticker')
+          .firstOrNull;
+      expect(ticker?.value, isNotNull, reason: '$type did not create its controller in initState');
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
 }
 
 GlassProxyHandle _handle(WidgetTester tester) => tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
