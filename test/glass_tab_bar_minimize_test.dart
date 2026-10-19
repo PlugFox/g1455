@@ -21,6 +21,10 @@
 //    changed (one per bare `setState`, before this feature as after it);
 //  - `debugGlassTabMinimizeTravel` is the cost arm's own control: off, every
 //    frame of the collapse is a capture.
+//  - in `_GlassTabBarState.build`, `math.min(kGlassTabAccessoryHeight,
+//    circle.height) / 2` -> `kGlassTabAccessoryHeight / 2`: the accessory is
+//    48 tall beside a 44-tall circle and hangs past the box, and the 44-tall
+//    arm fails.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';

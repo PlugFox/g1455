@@ -17,7 +17,8 @@
 //     label and the bar over white light glass with a black one, in either
 //     appearance; with it off, both wear the appearance's branch. A finish the
 //     bar names is kept and only its label follows; one the host names, the
-//     same; a rich backdrop keeps the worst-case label.
+//     same; a rich backdrop keeps the worst-case label. A tab bar and its
+//     accessory over two halves wear the bar's branch, both of them.
 //  4. **What it costs.** Off, a screen captured on every frame reads nothing
 //     back and the handle carries no verdicts. On, a still screen reads once
 //     and never again, and a screen captured on every frame reads at most once
@@ -41,6 +42,9 @@
 //    follows, and (3) fails;
 //  - in `_GlassPanelState._onReadings`, `_reduceMotion ||` deleted: the
 //    reduced-motion arm of (5) fails.
+//  - in `_GlassPanelState._readingOfGlass`, `share == null || _leads ?
+//    context : share._lead` -> `context`: a tab bar's accessory reads its own
+//    backdrop, and both tab bar arms fail.
 
 import 'package:flutter/foundation.dart';
 
