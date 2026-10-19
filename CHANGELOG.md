@@ -47,6 +47,23 @@ Fixes:
   the side-by-side layout the bar is 44 tall, and a 48-tall capsule centred
   on the circle hung 2 px past the bar's box, which clipped its bottom edge
   and corners. Beside the circle it is no taller than the circle now (#9).
+- A surface that replaces another at the same rect draws. The host's
+  oracle watches rectangles and a frame finds its slots by identity, so a
+  swap that moved no rectangle, behind a repaint boundary of its own, held
+  the capture and the newcomer drew nothing until something else changed —
+  `GlassMorph` settling into a plain surface did. The host now retakes when
+  the set of surfaces it captures for changes. The same check catches glass
+  that comes back to the top rung at the rects it left.
+- The capture walk counts a colour filter under an `OpacityLayer` that
+  arrives through `pushLayer`, as it did under a composited one, and sends
+  that subtree to the stock capture.
+- `FilteringCanvas` drops a mask-filtered paint on every draw that takes a
+  paint — points, images, vertices, atlases — not only on the shapes, as
+  `dropMaskFiltered` is documented to.
+- `GlassMenuAnchor`, `GlassPopoverAnchor` and a `GlassPageControl` given a
+  `PageController` create their animation controller in `initState`. Never
+  opened, or never animated, they created it for the first time in
+  `dispose`, which Flutter tolerates only from 3.47.
 - `GlassBadge`, `GlassScaffold` and `GlassTabBar` build without an ambient
   `Directionality` (#8).
 - The site's service worker precaches the shaders with the code that writes
