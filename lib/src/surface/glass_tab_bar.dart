@@ -721,6 +721,12 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   }
 
   void _onMove(PointerMoveEvent e) {
+    // Gone under the finger — a route popped, a list recycled the row: the
+    // binding still routes the rest of the gesture to this `Listener`, and the
+    // controllers it would move are disposed.
+    if (!mounted) {
+      return;
+    }
     final _TabGeometry? g = _geometry;
     if (!_down || g == null) {
       return;
@@ -734,6 +740,9 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   }
 
   void _onUp(PointerUpEvent e) {
+    if (!mounted) {
+      return;
+    }
     final _TabGeometry? g = _geometry;
     if (!_down || g == null) {
       return;
@@ -752,7 +761,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   }
 
   void _onCancel(PointerCancelEvent e) {
-    if (!_down) {
+    if (!mounted || !_down) {
       return;
     }
     _down = false;

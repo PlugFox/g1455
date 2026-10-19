@@ -129,47 +129,10 @@ void main() {
   ) async {
     final show = ValueNotifier<bool>(true);
     addTearDown(show.dispose);
-
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(size: kScreen, devicePixelRatio: 2),
-        child: Directionality(
-          textDirection: .ltr,
-          child: Align(
-            alignment: .topLeft,
-            child: GlassHost(
-              hardware: .appleMetal,
-              child: SizedBox.fromSize(
-                size: kScreen,
-                child: Stack(
-                  children: <Widget>[
-                    const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F1EA))),
-                    Positioned.fromRect(
-                      rect: kBar,
-                      child: ValueListenableBuilder<bool>(
-                        valueListenable: show,
-                        builder: (context, visible, _) {
-                          if (!visible) {
-                            return const SizedBox.shrink();
-                          }
-                          return const GlassSurface(
-                            ripple: GlassRipple(),
-                            child: SizedBox.expand(),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    await _mount(
+      tester,
+      _Shown(show, () => const GlassSurface(ripple: GlassRipple(), child: SizedBox.expand())),
     );
-    for (var i = 0; i < 4; i++) {
-      await tester.pump();
-    }
 
     final TestGesture finger = await tester.startGesture(kBar.center);
     await tester.pump();
@@ -180,6 +143,48 @@ void main() {
     await finger.up();
     await _settle(tester);
   });
+
+  // The route pops, a tab switches the page, a list recycles the row: the
+  // control is gone while its finger is still down. The gesture binding keeps
+  // routing that pointer to the targets of the down's hit test, so the move
+  // and the up still arrive — at a `Listener` whose state, and whose
+  // animation controllers, have been disposed.
+  final controls = <String, Widget Function()>{
+    'tab bar': () => _Tabs(onSelected: (_) {}),
+    'segmented control': () => _Segments(onSelected: (_) {}, enabled: const AlwaysStoppedAnimation<bool>(true)),
+    'button': () => Center(
+      child: GlassButton(onPressed: () {}, child: const Text('Go')),
+    ),
+    'switch': () => Center(child: GlassSwitch(value: false, onChanged: (_) {})),
+    'slider': () => GlassSlider(value: 0.2, onChanged: (_) {}),
+    'stepper': () => Center(child: GlassStepper(value: 1, onChanged: (_) {})),
+    'page control': () => Center(child: GlassPageControl(count: 4, onPageChanged: (_) {})),
+  };
+  for (final MapEntry<String, Widget Function()> control in controls.entries) {
+    for (final lift in <bool>[true, false]) {
+      testWidgets('${control.key}: removed under a held finger, the rest of its gesture is ignored '
+          '(${lift ? 'lifted' : 'cancelled'})', (
+        WidgetTester tester,
+      ) async {
+        final show = ValueNotifier<bool>(true);
+        addTearDown(show.dispose);
+        await _mount(tester, _Shown(show, control.value));
+
+        final TestGesture finger = await tester.startGesture(_tab(0));
+        await tester.pump(const Duration(milliseconds: 16));
+        await finger.moveTo(_tab(0.5));
+        await tester.pump(const Duration(milliseconds: 16));
+
+        show.value = false;
+        await tester.pump();
+        await finger.moveTo(_tab(1.5));
+        await tester.pump(const Duration(milliseconds: 16));
+        await (lift ? finger.up() : finger.cancel());
+        await _settle(tester);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -284,5 +289,19 @@ class _SegmentsState extends State<_Segments> {
             }
           : null,
     ),
+  );
+}
+
+/// [child] while [show] is true, and nothing once it is not.
+class _Shown extends StatelessWidget {
+  const _Shown(this.show, this.child);
+
+  final ValueListenable<bool> show;
+  final Widget Function() child;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+    valueListenable: show,
+    builder: (BuildContext context, bool visible, Widget? _) => visible ? child() : const SizedBox.shrink(),
   );
 }
