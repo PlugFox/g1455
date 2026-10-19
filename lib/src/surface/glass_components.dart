@@ -664,7 +664,7 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
     super.didChangeDependencies();
     final GlassSharedReadingScope? scope = GlassSharedReadingScope._of(context);
     final GlassSharedReading? share = scope?.share;
-    if (!identical(share, _share) || scope?.leads != _leads) {
+    if (!identical(share, _share) || (scope?.leads ?? false) != _leads) {
       _leaveShare();
       _share = share;
       _leads = scope?.leads ?? false;
@@ -809,9 +809,9 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
               : _GlassOverlay(widget.borderRadius, widget.overlay, focusRing: widget.focusRing),
           child: Padding(
             padding: widget.padding,
-            child: _share == null
-                ? _labelled(theme, shown, widget.child)
-                : GlassSharedReadingScope(share: null, child: _labelled(theme, shown, widget.child)),
+            // Hides the panel's scope from what it holds, there with or without
+            // a share so that one coming or going keeps the tree's shape.
+            child: GlassSharedReadingScope(share: null, child: _labelled(theme, shown, widget.child)),
           ),
         ),
       ),

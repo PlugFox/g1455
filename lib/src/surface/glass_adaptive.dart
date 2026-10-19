@@ -203,7 +203,7 @@ class GlassAdaptive {
 /// ```
 ///
 /// A *colour* for content on the glass is not picked from it: the glass is
-/// drawn on a branch that switches at a different level ([brightness]), so
+/// drawn on a branch that switches at a different level from [brightness], so
 /// over a mid grey the two disagree. The label is that colour, chosen against
 /// the glass as drawn:
 ///

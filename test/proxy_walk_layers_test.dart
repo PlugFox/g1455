@@ -334,12 +334,11 @@ void main() {
       plain.dispose();
     });
 
-    // `pushLayer` does not raise the alpha depth the way `pushOpacity` and a
-    // composited opacity boundary do, so a colour filter under an opacity layer
-    // pushed this way escapes `opacityFoldedIntoFilter` — the counter whose
-    // non-zero value is meant to send the subtree to the stock capture. No
-    // framework widget pushes an `OpacityLayer` through `pushLayer`; a custom
-    // render object may.
+    // `pushLayer` raises the alpha depth as `pushOpacity` and a composited
+    // opacity boundary do, so a colour filter under an opacity layer pushed this
+    // way is counted in `opacityFoldedIntoFilter` — the counter whose non-zero
+    // value sends the subtree to the stock capture. No framework widget pushes
+    // an `OpacityLayer` through `pushLayer`; a custom render object may.
     testWidgets(
       'a colour filter under an opacity layer pushed through pushLayer is counted as folded',
       (WidgetTester tester) async {

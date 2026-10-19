@@ -131,9 +131,9 @@ out, or pass `IconTheme.of(context).color` on.
 
 ### Adaptive glass does not adapt
 
-`GlassHost(adaptive: GlassAdaptive())` re-picks the glass for bars, cards and buttons only. A raw `GlassSurface`, a
-`GlassScrollEdge`, the tab bar and the segmented control keep the branch picked from `backdrop`, and a fused group's
-members adapt only their labels. A finish that is named anywhere, on the surface, the component, the host or a theme,
+`GlassHost(adaptive: GlassAdaptive())` re-picks the glass for bars, cards, buttons and the tab bar, its accessory with
+it. A raw `GlassSurface`, a `GlassScrollEdge` and the segmented control keep the branch picked from `backdrop`, and a
+fused group's members adapt only their labels. A finish that is named anywhere, on the surface, the component, the host or a theme,
 is held, and only its label follows the reading.
 
 ### "N of M surfaces in a GlassGroup name their own finish."

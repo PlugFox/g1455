@@ -1173,7 +1173,8 @@ class _GlassHostState extends State<GlassHost> {
     // a repaint boundary of its own the walk sees nothing either — the capture
     // would be held, and the newcomer, missing from it, would draw nothing until
     // something else changed. As a set, so a surface that re-registers (a
-    // reparent) and only changes its place in the register retakes nothing.
+    // reparent) and only changes its place in the register is no newcomer; its
+    // rectangle, moved in the list the oracle watches, still retakes once.
     final Set<GlassSurfaceGeometry> presentSet = present.toSet();
     if (!setEquals(presentSet, _lastPresent)) {
       _lastPresent = presentSet;
