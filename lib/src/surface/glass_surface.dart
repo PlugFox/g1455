@@ -579,6 +579,9 @@ class RenderGlassSurface extends RenderProxyBox implements GlassSurfaceGeometry 
 
   @override
   void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
+    if (!attached) {
+      return;
+    }
     final GlassRippleField? field = _rippleField;
     if (field == null) {
       return;
