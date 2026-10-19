@@ -220,6 +220,40 @@ void main() {
     expect(optics.optics.strength, closeTo(GlassFinish.clear.optics.strength / 2, 1e-9));
   });
 
+  test('content on the glass follows the label, not the backdrop\'s brightness', () {
+    // The two tests disagree between the appearance's switch and the black and
+    // white midpoint (~118): over grey 70 in the light appearance the glass is
+    // light while the backdrop is dark, and over grey 150 in the dark one the
+    // other way round. A recipe mapping `reading.brightness` to an icon colour
+    // paints white on light glass in the first (#11); the label does not.
+    for (final (Brightness appearance, double level, GlassFinish glass, Color label)
+        in <
+          (
+            Brightness,
+            double,
+            GlassFinish,
+            Color,
+          )
+        >[
+          (Brightness.light, 70, GlassFinish.regularLight, kBlack),
+          (Brightness.dark, 150, GlassFinish.regularDark, kWhite),
+        ]) {
+      final GlassBackdropReading reading = _grey(level);
+      final GlassThemeData over = GlassThemeData(
+        finish: GlassFinish.regularLight,
+        adaptive: const GlassAdaptive(),
+        regularAppearance: appearance,
+      ).adaptedTo(reading);
+      expect(over.finish, glass, reason: '$appearance over $level');
+      expect(over.legibility().label, label, reason: '$appearance over $level');
+      expect(
+        reading.brightness == Brightness.light ? kBlack : kWhite,
+        isNot(label),
+        reason: 'the arm needs a backdrop where the two tests disagree',
+      );
+    }
+  });
+
   test('the theme over a reading: the branch follows, a named finish holds', () {
     final GlassBackdropReading dark = _grey(10);
     const follows = GlassThemeData(

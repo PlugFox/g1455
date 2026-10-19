@@ -777,8 +777,15 @@ that colour.
 
 ## Content on the glass
 
-Inside a component that reads its backdrop, `GlassTheme.of(context).reading` is what it read, so an icon that is not a
-label, or a custom painter, can follow it:
+A colour for content on the glass — an icon that is not a label, a custom painter — is the label's, which is already
+chosen against the glass as drawn, on the branch it is on and halfway through a move between two:
+
+```dart
+final Color onGlass = GlassTheme.of(context).legibility().label;
+```
+
+Inside a component that reads its backdrop, `GlassTheme.of(context).reading` is what it read, for content that follows
+the backdrop itself rather than the glass:
 
 ```dart
 final GlassBackdropReading? reading = GlassTheme.of(context).reading;
@@ -786,8 +793,10 @@ final bool overLight = reading?.brightness == Brightness.light;
 ```
 
 It is null with adaptive off and before the first reading. `level` is the mean's luma in code values (0 to 255),
-`luminance` its WCAG relative luminance, and `brightness` whether black or white stands out more against it. The
-branch the glass is on is `GlassTheme.of(context).finish`.
+`luminance` its WCAG relative luminance, and `brightness` whether black or white stands out more against the backdrop
+with no glass between. **It is not a colour for the glass**: the branch the glass is on
+(`GlassTheme.of(context).finish`) switches at a different level, so over a mid grey in the light appearance the glass
+is light while `brightness` says dark, and an icon picked by it would be white on light glass.
 
 A custom component does what the built-in ones do with `GlassThemeData.adaptedTo(reading)`. To turn adaptive off for a
 subtree, nest `GlassTheme(data: GlassTheme.of(context).withAdaptive(null), ...)`.
