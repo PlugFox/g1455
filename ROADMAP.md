@@ -90,6 +90,14 @@ cheap setting is reachable without a fork.
       group, 24 to 12 for the ripple; byte-identical pixels, about a
       microsecond less raster time a draw on Metal.
 
+## Done — 0.3.0
+
+- [x] The tab bar adapts as one control: its accessory wears the bar's
+      verdict on its backdrop.
+- [x] `GlassLoad` prices only glass that draws; a control's drop at rest is
+      `restingSurfaceCount`.
+- [x] Controls removed under a held finger ignore the rest of the gesture.
+
 ## Next — what 0.2.0 left open
 
 - [ ] The engine's `RSuperellipse` corner in the shader. Tried and deferred:

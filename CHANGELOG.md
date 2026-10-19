@@ -1,3 +1,58 @@
+## 0.3.0
+
+A minor version rather than a patch, for two changes in behaviour: under an
+adaptive host the tab bar's accessory now wears the bar's branch instead of
+its own, and `GlassLoad` counts only glass that draws. Existing code builds
+unchanged.
+
+Adaptive glass:
+
+- The tab bar adapts, as one control. It did already, by accident, because
+  the bar is a `GlassBar`, while the guide said it did not; its accessory, a
+  `GlassBar` of its own, read its own backdrop, so a light bar could sit
+  under a dark accessory as rows scrolled by. The accessory now wears the
+  bar's verdict, and the two cross between branches together. The guide,
+  the tab bar page and the README say so (#10).
+- The `GlassBackdropReading` example, the site's "Content on the glass" and
+  the skill picked an icon colour from `reading.brightness`, which switches
+  at a different level from the glass: over a mid grey in the light
+  appearance that is a white icon on light glass. They give
+  `GlassTheme.of(context).legibility().label` for a colour now, and keep
+  `brightness` for content that follows the backdrop itself (#11).
+
+Cost:
+
+- `GlassLedger.read` leaves glass that draws nothing out of the load. A
+  control's drop at rest is a registered surface at `materialize` 0; it
+  paints no glass and the host captured nothing for it, yet the ledger
+  counted it, so twenty resting switches read as twenty captured surfaces
+  and twenty surfaces of fragmentation excess. They are
+  `GlassLoad.restingSurfaceCount` now, and in none of the other counts or
+  areas (#12).
+- `GlassSurfaceRecord.draws` and `GlassSurfaceRecord.captured`: the one test
+  the host's capture and the ledger both use, where each kept its own.
+
+Fixes:
+
+- A `GlassSurface` removed under a held finger no longer asserts on the rest
+  of the gesture: the binding keeps routing it to the targets of the down's
+  hit test, and the surface transformed the position while detached (#13,
+  by @melo936).
+- `GlassTabBar` and `GlassSegmentedControl` removed under a held finger — a
+  route popped, a list recycled the row — ignore the rest of the gesture.
+  They moved animation controllers they had disposed, which asserts in debug
+  and throws a null check in release. The button, switch, slider, stepper
+  and page control are tested the same way and were already safe.
+- A tab bar's accessory beside the collapsed circle keeps its lower rim. On
+  the side-by-side layout the bar is 44 tall, and a 48-tall capsule centred
+  on the circle hung 2 px past the bar's box, which clipped its bottom edge
+  and corners. Beside the circle it is no taller than the circle now (#9).
+- `GlassBadge`, `GlassScaffold` and `GlassTabBar` build without an ambient
+  `Directionality` (#8).
+- The site's service worker precaches the shaders with the code that writes
+  their uniforms: a returning browser ran the cached code of its last visit
+  against the new shaders, and a press drew the glass black (#8).
+
 ## 0.2.0
 
 A minor version rather than a patch: new components, new parameters on the
