@@ -238,6 +238,9 @@ const double kGlassTabMinimizeScroll = 12;
 /// The height of [GlassTabBar.bottomAccessory]'s glass, logical px. Layout
 /// taste: the bar's minimum tap target and a little.
 ///
+/// Beside a collapsed bar it is no taller than the circle: 44 next to the
+/// side-by-side layout's circle, which is that tall.
+///
 /// {@category Panels and controls}
 const double kGlassTabAccessoryHeight = 48;
 
@@ -849,11 +852,15 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                               builder: (BuildContext context, Widget? child) {
                                 final double m = _minimize.value.clamp(0.0, 1.0);
                                 final open = Rect.fromLTWH(0, 0, width, kGlassTabAccessoryHeight);
+                                // No taller than the circle it sits beside: a
+                                // 44-tall bar's box ends 2 px short of a 48-tall
+                                // capsule centred on it, and this Stack clips.
+                                final double half = math.min(kGlassTabAccessoryHeight, circle.height) / 2;
                                 final inline = Rect.fromLTRB(
                                   rtl ? 0 : circle.right + _kAccessoryGap,
-                                  circle.center.dy - kGlassTabAccessoryHeight / 2,
+                                  circle.center.dy - half,
                                   rtl ? circle.left - _kAccessoryGap : width,
-                                  circle.center.dy + kGlassTabAccessoryHeight / 2,
+                                  circle.center.dy + half,
                                 );
                                 return Stack(
                                   children: <Widget>[
