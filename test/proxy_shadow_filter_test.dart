@@ -237,27 +237,91 @@ void main() {
     });
 
     // The library documents `dropMaskFiltered` as "anything painted through a
-    // MaskFilter", but the paint-carrying draws below the shape family are
-    // forwarded without the check. None of the framework's shadow routes
-    // lowers to them, so the gap is harmless today; the arm records it so a
-    // change of either the doc or the code is a decision rather than a drift.
+    // MaskFilter". The paint-carrying draws below the shape family (images,
+    // points, vertices, atlas) must consult the same rule as the shape draws:
+    // dropped and counted when carrying a mask filter, forwarded when plain.
     test(
-      'drawPoints, drawImage and drawVertices drop a mask-filtered paint like the shape draws',
+      'every paint-carrying draw drops a mask-filtered paint like the shape draws, and forwards a plain one',
       () async {
-        final filter = ShadowFilter();
-        final Paint blurred = Paint()
-          ..color = const Color(0xFFE08020)
-          ..strokeWidth = 8
-          ..maskFilter = kBlur;
-        await _raster(
-          (Canvas c) =>
-              FilteringCanvas(c, filter).drawPoints(ui.PointMode.points, const <Offset>[Offset(32, 32)], blurred),
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 16, 16), Paint()..color = const Color(0xFFE08020));
+        final ui.Picture picture = recorder.endRecording();
+        final ui.Image sprite = picture.toImageSync(16, 16);
+        picture.dispose();
+        final vertices = ui.Vertices(
+          VertexMode.triangles,
+          const <Offset>[Offset(8, 8), Offset(56, 8), Offset(32, 56)],
         );
-        expect(filter.maskFilteredDraws, 1);
+
+        try {
+          final nonShapeDraws = <String, void Function(Canvas c, Paint p)>{
+            'drawPoints': (Canvas c, Paint p) =>
+                c.drawPoints(ui.PointMode.points, const <Offset>[Offset(32, 32)], p..strokeWidth = 8),
+            'drawRawPoints': (Canvas c, Paint p) => c.drawRawPoints(
+              ui.PointMode.lines,
+              Float32List.fromList(<double>[8, 8, 56, 56]),
+              p..strokeWidth = 4,
+            ),
+            'drawImage': (Canvas c, Paint p) => c.drawImage(sprite, const Offset(8, 8), p),
+            'drawImageRect': (Canvas c, Paint p) => c.drawImageRect(
+              sprite,
+              const Rect.fromLTWH(0, 0, 16, 16),
+              const Rect.fromLTWH(8, 8, 48, 48),
+              p,
+            ),
+            'drawImageNine': (Canvas c, Paint p) => c.drawImageNine(
+              sprite,
+              const Rect.fromLTWH(4, 4, 8, 8),
+              const Rect.fromLTWH(8, 8, 48, 48),
+              p,
+            ),
+            'drawVertices': (Canvas c, Paint p) => c.drawVertices(vertices, BlendMode.srcOver, p),
+            'drawAtlas': (Canvas c, Paint p) => c.drawAtlas(
+              sprite,
+              <RSTransform>[RSTransform(1, 0, 8, 8)],
+              const <Rect>[Rect.fromLTWH(0, 0, 16, 16)],
+              null,
+              null,
+              null,
+              p,
+            ),
+            'drawRawAtlas': (Canvas c, Paint p) => c.drawRawAtlas(
+              sprite,
+              Float32List.fromList(<double>[1, 0, 8, 8]),
+              Float32List.fromList(<double>[0, 0, 16, 16]),
+              null,
+              null,
+              null,
+              p,
+            ),
+          };
+
+          for (final MapEntry<String, void Function(Canvas, Paint)> e in nonShapeDraws.entries) {
+            final filter = ShadowFilter();
+            Paint plain() => Paint()..color = const Color(0xFFE08020);
+            final Uint8List bare = await _raster((Canvas c) => e.value(c, plain()));
+            final Uint8List kept = await _raster((Canvas c) => e.value(FilteringCanvas(c, filter), plain()));
+            expect(
+              _opaquePixels(bare),
+              greaterThan(0),
+              reason: '${e.key}: the draw has to paint something to be dropped',
+            );
+            expect(_differing(bare, kept), 0);
+            expect(filter.maskFilteredDraws, 0);
+
+            final Uint8List dropped = await _raster(
+              (Canvas c) => e.value(FilteringCanvas(c, filter), plain()..maskFilter = kBlur),
+            );
+            expect(_opaquePixels(dropped), 0, reason: '${e.key} with a blur mask filter reached the canvas');
+            expect(filter.maskFilteredDraws, 1);
+            expect(filter.shadowCalls, 0);
+            expect(filter.dropped, 1);
+          }
+        } finally {
+          sprite.dispose();
+          vertices.dispose();
+        }
       },
-      skip:
-          'FilteringCanvas forwards drawPoints/drawRawPoints/drawImage*/drawVertices/drawAtlas without '
-          'consulting dropMaskFiltered, although its doc says "anything painted through a MaskFilter"',
     );
   });
 }
