@@ -21,6 +21,10 @@
 //    changed (one per bare `setState`, before this feature as after it);
 //  - `debugGlassTabMinimizeTravel` is the cost arm's own control: off, every
 //    frame of the collapse is a capture.
+//  - in `_GlassTabBarState.build`, `math.min(kGlassTabAccessoryHeight,
+//    circle.height) / 2` -> `kGlassTabAccessoryHeight / 2`: the accessory is
+//    48 tall beside a 44-tall circle and hangs past the box, and the 44-tall
+//    arm fails.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -79,6 +83,27 @@ void main() {
     rig.scroll.jumpTo(0);
     await tester.pumpAndSettle();
     expect(rig.bar.globalRect, open, reason: 'at the top of the content the bar stayed collapsed');
+  });
+
+  testWidgets('beside the circle of a 44-tall bar, the accessory is as tall as the circle and inside the box', (
+    WidgetTester tester,
+  ) async {
+    // 600 wide: 112 per item, so the items sit side by side and the bar is 44
+    // tall — shorter than the 48 of an open accessory. Centred on the circle at
+    // 48, the capsule hung 2 px past the bottom of the bar's box and lost its
+    // lower rim to the clip there (#9).
+    final _Rig rig = await _Rig.mount(tester, accessory: true, screen: const Size(600, 800));
+    expect(rig.bar.globalRect.height, 44);
+    expect(rig.accessory.globalRect.height, kGlassTabAccessoryHeight, reason: 'open, the accessory keeps its height');
+    rig.minimizer.value = true;
+    await tester.pumpAndSettle();
+    final Rect shut = rig.bar.globalRect;
+    final Rect inline = rig.accessory.globalRect;
+    final Rect box = tester.getRect(find.byType(GlassTabBar));
+    expect(shut.height, 44);
+    expect(inline.height, shut.height, reason: 'the accessory is not the circle\'s height beside it');
+    expect(inline.center.dy, closeTo(shut.center.dy, 0.01));
+    expect(box.top <= inline.top && inline.bottom <= box.bottom, isTrue, reason: '$inline is not inside $box');
   });
 
   testWidgets('a bar that does not ask to collapse does not', (WidgetTester tester) async {
@@ -324,10 +349,11 @@ class _Rig {
     ScrollNotificationPredicate predicate = defaultScrollNotificationPredicate,
     Widget Function(Widget list)? around,
     bool reverse = false,
+    Size screen = kScreen,
   }) async {
     await tester.pumpWidget(const SizedBox());
     tester.view
-      ..physicalSize = kScreen * 2
+      ..physicalSize = screen * 2
       ..devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     final hostKey = GlobalKey();

@@ -500,14 +500,93 @@ void main() {
       GlassLoadVerdict.hardwareUnmeasured,
     );
   });
+  test('a surface that draws nothing is in the register and not in the load', () {
+    // A control's drop at rest is registered on purpose — the press needs it
+    // there — and paints no glass on any rung, so the host captures nothing for
+    // it. The load is a price of drawn glass: counting it would charge twenty
+    // resting switches for twenty panels, and the excess for 20² of them (#12).
+    final ledger = GlassLedger();
+    addTearDown(ledger.dispose);
+    const panel = Rect.fromLTWH(0, 0, 120, 120);
+    ledger
+      ..register(_FixedSurface(panel))
+      ..register(_FixedSurface(panel.translate(0, 200), materialize: 0))
+      ..register(_FixedSurface(panel.translate(0, 400), presence: 0));
+    final GlassLoad load = ledger.read(
+      viewSize: const Size(400, 800),
+      model: GlassSurfaceCostModel.adrenoCycles,
+    );
+    expect(ledger.registeredCount, 3);
+    expect(load.surfaceCount, 1);
+    expect(load.capturedSurfaceCount, 1);
+    expect(load.restingSurfaceCount, 2);
+    expect(load.rectAreaLogical, 120 * 120);
+    expect(load.capturedRectAreaLogical, 120 * 120);
+    expect(load.bounds, panel);
+    // The control: the same three at full presence are three surfaces.
+    expect(
+      const <({double materialize, double presence})>[(materialize: 0, presence: 1), (materialize: 1, presence: 0)]
+          .map((r) => GlassSurfaceRecord(rect: panel, shapeArea: 1, materialize: r.materialize, presence: r.presence))
+          .any((GlassSurfaceRecord r) => r.draws),
+      isFalse,
+    );
+    expect(const GlassSurfaceRecord(rect: panel, shapeArea: 1).draws, isTrue);
+  });
+
+  testWidgets('resting switches cost the load nothing until one is held', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(400, 800)),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassHost(
+            hardware: GlassHardware.adrenoVulkan,
+            child: ColoredBox(
+              color: const Color(0xFF1A1D29),
+              child: Wrap(
+                children: <Widget>[
+                  for (var i = 0; i < 20; i++) GlassSwitch(value: i.isEven, onChanged: (_) {}),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+    GlassLoad read() => GlassScope.maybeOf(tester.element(find.byType(Wrap)))!.read(
+      viewSize: const Size(400, 800),
+      model: GlassSurfaceCostModel.adrenoCycles,
+    );
+    final GlassLoad rest = read();
+    expect(rest.restingSurfaceCount, 20, reason: 'the drops are registered at rest; the arm means nothing otherwise');
+    expect(rest.surfaceCount, 0);
+    expect(rest.capturedSurfaceCount, 0);
+    expect(rest.screensOfGlass, 0);
+
+    final TestGesture finger = await tester.startGesture(tester.getCenter(find.byType(GlassSwitch).first));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final GlassLoad held = read();
+    expect(held.surfaceCount, 1, reason: 'a held drop is glass');
+    expect(held.capturedSurfaceCount, 1);
+    expect(held.restingSurfaceCount, 19);
+    await finger.up();
+    await tester.pumpAndSettle();
+  });
 }
 
 /// A surface that is simply somewhere, for testing the arithmetic without a
 /// render tree.
 class _FixedSurface implements GlassSurfaceGeometry {
-  _FixedSurface(this.rect);
+  _FixedSurface(this.rect, {this.materialize = 1, this.presence = 1});
 
   final Rect rect;
+  final double materialize;
+  final double presence;
 
   // Never composited: this surface is arithmetic, not a render object.
   @override
@@ -527,5 +606,7 @@ class _FixedSurface implements GlassSurfaceGeometry {
     shapeArea: GlassLedger.shapeAreaOf(
       RSuperellipse.fromRectAndRadius(rect, const Radius.circular(12)),
     ),
+    materialize: materialize,
+    presence: presence,
   );
 }

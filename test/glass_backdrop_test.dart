@@ -373,6 +373,55 @@ void main() {
     expect(surface.paintsWithDeclaredBackdrop, greaterThan(before));
   });
 
+  testWidgets('an image that fails to load reports an error and leaves glass on the capture', (
+    WidgetTester tester,
+  ) async {
+    FlutterErrorDetails? reported;
+    final void Function(FlutterErrorDetails)? previous = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) {
+      if (details.library == 'g1455') {
+        reported = details;
+        return;
+      }
+      previous?.call(details);
+    };
+    addTearDown(() => FlutterError.onError = previous);
+
+    final hostKey = GlobalKey();
+    await tester.pumpWidget(
+      _wrap(
+        GlassHost(
+          key: hostKey,
+          hardware: GlassHardware.appleMetal,
+          finish: GlassFinish.regularDark,
+          child: GlassBackdrop.image(
+            const _FailingImageProvider(),
+            child: Stack(
+              children: <Widget>[
+                const Positioned.fill(child: ColoredBox(color: _kGrey)),
+                Positioned.fromRect(rect: _kPanel, child: const GlassSurface()),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(reported, isNotNull, reason: 'the image load failure was not reported');
+    expect(reported!.library, 'g1455');
+    expect(reported!.context?.toDescription(), 'while loading the image of a GlassBackdrop');
+
+    final RenderGlassSurface surface = _surface(tester);
+    expect(surface.readsDeclaredBackdrop, isFalse, reason: 'sampled a declared texture despite load failure');
+    expect(surface.paintsWithDeclaredBackdrop, 0, reason: 'painted with declared texture despite load failure');
+    expect(
+      (hostKey.currentState! as dynamic).recorded,
+      greaterThan(0),
+      reason: 'the glass did not fall back to capture',
+    );
+  });
+
   testWidgets('a still surface that moves keeps drawing while another materializes over the same declaration', (
     WidgetTester tester,
   ) async {
@@ -766,4 +815,15 @@ Future<_Diff> _compare(WidgetTester tester, ui.Image a, ui.Image b, Rect region)
     diff = _Diff(maxDelta, differing, compared);
   });
   return diff;
+}
+
+class _FailingImageProvider extends ImageProvider<_FailingImageProvider> {
+  const _FailingImageProvider();
+
+  @override
+  Future<_FailingImageProvider> obtainKey(ImageConfiguration configuration) =>
+      Future<_FailingImageProvider>.error(Exception('image failed to load'));
+
+  @override
+  ImageStreamCompleter loadImage(_FailingImageProvider key, ImageDecoderCallback decode) => throw UnimplementedError();
 }

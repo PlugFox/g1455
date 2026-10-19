@@ -282,7 +282,7 @@ Every name links to its page in the API reference.
 | [`GlassFinish`][GlassFinish] | The optics: `.regularDark`, `.regularLight`, `.clear` and `.frosted`, calibrated against Apple's own materials on iOS 26. Apple's `.regular` is two materials, dark over dark content and light over light, and `GlassHost` picks the branch the same way unless you name one: from `backdrop` and the platform's appearance. |
 | [`GlassTheme`][GlassTheme] · [`GlassThemeData`][GlassThemeData] | The tokens a screen's glass reads: the finish every surface wears unless it names its own, the rung, the label floor. |
 | [`GlassRipple`][GlassRipple] | Optional, and not Apple's. A viscous wave from the touch: a dimple under the finger, a front that travels out, a spring-back on release. `viscosity` goes from water (0) to honey (1). Declare it on `GlassHost.ripple` for every surface, or on `GlassSurface.ripple` for one. A wave takes no capture and repaints nothing; off under reduced motion. |
-| [`GlassAdaptive`][GlassAdaptive] | Optional: glass that reads its own backdrop. Each bar, card and button picks the branch of `.regular` and its label from the mean level of the capture under it, instead of from `backdrop`. Off by default and free when off; on, a small read-back per capture, at most once per `interval` (250 ms, a second on the web), behind a band and a hold. |
+| [`GlassAdaptive`][GlassAdaptive] | Optional: glass that reads its own backdrop. Each bar, card, button and tab bar picks the branch of `.regular` and its label from the mean level of the capture under it, instead of from `backdrop`. Off by default and free when off; on, a small read-back per capture, at most once per `interval` (250 ms, a second on the web), behind a band and a hold. |
 | [`GlassDropMotion`][GlassDropMotion] | How the held drop of the switch, slider, segmented control and tab bar stretches as it sets off and squashes as it stops. On and subtle by default, because it costs no capture; `GlassDropMotion.none` turns it off, and so does reduced motion. Declare it on `GlassHost`, the theme or one control. |
 | [`GlassPress`][GlassPress] | How a pressed `GlassButton` swells (12 px on its longest side) and leans toward a dragging finger, then springs back. A feel, not a measurement: Apple's press was not measured. Two captures a press and none at rest; `GlassPress.none` turns it off, and so does reduced motion. Declare it on `GlassHost`, the theme or one button. |
 | [`GlassConcentric`][GlassConcentric] | Apple's concentric corners as arithmetic: a shape inset inside glass takes the glass's radius less the inset, never below a floor. For anything you nest in a surface. |
@@ -867,9 +867,10 @@ cyan outline. The same list, at more length:
 - **Labels in a bar have the wrong colour.** Bars, cards, buttons and modals set
   `DefaultTextStyle` and `IconTheme` to a legible colour; a colour hard-coded
   inside them overrides it.
-- **Adaptive glass does not adapt.** `GlassAdaptive` re-picks bars, cards and
-  buttons. A raw `GlassSurface`, `GlassScrollEdge`, the tab bar and the
-  segmented control do not adapt, and a finish named anywhere is held.
+- **Adaptive glass does not adapt.** `GlassAdaptive` re-picks bars, cards,
+  buttons and the tab bar (its accessory with it). A raw `GlassSurface`,
+  `GlassScrollEdge` and the segmented control do not adapt, and a finish named
+  anywhere is held.
 - **`N of M surfaces in a GlassGroup name their own finish.`** A fused group is
   one draw with one finish: the group's. Its members draw no `fade` and no
   ripple either.

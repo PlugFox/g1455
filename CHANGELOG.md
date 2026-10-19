@@ -1,3 +1,87 @@
+## 0.3.0
+
+A minor version rather than a patch, for two changes in behaviour: under an
+adaptive host the tab bar's accessory now wears the bar's branch instead of
+its own, and `GlassLoad` counts only glass that draws. Existing code builds
+unchanged.
+
+Adaptive glass:
+
+- The tab bar adapts, as one control. It did already, by accident, because
+  the bar is a `GlassBar`, while the guide said it did not; its accessory, a
+  `GlassBar` of its own, read its own backdrop, so a light bar could sit
+  under a dark accessory as rows scrolled by. The accessory now wears the
+  bar's verdict, and the two cross between branches together. The guide,
+  the tab bar page and the README say so (#10).
+- The `GlassBackdropReading` example, the site's "Content on the glass" and
+  the skill picked an icon colour from `reading.brightness`, which switches
+  at a different level from the glass: over a mid grey in the light
+  appearance that is a white icon on light glass. They give
+  `GlassTheme.of(context).legibility().label` for a colour now, and keep
+  `brightness` for content that follows the backdrop itself (#11).
+
+Cost:
+
+- `GlassLedger.read` leaves glass that draws nothing out of the load. A
+  control's drop at rest is a registered surface at `materialize` 0; it
+  paints no glass and the host captured nothing for it, yet the ledger
+  counted it, so twenty resting switches read as twenty captured surfaces
+  and twenty surfaces of fragmentation excess. They are
+  `GlassLoad.restingSurfaceCount` now, and in none of the other counts or
+  areas (#12).
+- `GlassSurfaceRecord.draws` and `GlassSurfaceRecord.captured`: the one test
+  the host's capture and the ledger both use, where each kept its own.
+
+Fixes:
+
+- A `GlassSurface` removed under a held finger no longer asserts on the rest
+  of the gesture: the binding keeps routing it to the targets of the down's
+  hit test, and the surface transformed the position while detached (#13,
+  by @melo936).
+- `GlassTabBar` and `GlassSegmentedControl` removed under a held finger — a
+  route popped, a list recycled the row — ignore the rest of the gesture.
+  They moved animation controllers they had disposed, which asserts in debug
+  and throws a null check in release. The button, switch, slider, stepper
+  and page control are tested the same way and were already safe.
+- A tab bar's accessory beside the collapsed circle keeps its lower rim. On
+  the side-by-side layout the bar is 44 tall, and a 48-tall capsule centred
+  on the circle hung 2 px past the bar's box, which clipped its bottom edge
+  and corners. Beside the circle it is no taller than the circle now (#9).
+- A surface that replaces another at the same rect draws. The host's
+  oracle watches rectangles and a frame finds its slots by identity, so a
+  swap that moved no rectangle, behind a repaint boundary of its own, held
+  the capture and the newcomer drew nothing until something else changed —
+  `GlassMorph` settling into a plain surface did. The host now retakes when
+  the set of surfaces it captures for changes. The same check catches glass
+  that comes back to the top rung at the rects it left.
+- The capture walk counts a colour filter under an `OpacityLayer` that
+  arrives through `pushLayer`, as it did under a composited one, and sends
+  that subtree to the stock capture.
+- `FilteringCanvas` drops a mask-filtered paint on every draw that takes a
+  paint — points, images, vertices, atlases — not only on the shapes, as
+  `dropMaskFiltered` is documented to.
+- `GlassMenuAnchor`, `GlassPopoverAnchor` and a `GlassPageControl` given a
+  `PageController` create their animation controller in `initState`. Never
+  opened, or never animated, they created it for the first time in
+  `dispose`, which Flutter tolerates only from 3.47.
+- A `GlassMenuController` given to a `GlassMenuAnchor` or a
+  `GlassPopoverAnchor` in a rebuild drives it. The anchor kept the
+  controller it was built with for life, so the new one's `open` and
+  `close` did nothing; taken away, the anchor's own takes over, and an open
+  panel stays open.
+- A `GlassPageControl` whose `PageController` is taken away shows
+  `currentPage`. Its own position stood still while the controller led, so
+  a `currentPage` moved meanwhile was not shown, nor told to a screen
+  reader, until it moved again.
+- The capture walk keeps its count of open opacities when a painter throws
+  inside `pushOpacity`, as it does in `pushLayer`. The count stayed raised,
+  and every colour filter later in the pass was sent to the stock capture.
+- `GlassBadge`, `GlassScaffold` and `GlassTabBar` build without an ambient
+  `Directionality` (#8).
+- The site's service worker precaches the shaders with the code that writes
+  their uniforms: a returning browser ran the cached code of its last visit
+  against the new shaders, and a press drew the glass black (#8).
+
 ## 0.2.0
 
 A minor version rather than a patch: new components, new parameters on the

@@ -169,6 +169,86 @@ class FilteringCanvas implements Canvas {
     inner.drawPath(path, paint);
   }
 
+  @override
+  void drawImage(ui.Image image, Offset offset, Paint paint) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawImage(image, offset, paint);
+  }
+
+  @override
+  void drawImageRect(ui.Image image, Rect src, Rect dst, Paint paint) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawImageRect(image, src, dst, paint);
+  }
+
+  @override
+  void drawImageNine(ui.Image image, Rect center, Rect dst, Paint paint) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawImageNine(image, center, dst, paint);
+  }
+
+  @override
+  void drawPoints(ui.PointMode pointMode, List<Offset> points, Paint paint) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawPoints(pointMode, points, paint);
+  }
+
+  @override
+  void drawRawPoints(ui.PointMode pointMode, Float32List points, Paint paint) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawRawPoints(pointMode, points, paint);
+  }
+
+  @override
+  void drawVertices(ui.Vertices vertices, BlendMode blendMode, Paint paint) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawVertices(vertices, blendMode, paint);
+  }
+
+  @override
+  void drawAtlas(
+    ui.Image atlas,
+    List<RSTransform> transforms,
+    List<Rect> rects,
+    List<Color>? colors,
+    BlendMode? blendMode,
+    Rect? cullRect,
+    Paint paint,
+  ) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawAtlas(atlas, transforms, rects, colors, blendMode, cullRect, paint);
+  }
+
+  @override
+  void drawRawAtlas(
+    ui.Image atlas,
+    Float32List rstTransforms,
+    Float32List rects,
+    Int32List? colors,
+    BlendMode? blendMode,
+    Rect? cullRect,
+    Paint paint,
+  ) {
+    if (filter._dropPaint(paint)) {
+      return;
+    }
+    inner.drawRawAtlas(atlas, rstTransforms, rects, colors, blendMode, cullRect, paint);
+  }
+
   // --- everything else, forwarded unchanged ---
 
   @override
@@ -228,52 +308,8 @@ class FilteringCanvas implements Canvas {
   void drawColor(Color color, BlendMode blendMode) => inner.drawColor(color, blendMode);
 
   @override
-  void drawImage(ui.Image image, Offset offset, Paint paint) => inner.drawImage(image, offset, paint);
-
-  @override
-  void drawImageRect(ui.Image image, Rect src, Rect dst, Paint paint) => inner.drawImageRect(image, src, dst, paint);
-
-  @override
-  void drawImageNine(ui.Image image, Rect center, Rect dst, Paint paint) =>
-      inner.drawImageNine(image, center, dst, paint);
-
-  @override
   void drawPicture(ui.Picture picture) => inner.drawPicture(picture);
 
   @override
   void drawParagraph(ui.Paragraph paragraph, Offset offset) => inner.drawParagraph(paragraph, offset);
-
-  @override
-  void drawPoints(ui.PointMode pointMode, List<Offset> points, Paint paint) =>
-      inner.drawPoints(pointMode, points, paint);
-
-  @override
-  void drawRawPoints(ui.PointMode pointMode, Float32List points, Paint paint) =>
-      inner.drawRawPoints(pointMode, points, paint);
-
-  @override
-  void drawVertices(ui.Vertices vertices, BlendMode blendMode, Paint paint) =>
-      inner.drawVertices(vertices, blendMode, paint);
-
-  @override
-  void drawAtlas(
-    ui.Image atlas,
-    List<RSTransform> transforms,
-    List<Rect> rects,
-    List<Color>? colors,
-    BlendMode? blendMode,
-    Rect? cullRect,
-    Paint paint,
-  ) => inner.drawAtlas(atlas, transforms, rects, colors, blendMode, cullRect, paint);
-
-  @override
-  void drawRawAtlas(
-    ui.Image atlas,
-    Float32List rstTransforms,
-    Float32List rects,
-    Int32List? colors,
-    BlendMode? blendMode,
-    Rect? cullRect,
-    Paint paint,
-  ) => inner.drawRawAtlas(atlas, rstTransforms, rects, colors, blendMode, cullRect, paint);
 }

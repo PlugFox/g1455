@@ -564,6 +564,42 @@ class _GlassButtonState extends State<GlassButton> with TickerProviderStateMixin
   }
 }
 
+/// One verdict for the panels of a control drawn as several glasses — a tab
+/// bar and its accessory — so that they wear one branch rather than each the
+/// branch of what is under it.
+///
+/// The panel below a [GlassSharedReadingScope] that [GlassSharedReadingScope.
+/// leads] reads its own backdrop, as any panel does; every other panel below a
+/// scope with the same share wears that verdict, and its own is never asked
+/// for. Not exported: a component that is several glasses uses it.
+class GlassSharedReading {
+  BuildContext? _lead;
+}
+
+/// Puts the panel below it into [share], as its leader or as a follower.
+///
+/// Read by the nearest panel only: a panel takes the scope and hides it from
+/// whatever it holds, so glass on the bar reads for itself.
+class GlassSharedReadingScope extends InheritedWidget {
+  /// The panel below [child] leads [share] or, when [leads] is false, wears its
+  /// leader's verdict. A null [share] puts the panel in none.
+  const GlassSharedReadingScope({required this.share, required super.child, this.leads = false, super.key})
+    : assert(!leads || share != null, 'a scope that leads needs a share to lead');
+
+  /// The verdict the panel below is in, or null for its own.
+  final GlassSharedReading? share;
+
+  /// Whether the panel below reads the backdrop for [share].
+  final bool leads;
+
+  static GlassSharedReadingScope? _of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<GlassSharedReadingScope>();
+
+  @override
+  bool updateShouldNotify(GlassSharedReadingScope oldWidget) =>
+      !identical(share, oldWidget.share) || leads != oldWidget.leads;
+}
+
 /// The body all three components are presets of.
 class _GlassPanel extends StatefulWidget {
   const _GlassPanel({
@@ -619,9 +655,28 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
   bool _reduceMotion = false;
   Duration _duration = Duration.zero;
 
+  /// The verdict this panel is in with others, or null for its own.
+  GlassSharedReading? _share;
+  bool _leads = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final GlassSharedReadingScope? scope = GlassSharedReadingScope._of(context);
+    final GlassSharedReading? share = scope?.share;
+    if (!identical(share, _share) || (scope?.leads ?? false) != _leads) {
+      _leaveShare();
+      _share = share;
+      _leads = scope?.leads ?? false;
+      if (_leads && share != null) {
+        share._lead = context;
+      }
+      // A follower that joins once the leader has a verdict wears it now: the
+      // verdicts will not move again for it.
+      if (_readings != null) {
+        _reading = _readingOfGlass();
+      }
+    }
     final GlassBackdropReadings? readings = GlassTheme.of(context).adaptive == null
         ? null
         : GlassProxyScope.maybeOf(context)?.readings;
@@ -640,19 +695,48 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
     }
   }
 
+  // Out of the share while inactive — a reparent, a route on its way out — as
+  // a follower asking an inactive element for its render object asserts; and
+  // back in when the element is.
+  @override
+  void deactivate() {
+    _leaveShare();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    final GlassSharedReading? share = _share;
+    if (_leads && share != null) {
+      share._lead = context;
+    }
+  }
+
   @override
   void dispose() {
+    _leaveShare();
     _readings?.removeListener(_onReadings);
     _move?.dispose();
     super.dispose();
   }
 
-  /// The verdict for this panel's own glass: the render object the panel
-  /// builds first is its [RenderGlassSurface], and that is what the host keys
-  /// the verdicts by. Asked when the verdicts move or the theme turns the
-  /// reading on, never from [build], where the answer could be a frame old.
+  void _leaveShare() {
+    final GlassSharedReading? share = _share;
+    if (_leads && share != null && identical(share._lead, context)) {
+      share._lead = null;
+    }
+  }
+
+  /// The verdict for this panel's glass: the render object the panel builds
+  /// first is its [RenderGlassSurface], and that is what the host keys the
+  /// verdicts by — the leader's, for a panel that follows one. Asked when the
+  /// verdicts move or the theme turns the reading on, never from [build],
+  /// where the answer could be a frame old.
   GlassBackdropReading? _readingOfGlass() {
-    final RenderObject? glass = context.findRenderObject();
+    final GlassSharedReading? share = _share;
+    final BuildContext? from = share == null || _leads ? context : share._lead;
+    final RenderObject? glass = from != null && from.mounted ? from.findRenderObject() : null;
     return glass is RenderGlassSurface ? _readings?.of(glass) : null;
   }
 
@@ -725,7 +809,9 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
               : _GlassOverlay(widget.borderRadius, widget.overlay, focusRing: widget.focusRing),
           child: Padding(
             padding: widget.padding,
-            child: _labelled(theme, shown, widget.child),
+            // Hides the panel's scope from what it holds, there with or without
+            // a share so that one coming or going keeps the tree's shape.
+            child: GlassSharedReadingScope(share: null, child: _labelled(theme, shown, widget.child)),
           ),
         ),
       ),

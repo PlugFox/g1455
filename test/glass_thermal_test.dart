@@ -23,7 +23,8 @@
 //
 // Breaks, each failing its own arm: the policy's `serious` allowance applied at
 // `fair` (1); the geometry condition dropped from `RetakeOracle.decide` (2);
-// the host no longer setting `throttleFrames` (3).
+// `RetakeOracle.noteSurfacesChanged` setting only `_dirty`, a replacement
+// held like content (2); the host no longer setting `throttleFrames` (3).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -117,6 +118,14 @@ void main() {
     expect(step(const <Rect>[Rect.fromLTWH(24, 40, 200, 60)]), RetakeReason.throttled);
     expect(
       step(const <Rect>[Rect.fromLTWH(24, 40, 200, 60), Rect.fromLTWH(24, 140, 200, 60)]),
+      RetakeReason.changed,
+    );
+    // And one replaced by another where it stood: no rectangle moves, the host
+    // says so, and the newcomer has no slot to draw from until it is recorded.
+    expect(step(const <Rect>[Rect.fromLTWH(24, 40, 200, 60), Rect.fromLTWH(24, 140, 200, 60)]), RetakeReason.throttled);
+    oracle.noteSurfacesChanged();
+    expect(
+      step(const <Rect>[Rect.fromLTWH(24, 40, 200, 60), Rect.fromLTWH(24, 140, 200, 60)], contentChanged: false),
       RetakeReason.changed,
     );
     // Nothing changed at all: the throttle does not turn a hold into anything.

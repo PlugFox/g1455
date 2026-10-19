@@ -90,6 +90,20 @@ cheap setting is reachable without a fork.
       group, 24 to 12 for the ripple; byte-identical pixels, about a
       microsecond less raster time a draw on Metal.
 
+## Done — 0.3.0
+
+- [x] The tab bar adapts as one control: its accessory wears the bar's
+      verdict on its backdrop.
+- [x] `GlassLoad` prices only glass that draws; a control's drop at rest is
+      `restingSurfaceCount`.
+- [x] Controls removed under a held finger ignore the rest of the gesture.
+- [x] A surface that replaces another at the same rect, or glass back on the
+      top rung where it was, gets a capture: the host compares whose
+      rectangles it captured, not only where they are.
+- [x] Animation controllers are created in `initState`, never first from
+      `dispose` (flutter/flutter#185248): the menu and popover anchors and a
+      page control given a `PageController`.
+
 ## Next — what 0.2.0 left open
 
 - [ ] The engine's `RSuperellipse` corner in the shader. Tried and deferred:
@@ -115,22 +129,15 @@ cheap setting is reachable without a fork.
       the number to have.
 - [ ] Adaptive glass over a declared backdrop: the texture is in hand, so the
       mean level is a read-back once per texture, not per capture.
-- [ ] `glass_modal.dart` creates a `late` animation controller from `dispose`
-      the first time it is read there; Flutter tolerates it from 3.47 only
-      (flutter/flutter#185248). Creating it in `initState` is the whole fix,
-      and the first step towards any floor below 3.47.
 
 ## Next — what the branch left open
 
 - [ ] Adaptivity for the rest: a raw `GlassSurface`, `GlassScrollEdge` (still
-      keys its tint off the declared `backdrop`), the tab bar and the
-      segmented control. Fused group members adapt only their labels.
+      keys its tint off the declared `backdrop`) and the segmented control.
+      Fused group members adapt only their labels. The tab bar adapts as one
+      control from 0.3.0: its accessory wears the bar's verdict.
 - [ ] Measure the adaptive read-back on devices, CanvasKit and Skwasm
       included; the band, hold and interval are taste until then.
-- [ ] A host replacing one surface with another at exactly the same rect
-      keeps the old capture, and the new surface draws nothing until
-      something else changes. Found while testing `GlassMorph`; look in
-      `glass_host.dart`.
 - [ ] `GlassMorph`: carry the spring's velocity through a swap mid-morph, and
       keep glass inside fading content (an `Opacity` layer drops it).
 - [ ] `GlassScaffold`: the keyboard (`viewInsets`), a bottom scroll edge, and

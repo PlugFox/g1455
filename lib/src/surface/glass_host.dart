@@ -1128,7 +1128,7 @@ class _GlassHostState extends State<GlassHost> {
       // Nor is a surface at presence zero, which draws nothing: capturing it
       // would size the atlas — and, for a finish of its own, the divisor — for
       // glass that is not there (a control's drop at rest).
-      if (record != null && record.readsCapture && record.presence > 0 && record.materialize > 0) {
+      if (record != null && record.captured) {
         final GlassFinish finish = record.finish ?? _finish;
         // A widened or minifying glass samples past its box; by its
         // full reach rather than the presence-scaled one, so a drop lifting in
@@ -1149,6 +1149,9 @@ class _GlassHostState extends State<GlassHost> {
       // promised: there is no image for a surface to sample even by mistake.
       _handle.publish(null);
       _publishUpper(const <GlassProxyFrame?>[]);
+      // Published empty, so whatever comes back — the same glass at the same
+      // rects included — is a change.
+      _lastPresent = const <GlassSurfaceGeometry>{};
       // Nothing to read, but the surfaces that left still leave: a screen
       // whose last glass went, or whose glass all fell to a rung that reads
       // nothing, would otherwise keep its verdicts, and the render objects
@@ -1164,6 +1167,18 @@ class _GlassHostState extends State<GlassHost> {
     if (!listEquals(blurs, _lastBlurs)) {
       _lastBlurs = blurs;
       _oracle.noteChange();
+    }
+    // Nor whose rectangles they are, and a frame finds its slots by identity: a
+    // surface replaced by another where it stood moves no rectangle, and behind
+    // a repaint boundary of its own the walk sees nothing either — the capture
+    // would be held, and the newcomer, missing from it, would draw nothing until
+    // something else changed. As a set, so a surface that re-registers (a
+    // reparent) and only changes its place in the register is no newcomer; its
+    // rectangle, moved in the list the oracle watches, still retakes once.
+    final Set<GlassSurfaceGeometry> presentSet = present.toSet();
+    if (!setEquals(presentSet, _lastPresent)) {
+      _lastPresent = presentSet;
+      _oracle.noteSurfacesChanged();
     }
     final _Levels levels = _Levels.of(present, root);
     if (widget.content != GlassContentDeclaration.undeclared) {
@@ -1303,6 +1318,9 @@ class _GlassHostState extends State<GlassHost> {
   final List<GlassProxyPipeline> _upperPipelines = <GlassProxyPipeline>[];
 
   List<double>? _lastBlurs;
+
+  /// The surfaces the last frame was captured for, by identity.
+  Set<GlassSurfaceGeometry>? _lastPresent;
 
   void _readCounters() {
     var snapshots = _pipeline.snapshots;

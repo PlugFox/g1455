@@ -158,7 +158,7 @@ class HomePage extends StatelessWidget {
 | `ripple` | `GlassRipple?` | `null` | A touch wave for every surface below. None by default. |
 | `dropMotion` | `GlassDropMotion` | `GlassDropMotion()` | How the held drop of the switch, slider, segmented control and tab bar stretches and squashes. `GlassDropMotion.none` keeps it round. |
 | `press` | `GlassPress` | `GlassPress()` | How a pressed `GlassButton` swells and leans: two captures a press, none at rest. `GlassPress.none` keeps every button its size. |
-| `adaptive` | `GlassAdaptive?` | `null` | Each bar, card and button reads the backdrop under it and picks its branch and label. Null reads nothing. |
+| `adaptive` | `GlassAdaptive?` | `null` | Each bar, card, button and tab bar reads the backdrop under it and picks its branch and label. Null reads nothing. |
 | `thermal` | `GlassThermalState?` | `null` | The device's thermal state, read by your app. Null is nominal. |
 | `thermalPolicy` | `GlassThermalPolicy` | `GlassThermalPolicy()` | How much staleness each thermal state may spend. `GlassThermalPolicy.never` keeps every frame fresh. |
 | `hardware` | `GlassHardware?` | `null` | Which device family's measurements apply. Null detects: `appleMetal` on Apple, otherwise `unmeasured`. |
@@ -765,9 +765,9 @@ it wears what the declarations give, exactly as with adaptive off.
 - **Moves animate.** A glass crossing between branches tweens its tint over `duration` (300 ms), and on every frame
   of it the label is the one that reads on the glass as drawn, so the floor holds halfway too. Under reduced motion it
   is a cut.
-- **What adapts.** `GlassBar`, `GlassCard` and `GlassButton`. A raw `GlassSurface`, the
-  [scroll edge](/foundations/scroll-edge), the [tab bar](/components/tab-bar) and the
-  [segmented control](/components/segmented-control) do not adapt yet.
+- **What adapts.** `GlassBar`, `GlassCard`, `GlassButton` and the [tab bar](/components/tab-bar), whose accessory
+  wears the bar's branch: the two are one control. A raw `GlassSurface`, the [scroll edge](/foundations/scroll-edge)
+  and the [segmented control](/components/segmented-control) do not adapt yet.
 
 The demo above turns adaptive on in the site's own host while the page is open, so the site's top bar and side panel
 follow it too. The site declares a rich backdrop, so the stage nests a `GlassTheme` with `richBackdrop: false` to let
@@ -777,8 +777,15 @@ that colour.
 
 ## Content on the glass
 
-Inside a component that reads its backdrop, `GlassTheme.of(context).reading` is what it read, so an icon that is not a
-label, or a custom painter, can follow it:
+A colour for content on the glass — an icon that is not a label, a custom painter — is the label's, which is already
+chosen against the glass as drawn, on the branch it is on and halfway through a move between two:
+
+```dart
+final Color onGlass = GlassTheme.of(context).legibility().label;
+```
+
+Inside a component that reads its backdrop, `GlassTheme.of(context).reading` is what it read, for content that follows
+the backdrop itself rather than the glass:
 
 ```dart
 final GlassBackdropReading? reading = GlassTheme.of(context).reading;
@@ -786,8 +793,10 @@ final bool overLight = reading?.brightness == Brightness.light;
 ```
 
 It is null with adaptive off and before the first reading. `level` is the mean's luma in code values (0 to 255),
-`luminance` its WCAG relative luminance, and `brightness` whether black or white stands out more against it. The
-branch the glass is on is `GlassTheme.of(context).finish`.
+`luminance` its WCAG relative luminance, and `brightness` whether black or white stands out more against the backdrop
+with no glass between. **It is not a colour for the glass**: the branch the glass is on
+(`GlassTheme.of(context).finish`) switches at a different level, so over a mid grey in the light appearance the glass
+is light while `brightness` says dark, and an icon picked by it would be white on light glass.
 
 A custom component does what the built-in ones do with `GlassThemeData.adaptedTo(reading)`. To turn adaptive off for a
 subtree, nest `GlassTheme(data: GlassTheme.of(context).withAdaptive(null), ...)`.

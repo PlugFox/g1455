@@ -238,6 +238,9 @@ const double kGlassTabMinimizeScroll = 12;
 /// The height of [GlassTabBar.bottomAccessory]'s glass, logical px. Layout
 /// taste: the bar's minimum tap target and a little.
 ///
+/// Beside a collapsed bar it is no taller than the circle: 44 next to the
+/// side-by-side layout's circle, which is that tall.
+///
 /// {@category Panels and controls}
 const double kGlassTabAccessoryHeight = 48;
 
@@ -429,7 +432,9 @@ class _TabGeometry {
 /// A bottom bar of tabs whose selection becomes a glass drop under a finger.
 ///
 /// The bar is a [GlassBar] — the theme's finish, the theme's label colour —
-/// and the drop is a clear glass that magnifies it. See the file comment for
+/// and the drop is a clear glass that magnifies it. Under an adaptive host
+/// (`GlassHost.adaptive`) the bar reads its backdrop as a bar does, and the
+/// [bottomAccessory]'s glass wears the bar's branch rather than its own. See the file comment for
 /// what each part costs.
 ///
 /// At rest the selected item sits on a grey capsule in [activeColor], and
@@ -545,6 +550,10 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     vsync: this,
     value: widget.selectedIndex.toDouble(),
   );
+
+  /// The bar's verdict on its backdrop, which the accessory wears too: the two
+  /// are one control, and a light bar under a dark accessory reads as two.
+  final GlassSharedReading _reading = GlassSharedReading();
 
   /// The item the drop is over while held; drives the highlight, which is
   /// binary so a drag repaints the items only when it crosses into another.
@@ -721,6 +730,12 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   }
 
   void _onMove(PointerMoveEvent e) {
+    // Gone under the finger — a route popped, a list recycled the row: the
+    // binding still routes the rest of the gesture to this `Listener`, and the
+    // controllers it would move are disposed.
+    if (!mounted) {
+      return;
+    }
     final _TabGeometry? g = _geometry;
     if (!_down || g == null) {
       return;
@@ -734,6 +749,9 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   }
 
   void _onUp(PointerUpEvent e) {
+    if (!mounted) {
+      return;
+    }
     final _TabGeometry? g = _geometry;
     if (!_down || g == null) {
       return;
@@ -752,7 +770,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   }
 
   void _onCancel(PointerCancelEvent e) {
-    if (!_down) {
+    if (!mounted || !_down) {
       return;
     }
     _down = false;
@@ -840,19 +858,26 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                               builder: (BuildContext context, Widget? child) {
                                 final double m = _minimize.value.clamp(0.0, 1.0);
                                 final open = Rect.fromLTWH(0, 0, width, kGlassTabAccessoryHeight);
+                                // No taller than the circle it sits beside: a
+                                // 44-tall bar's box ends 2 px short of a 48-tall
+                                // capsule centred on it, and this Stack clips.
+                                final double half = math.min(kGlassTabAccessoryHeight, circle.height) / 2;
                                 final inline = Rect.fromLTRB(
                                   rtl ? 0 : circle.right + _kAccessoryGap,
-                                  circle.center.dy - kGlassTabAccessoryHeight / 2,
+                                  circle.center.dy - half,
                                   rtl ? circle.left - _kAccessoryGap : width,
-                                  circle.center.dy + kGlassTabAccessoryHeight / 2,
+                                  circle.center.dy + half,
                                 );
                                 return Stack(
                                   children: <Widget>[
                                     Positioned.fromRect(
                                       rect: _snap(context, Rect.lerp(open, inline, m)!),
-                                      child: GlassBar(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        child: child!,
+                                      child: GlassSharedReadingScope(
+                                        share: _reading,
+                                        child: GlassBar(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          child: child!,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -951,50 +976,54 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       children: <Widget>[
         Positioned.fromRect(
           rect: bar,
-          child: GlassBar(
-            padding: EdgeInsets.zero,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: <Widget>[
-                // The same widgets at every stage of the collapse, so it changes
-                // properties and never the tree: clipped to the bar only while it
-                // collapses — at rest the items are inside it anyway — and the
-                // fades at 1 and 0 paint as if they were not there.
-                Positioned.fill(
-                  child: ClipRect(
-                    clipBehavior: m > 0 ? Clip.hardEdge : Clip.none,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: <Widget>[
-                        Positioned(
-                          left: items.dx,
-                          top: items.dy,
-                          width: width,
-                          height: g.height,
-                          child: Opacity(opacity: 1 - (2 * m).clamp(0.0, 1.0), child: content),
-                        ),
-                        // Only on a bar that can collapse, which is fixed for its
-                        // lifetime as far as the tree is concerned: a bar that never
-                        // does draws exactly what it drew before it could.
-                        if (widget.minimizeBehavior != GlassTabBarMinimizeBehavior.never)
-                          Positioned.fill(
-                            child: Opacity(
-                              opacity: (2 * m - 1).clamp(0.0, 1.0),
-                              child: Center(child: _glyph(context, g)),
-                            ),
+          child: GlassSharedReadingScope(
+            share: _reading,
+            leads: true,
+            child: GlassBar(
+              padding: EdgeInsets.zero,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: <Widget>[
+                  // The same widgets at every stage of the collapse, so it changes
+                  // properties and never the tree: clipped to the bar only while it
+                  // collapses — at rest the items are inside it anyway — and the
+                  // fades at 1 and 0 paint as if they were not there.
+                  Positioned.fill(
+                    child: ClipRect(
+                      clipBehavior: m > 0 ? Clip.hardEdge : Clip.none,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: <Widget>[
+                          Positioned(
+                            left: items.dx,
+                            top: items.dy,
+                            width: width,
+                            height: g.height,
+                            child: Opacity(opacity: 1 - (2 * m).clamp(0.0, 1.0), child: content),
                           ),
-                      ],
+                          // Only on a bar that can collapse, which is fixed for its
+                          // lifetime as far as the tree is concerned: a bar that never
+                          // does draws exactly what it drew before it could.
+                          if (widget.minimizeBehavior != GlassTabBarMinimizeBehavior.never)
+                            Positioned.fill(
+                              child: Opacity(
+                                opacity: (2 * m - 1).clamp(0.0, 1.0),
+                                child: Center(child: _glyph(context, g)),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  left: drop.dx,
-                  top: drop.dy,
-                  width: width + 2 * margin.width,
-                  height: g.height + 2 * margin.height,
-                  child: _dropStage(g, margin),
-                ),
-              ],
+                  Positioned(
+                    left: drop.dx,
+                    top: drop.dy,
+                    width: width + 2 * margin.width,
+                    height: g.height + 2 * margin.height,
+                    child: _dropStage(g, margin),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

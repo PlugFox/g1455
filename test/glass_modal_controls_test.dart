@@ -148,6 +148,47 @@ void main() {
     expect(find.text('Rename'), findsNothing);
   });
 
+  testWidgets('a controller given in a rebuild drives the anchor, and the one it replaced lets go', (
+    WidgetTester tester,
+  ) async {
+    final first = GlassMenuController();
+    final second = GlassMenuController();
+    GlassMenuController? built;
+    Future<void> mount(GlassMenuController? controller) => tester.pumpWidget(
+      _App(
+        home: Align(
+          alignment: Alignment.topLeft,
+          child: GlassMenuAnchor(
+            controller: controller,
+            items: const <GlassMenuItem>[GlassMenuItem(label: 'Rename')],
+            builder: (BuildContext context, GlassMenuController c) {
+              built = c;
+              return const Text('anchor');
+            },
+          ),
+        ),
+      ),
+    );
+    await mount(first);
+    await mount(second);
+    expect(built, same(second));
+    first.open();
+    await tester.pumpAndSettle();
+    expect(find.text('Rename'), findsNothing, reason: 'the replaced controller still drove the anchor');
+    second.open();
+    await tester.pumpAndSettle();
+    expect(find.text('Rename'), findsOneWidget, reason: 'the given controller was never attached');
+
+    // Taken away: the anchor's own drives it, and the open panel stays open.
+    await mount(null);
+    expect(built, isNot(same(second)));
+    expect(second.isOpen, isFalse);
+    expect(built!.isOpen, isTrue);
+    built!.close();
+    await tester.pumpAndSettle();
+    expect(find.text('Rename'), findsNothing);
+  });
+
   testWidgets('a sheet released after a short slow drag rises back and stays', (WidgetTester tester) async {
     await tester.pumpWidget(
       _App(

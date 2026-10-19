@@ -83,6 +83,18 @@ class GlassSurfaceRecord {
   /// its finish nothing, the rest of the time.
   final double presence;
 
+  /// Whether the surface draws any glass now: it is there ([presence]) and
+  /// has materialized ([materialize]).
+  ///
+  /// One that does not is in the register — a control's drop at rest is,
+  /// so that a press finds it — and in nothing that prices glass: the host
+  /// captures nothing for it and [GlassLedger.read] leaves it out of the load.
+  bool get draws => presence > 0 && materialize > 0;
+
+  /// Whether the host captures for this surface now: it [readsCapture] and
+  /// [draws].
+  bool get captured => readsCapture && draws;
+
   /// The finish this surface is drawn in — its own, or its blend group's — or
   /// null for "the host's". What the capture blurs its slot by.
   final GlassFinish? finish;
@@ -110,7 +122,7 @@ class GlassSurfaceRecord {
   ///
   /// Here rather than left to the host, because the register is read by two
   /// consumers that need **different** subsets of it. The capture wants the
-  /// surfaces that read a proxy; the tally wants every surface there is,
+  /// surfaces that read a proxy; the tally wants every surface that draws,
   /// because the translucency tax and its fragmentation excess follow any
   /// translucent fill and have nothing to do with the capture.
   final GlassTier tier;
@@ -409,8 +421,14 @@ class GlassLedger extends ChangeNotifier {
     var count = 0;
     var capturedCount = 0;
     var capturedRectArea = 0.0;
+    var resting = 0;
     Rect? bounds;
     for (final GlassSurfaceRecord r in surfaces) {
+      // Registered and not drawn: no tax, no capture, no area.
+      if (!r.draws) {
+        resting++;
+        continue;
+      }
       count++;
       rectArea += r.rectArea;
       shapeArea += r.shapeArea;
@@ -419,10 +437,10 @@ class GlassLedger extends ChangeNotifier {
         onScreenArea += visible.width * visible.height;
       }
       // The capture side counts only the rungs that read a proxy, and the tally
-      // side counts everything: a cheap surface pays the tax and takes no
+      // side counts every rung: a cheap surface pays the tax and takes no
       // snapshot. Spanning every surface would report a screen with one full
       // panel and eleven cheap ones as a capture eleven panels wide.
-      if (!r.readsCapture) {
+      if (!r.captured) {
         continue;
       }
       capturedCount++;
@@ -435,6 +453,7 @@ class GlassLedger extends ChangeNotifier {
       capturedSurfaceCount: capturedCount,
       rectAreaLogical: rectArea,
       capturedRectAreaLogical: capturedRectArea,
+      restingSurfaceCount: resting,
       onScreenRectAreaLogical: onScreenArea,
       shapeAreaLogical: shapeArea,
       bounds: bounds,
@@ -510,13 +529,21 @@ class GlassLoad {
     required this.model,
     this.capturedSurfaceCount = 0,
     this.capturedRectAreaLogical = 0,
+    this.restingSurfaceCount = 0,
   });
 
-  /// How many surfaces could say where they are, on every rung — the count
-  /// the fragmentation excess follows.
+  /// How many surfaces could say where they are and draw glass now, on every
+  /// rung — the count the fragmentation excess follows. A surface that draws
+  /// nothing is in [restingSurfaceCount] instead.
   final int surfaceCount;
 
-  /// How many of them read a proxy, which is how many the capture is for.
+  /// Registered surfaces that draw no glass now ([GlassSurfaceRecord.draws]),
+  /// and so are in none of the other counts and areas — a control's drop at
+  /// rest. Twenty resting switches are twenty of these and no glass.
+  final int restingSurfaceCount;
+
+  /// How many of the [surfaceCount] read a proxy, which is how many the
+  /// capture is for — the host's own test, [GlassSurfaceRecord.captured].
   ///
   /// Equal to [surfaceCount] on a screen that is all [GlassTier.full], and zero
   /// on one that is all cheap — where the whole pipeline goes quiet and the

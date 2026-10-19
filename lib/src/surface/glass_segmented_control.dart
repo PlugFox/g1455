@@ -344,6 +344,12 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   }
 
   void _onMove(PointerMoveEvent e) {
+    // Gone under the finger — a route popped, a list recycled the row: the
+    // binding still routes the rest of the gesture to this `Listener`, and the
+    // controllers it would move are disposed.
+    if (!mounted) {
+      return;
+    }
     final _SegmentGeometry? g = _geometry;
     if (!_down || g == null) {
       return;
@@ -357,6 +363,9 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   }
 
   void _onUp(PointerUpEvent e) {
+    if (!mounted) {
+      return;
+    }
     final _SegmentGeometry? g = _geometry;
     if (!_down || g == null) {
       return;
@@ -379,7 +388,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   /// gave the gesture to someone else. Also called for the arena's own end of
   /// a tap, after the `Listener` has seen the lift — by then nothing is down.
   void _onLost() {
-    if (!_down) {
+    if (!mounted || !_down) {
       return;
     }
     _down = false;

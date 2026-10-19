@@ -194,14 +194,21 @@ class GlassAdaptive {
 /// pixels inside its box.
 ///
 /// Inside a component that reads its backdrop, `GlassTheme.of(context).reading`
-/// is this, so content on the glass can follow it — an icon that is not a
-/// label, a custom painter.
+/// is this, for content that follows the backdrop itself — a glyph for a
+/// light scene and another for a dark one, a custom painter.
 ///
 /// ```dart
 /// final GlassBackdropReading? reading = GlassTheme.of(context).reading;
-/// final Color icon = reading?.brightness == Brightness.light
-///     ? const Color(0xFF000000)
-///     : const Color(0xFFFFFFFF);
+/// final bool overLight = reading?.brightness == Brightness.light;
+/// ```
+///
+/// A *colour* for content on the glass is not picked from it: the glass is
+/// drawn on a branch that switches at a different level from [brightness], so
+/// over a mid grey the two disagree. The label is that colour, chosen against
+/// the glass as drawn:
+///
+/// ```dart
+/// final Color onGlass = GlassTheme.of(context).legibility().label;
 /// ```
 ///
 /// {@category Foundations}

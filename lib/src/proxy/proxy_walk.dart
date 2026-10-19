@@ -453,16 +453,22 @@ class ProxyWalkContext extends PaintingContext {
   }) {
     // `PaintingContext.pushOpacity` puts `offset` on the layer and paints the
     // children at zero, so the translate has to happen here.
+    final int savesBefore = canvas.getSaveCount();
     _opacityDepth++;
-    canvas
-      ..save()
-      ..translate(offset.dx, offset.dy)
-      ..saveLayer(null, ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0));
-    painter(this, Offset.zero);
-    canvas
-      ..restore()
-      ..restore();
-    _opacityDepth--;
+    try {
+      canvas
+        ..save()
+        ..translate(offset.dx, offset.dy)
+        ..saveLayer(null, ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0));
+      painter(this, Offset.zero);
+    } finally {
+      // As in `pushLayer`: a painter that throws must not leave every later
+      // filter in the pass counted as folded.
+      _opacityDepth--;
+      while (canvas.getSaveCount() > savesBefore) {
+        canvas.restore();
+      }
+    }
     return oldLayer ?? _mint(OpacityLayer());
   }
 
@@ -474,9 +480,15 @@ class ProxyWalkContext extends PaintingContext {
     ColorFilterLayer? oldLayer,
   }) {
     _noteColorFilter();
-    canvas.saveLayer(null, ui.Paint()..colorFilter = colorFilter);
-    painter(this, offset);
-    canvas.restore();
+    final int savesBefore = canvas.getSaveCount();
+    try {
+      canvas.saveLayer(null, ui.Paint()..colorFilter = colorFilter);
+      painter(this, offset);
+    } finally {
+      while (canvas.getSaveCount() > savesBefore) {
+        canvas.restore();
+      }
+    }
     return oldLayer ?? _mint(ColorFilterLayer());
   }
 
@@ -507,12 +519,26 @@ class ProxyWalkContext extends PaintingContext {
     // children would gut a retained subtree, and the next real frame — which
     // has no reason to repaint it — would composite nothing.
     final _CanvasEffect? effect = _effectOf(childLayer);
+    // Live alpha under this layer as under a composited boundary's, or a colour
+    // filter below it would not be counted as folded.
+    final bool alpha = effect?.carriesAlpha ?? false;
     final int savesBefore = canvas.getSaveCount();
-    effect?.begin(canvas);
-    painter(this, offset);
-    effect?.end(canvas);
-    while (canvas.getSaveCount() > savesBefore) {
-      canvas.restore();
+    if (alpha) {
+      _opacityDepth++;
+    }
+    try {
+      effect?.begin(canvas);
+      painter(this, offset);
+      effect?.end(canvas);
+    } finally {
+      // A painter that throws is caught by the boundary walk above, which
+      // would otherwise go on counting every later filter as folded.
+      if (alpha) {
+        _opacityDepth--;
+      }
+      while (canvas.getSaveCount() > savesBefore) {
+        canvas.restore();
+      }
     }
   }
 
@@ -712,6 +738,9 @@ class _OffsetThen extends _CanvasEffect {
 
   final Offset offset;
   final _CanvasEffect? inner;
+
+  @override
+  bool get carriesAlpha => inner?.carriesAlpha ?? false;
 
   @override
   void begin(Canvas canvas) {
