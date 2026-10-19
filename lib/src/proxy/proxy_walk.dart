@@ -507,12 +507,26 @@ class ProxyWalkContext extends PaintingContext {
     // children would gut a retained subtree, and the next real frame — which
     // has no reason to repaint it — would composite nothing.
     final _CanvasEffect? effect = _effectOf(childLayer);
+    // Live alpha under this layer as under a composited boundary's, or a colour
+    // filter below it would not be counted as folded.
+    final bool alpha = effect?.carriesAlpha ?? false;
     final int savesBefore = canvas.getSaveCount();
-    effect?.begin(canvas);
-    painter(this, offset);
-    effect?.end(canvas);
-    while (canvas.getSaveCount() > savesBefore) {
-      canvas.restore();
+    if (alpha) {
+      _opacityDepth++;
+    }
+    try {
+      effect?.begin(canvas);
+      painter(this, offset);
+      effect?.end(canvas);
+    } finally {
+      // A painter that throws is caught by the boundary walk above, which
+      // would otherwise go on counting every later filter as folded.
+      if (alpha) {
+        _opacityDepth--;
+      }
+      while (canvas.getSaveCount() > savesBefore) {
+        canvas.restore();
+      }
     }
   }
 
@@ -712,6 +726,9 @@ class _OffsetThen extends _CanvasEffect {
 
   final Offset offset;
   final _CanvasEffect? inner;
+
+  @override
+  bool get carriesAlpha => inner?.carriesAlpha ?? false;
 
   @override
   void begin(Canvas canvas) {

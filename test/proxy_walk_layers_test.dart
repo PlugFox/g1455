@@ -353,9 +353,6 @@ void main() {
         expect(shot.log.opacityFoldedIntoFilter, 1);
         shot.dispose();
       },
-      // Skipped: `ProxyWalkContext.pushLayer` ignores the effect's `carriesAlpha`,
-      // so `_opacityDepth` stays 0 under it.
-      skip: true,
     );
   });
 
