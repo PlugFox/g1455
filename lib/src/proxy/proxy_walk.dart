@@ -453,16 +453,22 @@ class ProxyWalkContext extends PaintingContext {
   }) {
     // `PaintingContext.pushOpacity` puts `offset` on the layer and paints the
     // children at zero, so the translate has to happen here.
+    final int savesBefore = canvas.getSaveCount();
     _opacityDepth++;
-    canvas
-      ..save()
-      ..translate(offset.dx, offset.dy)
-      ..saveLayer(null, ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0));
-    painter(this, Offset.zero);
-    canvas
-      ..restore()
-      ..restore();
-    _opacityDepth--;
+    try {
+      canvas
+        ..save()
+        ..translate(offset.dx, offset.dy)
+        ..saveLayer(null, ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0));
+      painter(this, Offset.zero);
+    } finally {
+      // As in `pushLayer`: a painter that throws must not leave every later
+      // filter in the pass counted as folded.
+      _opacityDepth--;
+      while (canvas.getSaveCount() > savesBefore) {
+        canvas.restore();
+      }
+    }
     return oldLayer ?? _mint(OpacityLayer());
   }
 
@@ -474,9 +480,15 @@ class ProxyWalkContext extends PaintingContext {
     ColorFilterLayer? oldLayer,
   }) {
     _noteColorFilter();
-    canvas.saveLayer(null, ui.Paint()..colorFilter = colorFilter);
-    painter(this, offset);
-    canvas.restore();
+    final int savesBefore = canvas.getSaveCount();
+    try {
+      canvas.saveLayer(null, ui.Paint()..colorFilter = colorFilter);
+      painter(this, offset);
+    } finally {
+      while (canvas.getSaveCount() > savesBefore) {
+        canvas.restore();
+      }
+    }
     return oldLayer ?? _mint(ColorFilterLayer());
   }
 

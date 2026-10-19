@@ -64,6 +64,18 @@ Fixes:
   `PageController` create their animation controller in `initState`. Never
   opened, or never animated, they created it for the first time in
   `dispose`, which Flutter tolerates only from 3.47.
+- A `GlassMenuController` given to a `GlassMenuAnchor` or a
+  `GlassPopoverAnchor` in a rebuild drives it. The anchor kept the
+  controller it was built with for life, so the new one's `open` and
+  `close` did nothing; taken away, the anchor's own takes over, and an open
+  panel stays open.
+- A `GlassPageControl` whose `PageController` is taken away shows
+  `currentPage`. Its own position stood still while the controller led, so
+  a `currentPage` moved meanwhile was not shown, nor told to a screen
+  reader, until it moved again.
+- The capture walk keeps its count of open opacities when a painter throws
+  inside `pushOpacity`, as it does in `pushLayer`. The count stayed raised,
+  and every colour filter later in the pass was sent to the stock capture.
 - `GlassBadge`, `GlassScaffold` and `GlassTabBar` build without an ambient
   `Directionality` (#8).
 - The site's service worker precaches the shaders with the code that writes

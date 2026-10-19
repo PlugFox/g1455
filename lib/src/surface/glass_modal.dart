@@ -1283,8 +1283,9 @@ typedef _Placement = ({bool down, Alignment corner, double? left, double? right,
 /// anchor, the barrier, and a panel growing out of the anchor's corner.
 abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with SingleTickerProviderStateMixin<W> {
   final OverlayPortalController _portal = OverlayPortalController();
-  late final GlassMenuController _controller = _widgetController ?? GlassMenuController();
+  late GlassMenuController _controller = _widgetController ?? GlassMenuController();
   late final AnimationController _progress;
+  late bool _ownsController;
   bool _open = false;
 
   GlassMenuController? get _widgetController;
@@ -1308,6 +1309,25 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
       duration: const Duration(milliseconds: 280),
       reverseDuration: const Duration(milliseconds: 200),
     );
+    _ownsController = _widgetController == null;
+    _controller._state = this;
+  }
+
+  @override
+  void didUpdateWidget(W oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A controller given in a rebuild drives the anchor from then on, and one
+    // taken away leaves it to one of its own; the open panel stays open.
+    final GlassMenuController? given = _widgetController;
+    final bool owned = given == null;
+    if (owned ? _ownsController : identical(given, _controller)) {
+      return;
+    }
+    if (identical(_controller._state, this)) {
+      _controller._state = null;
+    }
+    _controller = given ?? GlassMenuController();
+    _ownsController = owned;
     _controller._state = this;
   }
 

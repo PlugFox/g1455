@@ -399,6 +399,26 @@ void main() {
       clean.dispose();
     });
 
+    testWidgets('an opacity whose painter throws leaves no alpha open for the filters after it', (
+      WidgetTester tester,
+    ) async {
+      // The throw is caught by the boundary walk, past `pushOpacity`; the depth
+      // it raised has to come down on the way out, or the sibling's filter —
+      // under no alpha at all — is counted as folded.
+      final _Shot shot = await _shoot(
+        tester,
+        Stack(
+          children: <Widget>[
+            const _OpacityThrower(),
+            ColorFiltered(colorFilter: const ColorFilter.mode(kRed, BlendMode.modulate), child: _scene()),
+          ],
+        ),
+      );
+      expect(shot.log.errors, hasLength(1));
+      expect(shot.log.opacityFoldedIntoFilter, 0, reason: 'the thrown opacity was still counted as open');
+      shot.dispose();
+    });
+
     testWidgets('a substituted node is a placeholder of its own paint bounds, in the given colour', (
       WidgetTester tester,
     ) async {
@@ -645,6 +665,27 @@ class _RenderThrower extends RenderBox {
         ..save()
         ..clipRect(const Rect.fromLTWH(0, 0, 5, 5));
       throw StateError('walk-only failure');
+    }
+  }
+}
+
+/// Inside the pass only: an opacity whose painter throws. On screen it is an
+/// empty box.
+class _OpacityThrower extends LeafRenderObjectWidget {
+  const _OpacityThrower();
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderOpacityThrower();
+}
+
+class _RenderOpacityThrower extends RenderBox {
+  @override
+  void performLayout() => size = constraints.biggest;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    if (context is ProxyWalkContext) {
+      context.pushOpacity(offset, 128, (PaintingContext c, Offset o) => throw StateError('walk-only failure'));
     }
   }
 }

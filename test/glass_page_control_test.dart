@@ -22,6 +22,8 @@
 //  7. **Fewer pages clamp the current one** at once — what a screen reader
 //     is told, and where a tap steps from — without a controller and with
 //     one that has no view, before the caller moves its own page.
+//  8. **A controller taken away leaves the dots at `currentPage`,** moved
+//     while the controller led them.
 //
 // Breaks, each undone by swapping the string back:
 //  - in `glass_page_control.dart`, `super(repaint: repaint);` ->
@@ -404,5 +406,23 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a controller taken away leaves the dots at currentPage, moved while it led them', (
+    WidgetTester tester,
+  ) async {
+    final SemanticsHandle handle = tester.ensureSemantics();
+    final PageController controller = PageController(initialPage: 1);
+    addTearDown(controller.dispose);
+    Widget control(PageController? c, int page) =>
+        GlassPageControl(count: 5, currentPage: page, controller: c, semanticLabel: 'Photos');
+    final ComponentScene scene = await ComponentScene.mount(tester, control(controller, 1));
+    // Ignored while the controller leads, and what the dots say once it goes.
+    await scene.pump(control(controller, 3));
+    await scene.pump(control(null, 3));
+    await scene.frames(30);
+    expect(tester.getSemantics(find.byType(GlassPageControl)).value, 'Page 4 of 5');
+    await tester.pumpWidget(const SizedBox());
+    handle.dispose();
   });
 }

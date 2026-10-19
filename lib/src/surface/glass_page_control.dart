@@ -239,6 +239,12 @@ class _GlassPageControlState extends State<GlassPageControl> with SingleTickerPr
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller?.removeListener(_onScroll);
       widget.controller?.addListener(_onScroll);
+      // The dots' own position stood still while a controller led them, and
+      // `currentPage` may have moved meanwhile: back on their own, they stand
+      // where it says.
+      if (widget.controller == null) {
+        _own.value = widget.currentPage.clamp(0, widget.count - 1).toDouble();
+      }
       _page = _nearest;
     }
     if (widget.controller == null && widget.currentPage != oldWidget.currentPage) {
