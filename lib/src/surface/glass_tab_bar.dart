@@ -973,6 +973,8 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     final Offset items = row.translate(slide, 0) - bar.topLeft;
     final Offset drop = row.translate(-margin.width, -margin.height) - bar.topLeft;
     return Stack(
+      // Clip.none fixes drop capsule clipping during press and drag
+      clipBehavior: Clip.none,
       children: <Widget>[
         Positioned.fromRect(
           rect: bar,

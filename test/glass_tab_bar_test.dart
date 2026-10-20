@@ -28,6 +28,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart';
 import 'package:g1455/src/proxy/proxy_pipeline.dart' show GlassProxyFrame;
+import 'package:g1455/src/surface/glass_components.dart' show GlassSharedReadingScope;
 
 const Size kScreen = Size(400, 400);
 
@@ -129,6 +130,29 @@ void main() {
     expect(selected, <int>[2]);
     expect(_drop(tester).materialize, 0, reason: 'the drop did not settle');
     expect(_handle(tester).upper.whereType<GlassProxyFrame>(), isEmpty, reason: 'the settled drop is still stacked');
+  });
+
+  testWidgets('the bar stack does not clip the drop during lift and spring', (
+    WidgetTester tester,
+  ) async {
+    await _mount(tester);
+    final TestGesture gesture = await tester.startGesture(_item(0));
+    final Finder barStackFinder = find.descendant(
+      of: find.byType(GlassTabBar),
+      matching: find.byWidgetPredicate(
+        (Widget w) =>
+            w is Stack &&
+            w.children.any(
+              (Widget c) => c is Positioned && c.child is GlassSharedReadingScope,
+            ),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      final Stack barStack = tester.widget<Stack>(barStackFinder);
+      expect(barStack.clipBehavior, Clip.none, reason: 'frame $i: the bar stack clips its children');
+    }
+    await gesture.up();
   });
 
   testWidgets('pressed on a far tab, the drop springs there: long setting off, short arriving, round on it', (
