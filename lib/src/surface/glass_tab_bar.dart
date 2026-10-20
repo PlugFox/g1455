@@ -973,6 +973,12 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     final Offset items = row.translate(slide, 0) - bar.topLeft;
     final Offset drop = row.translate(-margin.width, -margin.height) - bar.topLeft;
     return Stack(
+      // The bar's growth is snapped to whole device pixels, and lands on one
+      // only where `_kBarGrow` times the ratio is whole — at 3, 8.5 becomes
+      // 8.667 and the bar is laid out a sixth of a pixel wider than this box.
+      // Clipping would take that sixth off the bar and, with it, the top and
+      // bottom of the drop, which stands outside the box by design.
+      clipBehavior: Clip.none,
       children: <Widget>[
         Positioned.fromRect(
           rect: bar,
