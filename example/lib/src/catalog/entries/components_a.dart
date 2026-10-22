@@ -574,7 +574,7 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
           Icon(icon),
           const SizedBox(width: 12),
           Expanded(child: Text(label)),
-          GlassSwitch(value: value, onChanged: onChanged, activeColor: color ?? const Color(0xFF34C759)),
+          GlassSwitch(value: value, onChanged: onChanged, activeColor: color),
         ],
       ),
     ),

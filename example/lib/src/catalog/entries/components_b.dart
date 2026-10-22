@@ -1249,7 +1249,8 @@ the body sees `MediaQuery.viewInsets` as it is.
 ## The host
 
 With `host: null`, the default, the scaffold mounts a [GlassHost](/foundations/host) only when there is none above it,
-and that host takes every default. `host: true` always mounts one, `host: false` never does.
+and that host takes every default — the platform's appearance among them, so an app whose theme does not follow the
+phone's declares its `appearance:` on a host of its own. `host: true` always mounts one, `host: false` never does.
 
 > [!WARNING]
 > Dialogs, sheets, menus and popovers are built in the navigator's overlay, which a host inside the route does not

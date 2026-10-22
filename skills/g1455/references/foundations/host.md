@@ -61,8 +61,9 @@ The host builds a `GlassTheme` from its parameters and puts it below itself. Tha
   for a list of cards. See [Legibility & theme](../foundations/legibility.md) and [Tiers & fallbacks](../foundations/tiers.md).
 
 When `finish` is null the host uses Apple's `.regular`, which is two materials: it picks `regularDark` or
-`regularLight` from `backdrop` and the platform's appearance, and follows appearance changes. With `adaptive:` set it
-picks per glass instead, from what each one reads under it: see [Adaptive glass](../foundations/adaptive.md).
+`regularLight` from `backdrop` and the appearance — `appearance:` if the app declares one, the platform's otherwise —
+and follows appearance changes. With `adaptive:` set it picks per glass instead, from what each one reads under it:
+see [Adaptive glass](../foundations/adaptive.md).
 
 The host also sets the screen's motion: `ripple:` for a touch wave ([Ripple](../foundations/ripple.md)), `dropMotion:`
 for how the held drops of the controls stretch and squash ([Drop motion](../foundations/drop-motion.md)), and `press:` for
@@ -146,7 +147,8 @@ class HomePage extends StatelessWidget {
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `child` | `Widget` | **required** | The screen. Everything the glass shows must be inside it. |
-| `finish` | `GlassFinish?` | `null` | The default material for every surface below. Null is Apple's `.regular`: `regularDark` or `regularLight`, picked from `backdrop` and the platform's appearance. |
+| `finish` | `GlassFinish?` | `null` | The default material for every surface below. Null is Apple's `.regular`: `regularDark` or `regularLight`, picked from `backdrop` and `appearance`. |
+| `appearance` | `Brightness?` | `null` | The appearance `.regular` picks its branch in, for an app whose theme does not follow the phone's. Null reads the platform's. Ignored when `finish` is named. |
 | `tier` | `GlassTierChoice` | `GlassTierChoice.byDefault` | Full glass, a cheap translucent fill, or an opaque fill. Usually from `GlassTierPolicy.choose()`. |
 | `backdrop` | `Color?` | `null` | The screen's average background colour. Used for the label colour, and needed for the opaque tier to look right. |
 | `richBackdrop` | `bool` | `false` | The content behind the glass is an image, video, map or feed, so labels are chosen for the worst case. |

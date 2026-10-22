@@ -68,8 +68,9 @@ The host builds a `GlassTheme` from its parameters and puts it below itself. Tha
   for a list of cards. See [Legibility & theme](/foundations/legibility) and [Tiers & fallbacks](/foundations/tiers).
 
 When `finish` is null the host uses Apple's `.regular`, which is two materials: it picks `regularDark` or
-`regularLight` from `backdrop` and the platform's appearance, and follows appearance changes. With `adaptive:` set it
-picks per glass instead, from what each one reads under it: see [Adaptive glass](/foundations/adaptive).
+`regularLight` from `backdrop` and the appearance — `appearance:` if the app declares one, the platform's otherwise —
+and follows appearance changes. With `adaptive:` set it picks per glass instead, from what each one reads under it:
+see [Adaptive glass](/foundations/adaptive).
 
 The host also sets the screen's motion: `ripple:` for a touch wave ([Ripple](/foundations/ripple)), `dropMotion:`
 for how the held drops of the controls stretch and squash ([Drop motion](/foundations/drop-motion)), and `press:` for
@@ -149,7 +150,8 @@ class HomePage extends StatelessWidget {
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `child` | `Widget` | **required** | The screen. Everything the glass shows must be inside it. |
-| `finish` | `GlassFinish?` | `null` | The default material for every surface below. Null is Apple's `.regular`: `regularDark` or `regularLight`, picked from `backdrop` and the platform's appearance. |
+| `finish` | `GlassFinish?` | `null` | The default material for every surface below. Null is Apple's `.regular`: `regularDark` or `regularLight`, picked from `backdrop` and `appearance`. |
+| `appearance` | `Brightness?` | `null` | The appearance `.regular` picks its branch in, for an app whose theme does not follow the phone's. Null reads the platform's. Ignored when `finish` is named. |
 | `tier` | `GlassTierChoice` | `GlassTierChoice.byDefault` | Full glass, a cheap translucent fill, or an opaque fill. Usually from `GlassTierPolicy.choose()`. |
 | `backdrop` | `Color?` | `null` | The screen's average background colour. Used for the label colour, and needed for the opaque tier to look right. |
 | `richBackdrop` | `bool` | `false` | The content behind the glass is an image, video, map or feed, so labels are chosen for the worst case. |
@@ -715,9 +717,9 @@ class LightPanel extends StatelessWidget {
     source: 'lib/src/surface/glass_adaptive.dart',
     guide: r'''
 Apple's `.regular` is two materials, dark over dark content and light over light. Without help the package picks one
-branch for the whole screen, from what you declared: the host's `backdrop` and the platform's appearance. A screen is
-not one level, though. A bar over a photograph's sky and a button over its shadow sit on different branches of Apple's
-own material.
+branch for the whole screen, from what you declared: the host's `backdrop` and its `appearance`, or the platform's. A
+screen is not one level, though. A bar over a photograph's sky and a button over its shadow sit on different branches
+of Apple's own material.
 
 `GlassHost(adaptive: GlassAdaptive())` lets each glass look. The host already holds the pixels under every surface, so
 it reads back the mean level inside each one's box, and a [GlassBar](/components/bar), a [GlassCard](/components/card)

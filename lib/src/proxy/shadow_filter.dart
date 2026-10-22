@@ -28,7 +28,8 @@
 // reach the capture. Measured on Skia and Impeller, a picture's blurred rect
 // changes 3428 / 3208 px. Text shadows are kept on purpose — they are part of
 // the glyphs, not a drop shadow under a box — and both draws are counted
-// instead, so a report says the filter was blind there (#30).
+// instead, on the filter, for an application that reads it to see where the
+// filter was blind (#30). Nothing in the package reports them.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -64,11 +65,15 @@ class ShadowFilter {
   ///
   /// Heuristic, and it has to be named as one: a blurred draw is *usually* a
   /// shadow, and a design that blurs a highlight on purpose would lose it. The
-  /// two counters below are what makes the difference visible in a report
-  /// instead of in a screenshot.
+  /// two counters below are what makes the difference visible to an
+  /// application that reads them, instead of in a screenshot.
   final bool dropMaskFiltered;
 
   /// `drawShadow` calls dropped so far.
+  ///
+  /// This and the counters below run over the filter's life, across every
+  /// pass that draws through it, not per pass: a filter given to a host counts
+  /// every frame it records. Compare two readings for one pass's share.
   int shadowCalls = 0;
 
   /// Mask-filtered draws dropped so far.

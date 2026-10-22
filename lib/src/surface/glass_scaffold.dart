@@ -88,8 +88,9 @@ const double kGlassScaffoldActionGap = 16;
 ///
 /// **The host.** By default the scaffold mounts a [GlassHost] only when there
 /// is none above it ([host]). The one it mounts takes every default; to
-/// declare anything — a backdrop, a finish, the hardware, a ripple — put your
-/// own host above and the scaffold uses it. Dialogs, sheets and menus are built
+/// declare anything — a backdrop, a finish, the appearance of an app whose
+/// theme does not follow the phone's, the hardware, a ripple — put your own
+/// host above and the scaffold uses it. Dialogs, sheets and menus are built
 /// in the navigator's overlay, so they need the host above the navigator
 /// (`MaterialApp.builder`); a host the scaffold mounts is inside the route and
 /// does not reach them.

@@ -7,9 +7,9 @@
 - Source: [`lib/src/surface/glass_adaptive.dart`](https://github.com/PlugFox/g1455/blob/master/lib/src/surface/glass_adaptive.dart)
 
 Apple's `.regular` is two materials, dark over dark content and light over light. Without help the package picks one
-branch for the whole screen, from what you declared: the host's `backdrop` and the platform's appearance. A screen is
-not one level, though. A bar over a photograph's sky and a button over its shadow sit on different branches of Apple's
-own material.
+branch for the whole screen, from what you declared: the host's `backdrop` and its `appearance`, or the platform's. A
+screen is not one level, though. A bar over a photograph's sky and a button over its shadow sit on different branches
+of Apple's own material.
 
 `GlassHost(adaptive: GlassAdaptive())` lets each glass look. The host already holds the pixels under every surface, so
 it reads back the mean level inside each one's box, and a [GlassBar](../components/bar.md), a [GlassCard](../components/card.md)

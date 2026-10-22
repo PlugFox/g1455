@@ -876,7 +876,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                                 final open = Rect.fromLTWH(0, 0, width, kGlassTabAccessoryHeight);
                                 // No taller than the circle it sits beside: a
                                 // 44-tall bar's box ends 2 px short of a 48-tall
-                                // capsule centred on it, and this Stack clips.
+                                // capsule centred on it.
                                 final double half = math.min(kGlassTabAccessoryHeight, circle.height) / 2;
                                 final inline = Rect.fromLTRB(
                                   rtl ? 0 : circle.right + _kAccessoryGap,

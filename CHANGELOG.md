@@ -5,7 +5,9 @@ accessibility text size the tab bar's and the segmented control's labels stop
 at the default size and a field grows, and the fills, reds, blues and control
 tracks laid on dark glass are the dark appearance's. `GlassHost.appearance`
 is new. Code that builds the widgets builds unchanged; code that reads a
-colour or a padding back off one may need a `!` or a `resolve`.
+colour back off one gets a `Color?`, null where the default is meant, so it
+needs a fallback (`??`) rather than a `!`, and code that reads a padding
+needs a `resolve`.
 
 The appearance:
 
@@ -14,7 +16,9 @@ The appearance:
   platform's appearance, so a dark-themed app on a phone in the light
   appearance got light glass over its dark content. Unlike a named finish,
   it keeps `.regular` a choice the backdrop and adaptive glass still move.
-  "What the app declares" on the site says so (#16).
+  "What the app declares" on the site says so. The host a `GlassScaffold`
+  mounts for itself takes every default, so such an app declares it on a
+  host of its own (#16).
 - A sheet's grabber is `tertiaryLabel` of the sheet's own appearance: light
   grey on dark glass, where the light appearance's dark grey was 1.18 : 1
   against the sheet. It follows the finish drawn at the sheet's extent, so a
@@ -34,7 +38,7 @@ The appearance:
   the blue of a selected tab, a field's caret and Cancel. The parameters
   are nullable, null for that default; a colour passed is drawn as before
   (#28). The scroll edge's hard band is still white in both appearances: a
-  dark one was not photographed.
+  dark one was not photographed (#36).
 
 Text size (#20):
 
@@ -57,8 +61,10 @@ Right to left:
   40 pt in and the label 64, as on the left.
 - `GlassSegmentedControl` places its capsule again when segments are added or
   taken away, which under rtl moves where the selected one is drawn; held
-  while the direction flips, the release selects the segment it was held
-  over.
+  while the direction flips, the drop goes on to the segment it was held
+  over, and the release selects it. Held while segments are added or taken
+  away, the press ends selecting nothing, as a cancelled one does: the
+  release selected the index held, which could be past the last segment.
 - `GlassBar`, `GlassCard` and `GlassButton` take an `EdgeInsetsGeometry`
   padding and `GlassScaffold` an `EdgeInsetsGeometry` `barMargin`, resolved
   with the ambient `Directionality`: an asymmetric inset can be given as
@@ -86,7 +92,10 @@ Controls and modals:
 The capture walk and the layer watch:
 
 - `pushOpacity` at alpha 255, and an opacity at alpha 0 on any route, no
-  longer count as an alpha open above a filter (#18).
+  longer count as an alpha open above a filter (#18). At 255 it no longer
+  opens a layer either, as the engine opens none: a child that clears or
+  blends with what is under it, such as a `BlendMode.clear`, reached a
+  transparent layer instead of the page.
 - A `ShaderMask` anywhere but the origin draws its mask from its own rect's
   corner, as the engine does; drawn in place it read its gradient shifted by
   its own position.
@@ -110,7 +119,9 @@ The capture walk and the layer watch:
   pictures and paragraphs the filter forwards whole: a shadow recorded into
   a cached `Picture`, and a text's `TextStyle.shadows`, reach the capture
   whatever the switches say, and nothing reported it. Text is still drawn
-  with its shadows. The README and the capture page say so (#30).
+  with its shadows. Like the dropped draws' counters, they run over the
+  filter's life, for an app that reads them; the package reports none. The
+  README and the capture page say so (#30).
 - The walk's claim to reproduce the engine names its exception: on Skia, an
   image filter that resamples, such as a scaling `ImageFilter.matrix` at
   `FilterQuality.low`, samples differently in the pass's `saveLayer` than in
@@ -119,10 +130,11 @@ The capture walk and the layer watch:
   the stock capture yet (#32).
 
 Known, and filed: menus do not grow with large text (#26), the tab bar has
-no large content viewer (#27), the segmented control's, switch's, slider's
-and scroll edge's defaults are the light appearance's (#28), paddings cannot
-be given start and end (#29), and 15 tests fail under
-`flutter test --enable-impeller` (#33).
+no large content viewer (#27), what the walk cannot reproduce has no
+fallback (#32), 10 tests fail under `flutter test --enable-impeller` on real
+Impeller differences (#33), a search bar switched from light glass to dark
+keeps a trace of the light finish (#34), and the scroll edge's hard band is
+white in both appearances (#36).
 
 ## 0.3.0
 

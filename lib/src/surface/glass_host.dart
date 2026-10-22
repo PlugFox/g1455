@@ -652,9 +652,9 @@ class GlassHost extends StatefulWidget {
   /// this is the cheapest by a wide margin: under 0.2 ΔE behind the glass.
   ///
   /// Null means "draw them", which is the conservative default rather than the
-  /// cheap one — half of `ShadowFilter` is a heuristic (anything painted
-  /// through a `MaskFilter` is *usually* a shadow), and a design that blurs a
-  /// highlight on purpose would lose it silently.
+  /// cheap one — half of `ShadowFilter` is a heuristic (a shape, line, point
+  /// or image painted through a `MaskFilter` is *usually* a shadow), and a
+  /// design that blurs a highlight on purpose would lose it silently.
   final ShadowFilter? shadowFilter;
 
   /// Where the descent may stop, if the application has worked it out.
