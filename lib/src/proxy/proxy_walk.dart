@@ -8,6 +8,16 @@
 // constructs of 18 tested, and it leaves the live render tree exactly as it
 // found it.
 //
+// One sampling case is not byte for byte, on Skia only: an image filter that
+// resamples, such as `ImageFilter.matrix` with a scale at `FilterQuality.low`.
+// The pass flattens it into a `saveLayer` carrying the filter, which samples
+// differently from the layer the engine composites — 599 px apart, at most 45
+// a channel, on the composited route and the `pushLayer` one alike, even at
+// the origin (#31). Impeller is exact, and so is `FilterQuality.none` on both.
+// It is left as it is: the difference is the backdrop's own pixels resampled
+// once, under the glass's blur, and the tests pin scaling filters at
+// `FilterQuality.none` so they measure the offset rather than the sampler.
+//
 // Everything built on top of it — the atlas, stopping the descent on an
 // opaque cover, substituting platform views, the roles the app declares through
 // `GlassProxy` — is a *subtraction* from that pass, so the pass itself must not
@@ -818,6 +828,9 @@ class _SaveLayer extends _CanvasEffect {
 /// the layer lands a scaled subtree at half its offset exactly as if there were
 /// no translate at all. Painting at zero is also what the content does inside
 /// its own layer on screen.
+///
+/// A filter that resamples is still not byte-exact on Skia at
+/// `FilterQuality.low`, at any offset; see the note at the top of this file.
 class _FilterAt extends _CanvasEffect {
   const _FilterAt(this.offset, this.paint);
 

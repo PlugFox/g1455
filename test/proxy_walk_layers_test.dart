@@ -99,7 +99,7 @@ void main() {
       // A scale, because a blur or a translate is the same about any origin and
       // could not tell a filter applied about the layer's offset from one
       // applied about the canvas's. `FilterQuality.none`, because a matrix
-      // filter that samples is not byte-exact on Skia even at the origin.
+      // filter that samples is not byte-exact on Skia even at the origin (#31).
       'ImageFiltered at an offset': (Widget c) => Padding(
         padding: const EdgeInsets.only(left: 30, top: 20),
         child: ImageFiltered(

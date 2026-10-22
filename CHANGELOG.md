@@ -111,6 +111,10 @@ The capture walk and the layer watch:
   a cached `Picture`, and a text's `TextStyle.shadows`, reach the capture
   whatever the switches say, and nothing reported it. Text is still drawn
   with its shadows. The README and the capture page say so (#30).
+- The walk's claim to reproduce the engine names its exception: on Skia, an
+  image filter that resamples, such as a scaling `ImageFilter.matrix` at
+  `FilterQuality.low`, samples differently in the pass's `saveLayer` than in
+  the engine's layer. Impeller, and `FilterQuality.none`, are exact (#31).
 - `WalkLog`'s comments say what the log is: nothing reads it to fall back to
   the stock capture yet (#32).
 
