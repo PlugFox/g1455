@@ -500,8 +500,14 @@ class ProxyWalkContext extends PaintingContext {
     try {
       canvas
         ..save()
-        ..translate(offset.dx, offset.dy)
-        ..saveLayer(null, ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0));
+        ..translate(offset.dx, offset.dy);
+      // No layer at full alpha, as the engine adds none: an offscreen layer
+      // would give a child that blends with what is under it (`clear`,
+      // `dstOut`) a transparent backdrop instead of the content it punches
+      // through on screen.
+      if (alpha < 255) {
+        canvas.saveLayer(null, ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0));
+      }
       painter(this, Offset.zero);
     } finally {
       // As in `pushLayer`: a painter that throws must not leave every later

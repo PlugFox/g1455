@@ -47,6 +47,9 @@
 //    it applies, and the counting arm names the case. (Before this rule
 //    `pushLayer` also counted an opacity at 255, which the arm's 255 cases
 //    catch.)
+//  - in `pushOpacity`, the `if (alpha < 255) {` around `canvas.saveLayer` ->
+//    `if (true) {`: a full alpha opens a layer the engine does not, and the
+//    clearing child leaves the page intact by 2400 px.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -429,6 +432,31 @@ void main() {
         pushed.dispose();
       }
       plain.dispose();
+    });
+
+    // The engine adds no layer for an opacity at full alpha, so a child that
+    // blends with what is under it reaches the page: `clear` punches through
+    // it. In an offscreen layer of the pass's own it would clear nothing.
+    testWidgets('pushOpacity at full alpha opens no layer: a child that clears punches through the page', (
+      WidgetTester tester,
+    ) async {
+      final _Shot plain = await _shoot(tester, _scene());
+      final _Shot pushed = await _shoot(
+        tester,
+        _OpacityPusher(
+          alpha: 255,
+          child: const CustomPaint(size: kArea, painter: _Clearing()),
+        ),
+      );
+      expect(pushed.log.errors, isEmpty);
+      expect(
+        await _differing(tester, plain.stock, pushed.stock),
+        greaterThan(0),
+        reason: 'the fixture cannot tell a punched page from an intact one',
+      );
+      expect(await _differing(tester, pushed.stock, pushed.pass), 0);
+      plain.dispose();
+      pushed.dispose();
     });
 
     testWidgets('a layer whose effect was never set draws its content unaltered', (WidgetTester tester) async {
@@ -879,6 +907,19 @@ class _RenderOpacityPusher extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     layer = context.pushOpacity(offset, alpha, super.paint, oldLayer: layer as OpacityLayer?);
   }
+}
+
+/// Clears a rect of whatever is under it.
+class _Clearing extends CustomPainter {
+  const _Clearing();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(const Rect.fromLTWH(20, 20, 60, 40), Paint()..blendMode = BlendMode.clear);
+  }
+
+  @override
+  bool shouldRepaint(_Clearing oldDelegate) => false;
 }
 
 /// A repaint boundary whose composited layer is an opacity at [alpha], as

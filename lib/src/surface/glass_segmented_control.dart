@@ -298,6 +298,11 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
         _at.value = _visual(widget.selectedIndex).toDouble();
       } else if (flipped) {
         _at.value = widget.segments.length - 1 - _at.value;
+        // Setting the value stops the slide the press started; resumed, or a
+        // flip inside its first frames leaves the drop between two segments.
+        if (!_moved) {
+          _slideTo(_pressed, 0);
+        }
       }
     }
   }
@@ -307,6 +312,13 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     super.didUpdateWidget(oldWidget);
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     if (!_enabled && _down) {
+      _down = false;
+      _liftTo(0);
+    }
+    // The segment under the finger may be gone, or be another one: the press
+    // ends selecting nothing, as a lost one does, and the capsule is placed
+    // below like any other count change.
+    if (widget.segments.length != oldWidget.segments.length && _down) {
       _down = false;
       _liftTo(0);
     }
