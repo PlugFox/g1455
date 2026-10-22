@@ -25,7 +25,12 @@
 //    `_TabGeometry.indexUnder`, `indexAt(rtl ? width - x : x, count)` ->
 //    `indexAt(x, count)`: a tap selects the item at the mirrored position; in
 //    `_onUp`, `* (g.rtl ? -1 : 1)` -> `* 1`: a flick carries the drop back
-//    toward the item it left.
+//    toward the item it left;
+//  - in `_GlassSegmentedControlState.didUpdateWidget`, the `else if` that
+//    places `_at` when the count changes dropped: under rtl the capsule stays
+//    where the old first segment was drawn; in `didChangeDependencies`,
+//    `_at.value = widget.segments.length - 1 - _at.value` dropped: held over A
+//    while the direction flips, the release selects C.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -137,6 +142,61 @@ void main() {
       await tester.pumpAndSettle();
       expect(selected, <int>[0], reason: '$direction: pressing A did not select A');
     }
+  });
+
+  testWidgets('a segmented control keeps its capsule under the selected segment as segments come and go', (
+    WidgetTester tester,
+  ) async {
+    // `_at` is where the capsule is drawn; under rtl a segment added moves
+    // where the selected one is drawn, so the capsule is placed again.
+    for (final TextDirection direction in TextDirection.values) {
+      Widget control(List<String> labels) => SizedBox(
+        width: 300,
+        child: GlassSegmentedControl(
+          segments: <Widget>[for (final String l in labels) Text(l)],
+          selectedIndex: 0,
+          onSelected: (_) {},
+        ),
+      );
+      await _mount(tester, direction, control(<String>['A', 'B', 'C']));
+      await _mount(tester, direction, control(<String>['A', 'B', 'C', 'D']), keep: true);
+      await tester.pumpAndSettle();
+      final Rect box = tester.getRect(find.byType(GlassSegmentedControl));
+      final int count = 4;
+      final double pitch = (box.width - 4) / count;
+      final double at = _capsuleAt(tester);
+      final double drawnX = box.left + 2 + pitch * (at + 0.5);
+      expect(drawnX, closeTo(tester.getCenter(find.text('A')).dx, 1), reason: '$direction: the capsule left A');
+    }
+  });
+
+  testWidgets('a segmented control held while the direction flips selects the segment it was held over', (
+    WidgetTester tester,
+  ) async {
+    final selected = <int>[];
+    Widget control() => SizedBox(
+      width: 300,
+      child: GlassSegmentedControl(
+        segments: const <Widget>[Text('A'), Text('B'), Text('C')],
+        selectedIndex: 1,
+        onSelected: selected.add,
+      ),
+    );
+    await _mount(tester, TextDirection.ltr, control());
+    // Dragged a little, so the release reads where the drop is, not the
+    // segment pressed.
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('A')));
+    await gesture.moveBy(const Offset(8, 0));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await _mount(tester, TextDirection.rtl, control(), keep: true);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selected, <int>[0], reason: 'the release selected the segment mirrored from the one held');
   });
 
   testWidgets('a tab bar starts at the right: its capsule, its taps and its held drop follow its labels', (
@@ -368,8 +428,22 @@ RenderGlassSurface _knob(WidgetTester tester) => tester
     .renderObjectList<RenderGlassSurface>(find.byType(GlassSurface))
     .singleWhere((RenderGlassSurface s) => s.declaredFinish?.name == GlassFinish.clear.name);
 
-Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control) async {
-  _shotKey = GlobalKey();
+/// Where the segmented control's capsule is drawn, as a segment index.
+double _capsuleAt(WidgetTester tester) {
+  final CustomPaint paint = tester
+      .widgetList<CustomPaint>(find.byType(CustomPaint))
+      .firstWhere(
+        (CustomPaint p) => p.painter.runtimeType.toString() == '_CapsulePainter',
+      );
+  return ((paint.painter! as dynamic).at as Animation<double>).value;
+}
+
+/// [keep] rebuilds the same tree with [control] and [direction] in place —
+/// one host, one state — instead of mounting afresh.
+Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control, {bool keep = false}) async {
+  if (!keep) {
+    _shotKey = GlobalKey();
+  }
   await tester.pumpWidget(
     MediaQuery(
       data: const MediaQueryData(size: kScreen),
@@ -378,7 +452,7 @@ Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control
         child: Align(
           alignment: Alignment.topLeft,
           child: GlassHost(
-            key: ValueKey<TextDirection>(direction),
+            key: keep ? _hostKey : _hostKey = GlobalKey(),
             hardware: GlassHardware.appleMetal,
             tier: const GlassTierChoice(GlassTier.cheap, GlassTierReason.pinnedByHost),
             backdrop: const Color(0xFF404040),
@@ -403,6 +477,8 @@ Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control
     await tester.pump();
   }
 }
+
+GlobalKey _hostKey = GlobalKey();
 
 Future<Uint8List> _shot(WidgetTester tester) async {
   final boundary = _shotKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;

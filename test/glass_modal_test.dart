@@ -27,7 +27,9 @@
 //    an anchor with a semantics node trips the framework's
 //    `!semantics.parentDataDirty` in the grow arm, which holds semantics on;
 //  - the grabber's `glassTertiaryLabel(theme.legibility(route.finish).label)`
-//    -> `kGlassDisabledDarkLabel`: the grabber arm finds it dark on dark glass.
+//    -> `kGlassDisabledDarkLabel`: the grabber arm finds it dark on dark glass;
+//  - in `_row`, `EdgeInsetsDirectional.only(start: 16)` ->
+//    `EdgeInsets.only(left: 16)`: the menu row arm finds the rtl icon 24 in.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -190,6 +192,40 @@ void main() {
       );
       expect(grabbers, hasLength(1));
       expect((grabbers.single.decoration as ShapeDecoration).color, grey, reason: 'on ${finish.name}');
+    }
+  });
+
+  testWidgets('a menu row runs from its start edge, mirrored under rtl', (WidgetTester tester) async {
+    // The icon centred 40 in from the start edge and the label from 64, as on
+    // iOS, which mirrors the row under right to left.
+    for (final TextDirection direction in TextDirection.values) {
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey<TextDirection>(direction),
+          builder: (BuildContext context, Widget? child) => Directionality(
+            textDirection: direction,
+            child: GlassHost(hardware: GlassHardware.appleMetal, backdrop: const Color(0xFF406080), child: child!),
+          ),
+          home: Center(
+            child: GlassMenuAnchor(
+              items: <GlassMenuItem>[
+                GlassMenuItem(label: 'Rename', icon: const Icon(IconData(0x41)), onPressed: () {}),
+              ],
+              builder: (BuildContext context, GlassMenuController c) =>
+                  GestureDetector(onTap: c.open, child: const Text('row menu')),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('row menu'));
+      await tester.pumpAndSettle();
+      final Rect panel = _surfaceAbove(tester, find.text('Rename')).globalRect;
+      final Rect icon = tester.getRect(find.byType(Icon));
+      final Rect label = tester.getRect(find.text('Rename'));
+      final bool rtl = direction == TextDirection.rtl;
+      double fromStart(double x) => rtl ? panel.right - x : x - panel.left;
+      expect(fromStart(icon.center.dx), closeTo(40, 0.5), reason: '$direction: the icon');
+      expect(fromStart(rtl ? label.right : label.left), closeTo(64, 0.5), reason: '$direction: the label');
     }
   });
 

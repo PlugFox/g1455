@@ -1520,7 +1520,7 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
   Widget _row(GlassMenuItem item, double height) {
     final bool enabled = item.onPressed != null;
     // Spike 34: the icon ahead of the label, centred 40 pt in; the label from
-    // 64 pt to 28 pt short of the right edge.
+    // 64 pt to 28 pt short of the end edge — mirrored under rtl, as the row is.
     final Widget content = Row(
       children: <Widget>[
         SizedBox(width: 48, child: Center(child: item.icon ?? const SizedBox.shrink())),
@@ -1528,7 +1528,7 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
         const SizedBox(width: 28),
       ],
     );
-    Widget row = Padding(padding: const EdgeInsets.only(left: 16), child: content);
+    Widget row = Padding(padding: const EdgeInsetsDirectional.only(start: 16), child: content);
     if (item.isDestructive) {
       row = DefaultTextStyle.merge(
         style: const TextStyle(color: Color(0xFFFF3B30)),

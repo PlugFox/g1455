@@ -276,10 +276,15 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
     if (rtl != _rtl) {
+      final bool flipped = _rtl != null;
       _rtl = rtl;
       // The capsule is placed, not slid: the segments under it just moved.
+      // Held, the drop stays over the segment it was over, now drawn on the
+      // other side, so the release still selects that one.
       if (!_down) {
         _at.value = _visual(widget.selectedIndex).toDouble();
+      } else if (flipped) {
+        _at.value = widget.segments.length - 1 - _at.value;
       }
     }
   }
@@ -294,6 +299,10 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     }
     if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
       _slideTo(widget.selectedIndex, 0);
+    } else if (widget.segments.length != oldWidget.segments.length && !_down) {
+      // Under rtl a segment added or taken away moves where the selected one
+      // is drawn, and `_at` is where it is drawn: placed, as on a flip.
+      _at.value = _visual(widget.selectedIndex).toDouble();
     }
   }
 
