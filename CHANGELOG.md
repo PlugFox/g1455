@@ -1,3 +1,95 @@
+## 0.4.0
+
+A minor version rather than a patch, for changes in behaviour: with a large
+accessibility text size the tab bar's and the segmented control's labels stop
+at the default size and a field grows, and the fills and reds laid on dark
+glass are the dark appearance's. `GlassHost.appearance` is new. Existing code
+builds unchanged.
+
+The appearance:
+
+- `GlassHost(appearance:)`: an app whose theme does not follow the phone's
+  says which appearance it is in. `.regular` picked its branch in the
+  platform's appearance, so a dark-themed app on a phone in the light
+  appearance got light glass over its dark content. Unlike a named finish,
+  it keeps `.regular` a choice the backdrop and adaptive glass still move.
+  "What the app declares" on the site says so (#16).
+- A sheet's grabber is `tertiaryLabel` of the sheet's own appearance: light
+  grey on dark glass, where the light appearance's dark grey was 1.18 : 1
+  against the sheet. It follows the finish drawn at the sheet's extent, so a
+  sheet whose opaque large finish reads the other way changes it too (#15).
+- The tab bar's resting capsule and an alert's action capsules are
+  `systemFill` of the glass's appearance, and the destructive red of alerts
+  and menus its `systemRed`; each was the light appearance's on dark glass.
+- A held segment's label goes from the capsule's ink to the page's as the
+  capsule fades into the drop, and back: held on a dark control it was black
+  on the dark track, 1.7 : 1 (#21).
+
+Text size (#20):
+
+- `GlassTabBar` and `GlassSegmentedControl` keep their labels at no more than
+  the default text size, as UIKit's tab bar and `UISegmentedControl` do: at
+  twice the size the tab bar cut its labels mid-word and ran its icons into
+  the next item, and the segmented control cut its descenders. A smaller
+  size is kept, and a screen reader is given every label whole.
+- `GlassTextField` and `GlassSearchBar` grow with their line from 44,
+  keeping 11 above and below it, as a `UITextField` does under Dynamic Type.
+  The height is worked out from the style, so typing still lays out, and
+  captures, nothing around the field.
+
+Right to left:
+
+- `GlassTabBar` maps a touch, and places its resting capsule and its held
+  drop, from the start edge: under rtl a tap selected the mirrored tab
+  (#19, #22 by @sb-dor).
+- A menu row's 16 pt inset is at its start edge, so under rtl the icon is
+  40 pt in and the label 64, as on the left.
+- `GlassSegmentedControl` places its capsule again when segments are added or
+  taken away, which under rtl moves where the selected one is drawn; held
+  while the direction flips, the release selects the segment it was held
+  over.
+
+Clipping:
+
+- `GlassTabBar` no longer clips its held drop to the bar's box at every
+  device pixel ratio but 2: the bar's growth is snapped to device pixels,
+  and where it did not land on one the bar's `Stack` clipped (#23, #24 by
+  @akoflacko). The accessory's `Stack`, which clipped its capsule's end the
+  same way wherever its width did not land on a device pixel, does not
+  either.
+
+The capture walk and the layer watch:
+
+- `pushOpacity` at alpha 255, and an opacity at alpha 0 on any route, no
+  longer count as an alpha open above a filter (#18).
+- A `ShaderMask` anywhere but the origin draws its mask from its own rect's
+  corner, as the engine does; drawn in place it read its gradient shifted by
+  its own position.
+- A shader mask whose blend mode paints where its child does not (src,
+  srcOver, plus, …) is named in `WalkLog.unhandledLayers`: the pass's layer
+  is unbounded and the engine's is not. The masking modes are exact.
+- A composited image filter is applied about its layer's offset: a scaling
+  filter at an offset landed its content at the offset scaled.
+- An image filter under a live alpha is counted in `opacityFoldedIntoFilter`,
+  as a colour filter is: the engine folds the alpha into either.
+- `compositedEffectsApplied` counts an opacity or image filter when the pass
+  applies it, whichever route it arrived by.
+- The layer watch reads a changed colour filter as dirty over its clip: a
+  filter that paints transparent black, such as `srcOver`, changes every
+  pixel of it, and the region named only the child's, so a held capture went
+  stale. What its children change stays where they changed it.
+- `ShadowFilter.dropMaskFiltered` keeps vertices, atlases and nine-patches:
+  Skia and Impeller both ignore a mask filter on them and draw them sharp, so
+  dropping them took visible content out of the capture (#17).
+- `WalkLog`'s comments say what the log is: nothing reads it to fall back to
+  the stock capture yet (#32).
+
+Known, and filed: menus do not grow with large text (#26), the tab bar has
+no large content viewer (#27), the segmented control's, switch's, slider's
+and scroll edge's defaults are the light appearance's (#28), paddings cannot
+be given start and end (#29), and 15 tests fail under
+`flutter test --enable-impeller` (#33).
+
 ## 0.3.0
 
 A minor version rather than a patch, for two changes in behaviour: under an

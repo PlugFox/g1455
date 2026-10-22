@@ -104,6 +104,29 @@ cheap setting is reachable without a fork.
       `dispose` (flutter/flutter#185248): the menu and popover anchors and a
       page control given a `PageController`.
 
+## Done — 0.4.0
+
+- [x] `GlassHost.appearance`, for an app whose theme does not follow the
+      phone's (#16).
+- [x] Fills, reds and the grabber's grey in the appearance of the glass
+      they lie on (#15).
+- [x] Large text: the tab bar and the segmented control stop at the default
+      size, as UIKit's do; the field grows (#20).
+- [x] Right to left: the tab bar's touches, capsule and drop (#19), menu
+      rows, and the segmented control's capsule as segments change.
+- [x] Clips at fractional device pixel ratios: the tab bar's drop (#23) and
+      its accessory.
+- [x] The capture walk: a shader mask off the origin, a composited image
+      filter at an offset, filters under a fade, and the shadow filter's
+      sharp draws (#17, #18).
+
+## Next — what 0.4.0 left open
+
+- [ ] A fallback for what the walk cannot reproduce (#32).
+- [ ] Menus that grow with large text (#26) and the tab bar's large content
+      viewer (#27).
+- [ ] Every control's default colours per appearance (#28).
+
 ## Next — what 0.2.0 left open
 
 - [ ] The engine's `RSuperellipse` corner in the shader. Tried and deferred:
