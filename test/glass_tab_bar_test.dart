@@ -12,6 +12,12 @@
 //    the spring arm says so. (`+ reach.width` -> `+ 0` breaks nothing at the
 //    defaults: the bar's own growth leaves 3.5 px spare at the ends, more than
 //    the stretch a spring launch reaches.)
+//  - in `_GlassTabBarState._bar`, dropping `clipBehavior: Clip.none` from the
+//    outer `Stack`: wherever the bar's snapped growth does not land on a whole
+//    device pixel the bar leaves its own box, the `Stack` clips, and the drop
+//    loses its top and bottom. The arms at 1, 2.625 and 3 say so at rest; the
+//    one at 4 says so only through the lift, where the growth moves; at 2 it
+//    never happens, which is why the rest of this file missed it.
 //
 // The mechanisms the cost arms lean on — the drop as a level of its own, and
 // the watch over what the bar bears — are `GlassHost`'s, and their breaks are
@@ -261,6 +267,39 @@ void main() {
     expect(_drop(tester).materialize, 0, reason: 'the drop stayed up after the finger left');
   });
 
+  // The bar's growth is snapped to whole device pixels, and lands on one only
+  // where `_kBarGrow` times the ratio is whole: at 2 and 4 it does, everywhere
+  // else the bar is laid out a fraction of a pixel wider than the box reserved
+  // for it. That fraction is enough for a `Stack` left at its default
+  // `Clip.hardEdge` to clip — and the drop, which stands `_TabGeometry.margin`
+  // outside that box by design, is cut with it. Held still, 2 and 4 are clean;
+  // through the lift, where the growth is a moving value, 4 clips too.
+  for (final double dpr in <double>[1, 2, 2.625, 3, 4]) {
+    testWidgets('held at a ratio of $dpr, nothing clips the drop to the bar', (WidgetTester tester) async {
+      await _mount(tester, devicePixelRatio: dpr);
+
+      final TestGesture gesture = await tester.startGesture(_item(2));
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(
+          tester.layers.whereType<ClipRectLayer>(),
+          isEmpty,
+          reason: 'lifting, the bar clipped its own box and took the drop with it',
+        );
+      }
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.layers.whereType<ClipRectLayer>(),
+        isEmpty,
+        reason: 'held, the bar clipped its own box and took the drop with it',
+      );
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+  }
+
   testWidgets('a tap on another item selects it; the semantics say which is selected', (
     WidgetTester tester,
   ) async {
@@ -314,10 +353,11 @@ Future<void> _mount(
   ValueChanged<int>? onSelected,
   List<GlassTabItem>? items,
   GlassDropMotion? dropMotion,
+  double devicePixelRatio = 2,
 }) async {
   await tester.pumpWidget(
     MediaQuery(
-      data: const MediaQueryData(size: kScreen, devicePixelRatio: 2),
+      data: MediaQueryData(size: kScreen, devicePixelRatio: devicePixelRatio),
       child: Directionality(
         textDirection: TextDirection.ltr,
         child: Align(
