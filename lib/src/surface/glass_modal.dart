@@ -1353,6 +1353,41 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
     super.dispose();
   }
 
+  /// Where the panel was placed for the anchor, and whether a check that the
+  /// anchor is still there is waiting for the next frame.
+  Rect? _placedAt;
+  bool _following = false;
+
+  /// Keeps the panel over the anchor while it is shown.
+  ///
+  /// The panel is placed in the overlay's build from the anchor's last layout,
+  /// and an anchor can move by layout alone — a list scrolled under it, a
+  /// parent that put it somewhere else — with nothing rebuilding the panel, so
+  /// it stood where the anchor had been. After each frame that happens anyway
+  /// the anchor's rect is read again, and a moved one rebuilds the panel over
+  /// it, a frame late. A still screen schedules nothing: the check waits for a
+  /// frame and never asks for one.
+  void _follow(Rect at, RenderBox overlay) {
+    _placedAt = at;
+    if (_following) {
+      return;
+    }
+    _following = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _following = false;
+      final RenderBox? anchor = mounted ? context.findRenderObject() as RenderBox? : null;
+      if (anchor == null || !_portal.isShowing || !anchor.attached || !overlay.attached || !anchor.hasSize) {
+        return;
+      }
+      final Rect now = MatrixUtils.transformRect(anchor.getTransformTo(overlay), Offset.zero & anchor.size);
+      if (now != _placedAt) {
+        setState(() {});
+      } else {
+        _follow(now, overlay);
+      }
+    });
+  }
+
   void _show() {
     if (_open) {
       return;
@@ -1422,6 +1457,7 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
       return const SizedBox.shrink();
     }
     final Rect at = MatrixUtils.transformRect(anchor.getTransformTo(overlay), Offset.zero & anchor.size);
+    _follow(at, overlay);
     final _Placement place = _place(at, overlay.size, MediaQuery.paddingOf(context));
     final GlassThemeData theme = GlassTheme.of(context);
     final Color label = theme.legibility(_finish ?? theme.finish).label;

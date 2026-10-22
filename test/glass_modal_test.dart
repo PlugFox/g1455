@@ -30,6 +30,8 @@
 //    -> `kGlassDisabledDarkLabel`: the grabber arm finds it dark on dark glass;
 //  - in `_row`, `EdgeInsetsDirectional.only(start: 16)` ->
 //    `EdgeInsets.only(left: 16)`: the menu row arm finds the rtl icon 24 in;
+//  - in `_AnchoredState._follow`, `if (now != _placedAt) {` -> `if (false) {`:
+//    the moving-anchor arm finds the panel where the anchor was;
 //  - in `_RenderGrow`'s `width` setter, drop `markNeedsLayout();`: the
 //    new-width arm finds the open panel at its old width;
 //  - in `_RenderGrow`'s `from` or `corner` setter, drop the assignment: the
@@ -447,13 +449,12 @@ void main() {
 
   testWidgets(
     'an open popover whose anchor moves stands over where the anchor is now',
-    skip: true, // The panel is placed from the anchor's last layout; see below.
     (WidgetTester tester) async {
       // `_AnchoredState._overlay` reads the anchor's box in the build that
-      // moves it, which is before the layout that does: the panel is placed
-      // where the anchor was, and stays there until something rebuilds the
-      // anchor again. Here it stays over the left half, 4 px before the
-      // anchor's old left edge, while the anchor stands 420 px to the right.
+      // moves it, which is before the layout that does: the panel was placed
+      // where the anchor had been, and stayed over the left half while the
+      // anchor stood 420 px to the right. `_follow` reads it again after the
+      // frame, and the panel follows a frame late.
       final left = ValueNotifier<double>(20);
       addTearDown(left.dispose);
       await tester.pumpWidget(
