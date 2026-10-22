@@ -34,9 +34,19 @@
 // `backdropKey` to the engine without the signature reading it, and a whitelist
 // matching subtypes where it means to match types. Both are handled in
 // `lib/src/proxy/proxy_layer_watch.dart`; this file is what keeps them handled.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `_Walk.visit`, `if (spreads || fills) {` -> `if (spreads) {`: a colour
+//    filter that paints over transparency is read at its child's bound, and
+//    the srcOver arm finds pixels changed outside the region;
+//  - in `_Walk.visit`, `final int end = spreads ? out.length : selfEnd;` ->
+//    `final int end = spreads || fills ? out.length : selfEnd;`: a repaint
+//    under any colour filter is read as the whole clip, and the same arm's
+//    cost check says so.
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
@@ -430,6 +440,59 @@ void main() {
       expect(narrow.region, const Rect.fromLTRB(0, 0, 60, 60));
     });
 
+    // A colour filter that does not keep transparent black transparent paints
+    // over the whole of its cull rect, so changing it changes pixels nowhere
+    // near its children. The arm renders both frames and asks the region to
+    // cover every pixel that differs — a 20 x 20 child under a 60 x 60 clip,
+    // where the child's bound alone would leave 3200 px stale.
+    test('a colour filter that paints over transparency is dirty over its clip when it changes', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      const Rect clipRect = Rect.fromLTWH(0, 0, 60, 60);
+      const Rect child = Rect.fromLTWH(10, 10, 20, 20);
+      final root = OffsetLayer();
+      final clip = ClipRectLayer(clipRect: clipRect);
+      final filter = ColorFilterLayer(colorFilter: const ColorFilter.mode(Color(0x8000FFFF), BlendMode.srcOver));
+      final leaf = PictureLayer(child)..picture = _picture(child);
+      root.append(clip);
+      clip.append(filter);
+      filter.append(leaf);
+
+      final ProxyLayerWatch watch = ProxyLayerWatch();
+      expect(watch.changeSince(root).changed, isTrue);
+      final ui.Image before = root.toImageSync(const Rect.fromLTWH(0, 0, 100, 100));
+      filter.colorFilter = const ColorFilter.mode(Color(0x80FF00FF), BlendMode.srcOver);
+      final LayerChange change = watch.changeSince(root);
+      final ui.Image after = root.toImageSync(const Rect.fromLTWH(0, 0, 100, 100));
+      final Rect? changed = await _changedBounds(before, after);
+      before.dispose();
+      after.dispose();
+      expect(changed, isNotNull, reason: 'the fixture changed no pixel, so any region would pass');
+      expect(changed!.width * changed.height, greaterThan(child.width * child.height));
+      expect(change.bounded, isTrue);
+      expect(change.region, isNotNull);
+      expect(
+        change.region!.expandToInclude(changed),
+        change.region,
+        reason: 'pixels changed at $changed, outside the region ${change.region}',
+      );
+
+      // And what that costs: nothing for the children. A repaint under the
+      // same filter is dirty where it repainted, because a pixel the children
+      // left alone is the filter of the same thing on both frames.
+      leaf.picture = _picture(child);
+      expect(watch.changeSince(root).region, child);
+
+      // With no clip above it, a changed filter is dirty everywhere.
+      final unclipped = ContainerLayer();
+      final bare = ColorFilterLayer(colorFilter: const ColorFilter.mode(Color(0x8000FFFF), BlendMode.srcOver));
+      unclipped.append(bare);
+      bare.append(PictureLayer(child)..picture = _picture(child));
+      final ProxyLayerWatch second = ProxyLayerWatch();
+      expect(second.changeSince(unclipped).changed, isTrue);
+      bare.colorFilter = const ColorFilter.mode(Color(0x80FF00FF), BlendMode.srcOver);
+      expect(second.changeSince(unclipped).bounded, isFalse);
+    });
+
     test('a layer type the table cannot read is dirty everywhere, as it is unheld', () {
       // The whitelist rule, restated for the region: not knowing what a layer
       // draws is not knowing where it draws either, and the two refusals have to
@@ -662,6 +725,27 @@ ui.Picture _picture([Rect bounds = const Rect.fromLTWH(0, 0, 4, 4)]) {
   final ui.PictureRecorder recorder = ui.PictureRecorder();
   ui.Canvas(recorder, bounds).drawRect(bounds, ui.Paint());
   return recorder.endRecording();
+}
+
+/// The smallest rect holding every pixel that differs between [a] and [b], or
+/// null when none does.
+Future<Rect?> _changedBounds(ui.Image a, ui.Image b) async {
+  final ByteData? da = await a.toByteData();
+  final ByteData? db = await b.toByteData();
+  if (da == null || db == null) {
+    throw StateError('an image came back without bytes');
+  }
+  final Uint8List pa = da.buffer.asUint8List();
+  final Uint8List pb = db.buffer.asUint8List();
+  Rect? bounds;
+  for (var i = 0; i < pa.length; i += 4) {
+    if (pa[i] != pb[i] || pa[i + 1] != pb[i + 1] || pa[i + 2] != pb[i + 2] || pa[i + 3] != pb[i + 3]) {
+      final int p = i ~/ 4;
+      final pixel = Rect.fromLTWH((p % a.width).toDouble(), (p ~/ a.width).toDouble(), 1, 1);
+      bounds = bounds == null ? pixel : bounds.expandToInclude(pixel);
+    }
+  }
+  return bounds;
 }
 
 ui.Path _path() => ui.Path()..addRect(const Rect.fromLTWH(0, 0, 8, 8));
