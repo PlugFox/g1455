@@ -28,7 +28,11 @@
 //  - in `_effectOf`, `!_ShaderMask.staysInside.contains(blend)` -> `false`:
 //    a shader mask under src, srcOver and every other mode that paints over a
 //    transparent destination goes unnamed, though the pass paints it across
-//    the whole mask rect and the engine only over the child.
+//    the whole mask rect and the engine only over the child;
+//  - in `_compositedEffect`, `_FilterAt(offset, ` -> `_SaveLayer(`: a
+//    composited image filter is applied about the canvas's origin rather than
+//    its layer's, and the scaled `ImageFiltered` off the origin lands at half
+//    its offset.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -75,6 +79,20 @@ void main() {
             colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
           ).createShader(r),
           blendMode: BlendMode.dstIn,
+          child: c,
+        ),
+      ),
+      // A scale, because a blur or a translate is the same about any origin and
+      // could not tell a filter applied about the layer's offset from one
+      // applied about the canvas's. `FilterQuality.none`, because a matrix
+      // filter that samples is not byte-exact on Skia even at the origin.
+      'ImageFiltered at an offset': (Widget c) => Padding(
+        padding: const EdgeInsets.only(left: 30, top: 20),
+        child: ImageFiltered(
+          imageFilter: ui.ImageFilter.matrix(
+            Matrix4.diagonal3Values(0.5, 0.5, 1).storage,
+            filterQuality: FilterQuality.none,
+          ),
           child: c,
         ),
       ),

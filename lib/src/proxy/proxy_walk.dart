@@ -271,7 +271,7 @@ class ProxyWalkContext extends PaintingContext {
         break;
     }
 
-    final _CanvasEffect? composited = child.isRepaintBoundary ? _compositedEffect(child) : null;
+    final _CanvasEffect? composited = child.isRepaintBoundary ? _compositedEffect(child, offset) : null;
 
     // A throwing `paint` leaves the save stack unbalanced, and the next node
     // would then draw under somebody else's clip. Recorded, not hidden.
@@ -293,7 +293,7 @@ class ProxyWalkContext extends PaintingContext {
       // and nothing is recorded into the child's own layer. `paint` is
       // `@protected`, which is a lint and not a runtime guard.
       // ignore: invalid_use_of_protected_member
-      child.paint(this, offset);
+      child.paint(this, composited?.childOffset(offset) ?? offset);
     } catch (error) {
       log.errors.add('${child.runtimeType}: $error');
     } finally {
@@ -325,7 +325,12 @@ class ProxyWalkContext extends PaintingContext {
   /// `_RenderImageFiltered`) plus any future one, which a `case RenderOpacity`
   /// would not. The price is one layer allocated and disposed per boundary per
   /// pass, a real share of the pass's CPU cost.
-  _CanvasEffect? _compositedEffect(RenderObject child) {
+  ///
+  /// [offset] is where the boundary is painted, which on screen is the offset
+  /// of its layer: `_compositeChild` writes it there and the child paints at
+  /// zero inside. The walk paints the child at [offset] instead, so an effect
+  /// that is not translation-invariant has to be applied about it.
+  _CanvasEffect? _compositedEffect(RenderObject child, Offset offset) {
     final handle = LayerHandle<OffsetLayer>();
     try {
       handle.layer = child.updateCompositedLayer(oldLayer: null);
@@ -344,7 +349,7 @@ class ProxyWalkContext extends PaintingContext {
           return null;
         }
         log.compositedEffectsApplied++;
-        return _SaveLayer(ui.Paint()..imageFilter = filter);
+        return _FilterAt(offset, ui.Paint()..imageFilter = filter);
       }
       return null;
     } finally {
@@ -723,6 +728,13 @@ abstract class _CanvasEffect {
   /// fold into something below it.
   bool get carriesAlpha => false;
 
+  /// Where the content this effect wraps paints, given where it was asked to.
+  ///
+  /// The same place for every effect but one: [_FilterAt] moves the canvas to
+  /// the layer's corner itself, and the content then paints at zero, as it
+  /// does inside its own layer on screen.
+  Offset childOffset(Offset offset) => offset;
+
   void begin(Canvas canvas);
 
   void end(Canvas canvas);
@@ -746,6 +758,47 @@ class _SaveLayer extends _CanvasEffect {
 
   @override
   void end(Canvas canvas) => canvas.restore();
+}
+
+/// An image filter applied in the space of a layer at [offset], with the
+/// content it wraps painted at zero inside it.
+///
+/// The engine translates by an `ImageFilterLayer`'s offset before it applies
+/// the filter (`image_filter_layer.cc`), so the filter's origin is the layer's
+/// corner. A blur or a translate cannot tell, which is why a bare `saveLayer`
+/// passed for them; a scale or a rotation can, and drawn about the canvas's
+/// origin it lands the content at the offset scaled.
+///
+/// The content paints at zero rather than back at [offset] under a translate
+/// that undoes this one, and that is not a matter of taste. Skia takes the
+/// filter's origin from the transform at the `saveLayer`, so the two spellings
+/// agree there; Impeller does not, and measured, the undoing translate inside
+/// the layer lands a scaled subtree at half its offset exactly as if there were
+/// no translate at all. Painting at zero is also what the content does inside
+/// its own layer on screen.
+class _FilterAt extends _CanvasEffect {
+  const _FilterAt(this.offset, this.paint);
+
+  final Offset offset;
+  final ui.Paint paint;
+
+  @override
+  Offset childOffset(Offset offset) => Offset.zero;
+
+  @override
+  void begin(Canvas canvas) {
+    canvas
+      ..save()
+      ..translate(offset.dx, offset.dy)
+      ..saveLayer(null, paint);
+  }
+
+  @override
+  void end(Canvas canvas) {
+    canvas
+      ..restore()
+      ..restore();
+  }
 }
 
 class _OffsetThen extends _CanvasEffect {
