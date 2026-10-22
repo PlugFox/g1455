@@ -92,6 +92,16 @@ const Color kGlassDisabledLightLabel = Color(0x4DEBEBF5);
 Color glassTertiaryLabel(Color label) =>
     label.computeLuminance() < 0.5 ? kGlassDisabledDarkLabel : kGlassDisabledLightLabel;
 
+/// `systemFill` in the appearance whose label is [label]: (120, 120, 128) at
+/// 0.20 in light and 0.36 in dark — a capsule laid on the glass that is not
+/// glass, as a tab bar's selection and an alert's actions are.
+Color glassSystemFill(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0x33787880) : const Color(0x5C787880);
+
+/// `systemRed` in the appearance whose label is [label], for a destructive
+/// action: (255, 59, 48) in light, (255, 69, 58) in dark.
+Color glassSystemRed(Color label) => label.computeLuminance() < 0.5 ? const Color(0xFFFF3B30) : const Color(0xFFFF453A);
+
 /// A glass bar: the navigation layer, which is where Apple's guidelines put this
 /// material.
 ///

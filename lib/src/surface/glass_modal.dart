@@ -44,7 +44,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_above.dart';
-import 'glass_components.dart' show glassTertiaryLabel;
+import 'glass_components.dart' show glassSystemFill, glassSystemRed, glassTertiaryLabel;
 import 'glass_finish.dart';
 import 'glass_host.dart';
 import 'glass_surface.dart';
@@ -85,11 +85,6 @@ const double kGlassSheetInset = 8;
 ///
 /// {@category Modals}
 const double kGlassSheetRadius = 36;
-
-/// iOS's `systemFill`, (120, 120, 128) at 0.20 — the alert's action capsules
-/// look like it and were not measured: they lie on the alert's own glass, and
-/// one backdrop cannot separate a fill from the material under it.
-const Color _kActionFill = Color.fromRGBO(120, 120, 128, 0.20);
 
 /// Says, in debug, when a modal was built outside any `GlassHost`.
 void _assertHosted(BuildContext context, String what) {
@@ -391,7 +386,11 @@ class _AlertButtonState extends State<_AlertButton> {
   Widget build(BuildContext context) {
     final GlassAlertAction a = widget.action;
     final bool enabled = a.onPressed != null;
-    final Color colour = a.isDestructive ? const Color(0xFFFF3B30) : widget.label;
+    final Color colour = a.isDestructive ? glassSystemRed(widget.label) : widget.label;
+    // iOS's `systemFill` of the alert's appearance — the action capsules look
+    // like it and were not measured: they lie on the alert's own glass, and
+    // one backdrop cannot separate a fill from the material under it.
+    final Color fill = glassSystemFill(widget.label);
     return Semantics(
       button: true,
       enabled: enabled,
@@ -406,7 +405,7 @@ class _AlertButtonState extends State<_AlertButton> {
           alignment: Alignment.center,
           decoration: ShapeDecoration(
             shape: const StadiumBorder(),
-            color: _held ? _kActionFill.withValues(alpha: _kActionFill.a * 2) : _kActionFill,
+            color: _held ? fill.withValues(alpha: fill.a * 2) : fill,
           ),
           child: Text(
             a.label,
@@ -850,16 +849,23 @@ class _GlassSheet extends StatelessWidget {
             children: <Widget>[
               if (route.showGrabber)
                 Center(
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 5, bottom: 4),
-                    width: 36,
-                    height: 5,
-                    // `tertiaryLabel` of the sheet's own appearance: the light
-                    // grey on dark glass, as iOS draws it, where the dark one
-                    // all but disappears (#15).
-                    decoration: ShapeDecoration(
-                      shape: const StadiumBorder(),
-                      color: glassTertiaryLabel(theme.legibility(route.finish).label),
+                  // `tertiaryLabel` of the appearance the sheet is drawn in:
+                  // the light grey on dark glass, as iOS draws it, where the
+                  // dark one all but disappears (#15). Of the finish drawn at
+                  // this extent, which on the way to an opaque large one can
+                  // cross to the other branch.
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: route._extent,
+                    builder: (BuildContext context, double extent, Widget? _) => Container(
+                      margin: const EdgeInsets.only(top: 5, bottom: 4),
+                      width: 36,
+                      height: 5,
+                      decoration: ShapeDecoration(
+                        shape: const StadiumBorder(),
+                        color: glassTertiaryLabel(
+                          theme.legibility(extent <= 0 ? route.finish : GlassFinish.lerp(base, large, extent)).label,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1512,12 +1518,15 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[for (final GlassMenuItem item in items) _row(item, kGlassMenuRowHeight)],
+        children: <Widget>[
+          for (final GlassMenuItem item in items)
+            _row(item, kGlassMenuRowHeight, glassSystemRed(DefaultTextStyle.of(context).style.color!)),
+        ],
       ),
     );
   }
 
-  Widget _row(GlassMenuItem item, double height) {
+  Widget _row(GlassMenuItem item, double height, Color destructive) {
     final bool enabled = item.onPressed != null;
     // Spike 34: the icon ahead of the label, centred 40 pt in; the label from
     // 64 pt to 28 pt short of the end edge — mirrored under rtl, as the row is.
@@ -1531,9 +1540,9 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
     Widget row = Padding(padding: const EdgeInsetsDirectional.only(start: 16), child: content);
     if (item.isDestructive) {
       row = DefaultTextStyle.merge(
-        style: const TextStyle(color: Color(0xFFFF3B30)),
+        style: TextStyle(color: destructive),
         child: IconTheme.merge(
-          data: const IconThemeData(color: Color(0xFFFF3B30)),
+          data: IconThemeData(color: destructive),
           child: row,
         ),
       );

@@ -378,9 +378,6 @@ class _GlassTabBarMinimizerScope extends InheritedWidget {
   bool updateShouldNotify(_GlassTabBarMinimizerScope oldWidget) => !identical(minimized, oldWidget.minimized);
 }
 
-/// The resting capsule: iOS's fill on a light material.
-const Color _kPill = Color(0x33787880);
-
 /// Below this much bar per item the items stack icon over label, as an
 /// iPhone's do; above it they sit side by side, as an iPad's do.
 const double _kInlinePitch = 80;
@@ -1078,6 +1075,10 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
               if (fade <= 0) {
                 return const SizedBox.shrink();
               }
+              // iOS's `systemFill` for the appearance the bar's label is in:
+              // under the bar's glass, the ambient colour is that label, and
+              // the light fill all but vanishes on dark glass.
+              final Color pill = glassSystemFill(DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000));
               return Stack(
                 children: <Widget>[
                   Positioned(
@@ -1088,7 +1089,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                     child: DecoratedBox(
                       decoration: ShapeDecoration(
                         shape: const StadiumBorder(),
-                        color: _kPill.withValues(alpha: _kPill.a * fade),
+                        color: pill.withValues(alpha: pill.a * fade),
                       ),
                     ),
                   ),
