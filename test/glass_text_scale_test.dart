@@ -14,7 +14,10 @@
 //    twice the size;
 //  - in `_GlassTextFieldState._height`, `math.max(kGlassFieldHeight, line +
 //    22)` -> `kGlassFieldHeight`: the field arm finds the line 44 tall in a
-//    44-tall capsule.
+//    44-tall capsule;
+//  - in `GlassAtMostDefaultTextSize.build`, the `data == null` pass-through
+//    replaced by a clamp of a default `MediaQueryData`: the no-MediaQuery arm
+//    finds one made up under the labels.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderEditable, RenderParagraph;
@@ -63,6 +66,40 @@ void main() {
     for (final label in <String>['Day', 'Week']) {
       expect(_scaleOf(tester, label), 1, reason: label);
     }
+  });
+
+  testWidgets('a segmented control with no MediaQuery above it lays its labels out as they are', (
+    WidgetTester tester,
+  ) async {
+    // A `RawView`, which adds no MediaQuery: there is no text scale to clamp,
+    // and the clamp passes its child through rather than ask for one.
+    await tester.pumpWidget(
+      RawView(
+        view: tester.view,
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassHost(
+            hardware: GlassHardware.appleMetal,
+            backdrop: const Color(0xFF406080),
+            child: Center(
+              child: SizedBox(
+                width: 300,
+                child: GlassSegmentedControl(
+                  segments: const <Widget>[Text('Day'), Text('Week')],
+                  selectedIndex: 0,
+                  onSelected: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      wrapWithView: false,
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(MediaQuery.maybeOf(tester.element(find.text('Day'))), isNull, reason: 'the clamp made a MediaQuery up');
+    expect(_scaleOf(tester, 'Day'), 1);
   });
 
   testWidgets('a field grows with its line from 44, and keeps 11 above and below it', (WidgetTester tester) async {

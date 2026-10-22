@@ -459,6 +459,36 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('a slider no wider than its knob keeps its value under a finger', (WidgetTester tester) async {
+    // No track to measure a position along: a tap or a drag there says nothing
+    // about where the value is, and the slider keeps the one it has rather
+    // than divide by a span of nothing.
+    final changes = <double>[];
+    await _mount(
+      tester,
+      GlobalKey(),
+      Center(
+        child: SizedBox(
+          width: 30,
+          child: GlassSlider(value: 0.3, onChanged: changes.add),
+        ),
+      ),
+    );
+    final Rect box = tester.getRect(find.byType(GlassSlider));
+    expect(box.width, lessThanOrEqualTo(38), reason: 'the slider is wider than its knob, so this arm reaches nothing');
+    await tester.tapAt(box.centerRight - const Offset(1, 0));
+    await tester.pumpAndSettle();
+    final TestGesture drag = await tester.startGesture(box.centerLeft + const Offset(1, 0));
+    await drag.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await drag.moveBy(const Offset(-80, 0));
+    await tester.pump();
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(changes.every((double v) => v == 0.3), isTrue, reason: 'a slider with no track moved: $changes');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('disabled mid-drag, a control lets go', (WidgetTester tester) async {
     // Once the handlers are gone the drag's end never arrives, so a drop lifted
     // when the control was disabled would come back lifted when it is enabled

@@ -24,6 +24,8 @@
 //  - `if (reduce) {` -> `if (!reduce) {`: arm 2's reduced-motion Cancel
 //    slides, and arm 4's slide is a jump.
 
+import 'dart:math' as math;
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,6 +68,34 @@ void main() {
     expect(focus.hasFocus, isTrue, reason: 'clearing let go of the focus');
     expect(_clear, findsNothing);
     handle.dispose();
+  });
+
+  testWidgets('the clear button takes the colour of the glass it is on when that changes under it', (
+    WidgetTester tester,
+  ) async {
+    // The glyph is a painter of its own over the glass's kept content: a new
+    // colour has to repaint it, as the glass under it repaints for its finish.
+    final controller = TextEditingController(text: 'glass');
+    addTearDown(controller.dispose);
+    Widget bar(GlassFinish finish) => _bar(GlassSearchBar(controller: controller, finish: finish));
+    Future<List<int>> glyph(ComponentScene scene) async {
+      final Rect box = tester.getRect(find.byType(CustomPaint).last);
+      // Inside the disc, clear of the cross cut out of it.
+      return rgbAt(await scene.pixels(), box.center - Offset(0, box.height * 0.35));
+    }
+
+    final ComponentScene scene = await ComponentScene.mount(tester, bar(GlassFinish.regularLight));
+    expect(_clear, findsOneWidget);
+    final List<int> onLight = await glyph(scene);
+    await scene.pump(bar(GlassFinish.regularDark));
+    final List<int> live = await glyph(scene);
+    final ComponentScene fresh = await ComponentScene.mount(tester, bar(GlassFinish.regularDark));
+    final List<int> onDark = await glyph(fresh);
+    int apart(List<int> a, List<int> b) => <int>[for (var i = 0; i < 3; i++) (a[i] - b[i]).abs()].reduce(math.max);
+    // ignore: avoid_print
+    print('glyph on light $onLight, turned dark $live, mounted dark $onDark');
+    expect(apart(onDark, onLight), greaterThan(20), reason: 'the two finishes draw the glyph alike: nothing to see');
+    expect(apart(live, onDark), lessThanOrEqualTo(2), reason: 'the glyph kept the colour of the glass it was on');
   });
 
   testWidgets('Cancel slides in on focus and out on blur; a tap empties, blurs and calls onCancel', (

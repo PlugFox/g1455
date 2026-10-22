@@ -18,7 +18,9 @@
 //  - `label: _barrierLabel,` dropped from the anchors' barrier: the menu and
 //    popover arms find nothing to close them by;
 //  - `String get barrierLabel => dismissLabel;` -> `=> 'Dismiss';`: the
-//    sheet arm finds no barrier by the caller's name.
+//    sheet arm finds no barrier by the caller's name;
+//  - the switch's `onTap: enabled ? () => _commit(!widget.value) : null` ->
+//    `_commit(widget.value)`: the switch tap arm's tap changes nothing.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,6 +53,82 @@ void main() {
     );
     semantics.dispose();
   });
+
+  testWidgets('a screen reader\'s tap turns a switch over', (
+    WidgetTester tester,
+  ) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
+    var value = true;
+    var enabled = true;
+    late StateSetter rebuild;
+    await tester.pumpWidget(
+      _App(
+        home: Center(
+          child: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              rebuild = setState;
+              return GlassSwitch(
+                value: value,
+                semanticLabel: 'Wi-Fi',
+                onChanged: enabled ? (bool v) => setState(() => value = v) : null,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    tester.semantics.tap(find.semantics.byLabel('Wi-Fi'));
+    await tester.pumpAndSettle();
+    expect(value, isFalse, reason: 'the tap did not turn it off');
+    expect(tester.getSemantics(find.byType(GlassSwitch)), isSemantics(isToggled: false, hasTapAction: true));
+    tester.semantics.tap(find.semantics.byLabel('Wi-Fi'));
+    await tester.pumpAndSettle();
+    expect(value, isTrue, reason: 'the tap did not turn it back on');
+    rebuild(() => enabled = false);
+    await tester.pumpAndSettle();
+    expect(tester.getSemantics(find.byType(GlassSwitch)), isSemantics(isEnabled: false, isToggled: true));
+    semantics.dispose();
+  });
+
+  testWidgets(
+    'a disabled switch or slider offers a screen reader no action',
+    // The `RawGestureDetector` under each control keeps its recognizers when
+    // the control is disabled, with their callbacks null, and the framework's
+    // semantics delegate exports a tap and a horizontal scroll for any
+    // recognizer it finds: a disabled switch reads [scrollLeft, scrollRight,
+    // tap], each of which does nothing.
+    skip: true,
+    (WidgetTester tester) async {
+      final SemanticsHandle semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        const _App(
+          home: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              GlassSwitch(value: true, onChanged: null, semanticLabel: 'Wi-Fi'),
+              SizedBox(
+                width: 300,
+                child: GlassSlider(value: 0.5, onChanged: null, semanticLabel: 'Volume'),
+              ),
+            ],
+          ),
+        ),
+      );
+      for (final Type control in <Type>[GlassSwitch, GlassSlider]) {
+        expect(
+          tester.getSemantics(find.byType(control)),
+          isSemantics(
+            isEnabled: false,
+            hasTapAction: false,
+            hasScrollLeftAction: false,
+            hasScrollRightAction: false,
+          ),
+          reason: 'a disabled $control offers an action that does nothing',
+        );
+      }
+      semantics.dispose();
+    },
+  );
 
   testWidgets('a screen reader steps a slider by a tenth, start to end, and not past its ends', (
     WidgetTester tester,

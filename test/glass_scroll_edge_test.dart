@@ -25,7 +25,9 @@
 //    the bottom acquires a blur Apple's does not have. Read first at the
 //    bottom's plateau alone, this broke nothing — the glass the break lays
 //    sits above the plateau — so the arm reads the least contrast over the
-//    whole ramp instead.
+//    whole ramp instead;
+//  - in `appearanceFor`, `computeLuminance() < 0.4` -> `< 0.2`: the
+//    appearance arm finds the grey just below the threshold light.
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -61,6 +63,28 @@ void main() {
     expect(dark.bottom.a, closeTo(0.260, 0.01));
     expect(light.bottom.a, closeTo(0.862, 0.01));
     expect(dark.bottom.tint50, closeTo(808.5, 1));
+  });
+
+  test('an edge that names no appearance reads the declared backdrop, dark below a luminance of 0.4', () {
+    const edge = GlassScrollEdge(side: GlassScrollEdgeSide.top, extent: 100);
+    GlassScrollEdgeAppearance over(Color? backdrop) => edge.appearanceFor(GlassThemeData(backdrop: backdrop));
+    // Two greys a code apart, one each side of the threshold.
+    const below = Color(0xFFA9A9A9);
+    const above = Color(0xFFAAAAAA);
+    expect(below.computeLuminance(), lessThan(0.4));
+    expect(above.computeLuminance(), greaterThan(0.4));
+    expect(over(null), GlassScrollEdgeAppearance.light, reason: 'undeclared is light');
+    expect(over(const Color(0xFF000000)), GlassScrollEdgeAppearance.dark);
+    expect(over(below), GlassScrollEdgeAppearance.dark);
+    expect(over(above), GlassScrollEdgeAppearance.light);
+    expect(over(const Color(0xFFFFFFFF)), GlassScrollEdgeAppearance.light);
+    // One the edge names holds against any backdrop.
+    const named = GlassScrollEdge(
+      side: GlassScrollEdgeSide.top,
+      extent: 100,
+      appearance: GlassScrollEdgeAppearance.light,
+    );
+    expect(named.appearanceFor(const GlassThemeData(backdrop: Color(0xFF000000))), GlassScrollEdgeAppearance.light);
   });
 
   for (final GlassScrollEdgeAppearance appearance in GlassScrollEdgeAppearance.values) {

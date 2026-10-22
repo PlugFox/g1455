@@ -51,6 +51,41 @@ void main() {
     );
   });
 
+  testWidgets('the body\'s constraints carry the bottom bar\'s extent: equal while it is, and hashed alike', (
+    WidgetTester tester,
+  ) async {
+    // The extent rides on the constraints, so a body is laid out again when
+    // only the bar's height changed — and two that are equal are one key to a
+    // cache keyed on constraints, as the framework's equal sizes are.
+    Future<BoxConstraints> bodyUnder(double bar) async {
+      late BoxConstraints seen;
+      await _mount(
+        tester,
+        GlassScaffold(
+          bottomBar: SizedBox(key: kBottom, height: bar),
+          body: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              seen = constraints;
+              return const SizedBox.expand();
+            },
+          ),
+        ),
+      );
+      return seen;
+    }
+
+    final BoxConstraints a = await bodyUnder(60);
+    await _mount(tester, const SizedBox());
+    final BoxConstraints again = await bodyUnder(60);
+    final BoxConstraints taller = await bodyUnder(80);
+    expect(identical(a, again), isFalse);
+    expect(again, a);
+    expect(again.hashCode, a.hashCode, reason: 'two equal constraints hash apart');
+    expect(taller == a, isFalse, reason: 'a new bar height left the body\'s constraints equal');
+    expect(a == BoxConstraints.tight(kScreen), isFalse, reason: 'the extent is not part of what is compared');
+    expect(taller.biggest, a.biggest, reason: 'the arm is about the extent, not the size');
+  });
+
   testWidgets('the body fills the screen, starts below the top bar and scrolls under it', (
     WidgetTester tester,
   ) async {

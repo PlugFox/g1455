@@ -353,6 +353,40 @@ void main() {
     expect(added / layeredAdded, greaterThan(8));
   });
 
+  testWidgets('a focused button pressed adds the rim over its ring, and lets it go', (WidgetTester tester) async {
+    // The overlay is already painting the ring when the press comes: the press
+    // is a new overlay over an old one, and the old one must give way to it —
+    // no growth here (`GlassPress.none`), so nothing else repaints the panel.
+    tester.binding.focusManager.highlightStrategy = FocusHighlightStrategy.alwaysTraditional;
+    addTearDown(() => tester.binding.focusManager.highlightStrategy = FocusHighlightStrategy.automatic);
+    await _mount(
+      tester,
+      finish: GlassFinish.regularDark,
+      backdrop: kLight,
+      tier: GlassTier.cheap,
+      content: SizedBox.fromSize(
+        size: kPanel,
+        child: GlassButton(
+          onPressed: () {},
+          autofocus: true,
+          press: GlassPress.none,
+          padding: EdgeInsets.zero,
+          child: const SizedBox.shrink(),
+        ),
+      ),
+    );
+    await tester.pump();
+    final _Rgb focused = await _readCentre(tester);
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.byType(GlassButton)));
+    await tester.pump();
+    final _Rgb pressed = await _readCentre(tester);
+    expect(pressed.r - focused.r, closeTo(50, 2), reason: 'the press over the ring was never painted');
+    await gesture.up();
+    await tester.pump();
+    final _Rgb released = await _readCentre(tester);
+    expect(released.distanceTo(focused.color), lessThanOrEqualTo(1), reason: 'the press outlived the finger');
+  });
+
   // -------------------------------------------------------------------------
   // 6. The same arithmetic, applied to the rim the ladder promised to keep.
   // -------------------------------------------------------------------------
