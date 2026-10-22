@@ -13,11 +13,20 @@
 //     rasterise to the same bytes through the wrapper as without it — and a
 //     script that differs by one forwarded argument must not, or the
 //     comparison is blind.
-//  2. **Every paint-carrying draw drops on a mask filter, and counts it.** A
+//  2. **Every draw the engine blurs drops on a mask filter, and counts it.** A
 //     dropped draw with no count is a screenshot finding instead of a report
-//     finding.
+//     finding. The four the engine draws sharp through one — a nine-patch,
+//     vertices and both atlas draws — are forwarded, and equal the engine's
+//     own rendering.
 //  3. **Each switch is independent.** `drawShadow` is exact, the mask filter is
 //     a heuristic, and a report has to say which one fired.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `FilteringCanvas.drawVertices` (or `drawImageNine`, `drawAtlas`,
+//    `drawRawAtlas`), `=> inner.drawVertices(vertices, blendMode, paint);` ->
+//    `{ if (!filter._dropPaint(paint)) inner.drawVertices(vertices, blendMode,
+//    paint); }`: a draw the engine renders sharp is dropped through a mask
+//    filter, and the sharp half of the split arm names it.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -236,93 +245,110 @@ void main() {
       expect(heuristicOnly.dropped, 0);
     });
 
-    // The library documents `dropMaskFiltered` as "anything painted through a
-    // MaskFilter". The paint-carrying draws below the shape family (images,
-    // points, vertices, atlas) must consult the same rule as the shape draws:
-    // dropped and counted when carrying a mask filter, forwarded when plain.
-    test(
-      'every paint-carrying draw drops a mask-filtered paint like the shape draws, and forwards a plain one',
-      () async {
-        final recorder = ui.PictureRecorder();
-        Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 16, 16), Paint()..color = const Color(0xFFE08020));
-        final ui.Picture picture = recorder.endRecording();
-        final ui.Image sprite = picture.toImageSync(16, 16);
-        picture.dispose();
-        final vertices = ui.Vertices(
-          VertexMode.triangles,
-          const <Offset>[Offset(8, 8), Offset(56, 8), Offset(32, 56)],
-        );
+    // The draws below the shape family split by what the engine does with a
+    // mask filter on them, measured on Skia and on Impeller. Points, raw points
+    // and the two plain image draws blur, so with one they are a shadow-like
+    // smear and are dropped and counted, like the shapes. A nine-patch,
+    // vertices and both atlas draws are drawn sharp, so they are forwarded and
+    // the result has to be the engine's own rendering of the same draw (#17).
+    // Each half also asserts the engine's side of it, so a backend that starts
+    // or stops blurring one of them fails here rather than in a screenshot.
+    test('a draw the engine blurs drops a mask-filtered paint, and one it draws sharp is forwarded', () async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawRect(const Rect.fromLTWH(0, 0, 16, 16), Paint()..color = const Color(0xFFE08020));
+      final ui.Picture picture = recorder.endRecording();
+      final ui.Image sprite = picture.toImageSync(16, 16);
+      picture.dispose();
+      final vertices = ui.Vertices(
+        VertexMode.triangles,
+        const <Offset>[Offset(8, 8), Offset(56, 8), Offset(32, 56)],
+      );
 
-        try {
-          final nonShapeDraws = <String, void Function(Canvas c, Paint p)>{
-            'drawPoints': (Canvas c, Paint p) =>
-                c.drawPoints(ui.PointMode.points, const <Offset>[Offset(32, 32)], p..strokeWidth = 8),
-            'drawRawPoints': (Canvas c, Paint p) => c.drawRawPoints(
-              ui.PointMode.lines,
-              Float32List.fromList(<double>[8, 8, 56, 56]),
-              p..strokeWidth = 4,
-            ),
-            'drawImage': (Canvas c, Paint p) => c.drawImage(sprite, const Offset(8, 8), p),
-            'drawImageRect': (Canvas c, Paint p) => c.drawImageRect(
-              sprite,
-              const Rect.fromLTWH(0, 0, 16, 16),
-              const Rect.fromLTWH(8, 8, 48, 48),
-              p,
-            ),
-            'drawImageNine': (Canvas c, Paint p) => c.drawImageNine(
-              sprite,
-              const Rect.fromLTWH(4, 4, 8, 8),
-              const Rect.fromLTWH(8, 8, 48, 48),
-              p,
-            ),
-            'drawVertices': (Canvas c, Paint p) => c.drawVertices(vertices, BlendMode.srcOver, p),
-            'drawAtlas': (Canvas c, Paint p) => c.drawAtlas(
-              sprite,
-              <RSTransform>[RSTransform(1, 0, 8, 8)],
-              const <Rect>[Rect.fromLTWH(0, 0, 16, 16)],
-              null,
-              null,
-              null,
-              p,
-            ),
-            'drawRawAtlas': (Canvas c, Paint p) => c.drawRawAtlas(
-              sprite,
-              Float32List.fromList(<double>[1, 0, 8, 8]),
-              Float32List.fromList(<double>[0, 0, 16, 16]),
-              null,
-              null,
-              null,
-              p,
-            ),
-          };
+      try {
+        final blurred = <String, void Function(Canvas c, Paint p)>{
+          'drawPoints': (Canvas c, Paint p) =>
+              c.drawPoints(ui.PointMode.points, const <Offset>[Offset(32, 32)], p..strokeWidth = 8),
+          'drawRawPoints': (Canvas c, Paint p) => c.drawRawPoints(
+            ui.PointMode.lines,
+            Float32List.fromList(<double>[8, 8, 56, 56]),
+            p..strokeWidth = 4,
+          ),
+          'drawImage': (Canvas c, Paint p) => c.drawImage(sprite, const Offset(8, 8), p),
+          'drawImageRect': (Canvas c, Paint p) => c.drawImageRect(
+            sprite,
+            const Rect.fromLTWH(0, 0, 16, 16),
+            const Rect.fromLTWH(8, 8, 48, 48),
+            p,
+          ),
+        };
+        final sharp = <String, void Function(Canvas c, Paint p)>{
+          'drawImageNine': (Canvas c, Paint p) => c.drawImageNine(
+            sprite,
+            const Rect.fromLTWH(4, 4, 8, 8),
+            const Rect.fromLTWH(8, 8, 48, 48),
+            p,
+          ),
+          'drawVertices': (Canvas c, Paint p) => c.drawVertices(vertices, BlendMode.srcOver, p),
+          'drawAtlas': (Canvas c, Paint p) => c.drawAtlas(
+            sprite,
+            <RSTransform>[RSTransform(1, 0, 8, 8)],
+            const <Rect>[Rect.fromLTWH(0, 0, 16, 16)],
+            null,
+            null,
+            null,
+            p,
+          ),
+          'drawRawAtlas': (Canvas c, Paint p) => c.drawRawAtlas(
+            sprite,
+            Float32List.fromList(<double>[1, 0, 8, 8]),
+            Float32List.fromList(<double>[0, 0, 16, 16]),
+            null,
+            null,
+            null,
+            p,
+          ),
+        };
+        Paint plain() => Paint()..color = const Color(0xFFE08020);
+        Paint soft() => plain()..maskFilter = kBlur;
 
-          for (final MapEntry<String, void Function(Canvas, Paint)> e in nonShapeDraws.entries) {
-            final filter = ShadowFilter();
-            Paint plain() => Paint()..color = const Color(0xFFE08020);
-            final Uint8List bare = await _raster((Canvas c) => e.value(c, plain()));
-            final Uint8List kept = await _raster((Canvas c) => e.value(FilteringCanvas(c, filter), plain()));
-            expect(
-              _opaquePixels(bare),
-              greaterThan(0),
-              reason: '${e.key}: the draw has to paint something to be dropped',
-            );
-            expect(_differing(bare, kept), 0);
-            expect(filter.maskFilteredDraws, 0);
-
-            final Uint8List dropped = await _raster(
-              (Canvas c) => e.value(FilteringCanvas(c, filter), plain()..maskFilter = kBlur),
-            );
-            expect(_opaquePixels(dropped), 0, reason: '${e.key} with a blur mask filter reached the canvas');
-            expect(filter.maskFilteredDraws, 1);
-            expect(filter.shadowCalls, 0);
-            expect(filter.dropped, 1);
-          }
-        } finally {
-          sprite.dispose();
-          vertices.dispose();
+        for (final MapEntry<String, void Function(Canvas, Paint)> e in <String, void Function(Canvas, Paint)>{
+          ...blurred,
+          ...sharp,
+        }.entries) {
+          final filter = ShadowFilter();
+          final Uint8List bare = await _raster((Canvas c) => e.value(c, plain()));
+          final Uint8List kept = await _raster((Canvas c) => e.value(FilteringCanvas(c, filter), plain()));
+          expect(_opaquePixels(bare), greaterThan(0), reason: '${e.key}: the draw has to paint something');
+          expect(_differing(bare, kept), 0, reason: '${e.key}: a plain paint was not forwarded as drawn');
+          expect(filter.maskFilteredDraws, 0);
         }
-      },
-    );
+
+        for (final MapEntry<String, void Function(Canvas, Paint)> e in blurred.entries) {
+          final filter = ShadowFilter();
+          final Uint8List bare = await _raster((Canvas c) => e.value(c, plain()));
+          final Uint8List engine = await _raster((Canvas c) => e.value(c, soft()));
+          expect(_differing(bare, engine), greaterThan(0), reason: '${e.key}: the engine no longer blurs it');
+          final Uint8List dropped = await _raster((Canvas c) => e.value(FilteringCanvas(c, filter), soft()));
+          expect(_opaquePixels(dropped), 0, reason: '${e.key} with a blur mask filter reached the canvas');
+          expect(filter.maskFilteredDraws, 1);
+          expect(filter.shadowCalls, 0);
+          expect(filter.dropped, 1);
+        }
+
+        for (final MapEntry<String, void Function(Canvas, Paint)> e in sharp.entries) {
+          final filter = ShadowFilter();
+          final Uint8List bare = await _raster((Canvas c) => e.value(c, plain()));
+          final Uint8List engine = await _raster((Canvas c) => e.value(c, soft()));
+          expect(_differing(bare, engine), 0, reason: '${e.key}: the engine now blurs it, so it is a shadow to drop');
+          final Uint8List kept = await _raster((Canvas c) => e.value(FilteringCanvas(c, filter), soft()));
+          expect(_differing(engine, kept), 0, reason: '${e.key} with a mask filter is not what the engine draws');
+          expect(filter.dropped, 0, reason: '${e.key}: a forwarded draw was counted as dropped');
+        }
+      } finally {
+        sprite.dispose();
+        vertices.dispose();
+      }
+    });
   });
 }
 

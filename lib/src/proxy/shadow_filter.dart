@@ -39,7 +39,19 @@ class ShadowFilter {
   /// heuristic.
   final bool dropShadowCalls;
 
-  /// Anything painted through a `MaskFilter`.
+  /// Every draw the engine blurs through a `MaskFilter`.
+  ///
+  /// That is every draw that takes a paint except four: the shapes (`drawRect`,
+  /// `drawRRect`, `drawDRRect`, `drawRSuperellipse`, `drawOval`, `drawCircle`,
+  /// `drawArc`, `drawPath`), `drawPaint`, `drawLine`, `drawPoints`,
+  /// `drawRawPoints`, `drawImage` and `drawImageRect` are dropped when their
+  /// paint carries a mask filter. `drawImageNine`, `drawVertices`, `drawAtlas`
+  /// and `drawRawAtlas` are forwarded whatever their paint carries, because
+  /// the engine ignores the mask filter on them: measured on Skia and on
+  /// Impeller, the same draw with and without a blur differs by no pixel,
+  /// while the draws above differ by thousands. Those four are therefore
+  /// never a soft shadow-like smear, and dropping them would take sharp,
+  /// visible content out of the capture.
   ///
   /// Heuristic, and it has to be named as one: a blurred draw is *usually* a
   /// shadow, and a design that blurs a highlight on purpose would lose it. The
@@ -51,6 +63,10 @@ class ShadowFilter {
   int shadowCalls = 0;
 
   /// Mask-filtered draws dropped so far.
+  ///
+  /// A forwarded draw is not counted even when its paint carries a mask
+  /// filter: the counter is the report of what the capture lost, and the four
+  /// draws [dropMaskFiltered] forwards lose nothing.
   int maskFilteredDraws = 0;
 
   /// Every draw dropped so far, of either kind.
@@ -186,14 +202,6 @@ class FilteringCanvas implements Canvas {
   }
 
   @override
-  void drawImageNine(ui.Image image, Rect center, Rect dst, Paint paint) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawImageNine(image, center, dst, paint);
-  }
-
-  @override
   void drawPoints(ui.PointMode pointMode, List<Offset> points, Paint paint) {
     if (filter._dropPaint(paint)) {
       return;
@@ -209,13 +217,19 @@ class FilteringCanvas implements Canvas {
     inner.drawRawPoints(pointMode, points, paint);
   }
 
+  // --- the draws that carry a paint and are forwarded whatever it holds ---
+  //
+  // The engine draws these four sharp through a mask filter, measured on Skia
+  // and on Impeller, so there is no shadow in them to drop; see
+  // [ShadowFilter.dropMaskFiltered].
+
   @override
-  void drawVertices(ui.Vertices vertices, BlendMode blendMode, Paint paint) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawVertices(vertices, blendMode, paint);
-  }
+  void drawImageNine(ui.Image image, Rect center, Rect dst, Paint paint) =>
+      inner.drawImageNine(image, center, dst, paint);
+
+  @override
+  void drawVertices(ui.Vertices vertices, BlendMode blendMode, Paint paint) =>
+      inner.drawVertices(vertices, blendMode, paint);
 
   @override
   void drawAtlas(
@@ -226,12 +240,7 @@ class FilteringCanvas implements Canvas {
     BlendMode? blendMode,
     Rect? cullRect,
     Paint paint,
-  ) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawAtlas(atlas, transforms, rects, colors, blendMode, cullRect, paint);
-  }
+  ) => inner.drawAtlas(atlas, transforms, rects, colors, blendMode, cullRect, paint);
 
   @override
   void drawRawAtlas(
@@ -242,12 +251,7 @@ class FilteringCanvas implements Canvas {
     BlendMode? blendMode,
     Rect? cullRect,
     Paint paint,
-  ) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawRawAtlas(atlas, rstTransforms, rects, colors, blendMode, cullRect, paint);
-  }
+  ) => inner.drawRawAtlas(atlas, rstTransforms, rects, colors, blendMode, cullRect, paint);
 
   // --- everything else, forwarded unchanged ---
 
