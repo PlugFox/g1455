@@ -25,7 +25,9 @@
 //  - the anchor's semantics left to `Visibility` (`maintainSemantics: true,`
 //    dropped and `ExcludeSemantics` not excluding): closing the popover over
 //    an anchor with a semantics node trips the framework's
-//    `!semantics.parentDataDirty` in the grow arm, which holds semantics on.
+//    `!semantics.parentDataDirty` in the grow arm, which holds semantics on;
+//  - the grabber's `glassTertiaryLabel(theme.legibility(route.finish).label)`
+//    -> `kGlassDisabledDarkLabel`: the grabber arm finds it dark on dark glass.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -150,6 +152,45 @@ void main() {
     await tester.tap(find.text('close'));
     await tester.pumpAndSettle();
     expect(find.text('close'), findsNothing);
+  });
+
+  testWidgets('a sheet\'s grabber is the tertiary label of its own appearance', (WidgetTester tester) async {
+    // iOS's grabber is `tertiaryLabel`: dark grey on light glass, light grey on
+    // dark, where the dark one all but disappears (#15).
+    for (final (GlassFinish finish, Color grey) in <(GlassFinish, Color)>[
+      (GlassFinish.regularDark, kGlassDisabledLightLabel),
+      (GlassFinish.regularLight, kGlassDisabledDarkLabel),
+    ]) {
+      await tester.pumpWidget(
+        _App(
+          key: UniqueKey(),
+          home: Builder(
+            builder: (BuildContext context) => Center(
+              child: GestureDetector(
+                onTap: () => showGlassSheet<void>(
+                  context: context,
+                  finish: finish,
+                  builder: (_) => const SizedBox(height: 200, child: Center(child: Text('grabbed body'))),
+                ),
+                child: const Text('open grabbed sheet'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open grabbed sheet'));
+      await tester.pumpAndSettle();
+      final Iterable<DecoratedBox> grabbers = tester.widgetList<DecoratedBox>(
+        find.byWidgetPredicate(
+          (Widget w) =>
+              w is DecoratedBox &&
+              w.decoration is ShapeDecoration &&
+              (w.decoration as ShapeDecoration).shape is StadiumBorder,
+        ),
+      );
+      expect(grabbers, hasLength(1));
+      expect((grabbers.single.decoration as ShapeDecoration).color, grey, reason: 'on ${finish.name}');
+    }
   });
 
   testWidgets('a sheet with a max width is that wide, centred over the bottom', (WidgetTester tester) async {
@@ -352,7 +393,7 @@ RenderGlassSurface _surfaceAbove(WidgetTester tester, Finder finder) =>
 
 /// The host where a modal needs it: above the navigator.
 class _App extends StatelessWidget {
-  const _App({required this.home});
+  const _App({super.key, required this.home});
 
   final Widget home;
 

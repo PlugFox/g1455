@@ -44,6 +44,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_above.dart';
+import 'glass_components.dart' show glassTertiaryLabel;
 import 'glass_finish.dart';
 import 'glass_host.dart';
 import 'glass_surface.dart';
@@ -853,7 +854,13 @@ class _GlassSheet extends StatelessWidget {
                     margin: const EdgeInsets.only(top: 5, bottom: 4),
                     width: 36,
                     height: 5,
-                    decoration: const ShapeDecoration(shape: StadiumBorder(), color: Color(0x4D3C3C43)),
+                    // `tertiaryLabel` of the sheet's own appearance: the light
+                    // grey on dark glass, as iOS draws it, where the dark one
+                    // all but disappears (#15).
+                    decoration: ShapeDecoration(
+                      shape: const StadiumBorder(),
+                      color: glassTertiaryLabel(theme.legibility(route.finish).label),
+                    ),
                   ),
                 ),
               Flexible(child: Builder(builder: route.builder)),

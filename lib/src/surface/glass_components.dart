@@ -86,6 +86,12 @@ const Color kGlassDisabledDarkLabel = Color(0x4D3C3C43);
 /// {@category Panels and controls}
 const Color kGlassDisabledLightLabel = Color(0x4DEBEBF5);
 
+/// `tertiaryLabel` in the appearance whose label is [label]: the grey that
+/// sits at 0.3 next to a black or white label on the same glass — a disabled
+/// label, a sheet's grabber.
+Color glassTertiaryLabel(Color label) =>
+    label.computeLuminance() < 0.5 ? kGlassDisabledDarkLabel : kGlassDisabledLightLabel;
+
 /// A glass bar: the navigation layer, which is where Apple's guidelines put this
 /// material.
 ///
@@ -840,11 +846,7 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
         legibility.finish.worstContrast(legibility.label) < kTextContrastAA) {
       _reportIllegible(legibility.finish.worstContrast(legibility.label));
     }
-    final Color foreground = widget.enabled
-        ? legibility.label
-        : legibility.label.computeLuminance() < 0.5
-        ? kGlassDisabledDarkLabel
-        : kGlassDisabledLightLabel;
+    final Color foreground = widget.enabled ? legibility.label : glassTertiaryLabel(legibility.label);
     return IconTheme.merge(
       data: IconThemeData(color: foreground),
       child: DefaultTextStyle.merge(
