@@ -639,6 +639,58 @@ void main() {
     );
   });
 
+  testWidgets('a layout the split would cut too fine is drawn as the one quad, and counted', (
+    WidgetTester tester,
+  ) async {
+    // Six tall bars crossed by six wide ones: between two tall bars every slab
+    // is six spans, so the partition is forty-odd rectangles, past the
+    // ceiling. The split is refused and the paint falls back to the quad it
+    // always could draw: one draw a paint.
+    final boxes = <Rect>[
+      for (var i = 0; i < 6; i++) Rect.fromLTWH(20 + i * 66, 10, 24, 200),
+      for (var i = 0; i < 6; i++) Rect.fromLTWH(10, 14 + i * 34, 400, 14),
+    ];
+    expect(
+      fusedDrawTiles(boxes: boxes, reach: 2, cullMargin: 30),
+      isNull,
+      reason: 'the layout splits within the ceiling, so this arm reaches nothing',
+    );
+    final bool wasSplit = debugGlassFusedSplit;
+    addTearDown(() => debugGlassFusedSplit = wasSplit);
+    debugGlassFusedSplit = true;
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(size: kScreen),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: GlassHost(
+              hardware: GlassHardware.appleMetal,
+              child: SizedBox.fromSize(
+                size: kScreen,
+                child: GlassGroup(
+                  spacing: 4,
+                  child: Stack(
+                    children: <Widget>[
+                      for (final Rect box in boxes) Positioned.fromRect(rect: box, child: const GlassSurface()),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+    });
+    final RenderGlassGroup group = _groupOf(tester);
+    expect(group.fusedPaints, greaterThan(0), reason: 'the group never drew');
+    expect(group.fusedTileRefusals, group.fusedPaints, reason: 'a paint split the layout it should have refused');
+    expect(group.fusedDraws, group.fusedPaints, reason: 'not one quad a paint');
+  });
+
   testWidgets('a group splits by default, whatever hardware the host declares', (
     WidgetTester tester,
   ) async {
