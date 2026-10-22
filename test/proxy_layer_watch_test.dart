@@ -42,7 +42,9 @@
 //  - in `_Walk.visit`, `final int end = spreads ? out.length : selfEnd;` ->
 //    `final int end = spreads || fills ? out.length : selfEnd;`: a repaint
 //    under any colour filter is read as the whole clip, and the same arm's
-//    cost check says so.
+//    cost check says so;
+//  - the body of `reset` emptied: the reset arm reads an unchanged tree as
+//    unchanged.
 
 import 'dart:convert';
 import 'dart:io';
@@ -247,6 +249,19 @@ void main() {
             'the same three layers with the same properties in the same order, '
             'and a different screen',
       );
+    });
+
+    test('reset forgets the last frame, so an unchanged tree reads as new', () {
+      final root = ContainerLayer()..append(OffsetLayer(offset: const Offset(3, 4)));
+      final ProxyLayerWatch watch = ProxyLayerWatch();
+      expect(watch.changeSince(root).changed, isTrue);
+      expect(watch.changeSince(root).changed, isFalse);
+      watch.reset();
+      final LayerChange after = watch.changeSince(root);
+      expect(after.changed, isTrue, reason: 'reset kept the frame it was asked to forget');
+      expect(after.bounded, isFalse, reason: 'with nothing to compare against the change is everywhere');
+      // And it is one frame forgotten, not the watch turned off.
+      expect(watch.changeSince(root).changed, isFalse);
     });
   });
 

@@ -37,6 +37,11 @@
 //     `super.pushLayer` is never called, `paint()` leaves `_needsPaint` as it
 //     found it) — so what the arm does is *check* it under the knobs a caller
 //     would actually alternate.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `GlassProxy.opaque`, `role = GlassProxyRole.opaque` ->
+//    `role = GlassProxyRole.verbatim`: the transparency arm counts no opaque
+//    marker.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -83,7 +88,9 @@ void main() {
           children: <Widget>[
             Positioned.fromRect(
               rect: _first,
-              child: const GlassProxy.opaque(child: ColoredBox(color: kBox)),
+              // Built at run time rather than as a constant, so the marker
+              // that reaches the pass is the one its constructor made.
+              child: GlassProxy.opaque(child: _flat(kBox)),
             ),
             Positioned.fromRect(
               rect: _second,
@@ -548,6 +555,9 @@ WalkAction _skipBoundaries(RenderObject child) => child.isRepaintBoundary ? Walk
 
 const Rect _first = Rect.fromLTWH(40, 40, 80, 60);
 const Rect _second = Rect.fromLTWH(40, 120, 80, 40);
+
+/// A flat box, as a widget made at run time.
+Widget _flat(Color color) => ColoredBox(color: color);
 
 /// An opaque page, so a subtraction has something to fall back to.
 Widget _page(Widget body) => ColoredBox(color: kPage, child: body);

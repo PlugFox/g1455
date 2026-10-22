@@ -25,6 +25,11 @@
 // And one arm that is about the numbers rather than the code: the damage table
 // in `ProxyResolution` is re-derived from the report it was taken from, which is
 // still on disk. A constant copied by hand is a constant that drifts.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `ProxyRecorder.stock`, the `layer == null` check dropped and the layer
+//    read as `boundary.layer! as OffsetLayer`: the unpainted arm gets a null
+//    check failure instead of the refusal that names the cause.
 
 import 'dart:convert';
 import 'dart:io';
@@ -223,6 +228,20 @@ void main() {
     expect(rec.image.width, 160);
     expect(rec.image.height, 120);
     rec.dispose();
+  });
+
+  test('the stock capture refuses a boundary that has never painted', () {
+    // Not a blank image: a fallback that returned one would show no glass and
+    // say nothing, on exactly the frame the pass already gave up on.
+    expect(
+      () => ProxyRecorder.stock(
+        RenderRepaintBoundary(),
+        region: const Rect.fromLTWH(0, 0, 10, 10),
+        resolution: const ProxyResolution.full(),
+        devicePixelRatio: 2,
+      ),
+      throwsA(isA<StateError>().having((StateError e) => e.message, 'message', contains('has not painted'))),
+    );
   });
 
   // -------------------------------------------------------------------------

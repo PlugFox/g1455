@@ -19,6 +19,11 @@
 // seven times the others, so every model predicts about the same number there;
 // `res8lag2` puts resolution and staleness within a factor of two, which is
 // what lets the models separate.
+//
+// Breaks, each undone by swapping the string back:
+//  - `get framesSinceCapture => _framesSinceCapture` -> `0`, or
+//    `get shouldRetake => !decide().holds` -> `decide().holds`: the ceiling arm
+//    finds the lag or the question wrong on every frame.
 
 import 'dart:convert';
 import 'dart:io';
@@ -330,9 +335,20 @@ void main() {
     addTearDown(oracle.dispose);
 
     _run(pipeline, ledger, oracle);
-    final List<RetakeReason> reasons = <RetakeReason>[
-      for (var i = 0; i < 5; i++) _run(pipeline, ledger, oracle).reason,
-    ];
+    expect(oracle.framesSinceCapture, 0);
+    final reasons = <RetakeReason>[];
+    final asked = <bool>[];
+    final behind = <int>[];
+    for (var i = 0; i < 5; i++) {
+      // Asked before the frame, which is when a caller would ask it.
+      asked.add(oracle.shouldRetake);
+      reasons.add(_run(pipeline, ledger, oracle).reason);
+      behind.add(oracle.framesSinceCapture);
+    }
+    // How far behind the held proxy is: counted on every held frame, and
+    // back to nothing on the frame that recorded.
+    expect(behind, <int>[1, 2, 0, 1, 2]);
+    expect(asked, <bool>[false, false, true, false, false]);
     // Held for the ceiling, then re-recorded, then held again: a backstop, not
     // a schedule. With a ceiling of two that is hold, hold, ceiling, hold, hold.
     expect(reasons, <RetakeReason>[
