@@ -17,6 +17,8 @@
 // `glass_text_field_test.dart`: a focused field over a still screen records
 // nothing for seconds of blinking.
 
+import 'dart:math' as math;
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -160,6 +162,23 @@ class _GlassTextFieldState extends State<GlassTextField> {
     super.dispose();
   }
 
+  /// [kGlassFieldHeight], or taller when a larger text size makes the line
+  /// taller than it leaves room for: the capsule keeps 11 above and below the
+  /// line, as a `UITextField` grows under Dynamic Type. Fixed for a style, not
+  /// read off the text, so the field stays a box of its own size and typing
+  /// lays out nothing around it.
+  double _height(TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: ' ', style: style),
+      textScaler: MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final double line = painter.height;
+    painter.dispose();
+    return math.max(kGlassFieldHeight, line + 22);
+  }
+
   @override
   Widget build(BuildContext context) {
     final GlassThemeData theme = GlassTheme.of(context);
@@ -176,7 +195,7 @@ class _GlassTextFieldState extends State<GlassTextField> {
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: kGlassMinTapTarget.height),
         child: SizedBox(
-          height: kGlassFieldHeight,
+          height: _height(base),
           child: GlassSurface(
             borderRadius: kGlassCapsule,
             finish: widget.finish,

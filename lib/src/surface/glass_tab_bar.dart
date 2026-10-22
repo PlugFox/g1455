@@ -488,6 +488,11 @@ class _TabGeometry {
 /// down beside the collapsed circle. The bar's box is the same height either
 /// way, so a body told the bar's height is not laid out again for it.
 ///
+/// **Text size.** The items' labels do not grow past the default text size,
+/// as UIKit's tab bar's do not: an item is a fifth of a phone's width, and at
+/// twice the size its label is cut mid-word and its icon meets the next one.
+/// A screen reader is given each label whole.
+///
 /// See also:
 ///
 ///  * [GlassTabItem] and [GlassTabItemLook], for an icon or a label the bar
@@ -1103,15 +1108,19 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
         child: RepaintBoundary(
           child: ValueListenableBuilder<int>(
             valueListenable: _over,
-            builder: (BuildContext context, int over, Widget? _) => Row(
-              children: <Widget>[
-                SizedBox(width: g.pad),
-                for (var i = 0; i < widget.items.length; i++)
-                  SizedBox(
-                    width: g.pitch,
-                    child: _item(g, i, highlighted: i == over),
-                  ),
-              ],
+            // At most the default text size (see the class): a fifth of the
+            // bar holds no larger label.
+            builder: (BuildContext context, int over, Widget? _) => GlassAtMostDefaultTextSize(
+              child: Row(
+                children: <Widget>[
+                  SizedBox(width: g.pad),
+                  for (var i = 0; i < widget.items.length; i++)
+                    SizedBox(
+                      width: g.pitch,
+                      child: _item(g, i, highlighted: i == over),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

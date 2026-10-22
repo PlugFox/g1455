@@ -102,6 +102,30 @@ Color glassSystemFill(Color label) =>
 /// action: (255, 59, 48) in light, (255, 69, 58) in dark.
 Color glassSystemRed(Color label) => label.computeLuminance() < 0.5 ? const Color(0xFFFF3B30) : const Color(0xFFFF453A);
 
+/// [child] at no more than the default text size, for a control whose labels
+/// sit in a box that does not grow — as UIKit's tab bar and segmented control
+/// do not. A smaller text size is kept. Without a [MediaQuery] there is no
+/// scale to clamp.
+class GlassAtMostDefaultTextSize extends StatelessWidget {
+  /// Clamps the text scale under it to at most 1.
+  const GlassAtMostDefaultTextSize({super.key, required this.child});
+
+  /// What the clamp applies to.
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final MediaQueryData? data = MediaQuery.maybeOf(context);
+    if (data == null) {
+      return child;
+    }
+    return MediaQuery(
+      data: data.copyWith(textScaler: data.textScaler.clamp(maxScaleFactor: 1)),
+      child: child,
+    );
+  }
+}
+
 /// A glass bar: the navigation layer, which is where Apple's guidelines put this
 /// material.
 ///

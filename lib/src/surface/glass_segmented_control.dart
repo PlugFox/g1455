@@ -63,7 +63,7 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_components.dart' show GlassAtMostDefaultTextSize, kGlassMinTapTarget;
 import 'glass_concentric.dart';
 import 'glass_controls.dart' show glassControlClaimsPointer, kGlassDropOptics;
 import 'glass_drop_motion.dart';
@@ -171,6 +171,11 @@ Size _marginFor(GlassDropMotion motion) =>
 /// > Held, the drop is one clear glass over a track that is not glass: the
 /// > frames where it lifts and settles are captures, and a slide is drawn from
 /// > the proxy already held.
+///
+/// **Text size.** The labels do not grow past the default text size, as
+/// UIKit's `UISegmentedControl` does not: the track is 32 tall and its
+/// segments a quarter of the row, and a larger label is cut there. The
+/// semantics still carry every label whole to a screen reader.
 ///
 /// See also:
 ///
@@ -524,7 +529,11 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     );
   }
 
-  Widget _labels() => Padding(
+  // At most the default text size (see the class): a larger label is cut by
+  // the capsule it sits on.
+  Widget _labels() => GlassAtMostDefaultTextSize(child: _labelRow());
+
+  Widget _labelRow() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: _kInset),
     child: Row(
       children: <Widget>[
