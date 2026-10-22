@@ -102,6 +102,32 @@ Color glassSystemFill(Color label) =>
 /// action: (255, 59, 48) in light, (255, 69, 58) in dark.
 Color glassSystemRed(Color label) => label.computeLuminance() < 0.5 ? const Color(0xFFFF3B30) : const Color(0xFFFF453A);
 
+/// `secondarySystemFill` in the appearance whose label is [label]: (120, 120,
+/// 128) at 0.16 in light and 0.32 in dark — an off switch's track, a
+/// slider's.
+Color glassSecondarySystemFill(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0x29787880) : const Color(0x52787880);
+
+/// `tertiarySystemFill` in the appearance whose label is [label]: (118, 118,
+/// 128) at 0.12 in light and 0.24 in dark — a segmented control's track.
+Color glassTertiarySystemFill(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0x1F767680) : const Color(0x3D767680);
+
+/// `systemBlue` in the appearance whose label is [label]: (0, 122, 255) in
+/// light, (10, 132, 255) in dark — a slider's fill, a selected tab, a cursor.
+Color glassSystemBlue(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0xFF007AFF) : const Color(0xFF0A84FF);
+
+/// `systemGreen` in the appearance whose label is [label]: (52, 199, 89) in
+/// light, (48, 209, 88) in dark — an on switch's track.
+Color glassSystemGreen(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0xFF34C759) : const Color(0xFF30D158);
+
+/// The label colour [context] draws in — on glass, the one the glass chose
+/// for its finish ([GlassBar] and the others set it) — or black without one.
+/// What the appearance helpers above are given for a default.
+Color glassAmbientLabel(BuildContext context) => DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000);
+
 /// [child] at no more than the default text size, for a control whose labels
 /// sit in a box that does not grow — as UIKit's tab bar and segmented control
 /// do not. A smaller text size is kept. Without a [MediaQuery] there is no

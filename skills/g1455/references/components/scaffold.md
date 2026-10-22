@@ -182,7 +182,7 @@ class _LibraryPageState extends State<LibraryPage> {
 | `scrollEdge` | `GlassScrollEdgeStyle?` | `GlassScrollEdgeStyle.soft` | The scroll edge under the top bar. Null for none: the bar is only lifted. |
 | `bottomBar` | `Widget?` | `null` | The bar at the bottom, usually a `GlassTabBar`, at its own height. Lifted. |
 | `floatingAction` | `Widget?` | `null` | A control at the end edge above the bottom bar, usually a `GlassButton`, at its own size. Lifted. |
-| `barMargin` | `EdgeInsets` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. |
+| `barMargin` | `EdgeInsetsGeometry` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `host` | `bool?` | `null` | Whether to mount a `GlassHost`: null when there is none above, `true` always, `false` never. |
 | `minimizeNotificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which of the body's scroll notifications collapse a tab bar that asks to: the minimizer's `notificationPredicate`. |
 | `key` | `Key?` | `null` | |

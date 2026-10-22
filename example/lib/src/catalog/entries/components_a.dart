@@ -135,7 +135,7 @@ class LibraryScreen extends StatelessWidget {
 |---|---|---|---|
 | `child` | `Widget` | **required** | The bar's items. They are content, not glass, and get the bar's label colour. |
 | `borderRadius` | `BorderRadius` | `kGlassCapsule` | Corner radii. The default is a pill at any height. |
-| `padding` | `EdgeInsets` | `EdgeInsets.symmetric(horizontal: 16, vertical: 8)` | Space between the glass edge and the items. |
+| `padding` | `EdgeInsetsGeometry` | `EdgeInsets.symmetric(horizontal: 16, vertical: 8)` | Space between the glass edge and the items. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `finish` | `GlassFinish?` | `null` | The material. Null takes the theme's (normally the host's). |
 | `key` | `Key?` | `null` | |
 ''',
@@ -299,7 +299,7 @@ class _PhotoActionsState extends State<PhotoActions> {
 | `child` | `Widget` | **required** | The label or icon, centred, in a legible colour. |
 | `onPressed` | `VoidCallback?` | `null` | Called on a tap. Null disables the button. |
 | `borderRadius` | `BorderRadius` | `kGlassCapsule` | Corner radii. |
-| `padding` | `EdgeInsets` | `EdgeInsets.symmetric(horizontal: 20, vertical: 10)` | Space between the glass and the label. |
+| `padding` | `EdgeInsetsGeometry` | `EdgeInsets.symmetric(horizontal: 20, vertical: 10)` | Space between the glass and the label. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `minSize` | `Size` | `kGlassMinTapTarget` | The smallest the button may be. |
 | `pressedOverlay` | `Color?` | `null` | Added over the whole shape while held. Null takes the finish's `rim`; `Color(0x00000000)` disables it. |
 | `press` | `GlassPress?` | `null` | How the glass swells and leans while held. Null takes the theme's; `GlassPress.none` keeps the box. |
@@ -450,7 +450,7 @@ class WeatherCard extends StatelessWidget {
 |---|---|---|---|
 | `child` | `Widget` | **required** | The content. Gets the card's label colour. |
 | `borderRadius` | `BorderRadius` | `BorderRadius.all(Radius.circular(24))` | Corner radii. |
-| `padding` | `EdgeInsets` | `EdgeInsets.all(16)` | Space between the glass and the content. |
+| `padding` | `EdgeInsetsGeometry` | `EdgeInsets.all(16)` | Space between the glass and the content. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `finish` | `GlassFinish?` | `null` | The material. Null takes the theme's. |
 | `key` | `Key?` | `null` | |
 ''',
@@ -612,8 +612,8 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
 |---|---|---|---|
 | `value` | `bool` | **required** | Whether the switch is on. |
 | `onChanged` | `ValueChanged<bool>?` | **required** | Called with the new value. Null disables the switch (drawn at 50% opacity). |
-| `activeColor` | `Color` | `Color(0xFF34C759)` | Track colour when on (iOS green). |
-| `trackColor` | `Color` | `Color(0x29787880)` | Track colour when off. |
+| `activeColor` | `Color?` | `null` | Track colour when on. Null for iOS's green in the appearance of the label around the switch: `0xFF34C759` light, `0xFF30D158` dark. |
+| `trackColor` | `Color?` | `null` | Track colour when off. Null for iOS's `secondarySystemFill`: `0x29787880` light, `0x52787880` dark. |
 | `dropScale` | `double` | `kGlassDropScale` | Size of the held drop relative to the knob. At least 1. |
 | `dropWiden` | `double` | `kGlassSwitchDropWiden` | How many px of the surroundings the drop pulls in (a slight zoom-out). 0 for none. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
@@ -793,8 +793,8 @@ class _DisplayControlsState extends State<DisplayControls> {
 | `onChanged` | `ValueChanged<double>?` | **required** | Called while dragging. Null disables the slider (50% opacity). |
 | `onChangeStart` | `ValueChanged<double>?` | `null` | A drag or tap began. |
 | `onChangeEnd` | `ValueChanged<double>?` | `null` | A drag or tap ended. |
-| `activeColor` | `Color` | `Color(0xFF0A84FF)` | The filled part of the track. |
-| `trackColor` | `Color` | `Color(0x29787880)` | The rest of the track. |
+| `activeColor` | `Color?` | `null` | The filled part of the track. Null for iOS's blue in the appearance of the label around the slider: `0xFF007AFF` light, `0xFF0A84FF` dark. |
+| `trackColor` | `Color?` | `null` | The rest of the track. Null for iOS's `secondarySystemFill`, as the switch's. |
 | `dropScale` | `double` | `kGlassDropScale` | Size of the held drop relative to the knob. At least 1. |
 | `dropWiden` | `double` | `0` | How many px of the surroundings the drop pulls in. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
@@ -859,6 +859,8 @@ evenly between segments. It needs a bounded width.
 The control lives in the content layer, so it does not pick a label colour for the unselected
 segments: they use the ambient `DefaultTextStyle` and `IconTheme`. Inside a [Card](/components/card)
 that is already the card's legible colour. Elsewhere, set it yourself with `DefaultTextStyle.merge`.
+The track and the capsule follow the same colour: on a light label they are iOS's light ones, on a
+white label its dark track and grey capsule.
 
 The **selected** segment's label is picked for you, black on a light `thumbColor` and white on a
 dark one.
@@ -946,8 +948,8 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
 | `segments` | `List<Widget>` | **required** | One widget per segment, usually a `Text` or an `Icon`. At least 2. |
 | `selectedIndex` | `int` | **required** | The selected segment. |
 | `onSelected` | `ValueChanged<int>?` | **required** | Called with the new index. Null disables the control (half opacity). |
-| `trackColor` | `Color` | `kGlassSegmentTrack` | The track's fill. |
-| `thumbColor` | `Color` | `Color(0xFFFFFFFF)` | The capsule under the selected segment at rest. |
+| `trackColor` | `Color?` | `null` | The track's fill. Null for iOS's `tertiarySystemFill` in the appearance of the ambient label: `kGlassSegmentTrack` light, twice its alpha dark. |
+| `thumbColor` | `Color?` | `null` | The capsule under the selected segment at rest. Null for iOS's: white light, `Color(0xFF636366)` dark. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `focusNode` | `FocusNode?` | `null` | The control's focus. Null makes one the control owns. |
 | `autofocus` | `bool` | `false` | Take the focus as soon as the control is built. |
@@ -957,7 +959,7 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
 
 | Name | Value | Description |
 |---|---|---|
-| `kGlassSegmentTrack` | `Color.fromRGBO(118, 118, 128, 0.12)` | The default track fill (iOS's tertiary system fill). |
+| `kGlassSegmentTrack` | `Color.fromRGBO(118, 118, 128, 0.12)` | The default track fill in the light appearance (iOS's tertiary system fill). |
 | `kGlassSegmentDropGrow` | `Size(12, 8)` | How much larger the held drop is than the capsule, per side. |
 | `kGlassSegmentDropWiden` | `2.9` | How many px of the surroundings the drop pulls in (a slight zoom-out). |
 ''',
@@ -1201,7 +1203,7 @@ class _AppShellState extends State<AppShell> {
 | `items` | `List<GlassTabItem>` | **required** | The tabs. At least 2. |
 | `selectedIndex` | `int` | **required** | The selected tab. |
 | `onSelected` | `ValueChanged<int>?` | **required** | Called with the new tab. Null disables the bar. |
-| `activeColor` | `Color` | `Color(0xFF007AFF)` | Icon and label colour of the selected tab, and of the tab under a held drop. |
+| `activeColor` | `Color?` | `null` | Icon and label colour of the selected tab, and of the tab under a held drop. Null for iOS's blue in the bar's appearance: `0xFF007AFF` light, `0xFF0A84FF` dark. |
 | `dropZoom` | `double` | `kGlassTabDropZoom` | How much the held drop magnifies the bar. `1` for none; must be above 0. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `minimizeBehavior` | `GlassTabBarMinimizeBehavior` | `.never` | `.onScrollDown` collapses the bar to its selected tab while the content scrolls down, under a `GlassTabBarMinimizer`. |

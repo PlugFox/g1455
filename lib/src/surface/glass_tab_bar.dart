@@ -510,7 +510,7 @@ class GlassTabBar extends StatefulWidget {
     required this.items,
     required this.selectedIndex,
     required this.onSelected,
-    this.activeColor = const Color(0xFF007AFF),
+    this.activeColor,
     this.dropZoom = kGlassTabDropZoom,
     this.dropMotion,
     this.minimizeBehavior = GlassTabBarMinimizeBehavior.never,
@@ -530,8 +530,9 @@ class GlassTabBar extends StatefulWidget {
   /// [selectedIndex]. Null disables the bar.
   final ValueChanged<int>? onSelected;
 
-  /// The selected item's icon and label, and the one under a held drop.
-  final Color activeColor;
+  /// The selected item's icon and label, and the one under a held drop. Null
+  /// for iOS's `systemBlue` in the appearance of the bar's glass.
+  final Color? activeColor;
 
   /// See [kGlassTabDropZoom]; 1 is a drop that does not magnify.
   final double dropZoom;
@@ -1176,7 +1177,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   GlassTabItemLook _look(BuildContext context, _TabGeometry g, int i, {required bool highlighted}) {
     final TextStyle ambient = DefaultTextStyle.of(context).style;
     final Color colour = highlighted
-        ? widget.activeColor
+        ? widget.activeColor ?? glassSystemBlue(ambient.color ?? const Color(0xFF000000))
         : IconTheme.of(context).color ?? ambient.color ?? const Color(0xFF000000);
     return GlassTabItemLook(
       index: i,

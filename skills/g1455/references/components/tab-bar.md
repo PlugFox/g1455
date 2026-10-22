@@ -227,7 +227,7 @@ class _AppShellState extends State<AppShell> {
 | `items` | `List<GlassTabItem>` | **required** | The tabs. At least 2. |
 | `selectedIndex` | `int` | **required** | The selected tab. |
 | `onSelected` | `ValueChanged<int>?` | **required** | Called with the new tab. Null disables the bar. |
-| `activeColor` | `Color` | `Color(0xFF007AFF)` | Icon and label colour of the selected tab, and of the tab under a held drop. |
+| `activeColor` | `Color?` | `null` | Icon and label colour of the selected tab, and of the tab under a held drop. Null for iOS's blue in the bar's appearance: `0xFF007AFF` light, `0xFF0A84FF` dark. |
 | `dropZoom` | `double` | `kGlassTabDropZoom` | How much the held drop magnifies the bar. `1` for none; must be above 0. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](../foundations/drop-motion.md). |
 | `minimizeBehavior` | `GlassTabBarMinimizeBehavior` | `.never` | `.onScrollDown` collapses the bar to its selected tab while the content scrolls down, under a `GlassTabBarMinimizer`. |

@@ -158,8 +158,8 @@ class _DisplayControlsState extends State<DisplayControls> {
 | `onChanged` | `ValueChanged<double>?` | **required** | Called while dragging. Null disables the slider (50% opacity). |
 | `onChangeStart` | `ValueChanged<double>?` | `null` | A drag or tap began. |
 | `onChangeEnd` | `ValueChanged<double>?` | `null` | A drag or tap ended. |
-| `activeColor` | `Color` | `Color(0xFF0A84FF)` | The filled part of the track. |
-| `trackColor` | `Color` | `Color(0x29787880)` | The rest of the track. |
+| `activeColor` | `Color?` | `null` | The filled part of the track. Null for iOS's blue in the appearance of the label around the slider: `0xFF007AFF` light, `0xFF0A84FF` dark. |
+| `trackColor` | `Color?` | `null` | The rest of the track. Null for iOS's `secondarySystemFill`, as the switch's. |
 | `dropScale` | `double` | `kGlassDropScale` | Size of the held drop relative to the knob. At least 1. |
 | `dropWiden` | `double` | `0` | How many px of the surroundings the drop pulls in. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](../foundations/drop-motion.md). |

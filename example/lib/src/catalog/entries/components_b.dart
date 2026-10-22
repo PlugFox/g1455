@@ -68,7 +68,7 @@ GlassTextField(
 - `controller` and `focusNode` are optional. Without them the field makes its own and disposes of them.
 - There is no built-in clear button. Pass one as `trailing` and wire it to `controller.clear()`, as the code example does.
   Icons in `leading` and `trailing` are themed at 20 px.
-- `cursorColor` defaults to iOS blue (`0xFF007AFF`); the selection is the same colour at 30%.
+- `cursorColor` defaults to iOS blue in the field's appearance (`0xFF007AFF` light, `0xFF0A84FF` dark); the selection is the same colour at 30%.
 - The field is an `EditableText`, so it needs what an app provides: `MediaQuery`, `Directionality` and an `Overlay` for
   the selection handles. Any `MaterialApp` or `WidgetsApp` has them.
 
@@ -155,7 +155,7 @@ class _CitySearchState extends State<CitySearch> {
 | `autofocus` | `bool` | `false` | Focus the field when it first appears. |
 | `obscureText` | `bool` | `false` | Main constructor only. Hides the text, for passwords. |
 | `finish` | `GlassFinish?` | `null` | The glass. Null takes the theme's. |
-| `cursorColor` | `Color` | `Color(0xFF007AFF)` | The caret, and the selection at 30%. |
+| `cursorColor` | `Color?` | `null` | The caret, and the selection at 30%. Null for iOS's blue in the field's appearance. |
 
 ## Constants
 
@@ -1357,7 +1357,7 @@ class _LibraryPageState extends State<LibraryPage> {
 | `scrollEdge` | `GlassScrollEdgeStyle?` | `GlassScrollEdgeStyle.soft` | The scroll edge under the top bar. Null for none: the bar is only lifted. |
 | `bottomBar` | `Widget?` | `null` | The bar at the bottom, usually a `GlassTabBar`, at its own height. Lifted. |
 | `floatingAction` | `Widget?` | `null` | A control at the end edge above the bottom bar, usually a `GlassButton`, at its own size. Lifted. |
-| `barMargin` | `EdgeInsets` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. |
+| `barMargin` | `EdgeInsetsGeometry` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `host` | `bool?` | `null` | Whether to mount a `GlassHost`: null when there is none above, `true` always, `false` never. |
 | `minimizeNotificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which of the body's scroll notifications collapse a tab bar that asks to: the minimizer's `notificationPredicate`. |
 | `key` | `Key?` | `null` | |

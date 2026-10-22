@@ -57,7 +57,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_components.dart'
+    show glassAmbientLabel, glassSecondarySystemFill, glassSystemBlue, glassSystemGreen, kGlassMinTapTarget;
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
 import 'glass_focus.dart';
@@ -424,8 +425,8 @@ class GlassSwitch extends StatefulWidget {
   const GlassSwitch({
     required this.value,
     required this.onChanged,
-    this.activeColor = const Color(0xFF34C759),
-    this.trackColor = const Color(0x29787880),
+    this.activeColor,
+    this.trackColor,
     this.dropScale = kGlassDropScale,
     this.dropWiden = kGlassSwitchDropWiden,
     this.dropMotion,
@@ -462,11 +463,13 @@ class GlassSwitch extends StatefulWidget {
   /// then drawn at [kGlassDisabledOpacity].
   final ValueChanged<bool>? onChanged;
 
-  /// The track when on. iOS's green by default.
-  final Color activeColor;
+  /// The track when on. Null for iOS's `systemGreen` in the appearance of the
+  /// label around the switch: on glass, the glass's.
+  final Color? activeColor;
 
-  /// The track when off.
-  final Color trackColor;
+  /// The track when off. Null for iOS's `secondarySystemFill` in that
+  /// appearance.
+  final Color? trackColor;
 
   /// What a screen reader says the switch is for. Null leaves it to a
   /// `MergeSemantics` around the switch and its row's label.
@@ -649,12 +652,19 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
           child: RepaintBoundary(
             child: AnimatedBuilder(
               animation: _colour,
-              builder: (BuildContext context, Widget? _) => DecoratedBox(
-                decoration: ShapeDecoration(
-                  shape: const StadiumBorder(),
-                  color: Color.lerp(widget.trackColor, widget.activeColor, _colour.value),
-                ),
-              ),
+              builder: (BuildContext context, Widget? _) {
+                final Color label = glassAmbientLabel(context);
+                return DecoratedBox(
+                  decoration: ShapeDecoration(
+                    shape: const StadiumBorder(),
+                    color: Color.lerp(
+                      widget.trackColor ?? glassSecondarySystemFill(label),
+                      widget.activeColor ?? glassSystemGreen(label),
+                      _colour.value,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -751,8 +761,8 @@ class GlassSlider extends StatefulWidget {
     required this.onChanged,
     this.onChangeStart,
     this.onChangeEnd,
-    this.activeColor = const Color(0xFF0A84FF),
-    this.trackColor = const Color(0x29787880),
+    this.activeColor,
+    this.trackColor,
     this.dropScale = kGlassDropScale,
     this.dropWiden = 0,
     this.dropMotion,
@@ -804,11 +814,13 @@ class GlassSlider extends StatefulWidget {
   /// [onChanged] was told, as Material's `Slider` does.
   final ValueChanged<double>? onChangeEnd;
 
-  /// The fill from 0 to [value]. iOS's blue by default.
-  final Color activeColor;
+  /// The fill from 0 to [value]. Null for iOS's `systemBlue` in the
+  /// appearance of the label around the slider: on glass, the glass's.
+  final Color? activeColor;
 
-  /// The track behind the fill.
-  final Color trackColor;
+  /// The track behind the fill. Null for iOS's `secondarySystemFill` in that
+  /// appearance.
+  final Color? trackColor;
 
   /// What a screen reader says the slider is for. Null leaves it to a
   /// `MergeSemantics` around the slider and its row's label.
@@ -1061,7 +1073,14 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
       children: <Widget>[
         Positioned.fill(
           child: RepaintBoundary(
-            child: CustomPaint(painter: _SliderTrack(value, widget.trackColor, widget.activeColor, rtl: _rtl)),
+            child: CustomPaint(
+              painter: _SliderTrack(
+                value,
+                widget.trackColor ?? glassSecondarySystemFill(glassAmbientLabel(context)),
+                widget.activeColor ?? glassSystemBlue(glassAmbientLabel(context)),
+                rtl: _rtl,
+              ),
+            ),
           ),
         ),
         if (!_enabled)

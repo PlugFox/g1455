@@ -2,9 +2,10 @@
 
 A minor version rather than a patch, for changes in behaviour: with a large
 accessibility text size the tab bar's and the segmented control's labels stop
-at the default size and a field grows, and the fills and reds laid on dark
-glass are the dark appearance's. `GlassHost.appearance` is new. Existing code
-builds unchanged.
+at the default size and a field grows, and the fills, reds, blues and control
+tracks laid on dark glass are the dark appearance's. `GlassHost.appearance`
+is new. Code that builds the widgets builds unchanged; code that reads a
+colour or a padding back off one may need a `!` or a `resolve`.
 
 The appearance:
 
@@ -24,6 +25,16 @@ The appearance:
 - A held segment's label goes from the capsule's ink to the page's as the
   capsule fades into the drop, and back: held on a dark control it was black
   on the dark track, 1.7 : 1 (#21).
+- The controls' colour defaults are iOS's for the appearance of the label
+  around them — on glass, the glass's — where each was the light
+  appearance's, or in the slider's case the dark one's blue: the switch's
+  tracks (`secondarySystemFill`, `systemGreen`), the slider's
+  (`secondarySystemFill`, `systemBlue`), the segmented control's track
+  (`tertiarySystemFill`) and capsule (white, or (99, 99, 102) on dark), and
+  the blue of a selected tab, a field's caret and Cancel. The parameters
+  are nullable, null for that default; a colour passed is drawn as before
+  (#28). The scroll edge's hard band is still white in both appearances: a
+  dark one was not photographed.
 
 Text size (#20):
 

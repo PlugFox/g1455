@@ -176,8 +176,10 @@ void main() {
   ) async {
     // The capsule fades into the drop, so a black label on it would be black
     // on the track while held — on a dark page, black on dark (#21).
+    // A white capsule named, so its black ink differs from the page's white:
+    // the default on a dark page is iOS's dark capsule, under the page's ink.
     const white = Color(0xFFFFFFFF);
-    await _mount(tester, textColour: white);
+    await _mount(tester, textColour: white, thumbColour: white);
     Color? ink(String label) => tester.renderObject<RenderParagraph>(find.text(label)).text.style?.color;
     expect(ink('Day'), const Color(0xFF000000), reason: 'at rest, on the white capsule');
     expect(ink('Week'), white);
@@ -220,6 +222,7 @@ Future<void> _mount(
   List<Widget>? segments,
   Color? iconColour,
   Color? textColour,
+  Color? thumbColour,
 }) async {
   await tester.pumpWidget(
     MediaQuery(
@@ -248,6 +251,7 @@ Future<void> _mount(
                           onSelected: enabled ? (onSelected ?? (_) {}) : null,
                           dropMotion: dropMotion,
                           segments: segments,
+                          thumbColour: thumbColour,
                         ),
                       ),
                     ),
@@ -266,11 +270,12 @@ Future<void> _mount(
 }
 
 class _Segments extends StatefulWidget {
-  const _Segments({required this.onSelected, this.dropMotion, this.segments});
+  const _Segments({required this.onSelected, this.dropMotion, this.segments, this.thumbColour});
 
   final ValueChanged<int>? onSelected;
   final GlassDropMotion? dropMotion;
   final List<Widget>? segments;
+  final Color? thumbColour;
 
   @override
   State<_Segments> createState() => _SegmentsState();
@@ -283,6 +288,7 @@ class _SegmentsState extends State<_Segments> {
   Widget build(BuildContext context) => GlassSegmentedControl(
     segments: widget.segments ?? const <Widget>[Text('Day'), Text('Week'), Text('Month'), Text('Year')],
     dropMotion: widget.dropMotion,
+    thumbColor: widget.thumbColour,
     selectedIndex: _index,
     onSelected: widget.onSelected == null
         ? null

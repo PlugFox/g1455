@@ -22,7 +22,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_components.dart' show glassSystemBlue, kGlassMinTapTarget;
 import 'glass_finish.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
@@ -82,7 +82,7 @@ class GlassTextField extends StatefulWidget {
     this.autofocus = false,
     this.obscureText = false,
     this.finish,
-    this.cursorColor = const Color(0xFF007AFF),
+    this.cursorColor,
     super.key,
   });
 
@@ -98,7 +98,7 @@ class GlassTextField extends StatefulWidget {
     this.onSubmitted,
     this.autofocus = false,
     this.finish,
-    this.cursorColor = const Color(0xFF007AFF),
+    this.cursorColor,
     super.key,
   }) : keyboardType = TextInputType.text,
        textInputAction = TextInputAction.search,
@@ -141,8 +141,9 @@ class GlassTextField extends StatefulWidget {
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
 
-  /// The caret, and the selection at 0.3 of it. iOS's blue by default.
-  final Color cursorColor;
+  /// The caret, and the selection at 0.3 of it. Null for iOS's `systemBlue`
+  /// in the appearance of the field's own label.
+  final Color? cursorColor;
 
   @override
   State<GlassTextField> createState() => _GlassTextFieldState();
@@ -189,6 +190,7 @@ class _GlassTextFieldState extends State<GlassTextField> {
     final Color label = theme.legibility(finish).label;
     final TextStyle base = DefaultTextStyle.of(context).style.copyWith(color: label, fontSize: 17);
     final TextStyle hint = base.copyWith(color: label.withValues(alpha: label.a * 0.3));
+    final Color cursor = widget.cursorColor ?? glassSystemBlue(label);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _focus.requestFocus,
@@ -221,9 +223,9 @@ class _GlassTextFieldState extends State<GlassTextField> {
                             controller: _controller,
                             focusNode: _focus,
                             style: base,
-                            cursorColor: widget.cursorColor,
+                            cursorColor: cursor,
                             backgroundCursorColor: const Color(0xFF8E8E93),
-                            selectionColor: widget.cursorColor.withValues(alpha: 0.3),
+                            selectionColor: cursor.withValues(alpha: 0.3),
                             keyboardType: widget.keyboardType,
                             textInputAction: widget.textInputAction,
                             autofocus: widget.autofocus,

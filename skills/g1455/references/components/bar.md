@@ -132,6 +132,6 @@ class LibraryScreen extends StatelessWidget {
 |---|---|---|---|
 | `child` | `Widget` | **required** | The bar's items. They are content, not glass, and get the bar's label colour. |
 | `borderRadius` | `BorderRadius` | `kGlassCapsule` | Corner radii. The default is a pill at any height. |
-| `padding` | `EdgeInsets` | `EdgeInsets.symmetric(horizontal: 16, vertical: 8)` | Space between the glass edge and the items. |
+| `padding` | `EdgeInsetsGeometry` | `EdgeInsets.symmetric(horizontal: 16, vertical: 8)` | Space between the glass edge and the items. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `finish` | `GlassFinish?` | `null` | The material. Null takes the theme's (normally the host's). |
 | `key` | `Key?` | `null` | |

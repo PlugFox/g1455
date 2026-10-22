@@ -63,7 +63,8 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show GlassAtMostDefaultTextSize, kGlassMinTapTarget;
+import 'glass_components.dart'
+    show GlassAtMostDefaultTextSize, glassAmbientLabel, glassTertiarySystemFill, kGlassMinTapTarget;
 import 'glass_concentric.dart';
 import 'glass_controls.dart' show glassControlClaimsPointer, kGlassDropOptics;
 import 'glass_drop_motion.dart';
@@ -80,6 +81,10 @@ import 'glass_travel.dart';
 ///
 /// {@category Panels and controls}
 const Color kGlassSegmentTrack = Color.fromRGBO(118, 118, 128, 0.12);
+
+/// The resting capsule on a dark control: (99, 99, 102), iOS's selected
+/// segment in the dark appearance. White in the light one.
+const Color _kDarkThumb = Color(0xFF636366);
 
 /// How far past the resting capsule the held drop reaches, across and down,
 /// logical px (iOS 26.5: 86 x 28 -> 110 x 44).
@@ -192,8 +197,8 @@ class GlassSegmentedControl extends StatefulWidget {
     required this.segments,
     required this.selectedIndex,
     required this.onSelected,
-    this.trackColor = kGlassSegmentTrack,
-    this.thumbColor = const Color(0xFFFFFFFF),
+    this.trackColor,
+    this.thumbColor,
     this.dropMotion,
     this.focusNode,
     this.autofocus = false,
@@ -218,11 +223,14 @@ class GlassSegmentedControl extends StatefulWidget {
   /// opacity.
   final ValueChanged<int>? onSelected;
 
-  /// The track's fill. [kGlassSegmentTrack], iOS's, by default.
-  final Color trackColor;
+  /// The track's fill. Null for iOS's `tertiarySystemFill` in the appearance
+  /// of the label around the control: [kGlassSegmentTrack] in light, twice its
+  /// alpha in dark.
+  final Color? trackColor;
 
-  /// The resting capsule under the selected segment.
-  final Color thumbColor;
+  /// The resting capsule under the selected segment. Null for iOS's: white in
+  /// the light appearance, (99, 99, 102) in the dark.
+  final Color? thumbColor;
 
   /// How the held drop deforms as it launches and brakes. Null takes
   /// [GlassThemeData.dropMotion]; [GlassDropMotion.none] keeps its shape.
@@ -445,7 +453,10 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
               children: <Widget>[
                 Positioned.fill(
                   child: DecoratedBox(
-                    decoration: ShapeDecoration(shape: const StadiumBorder(), color: widget.trackColor),
+                    decoration: ShapeDecoration(
+                      shape: const StadiumBorder(),
+                      color: widget.trackColor ?? glassTertiarySystemFill(glassAmbientLabel(context)),
+                    ),
                   ),
                 ),
                 GlassFocusRing(visible: _focused && _enabled, radius: kGlassCapsule),
@@ -458,7 +469,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
                         lift: _lift,
                         at: _at,
                         count: widget.segments.length,
-                        colour: widget.thumbColor,
+                        colour: _thumb,
                         repaint: _capsuleRepaint,
                       ),
                     ),
@@ -553,6 +564,12 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     ),
   );
 
+  /// The resting capsule's colour: [GlassSegmentedControl.thumbColor], or
+  /// iOS's for the appearance of the label around the control.
+  Color get _thumb =>
+      widget.thumbColor ??
+      (glassAmbientLabel(context).computeLuminance() < 0.5 ? const Color(0xFFFFFFFF) : _kDarkThumb);
+
   /// The selected segment's label in a colour that reads on the capsule under
   /// it — black on the white one, white on a dark one — rather than in the
   /// ambient label colour, which on a dark page is the capsule's own white.
@@ -562,7 +579,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   /// black one there is black on a dark track (#21). Only the lift moves it,
   /// so a slide, where the lift stands still, repaints no label.
   Widget _onThumb(Widget label) {
-    final Color thumb = widget.thumbColor;
+    final Color thumb = _thumb;
     final Color ink = thumb.computeLuminance() > 0.4 ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
     final Color? text = DefaultTextStyle.of(context).style.color;
     final Color? icon = IconTheme.of(context).color;

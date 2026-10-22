@@ -42,6 +42,8 @@ evenly between segments. It needs a bounded width.
 The control lives in the content layer, so it does not pick a label colour for the unselected
 segments: they use the ambient `DefaultTextStyle` and `IconTheme`. Inside a [Card](../components/card.md)
 that is already the card's legible colour. Elsewhere, set it yourself with `DefaultTextStyle.merge`.
+The track and the capsule follow the same colour: on a light label they are iOS's light ones, on a
+white label its dark track and grey capsule.
 
 The **selected** segment's label is picked for you, black on a light `thumbColor` and white on a
 dark one.
@@ -133,8 +135,8 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
 | `segments` | `List<Widget>` | **required** | One widget per segment, usually a `Text` or an `Icon`. At least 2. |
 | `selectedIndex` | `int` | **required** | The selected segment. |
 | `onSelected` | `ValueChanged<int>?` | **required** | Called with the new index. Null disables the control (half opacity). |
-| `trackColor` | `Color` | `kGlassSegmentTrack` | The track's fill. |
-| `thumbColor` | `Color` | `Color(0xFFFFFFFF)` | The capsule under the selected segment at rest. |
+| `trackColor` | `Color?` | `null` | The track's fill. Null for iOS's `tertiarySystemFill` in the appearance of the ambient label: `kGlassSegmentTrack` light, twice its alpha dark. |
+| `thumbColor` | `Color?` | `null` | The capsule under the selected segment at rest. Null for iOS's: white light, `Color(0xFF636366)` dark. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](../foundations/drop-motion.md). |
 | `focusNode` | `FocusNode?` | `null` | The control's focus. Null makes one the control owns. |
 | `autofocus` | `bool` | `false` | Take the focus as soon as the control is built. |
@@ -144,6 +146,6 @@ Widget layoutPicker(int index, ValueChanged<int> onSelected) => SizedBox(
 
 | Name | Value | Description |
 |---|---|---|
-| `kGlassSegmentTrack` | `Color.fromRGBO(118, 118, 128, 0.12)` | The default track fill (iOS's tertiary system fill). |
+| `kGlassSegmentTrack` | `Color.fromRGBO(118, 118, 128, 0.12)` | The default track fill in the light appearance (iOS's tertiary system fill). |
 | `kGlassSegmentDropGrow` | `Size(12, 8)` | How much larger the held drop is than the capsule, per side. |
 | `kGlassSegmentDropWiden` | `2.9` | How many px of the surroundings the drop pulls in (a slight zoom-out). |
