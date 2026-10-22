@@ -47,7 +47,12 @@
 //    backdrop, and both tab bar arms fail;
 //  - `_GlassPanelState.activate` deleted: a bar moved to another parent leaves
 //    the share on its deactivate and never rejoins it, and the moved-bar arm
-//    fails.
+//    fails;
+//  - in `GlassBackdropReader._settleAndRearm`, `due < next` -> `due > next`:
+//    the reader wakes for the last hold to end, and the two-holds arm of (5)
+//    finds the older verdict still waiting past its own;
+//  - the `band >= 0` assert dropped from `GlassAdaptive`: the band arm of (2)
+//    builds a negative band without a complaint.
 
 import 'package:flutter/foundation.dart';
 
@@ -56,6 +61,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart';
 import 'package:g1455/src/proxy/proxy_reading.dart';
+import 'package:g1455/src/surface/glass_adaptive.dart' show GlassBackdropReader;
 
 const Size kScreen = Size(400, 200);
 const Color kBlack = Color(0xFF000000);
@@ -165,6 +171,23 @@ void main() {
   // -------------------------------------------------------------------------
   // 2. The pieces it is made of.
   // -------------------------------------------------------------------------
+
+  test('a band is a distance, and a negative one is refused', () {
+    // Built at run time, as an app reading its band from settings builds it.
+    final double band = <double>[-1][0];
+    expect(() => GlassAdaptive(band: band), throwsAssertionError);
+    expect(GlassAdaptive(band: band.abs()).band, 1);
+    expect(GlassAdaptive(band: band + 1), const GlassAdaptive(band: 0));
+  });
+
+  test('a reader reports the rules in force, and takes new ones', () {
+    final reader = GlassBackdropReader(const GlassAdaptive(), GlassProxyHandle());
+    addTearDown(reader.dispose);
+    expect(reader.adaptive, const GlassAdaptive());
+    reader.adaptive = const GlassAdaptive(band: 4, hold: Duration.zero);
+    expect(reader.adaptive, const GlassAdaptive(band: 4, hold: Duration.zero));
+    expect(reader.hungry, isTrue, reason: 'a new reader has been handed nothing yet');
+  });
 
   test('the read-back decodes a coverage-weighted mean per cell', () {
     const count = 3;
@@ -466,6 +489,45 @@ void main() {
     expect(scene.handle.readBacks, reads);
   });
 
+  testWidgets('two readings the hold turns away are each taken when their own hold ends', (
+    WidgetTester tester,
+  ) async {
+    // The reader wakes for the earliest hold to end, not the last: the dark
+    // bar's verdict is a second older than the light bar's, and its waiting
+    // reading is taken a second sooner.
+    final left = ValueNotifier<Color>(kBlack);
+    final right = ValueNotifier<Color>(kWhite);
+    addTearDown(left.dispose);
+    addTearDown(right.dispose);
+    const adaptive = GlassAdaptive(hold: Duration(seconds: 2), interval: Duration.zero);
+    final _Scene scene = await _mount(tester, adaptive: adaptive, left: left, right: right, onlyDark: true);
+    await _land(tester);
+    expect(scene.seen['dark']!.finish, GlassFinish.regularDark);
+    await tester.pump(const Duration(seconds: 1));
+    await _mount(tester, adaptive: adaptive, left: left, right: right);
+    await _land(tester, settle: false);
+    expect(scene.seen['light']!.finish, GlassFinish.regularLight);
+    // Both backdrops turn over, inside both holds: read, and both kept waiting.
+    left.value = kWhite;
+    right.value = kBlack;
+    await tester.pump();
+    await _land(tester, settle: false);
+    final int reads = scene.handle.readBacks;
+    expect(scene.seen['dark']!.finish, GlassFinish.regularDark, reason: 'moved inside the hold');
+    expect(scene.seen['light']!.finish, GlassFinish.regularLight, reason: 'moved inside the hold');
+
+    // Past the dark bar's hold and well inside the light bar's.
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(scene.seen['dark']!.finish, GlassFinish.regularLight, reason: 'waited for the later hold');
+    expect(scene.seen['light']!.finish, GlassFinish.regularLight, reason: 'taken before its own hold ended');
+    // Past the light bar's.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(scene.seen['light']!.finish, GlassFinish.regularDark);
+    expect(scene.handle.readBacks, reads, reason: 'a hold that ended read the backdrop again');
+  });
+
   testWidgets('turning it off keeps what the bar holds, and its verdicts go', (WidgetTester tester) async {
     final _Scene scene = await _mount(tester, adaptive: const GlassAdaptive());
     await _land(tester);
@@ -679,6 +741,7 @@ Future<_Scene> _mount(
   bool disableAnimations = false,
   GlassContentDeclaration content = GlassContentDeclaration.byDefault,
   ValueListenable<Color>? left,
+  ValueListenable<Color>? right,
   bool onlyDark = false,
   bool bars = true,
   GlassTierChoice tier = GlassTierChoice.byDefault,
@@ -728,7 +791,14 @@ Future<_Scene> _mount(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     Expanded(child: leftHalf),
-                    const Expanded(child: ColoredBox(color: kWhite)),
+                    Expanded(
+                      child: right == null
+                          ? const ColoredBox(color: kWhite)
+                          : ValueListenableBuilder<Color>(
+                              valueListenable: right,
+                              builder: (BuildContext context, Color c, Widget? _) => ColoredBox(color: c),
+                            ),
+                    ),
                   ],
                 ),
               ),
