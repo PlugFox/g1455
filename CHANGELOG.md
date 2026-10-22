@@ -58,6 +58,15 @@ Clipping:
   same way wherever its width did not land on a device pixel, does not
   either.
 
+Controls and modals:
+
+- An open `GlassMenuAnchor` or `GlassPopoverAnchor` follows its anchor when
+  the anchor moves by layout alone — a list scrolled under it, a parent that
+  put it elsewhere. The panel stood where the anchor had been.
+- A disabled `GlassSwitch` or `GlassSlider` offers a screen reader no tap
+  and no scroll: its gesture recognizers, kept with null callbacks, were
+  exported as actions that did nothing.
+
 The capture walk and the layer watch:
 
 - `pushOpacity` at alpha 255, and an opacity at alpha 0 on any route, no
