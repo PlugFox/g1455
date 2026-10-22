@@ -20,6 +20,15 @@
 // forward *to*), so every one is written out. A method added to `Canvas`
 // upstream is a compile error here rather than a silently dropped draw, which
 // is the right way round.
+//
+// **What it cannot see into.** A `Picture` is opaque to Dart and a `Paragraph`
+// keeps its styles to itself, so `drawPicture` and `drawParagraph` are
+// forwarded whole: a blurred rect or a `drawShadow` recorded into a cached
+// picture, and a `TextStyle.shadows` or a mask-filtered text `foreground`, all
+// reach the capture. Measured on Skia and Impeller, a picture's blurred rect
+// changes 3428 / 3208 px. Text shadows are kept on purpose — they are part of
+// the glyphs, not a drop shadow under a box — and both draws are counted
+// instead, so a report says the filter was blind there (#30).
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -72,6 +81,22 @@ class ShadowFilter {
   /// Every draw dropped so far, of either kind.
   int get dropped => shadowCalls + maskFilteredDraws;
 
+  /// `drawPicture` calls forwarded whole so far.
+  ///
+  /// A picture's content is not reachable from Dart, so a shadow recorded
+  /// into a cached `Picture` is drawn into the capture whatever the switches
+  /// say. Not
+  /// part of [dropped]: the count is of draws the filter could not look into,
+  /// not of draws it took out.
+  int picturesForwarded = 0;
+
+  /// `drawParagraph` calls forwarded whole so far.
+  ///
+  /// `TextStyle.shadows` and a mask-filtered text `foreground` are inside the
+  /// paragraph, out of the filter's reach, and kept: text is drawn as laid
+  /// out. Not part of [dropped], for the same reason as [picturesForwarded].
+  int paragraphsForwarded = 0;
+
   bool _dropPaint(ui.Paint paint) {
     if (dropMaskFiltered && paint.maskFilter != null) {
       maskFilteredDraws++;
@@ -83,6 +108,10 @@ class ShadowFilter {
 
 /// A `Canvas` that forwards everything and refuses the draws a [ShadowFilter]
 /// names.
+///
+/// Shadows inside a `Picture` or a `Paragraph` are not filtered: both are
+/// forwarded whole and counted in [ShadowFilter.picturesForwarded] and
+/// [ShadowFilter.paragraphsForwarded].
 class FilteringCanvas implements Canvas {
   /// Wraps [inner], dropping what [filter] names.
   FilteringCanvas(this.inner, this.filter);
@@ -311,9 +340,17 @@ class FilteringCanvas implements Canvas {
   @override
   void drawColor(Color color, BlendMode blendMode) => inner.drawColor(color, blendMode);
 
-  @override
-  void drawPicture(ui.Picture picture) => inner.drawPicture(picture);
+  // --- the draws the filter cannot look into, forwarded whole and counted ---
 
   @override
-  void drawParagraph(ui.Paragraph paragraph, Offset offset) => inner.drawParagraph(paragraph, offset);
+  void drawPicture(ui.Picture picture) {
+    filter.picturesForwarded++;
+    inner.drawPicture(picture);
+  }
+
+  @override
+  void drawParagraph(ui.Paragraph paragraph, Offset offset) {
+    filter.paragraphsForwarded++;
+    inner.drawParagraph(paragraph, offset);
+  }
 }

@@ -664,6 +664,10 @@ Three more declarations do the rest of what the capture cannot know:
 | `GlassProxy.opaque` | takes the subtree as covering its box, and looks no further under it | a full-bleed image or panel |
 | `GlassProxy.verbatim` | exempts the subtree from the shadow filter | a highlight blurred through a `MaskFilter` on purpose |
 
+The shadow filter sees the draws a subtree makes, not what is inside them: a
+shadow recorded into a cached `Picture`, and a text's `TextStyle.shadows`, are
+drawn into the capture whatever the filter says.
+
 A stand-in changes what the glass sees, not when the host captures: a video
 that composites a new frame is still a change. Live, with each declaration:
 [Capture control](https://g1455.plugfox.dev/foundations/capture).

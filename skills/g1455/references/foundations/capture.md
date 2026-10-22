@@ -22,6 +22,9 @@ frame the user sees.
 
 The outermost declaration wins: a `replace` inside a `hidden` is never reached.
 
+The shadow filter sees the draws a subtree makes, not what is inside them: a shadow recorded into a cached `Picture`,
+and a text's `TextStyle.shadows`, are drawn into the capture whatever the filter says.
+
 ## A stand-in
 
 A stand-in is a `GlassProxyPainter`, shaped like a `CustomPainter`. Two come with the package:

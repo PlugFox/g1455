@@ -106,6 +106,11 @@ The capture walk and the layer watch:
 - `ShadowFilter.dropMaskFiltered` keeps vertices, atlases and nine-patches:
   Skia and Impeller both ignore a mask filter on them and draw them sharp, so
   dropping them took visible content out of the capture (#17).
+- `ShadowFilter.picturesForwarded` and `paragraphsForwarded` count the
+  pictures and paragraphs the filter forwards whole: a shadow recorded into
+  a cached `Picture`, and a text's `TextStyle.shadows`, reach the capture
+  whatever the switches say, and nothing reported it. Text is still drawn
+  with its shadows. The README and the capture page say so (#30).
 - `WalkLog`'s comments say what the log is: nothing reads it to fall back to
   the stock capture yet (#32).
 

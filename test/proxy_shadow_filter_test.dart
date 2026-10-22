@@ -20,6 +20,9 @@
 //     own rendering.
 //  3. **Each switch is independent.** `drawShadow` is exact, the mask filter is
 //     a heuristic, and a report has to say which one fired.
+//  4. **What the filter cannot see into is counted.** A picture and a
+//     paragraph are forwarded whole, shadows and all, and each one is counted
+//     so a report says the filter was blind there (#30).
 //
 // Breaks, each undone by swapping the string back:
 //  - in `FilteringCanvas.drawVertices` (or `drawImageNine`, `drawAtlas`,
@@ -27,6 +30,10 @@
 //    `{ if (!filter._dropPaint(paint)) inner.drawVertices(vertices, blendMode,
 //    paint); }`: a draw the engine renders sharp is dropped through a mask
 //    filter, and the sharp half of the split arm names it.
+//  - in `FilteringCanvas.drawPicture`, `filter.picturesForwarded++;` ->
+//    nothing (or the same in `drawParagraph`): a picture's shadows reach the
+//    capture with nothing in the report, and the picture-and-paragraph test
+//    names it.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -347,6 +354,54 @@ void main() {
       } finally {
         sprite.dispose();
         vertices.dispose();
+      }
+    });
+
+    // A picture's content is not reachable from Dart and a paragraph keeps its
+    // styles to itself, so the shadows inside them are drawn. Both are kept as
+    // the engine draws them — text shadows are part of the text — and counted
+    // apart from [ShadowFilter.dropped], which reports only what was taken out.
+    test('a picture and a paragraph are forwarded whole, shadows and all, and counted', () async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder)
+        ..drawRect(
+          const Rect.fromLTWH(8, 8, 30, 30),
+          Paint()
+            ..color = const Color(0xFFE08020)
+            ..maskFilter = kBlur,
+        )
+        ..drawShadow(Path()..addRect(const Rect.fromLTWH(20, 20, 30, 30)), const Color(0xFF000000), 8, false);
+      final ui.Picture picture = recorder.endRecording();
+      final builder = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: 12))
+        ..pushStyle(
+          ui.TextStyle(
+            color: const Color(0xFFFFFFFF),
+            shadows: const <Shadow>[Shadow(color: Color(0xFF00FF00), offset: Offset(2, 2), blurRadius: 3)],
+          ),
+        )
+        ..addText('Ag');
+      final ui.Paragraph paragraph = builder.build()..layout(const ui.ParagraphConstraints(width: 60));
+
+      try {
+        final filter = ShadowFilter();
+        final Uint8List bare = await _raster(
+          (Canvas c) => c
+            ..drawPicture(picture)
+            ..drawParagraph(paragraph, const Offset(4, 40)),
+        );
+        final Uint8List kept = await _raster(
+          (Canvas c) => FilteringCanvas(c, filter)
+            ..drawPicture(picture)
+            ..drawParagraph(paragraph, const Offset(4, 40)),
+        );
+        expect(_opaquePixels(bare, threshold: 1), greaterThan(0), reason: 'the picture has to paint something');
+        expect(_differing(bare, kept), 0, reason: 'a picture or a paragraph was not forwarded as drawn');
+        expect(filter.picturesForwarded, 1);
+        expect(filter.paragraphsForwarded, 1);
+        expect(filter.dropped, 0, reason: 'a forwarded draw was counted as dropped');
+      } finally {
+        picture.dispose();
+        paragraph.dispose();
       }
     });
   });
