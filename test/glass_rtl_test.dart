@@ -20,6 +20,12 @@
 //  - in `_DotsPainter.paint`, `rtl ? size.width - x - w : x` -> `x`: the first
 //    page's wide dot is at the left; in `_along`, `_rtl ? _geometry.width - x
 //    : x` -> `x`: a tap toward the left goes back.
+//  - in `_TabGeometry.drawn`, `rtl ? width - centre(i) : centre(i)` ->
+//    `centre(i)`: the resting capsule is drawn under the last item; in
+//    `_TabGeometry.indexUnder`, `indexAt(rtl ? width - x : x, count)` ->
+//    `indexAt(x, count)`: a tap selects the item at the mirrored position; in
+//    `_onUp`, `* (g.rtl ? -1 : 1)` -> `* 1`: a flick carries the drop back
+//    toward the item it left.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -102,9 +108,7 @@ void main() {
     expect(SliderGeometry.fillEnd(0.3, 300, textDirection: TextDirection.rtl), 300 - SliderGeometry.fillEnd(0.3, 300));
   });
 
-  testWidgets('a segmented control starts at the right, and its drop follows its labels', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('a segmented control starts at the right, and its drop follows its labels', (WidgetTester tester) async {
     for (final TextDirection direction in TextDirection.values) {
       final selected = <int>[];
       await _mount(
@@ -132,6 +136,67 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(selected, <int>[0], reason: '$direction: pressing A did not select A');
+    }
+  });
+
+  testWidgets('a tab bar starts at the right: its capsule, its taps and its held drop follow its labels', (
+    WidgetTester tester,
+  ) async {
+    for (final TextDirection direction in TextDirection.values) {
+      final selected = <int>[];
+      await _mount(
+        tester,
+        direction,
+        SizedBox(
+          width: 300,
+          child: GlassTabBar(
+            items: const <GlassTabItem>[
+              GlassTabItem(label: 'A', icon: Icons.circle),
+              GlassTabItem(label: 'B', icon: Icons.circle),
+              GlassTabItem(label: 'C', icon: Icons.circle),
+              GlassTabItem(label: 'D', icon: Icons.circle),
+            ],
+            selectedIndex: 0,
+            onSelected: selected.add,
+          ),
+        ),
+      );
+      final Offset a = tester.getCenter(find.text('A'));
+      final Offset d = tester.getCenter(find.text('D'));
+      expect(a.dx < d.dx, direction == TextDirection.ltr, reason: '$direction: the labels are not in order');
+      // At rest the capsule is under the selected item, A.
+      final Rect capsule = tester.getRect(
+        find.byWidgetPredicate(
+          (Widget w) =>
+              w is DecoratedBox &&
+              w.decoration is ShapeDecoration &&
+              (w.decoration as ShapeDecoration).shape is StadiumBorder,
+        ),
+      );
+      expect(capsule.center.dx, closeTo(a.dx, 2), reason: '$direction: the capsule is not under A');
+      // A tap on each other item selects that item.
+      for (final String label in <String>['B', 'C', 'D']) {
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+      }
+      expect(selected, <int>[1, 2, 3], reason: '$direction: a tap selected another item than the one under it');
+      // Held over C, the drop is under C, and letting go selects C.
+      selected.clear();
+      final Offset c = tester.getCenter(find.text('C'));
+      final TestGesture gesture = await tester.startGesture(c);
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(_knob(tester).globalRect.center.dx, closeTo(c.dx, 2), reason: '$direction: the drop is not under C');
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(selected, <int>[2], reason: '$direction: holding C did not select C');
+      // Flicked from B toward C, the drop carries on past C to D.
+      selected.clear();
+      final double towardC = direction == TextDirection.ltr ? 1 : -1;
+      await tester.flingFrom(tester.getCenter(find.text('B')), Offset(60 * towardC, 0), 2000);
+      await tester.pumpAndSettle();
+      expect(selected, <int>[3], reason: '$direction: a flick toward C did not carry on to D');
     }
   });
 
