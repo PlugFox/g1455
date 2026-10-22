@@ -454,7 +454,12 @@ class ProxyWalkContext extends PaintingContext {
     // `PaintingContext.pushOpacity` puts `offset` on the layer and paints the
     // children at zero, so the translate has to happen here.
     final int savesBefore = canvas.getSaveCount();
-    _opacityDepth++;
+    // Full alpha folds nothing into a filter below it, as through `pushLayer`
+    // and a composited boundary: only a live alpha is counted open.
+    final bool live = alpha < 255;
+    if (live) {
+      _opacityDepth++;
+    }
     try {
       canvas
         ..save()
@@ -464,7 +469,9 @@ class ProxyWalkContext extends PaintingContext {
     } finally {
       // As in `pushLayer`: a painter that throws must not leave every later
       // filter in the pass counted as folded.
-      _opacityDepth--;
+      if (live) {
+        _opacityDepth--;
+      }
       while (canvas.getSaveCount() > savesBefore) {
         canvas.restore();
       }

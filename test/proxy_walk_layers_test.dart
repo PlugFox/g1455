@@ -353,6 +353,35 @@ void main() {
         shot.dispose();
       },
     );
+    // Alpha 255 is no live alpha on any route: a colour filter under it folds
+    // nothing, so nothing is counted and the subtree keeps the pass (#18).
+    testWidgets('a colour filter under full alpha is not counted as folded, on any route', (
+      WidgetTester tester,
+    ) async {
+      Widget filtered() => ColorFiltered(
+        colorFilter: const ColorFilter.mode(kRed, BlendMode.modulate),
+        child: _scene(),
+      );
+      final routes = <String, Widget>{
+        'pushOpacity': _OpacityPusher(alpha: 255, child: filtered()),
+        'pushLayer': _Pusher(
+          route: _Route.offset((Offset o) => OpacityLayer(alpha: 255, offset: o)),
+          child: filtered(),
+        ),
+        'a composited boundary': FadeTransition(opacity: const AlwaysStoppedAnimation<double>(1), child: filtered()),
+      };
+      for (final MapEntry<String, Widget> route in routes.entries) {
+        final _Shot shot = await _shoot(tester, route.value);
+        expect(shot.log.errors, isEmpty, reason: route.key);
+        expect(shot.log.opacityFoldedIntoFilter, 0, reason: '${route.key}: full alpha was counted as open');
+        expect(await _differing(tester, shot.stock, shot.pass), 0, reason: route.key);
+        shot.dispose();
+      }
+      // The control: the same pushOpacity at a live alpha is counted.
+      final _Shot live = await _shoot(tester, _OpacityPusher(alpha: 128, child: filtered()));
+      expect(live.log.opacityFoldedIntoFilter, 1);
+      live.dispose();
+    });
   });
 
   group('the bookkeeping routes', () {
@@ -589,6 +618,31 @@ class _RenderPusher extends RenderProxyBox {
   void dispose() {
     _handle.layer = null;
     super.dispose();
+  }
+}
+
+/// Pushes its child through `pushOpacity` at [alpha], on screen and in the
+/// pass alike.
+class _OpacityPusher extends SingleChildRenderObjectWidget {
+  const _OpacityPusher({required this.alpha, super.child});
+
+  final int alpha;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderOpacityPusher(alpha);
+}
+
+class _RenderOpacityPusher extends RenderProxyBox {
+  _RenderOpacityPusher(this.alpha);
+
+  final int alpha;
+
+  @override
+  bool get alwaysNeedsCompositing => true;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    layer = context.pushOpacity(offset, alpha, super.paint, oldLayer: layer as OpacityLayer?);
   }
 }
 
