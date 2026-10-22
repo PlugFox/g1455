@@ -22,7 +22,10 @@
 //    as its undeclared control does (and the saving arm's rise is no longer
 //    the one retake the rung's step costs); and in `_settleTo`'s status
 //    listener, `_moving.value = false;` -> `_moving.value = true;`: the
-//    travel arm finds a resting sheet still declaring the whole area.
+//    travel arm finds a resting sheet still declaring the whole area;
+//  - in `_RenderSheetFrame.computeDryLayout`, `constraints.biggest` ->
+//    `constraints.smallest`: the dry-layout arm gets nothing for the area the
+//    frame fills.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -103,6 +106,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(rig.sheet.globalRect, medium);
     expect(rig.sheet.effectiveTier, GlassTier.full);
+  });
+
+  testWidgets('asked for its size without a layout, the sheet\'s frame gives the one it lays out at', (
+    WidgetTester tester,
+  ) async {
+    // The frame fills what it is given and puts the sheet in it; a parent that
+    // asks for a dry layout — to size itself round the route — has to get the
+    // same answer, under loose constraints as well as the tight ones a page has.
+    final _Rig rig = await _Rig.mount(tester);
+    await rig.open();
+    final RenderBox frame = tester.allRenderObjects.firstWhere(
+      (RenderObject r) => r.runtimeType.toString() == '_RenderSheetFrame',
+    ) as RenderBox;
+    expect(frame.getDryLayout(BoxConstraints.tight(frame.size)), frame.size);
+    expect(frame.getDryLayout(BoxConstraints.loose(frame.size)), frame.size);
+    expect(frame.getDryLayout(BoxConstraints.loose(const Size(300, 500))), const Size(300, 500));
   });
 
   testWidgets('opening at large, under reduced motion, a release settles on the next frame', (

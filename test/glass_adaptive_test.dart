@@ -52,7 +52,11 @@
 //    the reader wakes for the last hold to end, and the two-holds arm of (5)
 //    finds the older verdict still waiting past its own;
 //  - the `band >= 0` assert dropped from `GlassAdaptive`: the band arm of (2)
-//    builds a negative band without a complaint.
+//    builds a negative band without a complaint;
+//  - in `_GlassPanelState.didChangeDependencies`, the
+//    `if (_readings != null) { _reading = _readingOfGlass(); }` after a share
+//    changes deleted: a bar that joins a leader with a verdict keeps its own,
+//    and the joining arm finds it light over the leader's dark.
 
 import 'package:flutter/foundation.dart';
 
@@ -62,6 +66,7 @@ import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart';
 import 'package:g1455/src/proxy/proxy_reading.dart';
 import 'package:g1455/src/surface/glass_adaptive.dart' show GlassBackdropReader;
+import 'package:g1455/src/surface/glass_components.dart' show GlassSharedReading, GlassSharedReadingScope;
 
 const Size kScreen = Size(400, 200);
 const Color kBlack = Color(0xFF000000);
@@ -708,6 +713,27 @@ void main() {
     expect(seen['accessory']!.finish, GlassFinish.regularDark, reason: 'the moved bar no longer leads its accessory');
   });
 
+  testWidgets('a bar that joins a share once its leader has a verdict wears it on that frame', (
+    WidgetTester tester,
+  ) async {
+    // The verdicts will not move again on a still screen, so a follower that
+    // waited for them to would wear its own for as long as nothing moved.
+    final share = GlassSharedReading();
+    final _Scene scene = await _mount(tester, adaptive: const GlassAdaptive(), share: share);
+    await _land(tester);
+    expect(scene.seen['dark']!.finish, GlassFinish.regularDark);
+    expect(scene.seen['light']!.finish, GlassFinish.regularLight, reason: 'the bar in no share wore another verdict');
+    final int reads = scene.handle.readBacks;
+
+    await _mount(tester, adaptive: const GlassAdaptive(), share: share, lightFollows: true);
+    expect(scene.seen['light']!.finish, GlassFinish.regularDark, reason: 'the bar that joined kept its own verdict');
+    expect(scene.seen['light']!.reading, scene.seen['dark']!.reading);
+    expect(scene.label['light'], kWhite);
+    await _run(tester, frames: 4);
+    expect(scene.seen['light']!.finish, GlassFinish.regularDark);
+    expect(scene.handle.readBacks, reads, reason: 'the arm is about a still screen, and something read again');
+  });
+
   testWidgets('a host that goes with a read in flight leaves nothing behind', (WidgetTester tester) async {
     await _mount(tester, adaptive: const GlassAdaptive());
     await tester.pump();
@@ -745,6 +771,8 @@ Future<_Scene> _mount(
   bool onlyDark = false,
   bool bars = true,
   GlassTierChoice tier = GlassTierChoice.byDefault,
+  GlassSharedReading? share,
+  bool lightFollows = false,
 }) async {
   tester.view
     ..physicalSize = kScreen
@@ -802,8 +830,26 @@ Future<_Scene> _mount(
                   ],
                 ),
               ),
-              if (bars) Positioned(left: 20, top: 70, width: 160, height: 60, child: bar('dark')),
-              if (bars && !onlyDark) Positioned(left: 220, top: 70, width: 160, height: 60, child: bar('light')),
+              if (bars)
+                Positioned(
+                  left: 20,
+                  top: 70,
+                  width: 160,
+                  height: 60,
+                  child: share == null
+                      ? bar('dark')
+                      : GlassSharedReadingScope(share: share, leads: true, child: bar('dark')),
+                ),
+              if (bars && !onlyDark)
+                Positioned(
+                  left: 220,
+                  top: 70,
+                  width: 160,
+                  height: 60,
+                  child: share == null
+                      ? bar('light')
+                      : GlassSharedReadingScope(share: lightFollows ? share : null, child: bar('light')),
+                ),
               // Moves on every frame under the undeclared content, so the
               // host captures every frame.
               if (content == GlassContentDeclaration.undeclared) const _Ticking(),
