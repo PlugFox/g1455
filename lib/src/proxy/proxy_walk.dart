@@ -111,7 +111,9 @@ class WalkLog {
   /// filter that paints transparent black stops covering the empty area.
   /// Measured: at opacity 1.0 the region is opaque cyan and at 254/255 it is
   /// gone, in the engine's own rendering. This pass keeps it, so a subtree with
-  /// a non-zero count here belongs on the `toImageSync` fallback.
+  /// a non-zero count here belongs on the `toImageSync` fallback — which does
+  /// not exist yet: the pipeline records through this pass whatever the count
+  /// says, and the count reaches diagnostics only (#32).
   ///
   /// An image filter is counted for the same reason: `ImageFilterLayer`
   /// accepts its parent's opacity as `ColorFilterLayer` does, and a colour
@@ -612,8 +614,9 @@ class ProxyWalkContext extends PaintingContext {
   /// child advertises that it can absorb one, and this counts every colour or
   /// image filter under any live alpha — a blur that would have survived the
   /// fold included, because Dart cannot ask a filter whether it holds a colour
-  /// filter. Over-reporting sends a subtree back to a plain `toImageSync`,
-  /// which is the direction a fallback should err in.
+  /// filter. Over-reporting would send a subtree back to a plain
+  /// `toImageSync`, which is the direction a fallback should err in, once
+  /// there is one (#32).
   void _noteFilter() {
     if (_opacityDepth > 0) {
       log.opacityFoldedIntoFilter++;
@@ -625,8 +628,7 @@ class ProxyWalkContext extends PaintingContext {
   /// Neither end is. At 255 there is no alpha to fold; at 0 nothing under it
   /// is drawn at all, in the engine's rendering or in this pass's, so whatever
   /// the fold would have done to a filter's bounds it does to nothing. Counting
-  /// either would send a subtree to the stock capture for a divergence no
-  /// pixel can show — the rule `Opacity` and `FadeTransition` already obey by
+  /// either would report a divergence no pixel can show — the rule `Opacity` and `FadeTransition` already obey by
   /// not painting their child at 0.
   ///
   /// The pass still paints the subtree at 0 rather than skipping it as those
@@ -969,9 +971,10 @@ class _ShaderMask extends _CanvasEffect {
   /// `S·(1 − Da)` term, which is the whole of the source — src, srcOver,
   /// dstOver, srcOut, dstATop, xor, plus, screen and every separable and
   /// non-separable mode after it — and paints the mask across the empty part
-  /// of its rect. Those are named as unhandled, so the subtree goes to the
-  /// stock capture; the masking modes a `ShaderMask` is nearly always used for
-  /// stay here.
+  /// of its rect. Those are named as unhandled, so diagnostics show where the
+  /// pass and the engine part — the pipeline has no fallback to send them to
+  /// yet (#32); the masking modes a `ShaderMask` is nearly always used for are
+  /// exact here.
   static const Set<BlendMode> staysInside = <BlendMode>{
     BlendMode.clear,
     BlendMode.dst,
