@@ -882,6 +882,11 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                                   circle.center.dy + half,
                                 );
                                 return Stack(
+                                  // Snapped to whole device pixels, the bar can
+                                  // end a fraction past this box wherever the
+                                  // width does not land on one (369 at 2.625),
+                                  // and a clip would shave its end and rim.
+                                  clipBehavior: Clip.none,
                                   children: <Widget>[
                                     Positioned.fromRect(
                                       rect: _snap(context, Rect.lerp(open, inline, m)!),

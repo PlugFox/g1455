@@ -24,7 +24,9 @@
 //  - in `_GlassTabBarState.build`, `math.min(kGlassTabAccessoryHeight,
 //    circle.height) / 2` -> `kGlassTabAccessoryHeight / 2`: the accessory is
 //    48 tall beside a 44-tall circle and hangs past the box, and the 44-tall
-//    arm fails.
+//    arm fails;
+//  - `clipBehavior: Clip.none` dropped from the accessory's `Stack`: at 2.625
+//    the snapped bar ends past the box, and the ratio arm finds a clip.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -104,6 +106,20 @@ void main() {
     expect(inline.height, shut.height, reason: 'the accessory is not the circle\'s height beside it');
     expect(inline.center.dy, closeTo(shut.center.dy, 0.01));
     expect(box.top <= inline.top && inline.bottom <= box.bottom, isTrue, reason: '$inline is not inside $box');
+  });
+
+  testWidgets('at a ratio its width does not land on, nothing clips the accessory', (WidgetTester tester) async {
+    // 393 less the margins is 369 wide, 968.625 device px at 2.625: snapped,
+    // the accessory's bar ends a fraction past its box, which must not clip.
+    await _Rig.mount(tester, accessory: true, screen: const Size(393, 852), devicePixelRatio: 2.625);
+    await tester.pumpAndSettle();
+    expect(find.text('Now playing'), findsOneWidget);
+    // The body's viewport clips to the screen, and only that.
+    expect(
+      tester.layers.whereType<ClipRectLayer>().where((ClipRectLayer l) => l.clipRect!.width < 393),
+      isEmpty,
+      reason: 'the accessory clipped its own bar',
+    );
   });
 
   testWidgets('a bar that does not ask to collapse does not', (WidgetTester tester) async {
@@ -350,11 +366,12 @@ class _Rig {
     Widget Function(Widget list)? around,
     bool reverse = false,
     Size screen = kScreen,
+    double devicePixelRatio = 2,
   }) async {
     await tester.pumpWidget(const SizedBox());
     tester.view
-      ..physicalSize = screen * 2
-      ..devicePixelRatio = 2;
+      ..physicalSize = screen * devicePixelRatio
+      ..devicePixelRatio = devicePixelRatio;
     addTearDown(tester.view.reset);
     final hostKey = GlobalKey();
     final scroll = ScrollController();
