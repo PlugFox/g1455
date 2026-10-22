@@ -31,6 +31,9 @@
 //    where the old first segment was drawn; in `didChangeDependencies`,
 //    `_at.value = widget.segments.length - 1 - _at.value` dropped: held over A
 //    while the direction flips, the release selects C.
+//  - in `_GlassPanel.build`, `widget.padding.resolve(Directionality.maybeOf(
+//    context) ?? TextDirection.ltr)` -> `.resolve(TextDirection.ltr)`: a
+//    directional padding's start stays at the left under rtl.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -257,6 +260,40 @@ void main() {
       await tester.flingFrom(tester.getCenter(find.text('B')), Offset(60 * towardC, 0), 2000);
       await tester.pumpAndSettle();
       expect(selected, <int>[3], reason: '$direction: a flick toward C did not carry on to D');
+    }
+  });
+
+  testWidgets('a bar, a card and a button put a directional padding\'s start at the right', (
+    WidgetTester tester,
+  ) async {
+    const padding = EdgeInsetsDirectional.only(start: 30, end: 4);
+    const Key inside = Key('inside');
+    final panels = <String, Widget Function()>{
+      'bar': () => const GlassBar(
+        padding: padding,
+        child: SizedBox(key: inside, width: 40, height: 20),
+      ),
+      'card': () => const GlassCard(
+        padding: padding,
+        child: SizedBox(key: inside, width: 40, height: 20),
+      ),
+      'button': () => GlassButton(
+        onPressed: () {},
+        padding: padding,
+        minSize: Size.zero,
+        child: const SizedBox(key: inside, width: 40, height: 20),
+      ),
+    };
+    for (final MapEntry<String, Widget Function()> panel in panels.entries) {
+      for (final TextDirection direction in TextDirection.values) {
+        await _mount(tester, direction, panel.value());
+        final Rect glass = tester.getRect(find.byType(GlassSurface).first);
+        final Rect child = tester.getRect(find.byKey(inside));
+        final (double start, double end) = direction == TextDirection.rtl
+            ? (glass.right - child.right, child.left - glass.left)
+            : (child.left - glass.left, glass.right - child.right);
+        expect((start, end), (30.0, 4.0), reason: '${panel.key}, $direction: the start is not where it reads from');
+      }
     }
   });
 

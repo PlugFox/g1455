@@ -48,6 +48,11 @@ Right to left:
   taken away, which under rtl moves where the selected one is drawn; held
   while the direction flips, the release selects the segment it was held
   over.
+- `GlassBar`, `GlassCard` and `GlassButton` take an `EdgeInsetsGeometry`
+  padding and `GlassScaffold` an `EdgeInsetsGeometry` `barMargin`, resolved
+  with the ambient `Directionality`: an asymmetric inset can be given as
+  `EdgeInsetsDirectional` and mirrors under rtl. Code that reads the field
+  as `EdgeInsets` resolves it first (#29).
 
 Clipping:
 

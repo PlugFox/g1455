@@ -171,8 +171,10 @@ class GlassScaffold extends StatelessWidget {
 
   /// The space around each bar, inside the safe area: the top bar's top and
   /// sides and the gap under it, the bottom bar's sides and the gap above it.
-  /// Under the bottom bar it is the larger of this and the safe area.
-  final EdgeInsets barMargin;
+  /// Under the bottom bar it is the larger of this and the safe area. An
+  /// [EdgeInsetsDirectional] is resolved with the ambient [Directionality],
+  /// left to right without one.
+  final EdgeInsetsGeometry barMargin;
 
   /// Whether the scaffold mounts a [GlassHost] of its own: null (the default)
   /// when there is none above it, true always, false never.
@@ -188,18 +190,20 @@ class GlassScaffold extends StatelessWidget {
   /// The top bar's extent from the top of the screen, logical px: the safe
   /// area, [barMargin] above and below, and [topBarHeight]. What the body is
   /// told as its top padding, and the scroll edge's [GlassScrollEdge.extent].
-  double topExtentFor(EdgeInsets safe) => safe.top + barMargin.top + topBarHeight + barMargin.bottom;
+  double topExtentFor(EdgeInsets safe) {
+    // Top and bottom are the same in either direction.
+    final EdgeInsets margin = barMargin.resolve(TextDirection.ltr);
+    return safe.top + margin.top + topBarHeight + margin.bottom;
+  }
 
   @override
   Widget build(BuildContext context) {
     final EdgeInsets safe = MediaQuery.paddingOf(context);
+    final TextDirection direction = Directionality.maybeOf(context) ?? TextDirection.ltr;
+    final EdgeInsets margin = barMargin.resolve(direction);
     final double? top = topBar == null ? null : topExtentFor(safe);
     final Widget screen = CustomMultiChildLayout(
-      delegate: _GlassScaffoldLayout(
-        safe: safe,
-        margin: barMargin,
-        textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
-      ),
+      delegate: _GlassScaffoldLayout(safe: safe, textDirection: direction),
       // In paint order: the body under everything, the top bar over all.
       children: <Widget>[
         LayoutId(
@@ -212,10 +216,10 @@ class GlassScaffold extends StatelessWidget {
             child: GlassAbove(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  safe.left + barMargin.left,
-                  barMargin.top,
-                  safe.right + barMargin.right,
-                  math.max(safe.bottom, barMargin.bottom),
+                  safe.left + margin.left,
+                  margin.top,
+                  safe.right + margin.right,
+                  math.max(safe.bottom, margin.bottom),
                 ),
                 child: bar,
               ),
@@ -226,7 +230,7 @@ class GlassScaffold extends StatelessWidget {
             id: _Slot.action,
             child: GlassAbove(child: action),
           ),
-        if (top != null) LayoutId(id: _Slot.top, child: _top(safe, top)),
+        if (top != null) LayoutId(id: _Slot.top, child: _top(safe, margin, top)),
       ],
     );
     final bool own = host ?? GlassProxyScope.maybeOf(context) == null;
@@ -234,13 +238,13 @@ class GlassScaffold extends StatelessWidget {
     return own ? GlassHost(child: minimizing) : minimizing;
   }
 
-  Widget _top(EdgeInsets safe, double extent) {
+  Widget _top(EdgeInsets safe, EdgeInsets margin, double extent) {
     final Widget bar = Padding(
       padding: EdgeInsets.fromLTRB(
-        safe.left + barMargin.left,
-        safe.top + barMargin.top,
-        safe.right + barMargin.right,
-        barMargin.bottom,
+        safe.left + margin.left,
+        safe.top + margin.top,
+        safe.right + margin.right,
+        margin.bottom,
       ),
       child: SizedBox(height: topBarHeight, child: topBar),
     );
@@ -274,10 +278,9 @@ class _GlassScaffoldConstraints extends BoxConstraints {
 
 /// Lays out the bottom bar first, so the body can be told its height.
 class _GlassScaffoldLayout extends MultiChildLayoutDelegate {
-  _GlassScaffoldLayout({required this.safe, required this.margin, required this.textDirection});
+  _GlassScaffoldLayout({required this.safe, required this.textDirection});
 
   final EdgeInsets safe;
-  final EdgeInsets margin;
   final TextDirection textDirection;
 
   @override
@@ -309,7 +312,7 @@ class _GlassScaffoldLayout extends MultiChildLayoutDelegate {
 
   @override
   bool shouldRelayout(_GlassScaffoldLayout oldDelegate) =>
-      oldDelegate.safe != safe || oldDelegate.margin != margin || oldDelegate.textDirection != textDirection;
+      oldDelegate.safe != safe || oldDelegate.textDirection != textDirection;
 }
 
 /// The body, told the bars' extents as its media query's padding.

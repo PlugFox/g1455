@@ -185,8 +185,9 @@ class GlassBar extends StatelessWidget {
   ///
   /// **Layout taste, not a measurement**: the package's optics were calibrated
   /// against Apple's material — its transmission, its blur, its rim — but none
-  /// of its layout metrics were.
-  final EdgeInsets padding;
+  /// of its layout metrics were. An [EdgeInsetsDirectional] is resolved with
+  /// the ambient [Directionality], left to right without one.
+  final EdgeInsetsGeometry padding;
 
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
@@ -260,7 +261,7 @@ class GlassCard extends StatelessWidget {
 
   /// Space between the glass and the content. Layout taste — see
   /// [GlassBar.padding].
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
 
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
@@ -366,7 +367,7 @@ class GlassButton extends StatefulWidget {
 
   /// Space between the glass and the label. Layout taste — see
   /// [GlassBar.padding].
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
 
   /// The smallest the control may be. [kGlassMinTapTarget] by default.
   final Size minSize;
@@ -653,7 +654,7 @@ class _GlassPanel extends StatefulWidget {
   });
 
   final BorderRadius borderRadius;
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
   final GlassFinish? finish;
   final Color? overlay;
 
@@ -848,7 +849,7 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
               ? null
               : _GlassOverlay(widget.borderRadius, widget.overlay, focusRing: widget.focusRing),
           child: Padding(
-            padding: widget.padding,
+            padding: widget.padding.resolve(Directionality.maybeOf(context) ?? TextDirection.ltr),
             // Hides the panel's scope from what it holds, there with or without
             // a share so that one coming or going keeps the tree's shape.
             child: GlassSharedReadingScope(share: null, child: _labelled(theme, shown, widget.child)),

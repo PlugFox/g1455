@@ -5,6 +5,11 @@
 // No pixels: the scaffold draws nothing of its own, so what can be wrong with
 // it is a rect or a number — the body's padding, a bar's box, how many hosts
 // there are. The glass the bars draw is tested where the bars are.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `GlassScaffold.build`, `barMargin.resolve(direction)` ->
+//    `barMargin.resolve(TextDirection.ltr)`: a directional margin's start
+//    stays at the left under rtl.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -150,6 +155,27 @@ void main() {
       textDirection: TextDirection.rtl,
     );
     expect(tester.getTopLeft(find.byKey(kAction)).dx, 16);
+  });
+
+  testWidgets('a directional bar margin puts its start at the right, right to left', (WidgetTester tester) async {
+    for (final TextDirection direction in TextDirection.values) {
+      await _mount(
+        tester,
+        const GlassScaffold(
+          barMargin: EdgeInsetsDirectional.fromSTEB(30, 8, 4, 8),
+          topBar: SizedBox.expand(key: kTop),
+          bottomBar: SizedBox(key: kBottom, height: 60),
+          body: SizedBox.expand(),
+        ),
+        textDirection: direction,
+      );
+      final (double left, double right) = direction == TextDirection.rtl ? (4, 30) : (30, 4);
+      for (final Key bar in <Key>[kTop, kBottom]) {
+        final Rect box = tester.getRect(find.byKey(bar));
+        expect((box.left, kScreen.width - box.right), (left, right), reason: '$bar, $direction');
+      }
+      expect(tester.getTopLeft(find.byKey(kTop)).dy, 47 + 8);
+    }
   });
 
   testWidgets('the top bar stands in a soft scroll edge by default, lifted alone without one', (
