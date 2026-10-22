@@ -65,9 +65,16 @@ class WalkLog {
   /// Repaint boundaries the pass walked through instead of compositing.
   int boundariesCrossed = 0;
 
-  /// Effects recovered from `updateCompositedLayer` — the ones a direct
-  /// `paint()` call cannot see. Zero here on a tree containing an `Opacity`
-  /// means the pass dropped its transparency.
+  /// Opacities and image filters the pass applied — the two effects a repaint
+  /// boundary carries in `updateCompositedLayer`, where a direct `paint()`
+  /// call cannot see them. Zero here on a tree containing an `Opacity` means
+  /// the pass dropped its transparency.
+  ///
+  /// One rule on every route, so the number means the same whichever one a
+  /// tree happens to use: an effect is counted when the pass actually applies
+  /// it, whether it came off a composited boundary, through `pushOpacity` or
+  /// through `pushLayer`. An alpha of 255 and a missing filter apply nothing
+  /// and are not counted; an alpha of 0 hides its content and is.
   int compositedEffectsApplied = 0;
 
   /// Layers this pass had to create because a `push*` return type is
@@ -349,7 +356,7 @@ class ProxyWalkContext extends PaintingContext {
           return null;
         }
         log.compositedEffectsApplied++;
-        return _SaveLayer(ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0), carriesAlpha: true);
+        return _SaveLayer(ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0), carriesAlpha: _live(alpha));
       }
       if (probe is ImageFilterLayer) {
         final ui.ImageFilter? filter = probe.imageFilter;
@@ -468,11 +475,15 @@ class ProxyWalkContext extends PaintingContext {
     // `PaintingContext.pushOpacity` puts `offset` on the layer and paints the
     // children at zero, so the translate has to happen here.
     final int savesBefore = canvas.getSaveCount();
-    // Full alpha folds nothing into a filter below it, as through `pushLayer`
-    // and a composited boundary: only a live alpha is counted open.
-    final bool live = alpha < 255;
+    // Full alpha folds nothing into a filter below it and a zero alpha leaves
+    // nothing to fold into, as through `pushLayer` and a composited boundary:
+    // only a live alpha is counted open.
+    final bool live = _live(alpha);
     if (live) {
       _opacityDepth++;
+    }
+    if (alpha < 255) {
+      log.compositedEffectsApplied++;
     }
     try {
       canvas
@@ -609,6 +620,21 @@ class ProxyWalkContext extends PaintingContext {
     }
   }
 
+  /// Whether [alpha] is one the engine could fold into a filter below it.
+  ///
+  /// Neither end is. At 255 there is no alpha to fold; at 0 nothing under it
+  /// is drawn at all, in the engine's rendering or in this pass's, so whatever
+  /// the fold would have done to a filter's bounds it does to nothing. Counting
+  /// either would send a subtree to the stock capture for a divergence no
+  /// pixel can show — the rule `Opacity` and `FadeTransition` already obey by
+  /// not painting their child at 0.
+  ///
+  /// The pass still paints the subtree at 0 rather than skipping it as those
+  /// two widgets do: its markers are counted and the occlusion policy reads
+  /// paint order off the descent, and a subtree that vanished from the walk
+  /// would read as one an ancestor cut off.
+  static bool _live(int alpha) => alpha > 0 && alpha < 255;
+
   /// Reads a layer's effect and returns the canvas operation that reproduces
   /// it, or null when there is none to reproduce.
   _CanvasEffect? _effectOf(ContainerLayer layer) {
@@ -630,15 +656,13 @@ class ProxyWalkContext extends PaintingContext {
         return m == null ? null : _Transform(m);
       case OpacityLayer():
         final int alpha = layer.alpha ?? 255;
+        if (alpha == 255) {
+          return _OffsetThen(layer.offset, null);
+        }
         log.compositedEffectsApplied++;
         return _OffsetThen(
           layer.offset,
-          alpha == 255
-              ? null
-              : _SaveLayer(
-                  ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0),
-                  carriesAlpha: true,
-                ),
+          _SaveLayer(ui.Paint()..color = ui.Color.fromARGB(alpha, 0, 0, 0), carriesAlpha: _live(alpha)),
         );
       case ImageFilterLayer():
         final ui.ImageFilter? filter = layer.imageFilter;
@@ -646,6 +670,7 @@ class ProxyWalkContext extends PaintingContext {
           return null;
         }
         _noteFilter();
+        log.compositedEffectsApplied++;
         return _OffsetThen(layer.offset, _SaveLayer(ui.Paint()..imageFilter = filter));
       case ColorFilterLayer():
         final ColorFilter? filter = layer.colorFilter;

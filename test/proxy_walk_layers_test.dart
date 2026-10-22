@@ -37,7 +37,16 @@
 //    `return _FilterAt(` -> nothing, or in `_effectOf`'s `ImageFilterLayer`
 //    case the one before `return _OffsetThen(` -> nothing: an image filter
 //    under a live alpha goes uncounted on that route, and the fold arm says
-//    which.
+//    which;
+//  - in `ProxyWalkContext._live`, `alpha > 0 && alpha < 255` -> `alpha < 255`:
+//    an alpha of 0 is counted open on every route that paints under it, and
+//    the zero-alpha arm sees a colour filter counted as folded;
+//  - in `pushOpacity`, `if (alpha < 255) {` -> `if (false) {`, or in
+//    `_effectOf`, the `log.compositedEffectsApplied++;` before the image
+//    filter's `return _OffsetThen(` -> nothing: that route stops counting what
+//    it applies, and the counting arm names the case. (Before this rule
+//    `pushLayer` also counted an opacity at 255, which the arm's 255 cases
+//    catch.)
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -498,6 +507,87 @@ void main() {
       expect(live.log.opacityFoldedIntoFilter, 1);
       live.dispose();
     });
+
+    // The other end of the same rule. At alpha 0 nothing under the opacity is
+    // drawn, by the engine or by the pass, so there is nothing for a fold to
+    // change: `Opacity(0)` and `FadeTransition(0)` count nothing because they
+    // do not paint their child, and the routes that do paint it must agree.
+    testWidgets('a colour filter under zero alpha is not counted as folded, on any route', (
+      WidgetTester tester,
+    ) async {
+      Widget filtered() => ColorFiltered(
+        colorFilter: const ColorFilter.mode(kRed, BlendMode.srcOver),
+        child: _scene(),
+      );
+      final routes = <String, Widget>{
+        'pushOpacity': _OpacityPusher(alpha: 0, child: filtered()),
+        'pushLayer': _Pusher(
+          route: _Route.offset((Offset o) => OpacityLayer(alpha: 0, offset: o)),
+          child: filtered(),
+        ),
+        'a composited boundary': _AlphaBoundary(alpha: 0, child: filtered()),
+      };
+      for (final MapEntry<String, Widget> route in routes.entries) {
+        final _Shot shot = await _shoot(tester, route.value);
+        expect(shot.log.errors, isEmpty, reason: route.key);
+        expect(shot.log.opacityFoldedIntoFilter, 0, reason: '${route.key}: zero alpha was counted as open');
+        expect(await _differing(tester, shot.stock, shot.pass), 0, reason: route.key);
+        // Still walked, so a marker under it is still seen.
+        expect(shot.log.visited, greaterThan(4), reason: '${route.key}: the subtree was skipped');
+        shot.dispose();
+      }
+    });
+
+    // `compositedEffectsApplied` counts an opacity or an image filter the pass
+    // applied, by the same rule whichever route brought it.
+    testWidgets('an opacity or image filter is counted when it is applied, whatever the route', (
+      WidgetTester tester,
+    ) async {
+      final ui.ImageFilter blur = ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2);
+      final cases = <String, (Widget, int)>{
+        'pushOpacity 128': (_OpacityPusher(alpha: 128, child: _scene()), 1),
+        'pushOpacity 0': (_OpacityPusher(alpha: 0, child: _scene()), 1),
+        'pushOpacity 255': (_OpacityPusher(alpha: 255, child: _scene()), 0),
+        'pushLayer opacity 128': (
+          _Pusher(
+            route: _Route.offset((Offset o) => OpacityLayer(alpha: 128, offset: o)),
+            child: _scene(),
+          ),
+          1,
+        ),
+        'pushLayer opacity 0': (
+          _Pusher(
+            route: _Route.offset((Offset o) => OpacityLayer(alpha: 0, offset: o)),
+            child: _scene(),
+          ),
+          1,
+        ),
+        'pushLayer opacity 255': (
+          _Pusher(
+            route: _Route.offset((Offset o) => OpacityLayer(alpha: 255, offset: o)),
+            child: _scene(),
+          ),
+          0,
+        ),
+        'pushLayer image filter': (
+          _Pusher(
+            route: _Route.offset((Offset o) => ImageFilterLayer(imageFilter: blur, offset: o)),
+            child: _scene(),
+          ),
+          1,
+        ),
+        'composited opacity 128': (_AlphaBoundary(alpha: 128, child: _scene()), 1),
+        'composited opacity 0': (_AlphaBoundary(alpha: 0, child: _scene()), 1),
+        'composited opacity 255': (_AlphaBoundary(alpha: 255, child: _scene()), 0),
+        'composited image filter': (ImageFiltered(imageFilter: blur, child: _scene()), 1),
+      };
+      for (final MapEntry<String, (Widget, int)> c in cases.entries) {
+        final _Shot shot = await _shoot(tester, c.value.$1);
+        expect(shot.log.errors, isEmpty, reason: c.key);
+        expect(shot.log.compositedEffectsApplied, c.value.$2, reason: c.key);
+        shot.dispose();
+      }
+    });
   });
 
   group('the bookkeeping routes', () {
@@ -789,6 +879,31 @@ class _RenderOpacityPusher extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     layer = context.pushOpacity(offset, alpha, super.paint, oldLayer: layer as OpacityLayer?);
   }
+}
+
+/// A repaint boundary whose composited layer is an opacity at [alpha], as
+/// `RenderOpacity`'s is, but at any alpha: the framework's own boundaries stop
+/// painting their child at 0, and this one goes on.
+class _AlphaBoundary extends SingleChildRenderObjectWidget {
+  const _AlphaBoundary({required this.alpha, super.child});
+
+  final int alpha;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderAlphaBoundary(alpha);
+}
+
+class _RenderAlphaBoundary extends RenderProxyBox {
+  _RenderAlphaBoundary(this.alpha);
+
+  final int alpha;
+
+  @override
+  bool get isRepaintBoundary => true;
+
+  @override
+  OffsetLayer updateCompositedLayer({required covariant OpacityLayer? oldLayer}) =>
+      (oldLayer ?? OpacityLayer())..alpha = alpha;
 }
 
 /// Reaches the three routes the pass overrides only to record that they were
