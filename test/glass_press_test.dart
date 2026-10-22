@@ -15,18 +15,29 @@
 // region is declared from touch-down until the spring settles, which is two
 // captures a press; the arm declared always is the zero they are counted
 // against. The two
-// for the boundary are breaks, each undone by swapping the string back:
+// for the boundary, and those for a spec that changes, are breaks, each undone
+// by swapping the string back:
 //  - in `RenderGlassPressBody`, `bool get isRepaintBoundary => true;` ->
 //    `=> false;`: every frame of the press repaints the screen's boundary, and
 //    the content arm counts the painter beside the button repainting;
 //  - in `RenderGlassPressBody.markNeedsLayout`, `if (!_forPress && parent !=
 //    null)` -> `if (false)`: a label that grows under a boundary laid out
 //    tight never reaches the stage that measures it, and the relabel arm's
-//    button keeps its old width.
+//    button keeps its old width;
+//  - in `_RenderPressStage.press`'s setter, drop `markNeedsLayout();`: a spec
+//    changed under a held finger keeps the old margin, and the regrow arm's
+//    region is the old one with the glass grown past it;
+//  - in `RenderGlassPressBody.press`'s setter, drop `_relayoutForPress();`:
+//    the new-spec arm's body lays its glass out at the old growth;
+//  - in `GlassPress.copyWith`, `grow: grow ?? this.grow` -> `grow: this.grow`
+//    (or any other field so): the copyWith arm keeps the old value;
+//  - in `RenderGlassPressBody.debugFillProperties`, drop the `spec` property:
+//    the regrow arm finds no spec to read.
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/src/surface/glass_press.dart'
@@ -100,6 +111,45 @@ void main() {
       expect(press.margin(const Size(44, 44)).width, closeTo(12.3, 0.05));
       expect(press.margin(const Size(132, 44)).width, closeTo(14.5, 0.05));
       expect(press.margin(const Size(132, 44)).height, closeTo(7.5, 0.05));
+    });
+
+    test('copyWith replaces the fields it names and keeps the rest', () {
+      const press = GlassPress(grow: 8, maxStretch: 0.1, maxPull: 2, pullReach: 10, stiffness: 400, damping: 20);
+      expect(press.copyWith(), press);
+      expect(press.copyWith().hashCode, press.hashCode);
+      final GlassPress each = press.copyWith(
+        grow: 1,
+        maxStretch: 0.2,
+        maxPull: 3,
+        pullReach: 4,
+        stiffness: 5,
+        damping: 6,
+      );
+      expect(
+        <double>[each.grow, each.maxStretch, each.maxPull, each.pullReach, each.stiffness, each.damping],
+        <double>[1, 0.2, 3, 4, 5, 6],
+      );
+      // One at a time, so a field read from the wrong argument is seen.
+      expect(
+        press.copyWith(grow: 1),
+        const GlassPress(grow: 1, maxStretch: 0.1, maxPull: 2, pullReach: 10, stiffness: 400, damping: 20),
+      );
+      expect(press.copyWith(maxStretch: 0.2).maxStretch, 0.2);
+      expect(press.copyWith(maxPull: 3).maxPull, 3);
+      expect(press.copyWith(pullReach: 4).pullReach, 4);
+      expect(press.copyWith(stiffness: 5).stiffness, 5);
+      expect(press.copyWith(damping: 6).damping, 6);
+      expect(press.copyWith(damping: 6).stiffness, 400);
+      // Zeroing the three that move the glass is none.
+      expect(const GlassPress().copyWith(grow: 0, maxStretch: 0, maxPull: 0).isNone, isTrue);
+    });
+
+    test('toString names none by name and spells out the rest', () {
+      expect(GlassPress.none.toString(), 'GlassPress.none');
+      expect(
+        const GlassPress().toString(),
+        'GlassPress(grow 12.0, stretch 0.05, pull 3.0 over 12.0, spring 500.0/26.0)',
+      );
     });
 
     test('none is the box, at every press', () {
@@ -219,6 +269,62 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
     }
+  });
+
+  testWidgets('a press that changes under a held finger regrows the glass and its region', (WidgetTester tester) async {
+    // The spec reaches a mounted stage and body through their setters, not a
+    // new render object: a theme that changes while a button is held must
+    // move the glass to the new growth, and the region to the new margin, or
+    // the glass grows past the region it was captured in.
+    final hostKey = GlobalKey();
+    await _mount(tester, hostKey, _Screen(paints: _Counter(), press: const GlassPress()));
+    final RenderGlassSurface glass = _glass(tester);
+    final Rect rest = glass.globalRect;
+    final RenderGlassPressBody body = tester.allRenderObjects.whereType<RenderGlassPressBody>().single;
+    GlassTravelRegion region() => tester.widget<GlassTravelScope>(find.byType(GlassTravelScope)).region;
+    final TestGesture gesture = await tester.startGesture(rest.center);
+    await tester.pumpAndSettle();
+    expect(glass.globalRect.width - rest.width, closeTo(12, 0.01));
+    final Rect narrow = region().globalRect!;
+
+    const wider = GlassPress(grow: 20);
+    await _mount(tester, hostKey, _Screen(paints: _Counter(), press: wider));
+    expect(tester.allRenderObjects.whereType<RenderGlassPressBody>().single, same(body), reason: 'not the setters');
+    expect(glass.globalRect.width - rest.width, closeTo(20, 0.01), reason: 'the held glass kept the old growth');
+    final Size m = wider.margin(rest.size);
+    expect(
+      region().globalRect,
+      Rect.fromLTRB(rest.left - m.width, rest.top - m.height, rest.right + m.width, rest.bottom + m.height),
+    );
+    expect(region().globalRect!.width, greaterThan(narrow.width), reason: 'the region kept the old margin');
+    expect(region().globalRect!.expandToInclude(glass.globalRect), region().globalRect, reason: 'glass outside region');
+    // What the inspector shows of a held glass: where the press is, the
+    // finger, and the spec it follows now.
+    final Map<String, Object?> shown = <String, Object?>{
+      for (final DiagnosticsNode p in body.toDiagnosticsNode().getProperties()) p.name!: p.value,
+    };
+    expect(shown['press'], 1.0);
+    expect(shown['finger'], Offset.zero);
+    expect(shown['spec'], wider);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(glass.globalRect, rest);
+  });
+
+  test('a body given a new spec lays its glass out again at the new growth', () {
+    // The stage lays the body out again whenever the button's spec changes,
+    // so through a button this is the body's own setter seen from below: a
+    // body whose spec changes and nothing else must not keep the old glass.
+    final glass = RenderConstrainedBox(additionalConstraints: const BoxConstraints());
+    final body = RenderGlassPressBody(const GlassPress(), 1, Offset.zero)..child = glass;
+    const rest = BoxConstraints.tightFor(width: 132, height: 44);
+    body.layout(rest);
+    expect(glass.size.width, closeTo(132 + 12, 1e-2));
+    body.press = const GlassPress(grow: 20);
+    body.layout(rest);
+    expect(glass.size.width, closeTo(132 + 20, 1e-2), reason: 'the body kept the old growth');
+    body.press = const GlassPress(grow: 20);
+    expect(body.debugNeedsLayout, isFalse, reason: 'an equal spec laid the glass out again');
   });
 
   testWidgets('the theme carries the press, and a button may name its own', (WidgetTester tester) async {
