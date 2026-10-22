@@ -375,7 +375,10 @@ every number as `GlassFinish` holds it:
 `.regularDark` and `.regularLight` are the two branches of Apple's `.regular`,
 which is dark over a dark backdrop and light over a light one.
 `GlassFinish.regular(appearance:, backdrop:)` picks the branch, and `GlassHost`
-calls it unless a finish is named. `.clear` and `.frosted` differ only in blur.
+calls it unless a finish is named, in the platform's appearance — or in
+`GlassHost.appearance`, which an app whose theme does not follow the phone's
+declares, so a dark app on a light-mode phone is not given light glass.
+`.clear` and `.frosted` differ only in blur.
 `.frosted` is a heavy blur kept under its old name: scored against Apple's
 material, it is a `UIVisualEffectView` blur rather than Liquid Glass.
 

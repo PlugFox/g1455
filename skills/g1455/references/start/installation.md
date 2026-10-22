@@ -96,7 +96,8 @@ catch it if the app should start regardless.
 ## Next steps
 
 - [How it works](../start/how-it-works.md): one capture for the whole screen, and only when something changed.
-- [What the app declares](../start/declarations.md): the backdrop, reduce transparency, contrast, thermal state.
+- [What the app declares](../start/declarations.md): the backdrop, the appearance, reduce transparency, contrast, thermal
+  state.
 - [GlassHost](../foundations/host.md) and [GlassSurface](../foundations/surface.md): the two building blocks.
 - [Finishes](../foundations/finishes.md): regular, clear and frosted glass.
 - [Scaffold](../components/scaffold.md): a whole screen, a bar, a tab bar and a list scrolling under them, wired for you.

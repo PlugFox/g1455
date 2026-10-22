@@ -128,7 +128,10 @@ Break one of these and the result is wrong, slow or invisible.
     `copyWith(...)` and keep the preset's `name`: an unknown name loses the
     measured tables and captures at full resolution (slower). Default (null) is
     Apple's `.regular`, branch picked from `backdrop` and platform brightness.
-    Text on `.clear` needs `minLabelContrast`.
+    An app whose theme does not follow the phone's declares
+    `GlassHost(appearance: Brightness.dark)` (or light), or a dark app on a
+    light-mode phone gets light glass; it keeps adaptive glass working, where a
+    named finish holds its branch. Text on `.clear` needs `minLabelContrast`.
 12. **Text-free glass** (lenses, blobs, drops) passes `labelled: false`, so it
     is not dimmed for a label floor.
 13. **No `SafeArea` is applied by bars.** Add `MediaQuery.paddingOf(context)`

@@ -458,6 +458,7 @@ class GlassHost extends StatefulWidget {
     required this.child,
     this.hardware,
     this.finish,
+    this.appearance,
     this.tier = GlassTierChoice.byDefault,
     this.backdrop,
     this.highContrast,
@@ -505,6 +506,30 @@ class GlassHost extends StatefulWidget {
   /// hold it — a dark glass on a light screen is a choice Apple's material
   /// does not make, and this is where an application makes it.
   final GlassFinish? finish;
+
+  /// The appearance `.regular` picks its branch in when [finish] is null, or
+  /// null to follow the platform's (`MediaQuery.platformBrightnessOf`).
+  ///
+  /// Declare it when the application's theme does not follow the phone's. A
+  /// dark-themed application on a phone in the light appearance otherwise
+  /// gets light glass over its dark content: in the light appearance
+  /// `.regular` takes its light branch over anything above a luma of 54
+  /// ([GlassFinish.kRegularSwitchLight]), and an ordinary dark grey page is above that.
+  ///
+  /// ```dart
+  /// MaterialApp(
+  ///   themeMode: mode,
+  ///   builder: (context, child) => GlassHost(
+  ///     appearance: mode == ThemeMode.system ? null : (mode == ThemeMode.dark ? Brightness.dark : Brightness.light),
+  ///     child: child!,
+  ///   ),
+  /// )
+  /// ```
+  ///
+  /// Unlike naming a branch in [finish], this keeps `.regular` a choice:
+  /// [backdrop] and [adaptive] still move the glass between its branches, in
+  /// the appearance declared here. Ignored when [finish] is named.
+  final Brightness? appearance;
 
   /// Which rung of the finish ladder every surface under this host draws.
   ///
@@ -846,8 +871,11 @@ class _GlassHostState extends State<GlassHost> {
 
   /// The appearance `.regular` was picked in, or null when a finish was named —
   /// what lets a reading pick the branch again for one glass.
-  Brightness? get _regularAppearance =>
-      widget.finish != null ? null : (MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light);
+  Brightness? get _regularAppearance => widget.finish != null ? null : _appearance;
+
+  /// [GlassHost.appearance], or the platform's. Read only when it is not
+  /// declared, so a declared one does not depend on the platform's.
+  Brightness get _appearance => widget.appearance ?? MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light;
 
   /// Reads the backdrop back for [GlassHost.adaptive]; null — and nothing at
   /// all — without it.
@@ -871,11 +899,7 @@ class _GlassHostState extends State<GlassHost> {
   }
 
   GlassFinish _resolveFinish() =>
-      widget.finish ??
-      GlassFinish.regular(
-        appearance: MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light,
-        backdrop: widget.backdrop,
-      );
+      widget.finish ?? GlassFinish.regular(appearance: _appearance, backdrop: widget.backdrop);
 
   static ui.FragmentProgram? _cachedProgram;
   static Future<ui.FragmentProgram>? _loading;
