@@ -24,7 +24,11 @@
 //  - in `_ShaderMask.end`, `..translate(maskRect.left, maskRect.top)` ->
 //    `..translate(0, 0)`: the mask is drawn in the layer's space rather than
 //    its own, and the arm with the `ShaderMask` off the origin differs by
-//    9000 px.
+//    9000 px;
+//  - in `_effectOf`, `!_ShaderMask.staysInside.contains(blend)` -> `false`:
+//    a shader mask under src, srcOver and every other mode that paints over a
+//    transparent destination goes unnamed, though the pass paints it across
+//    the whole mask rect and the engine only over the child.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -107,6 +111,40 @@ void main() {
         effect.dispose();
       });
     }
+
+    // The engine's shader-mask layer covers the children's paint bounds and the
+    // pass's covers the whole mask rect, so a mode that paints over a
+    // transparent destination paints the mask where the children did not. The
+    // fixture is a 60 x 60 mask over a 20 x 20 child, so that region is most of
+    // the mask. Each mode is either exact here or named, and a named one has to
+    // diverge: naming a mode that does not would send its subtree to the stock
+    // capture for nothing.
+    testWidgets('a shader mask is exact under the modes that keep transparency, and named under the rest', (
+      WidgetTester tester,
+    ) async {
+      const exact = <BlendMode>{
+        BlendMode.clear,
+        BlendMode.dst,
+        BlendMode.srcIn,
+        BlendMode.dstIn,
+        BlendMode.dstOut,
+        BlendMode.srcATop,
+        BlendMode.modulate,
+      };
+      for (final BlendMode mode in BlendMode.values) {
+        final _Shot shot = await _shoot(tester, _maskOverSmallChild(mode));
+        final int differing = await _differing(tester, shot.stock, shot.pass);
+        expect(shot.log.errors, isEmpty, reason: mode.name);
+        if (exact.contains(mode)) {
+          expect(shot.log.unhandledLayers, isEmpty, reason: '${mode.name} keeps transparency and was named');
+          expect(differing, 0, reason: mode.name);
+        } else {
+          expect(shot.log.unhandledLayers, <String>['ShaderMaskLayer'], reason: '${mode.name} went unnamed');
+          expect(differing, greaterThan(0), reason: '${mode.name} is named but the pass reproduces it');
+        }
+        shot.dispose();
+      }
+    });
 
     testWidgets('a colour filter under a live alpha is counted as the one known divergence', (
       WidgetTester tester,
@@ -547,6 +585,35 @@ Widget _scene() => SizedBox.fromSize(
       Positioned(left: 0, top: 0, width: 70, height: 50, child: ColoredBox(color: kRed)),
       Positioned(left: 50, top: 60, width: 70, height: 60, child: ColoredBox(color: kGreen)),
     ],
+  ),
+);
+
+/// A 60 x 60 shader mask at (30, 20) whose child paints only its top-left
+/// 20 x 20.
+///
+/// The gradient is one opaque colour across everything the child covers: Skia
+/// dithers a gradient by device position, and a layer whose origin differs from
+/// the engine's moves the dither by a code value wherever the blend leaves a
+/// fraction, which is a different question from where the mask paints.
+Widget _maskOverSmallChild(BlendMode mode) => Padding(
+  padding: const EdgeInsets.only(left: 30, top: 20),
+  child: Align(
+    alignment: Alignment.topLeft,
+    child: SizedBox(
+      width: 60,
+      height: 60,
+      child: ShaderMask(
+        shaderCallback: (Rect r) => const LinearGradient(
+          colors: <Color>[Color(0xFFFFE000), Color(0xFFFFE000), Color(0x802040FF), Color(0x802040FF)],
+          stops: <double>[0, 0.5, 0.5, 1],
+        ).createShader(r),
+        blendMode: mode,
+        child: const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 20, height: 20, child: ColoredBox(color: kRed)),
+        ),
+      ),
+    ),
   ),
 );
 

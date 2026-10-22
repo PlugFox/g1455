@@ -638,7 +638,15 @@ class ProxyWalkContext extends PaintingContext {
         final Shader? shader = layer.shader;
         final Rect? maskRect = layer.maskRect;
         final BlendMode? blend = layer.blendMode;
-        return (shader == null || maskRect == null || blend == null) ? null : _ShaderMask(shader, maskRect, blend);
+        if (shader == null || maskRect == null || blend == null) {
+          return null;
+        }
+        if (!_ShaderMask.staysInside.contains(blend)) {
+          // Drawn anyway, because inside the children it is the right answer;
+          // named, because outside them it paints where the engine does not.
+          log.unhandledLayers.add(layer.runtimeType.toString());
+        }
+        return _ShaderMask(shader, maskRect, blend);
       case LeaderLayer():
         return _OffsetThen(layer.offset, null);
       case OffsetLayer():
@@ -853,6 +861,33 @@ class _ClipPath extends _Clip {
 
 class _ShaderMask extends _CanvasEffect {
   const _ShaderMask(this.shader, this.maskRect, this.blendMode);
+
+  /// The blend modes under which this flattening is exact: the ones that leave
+  /// a transparent destination transparent, whatever the shader is.
+  ///
+  /// The engine's layer covers only the children's paint bounds, and the mask
+  /// is drawn inside that layer, so nothing outside what the children painted
+  /// can be touched by it. This layer is unbounded — the walk is top-down and
+  /// cannot know the children's extent before they paint — so the mask covers
+  /// its whole rect, and the two agree only where the mode turns a transparent
+  /// destination into a transparent result. Over `D = 0` srcIn, srcATop and
+  /// modulate are `S·Da`, dstIn, dstOut and dst are a multiple of `D`, and
+  /// clear is nothing: all seven are zero there. Every other mode keeps a
+  /// `S·(1 − Da)` term, which is the whole of the source — src, srcOver,
+  /// dstOver, srcOut, dstATop, xor, plus, screen and every separable and
+  /// non-separable mode after it — and paints the mask across the empty part
+  /// of its rect. Those are named as unhandled, so the subtree goes to the
+  /// stock capture; the masking modes a `ShaderMask` is nearly always used for
+  /// stay here.
+  static const Set<BlendMode> staysInside = <BlendMode>{
+    BlendMode.clear,
+    BlendMode.dst,
+    BlendMode.srcIn,
+    BlendMode.dstIn,
+    BlendMode.dstOut,
+    BlendMode.srcATop,
+    BlendMode.modulate,
+  };
 
   final Shader shader;
   final Rect maskRect;
