@@ -96,7 +96,8 @@ class WalkLog {
   /// ancestor cut off before the pass ever saw it.
   final Map<GlassProxyRole, int> proxyRoles = <GlassProxyRole, int>{};
 
-  /// Colour filters flattened while an alpha layer was open above them.
+  /// Colour and image filters flattened while an alpha layer was open above
+  /// them.
   ///
   /// The engine folds the alpha into the filter's own `saveLayer`, and the fold
   /// changes that layer's bounds from the cull rect to the content — so a
@@ -104,6 +105,12 @@ class WalkLog {
   /// Measured: at opacity 1.0 the region is opaque cyan and at 254/255 it is
   /// gone, in the engine's own rendering. This pass keeps it, so a subtree with
   /// a non-zero count here belongs on the `toImageSync` fallback.
+  ///
+  /// An image filter is counted for the same reason: `ImageFilterLayer`
+  /// accepts its parent's opacity as `ColorFilterLayer` does, and a colour
+  /// filter can be handed over as an image filter, alone or composed. Measured
+  /// with `Opacity(0.5)` over `ImageFiltered(compose(colour filter, blur))`:
+  /// 2116 px differ on Impeller and every pixel by a code value on Skia.
   int opacityFoldedIntoFilter = 0;
 
   /// Nodes whose `paint` threw. We run foreign code; this is the budget for it.
@@ -206,9 +213,10 @@ class ProxyWalkContext extends PaintingContext {
   /// Alpha-carrying `saveLayer`s currently open above the cursor.
   ///
   /// The one construct this pass does not reproduce needs both halves: an
-  /// opacity below 1.0 *and* a colour filter under it. The engine folds the
-  /// first into the second (`ColorFilterLayer::Preroll` advertises
-  /// `kCallerCanApplyOpacity`) and the fold changes the filter's bounds from the
+  /// opacity below 1.0 *and* a colour or image filter under it. The engine
+  /// folds the first into the second (`ColorFilterLayer::Preroll` and
+  /// `ImageFilterLayer::Preroll` both advertise `kCallerCanApplyOpacity`) and
+  /// the fold changes the filter's bounds from the
   /// cull rect to the content, which deletes everything the filter painted
   /// outside the content. A flattened pass keeps two layers and keeps that
   /// region. Counted rather than fixed: reproducing the fold means knowing
@@ -348,6 +356,7 @@ class ProxyWalkContext extends PaintingContext {
         if (filter == null) {
           return null;
         }
+        _noteFilter();
         log.compositedEffectsApplied++;
         return _FilterAt(offset, ui.Paint()..imageFilter = filter);
       }
@@ -491,7 +500,7 @@ class ProxyWalkContext extends PaintingContext {
     PaintingContextCallback painter, {
     ColorFilterLayer? oldLayer,
   }) {
-    _noteColorFilter();
+    _noteFilter();
     final int savesBefore = canvas.getSaveCount();
     try {
       canvas.saveLayer(null, ui.Paint()..colorFilter = colorFilter);
@@ -589,10 +598,12 @@ class ProxyWalkContext extends PaintingContext {
   /// The one place this pass is known to diverge from `toImageSync`.
   ///
   /// Conservative on purpose: the engine only folds when the opacity's sole
-  /// child advertises that it can absorb one, and this counts every colour
-  /// filter under any live alpha. Over-reporting sends a subtree back to a
-  /// plain `toImageSync`, which is the direction a fallback should err in.
-  void _noteColorFilter() {
+  /// child advertises that it can absorb one, and this counts every colour or
+  /// image filter under any live alpha — a blur that would have survived the
+  /// fold included, because Dart cannot ask a filter whether it holds a colour
+  /// filter. Over-reporting sends a subtree back to a plain `toImageSync`,
+  /// which is the direction a fallback should err in.
+  void _noteFilter() {
     if (_opacityDepth > 0) {
       log.opacityFoldedIntoFilter++;
     }
@@ -631,13 +642,17 @@ class ProxyWalkContext extends PaintingContext {
         );
       case ImageFilterLayer():
         final ui.ImageFilter? filter = layer.imageFilter;
-        return filter == null ? null : _OffsetThen(layer.offset, _SaveLayer(ui.Paint()..imageFilter = filter));
+        if (filter == null) {
+          return null;
+        }
+        _noteFilter();
+        return _OffsetThen(layer.offset, _SaveLayer(ui.Paint()..imageFilter = filter));
       case ColorFilterLayer():
         final ColorFilter? filter = layer.colorFilter;
         if (filter == null) {
           return null;
         }
-        _noteColorFilter();
+        _noteFilter();
         return _SaveLayer(ui.Paint()..colorFilter = filter);
       case ShaderMaskLayer():
         final Shader? shader = layer.shader;

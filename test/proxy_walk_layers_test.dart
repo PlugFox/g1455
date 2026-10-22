@@ -32,7 +32,12 @@
 //  - in `_compositedEffect`, `_FilterAt(offset, ` -> `_SaveLayer(`: a
 //    composited image filter is applied about the canvas's origin rather than
 //    its layer's, and the scaled `ImageFiltered` off the origin lands at half
-//    its offset.
+//    its offset;
+//  - in `_compositedEffect`, the `_noteFilter();` before
+//    `return _FilterAt(` -> nothing, or in `_effectOf`'s `ImageFilterLayer`
+//    case the one before `return _OffsetThen(` -> nothing: an image filter
+//    under a live alpha goes uncounted on that route, and the fold arm says
+//    which.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -194,6 +199,42 @@ void main() {
       expect(folded.log.opacityFoldedIntoFilter, 1);
       alone.dispose();
       folded.dispose();
+    });
+
+    // The engine folds an opacity into an image filter below it as into a
+    // colour filter, and a colour filter can travel as an image filter. So an
+    // image filter under a live alpha is counted, through a composited boundary
+    // and through `pushLayer` alike, and the subtree goes to the stock capture.
+    testWidgets('an image filter under a live alpha is counted as folded, on both routes', (
+      WidgetTester tester,
+    ) async {
+      final ui.ImageFilter filter = ui.ImageFilter.compose(
+        outer: const ColorFilter.mode(Color(0xFF00FFFF), BlendMode.srcOver),
+        inner: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+      );
+      final routes = <String, Widget>{
+        'a composited boundary': Opacity(
+          opacity: 0.5,
+          child: ImageFiltered(imageFilter: filter, child: _scene()),
+        ),
+        'pushLayer': _Pusher(
+          route: _Route.offset((Offset o) => OpacityLayer(alpha: 128, offset: o)),
+          child: _Pusher(
+            route: _Route.offset((Offset o) => ImageFilterLayer(imageFilter: filter, offset: o)),
+            child: _scene(),
+          ),
+        ),
+      };
+      for (final MapEntry<String, Widget> route in routes.entries) {
+        final _Shot shot = await _shoot(tester, route.value);
+        expect(shot.log.errors, isEmpty, reason: route.key);
+        expect(shot.log.opacityFoldedIntoFilter, 1, reason: '${route.key}: the fold went uncounted');
+        shot.dispose();
+      }
+      // The control: the same filter under no alpha folds nothing.
+      final _Shot alone = await _shoot(tester, ImageFiltered(imageFilter: filter, child: _scene()));
+      expect(alone.log.opacityFoldedIntoFilter, 0);
+      alone.dispose();
     });
 
     testWidgets('an opacity pushed without an old layer mints one, and only one, and leaves the tree', (
