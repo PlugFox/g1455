@@ -538,15 +538,29 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   /// The selected segment's label in a colour that reads on the capsule under
   /// it — black on the white one, white on a dark one — rather than in the
   /// ambient label colour, which on a dark page is the capsule's own white.
+  ///
+  /// The capsule fades as the drop lifts, and the ink goes back to the ambient
+  /// colour with it: held, the label is on the track like the others, and a
+  /// black one there is black on a dark track (#21). Only the lift moves it,
+  /// so a slide, where the lift stands still, repaints no label.
   Widget _onThumb(Widget label) {
     final Color thumb = widget.thumbColor;
     final Color ink = thumb.computeLuminance() > 0.4 ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
-    return DefaultTextStyle.merge(
-      style: TextStyle(color: ink),
-      child: IconTheme.merge(
-        data: IconThemeData(color: ink),
-        child: label,
-      ),
+    final Color? text = DefaultTextStyle.of(context).style.color;
+    final Color? icon = IconTheme.of(context).color;
+    return AnimatedBuilder(
+      animation: _lift,
+      child: label,
+      builder: (BuildContext context, Widget? label) {
+        final double t = _lift.value.clamp(0.0, 1.0);
+        return DefaultTextStyle.merge(
+          style: TextStyle(color: text == null ? ink : Color.lerp(ink, text, t)),
+          child: IconTheme.merge(
+            data: IconThemeData(color: icon == null ? ink : Color.lerp(ink, icon, t)),
+            child: label!,
+          ),
+        );
+      },
     );
   }
 
