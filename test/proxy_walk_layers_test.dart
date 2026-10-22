@@ -19,6 +19,12 @@
 //  3. **The live tree is left as found.** A layer the pass had to mint, a
 //     throwing `paint`, an offset written into a live layer: each is checked
 //     with `invariants.dart`, not assumed.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `_ShaderMask.end`, `..translate(maskRect.left, maskRect.top)` ->
+//    `..translate(0, 0)`: the mask is drawn in the layer's space rather than
+//    its own, and the arm with the `ShaderMask` off the origin differs by
+//    9000 px.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -54,6 +60,19 @@ void main() {
         ).createShader(r),
         blendMode: BlendMode.dstIn,
         child: c,
+      ),
+      // Off the origin, because the shader is built at `Offset.zero & size` and
+      // the engine draws it from the mask rect's corner: at the origin a mask
+      // drawn in the layer's space and one drawn in its own are the same.
+      'ShaderMask at an offset': (Widget c) => Padding(
+        padding: const EdgeInsets.only(left: 30, top: 20),
+        child: ShaderMask(
+          shaderCallback: (Rect r) => const LinearGradient(
+            colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+          ).createShader(r),
+          blendMode: BlendMode.dstIn,
+          child: c,
+        ),
       ),
       'SliverOpacity': (Widget c) => CustomScrollView(
         slivers: <Widget>[
@@ -262,7 +281,7 @@ void main() {
         (Offset o) => ShaderMaskLayer(
           shader: const LinearGradient(
             colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
-          ).createShader(o & kArea),
+          ).createShader(Offset.zero & kArea),
           maskRect: o & kArea,
           blendMode: BlendMode.dstIn,
         ),

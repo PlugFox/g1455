@@ -861,15 +861,24 @@ class _ShaderMask extends _CanvasEffect {
   @override
   void begin(Canvas canvas) => canvas.saveLayer(null, ui.Paint());
 
+  /// The mask is drawn in its own rect's space, not the layer's: the engine
+  /// translates to `maskRect.topLeft` before it draws the shader
+  /// (`shader_mask_layer.cc`), and `RenderShaderMask` builds the shader at
+  /// `Offset.zero & size` for exactly that. Drawn at `maskRect` in place, a
+  /// mask anywhere but the origin reads its gradient shifted by its own
+  /// position.
   @override
   void end(Canvas canvas) {
     canvas
+      ..save()
+      ..translate(maskRect.left, maskRect.top)
       ..drawRect(
-        maskRect,
+        Offset.zero & maskRect.size,
         ui.Paint()
           ..shader = shader
           ..blendMode = blendMode,
       )
+      ..restore()
       ..restore();
   }
 }
