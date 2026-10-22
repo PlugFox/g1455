@@ -42,6 +42,14 @@ import 'package:g1455/src/proxy/proxy_retake.dart';
 const Size kScreen = Size(400, 600);
 final GlobalKey _shotKey = GlobalKey();
 
+/// The most a pixel of an identity glass may differ from the bare frame, in the
+/// arms whose slot is off the origin or off the device grid.
+///
+/// One code value, and only on Impeller, where a few pixels read one off (10 of
+/// 843750 at dpr 1.875, 16 of 240000 for the pair). Skia reads zero. The defect
+/// these arms guard against was 72 code values on the device.
+const int kBackendTolerance = 1;
+
 void main() {
   testWidgets('an identity glass is invisible, and a shifted sample is not', (
     WidgetTester tester,
@@ -83,7 +91,7 @@ void main() {
       final ui.Image bare = await _shot(tester, const _Scene(surface: false), dpr: dpr);
       final ui.Image glass = await _shot(tester, const _Scene(surface: true, second: true), dpr: dpr);
       final _Diff diff = await _compare(tester, bare, glass);
-      expect(diff.differing, 0, reason: 'identity visible at dpr $dpr: $diff');
+      expect(diff.maxDelta, lessThanOrEqualTo(kBackendTolerance), reason: 'identity visible at dpr $dpr: $diff');
     }
     tester.view.resetDevicePixelRatio();
   });
@@ -99,7 +107,11 @@ void main() {
     final ui.Image bare = await _shot(tester, const _Scene());
     final ui.Image both = await _shot(tester, const _Scene(surface: true, second: true));
     final _Diff diff = await _compare(tester, bare, both);
-    expect(diff.differing, 0, reason: 'a surface away from the atlas origin is visible: $diff');
+    expect(
+      diff.maxDelta,
+      lessThanOrEqualTo(kBackendTolerance),
+      reason: 'a surface away from the atlas origin is visible: $diff',
+    );
     // And the slots really are in different places, or the arm is the same one
     // as before wearing two panels.
     final List<RenderGlassSurface> surfaces = tester

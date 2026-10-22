@@ -28,6 +28,14 @@ const Rect kRegion = Rect.fromLTWH(20, 100, 360, 120);
 const Size kKnob = Size(120, 80);
 final GlobalKey _shotKey = GlobalKey();
 
+/// The most a pixel of a surface moved on the proxy it holds may differ from
+/// the bare frame.
+///
+/// One code value, and only on Impeller, where a handful of pixels of the moved
+/// draw read one off (3 of 240000, at one step). Skia reads zero. A draw that
+/// did not follow the surface is wrong over its whole box.
+const int kBackendTolerance = 1;
+
 void main() {
   testWidgets('a surface that moved samples where it now is, on the frame it moved', (
     WidgetTester tester,
@@ -86,7 +94,11 @@ void main() {
         // Only the declared arm is exact on the frame of the move; the other is
         // the lag the first arm locates.
         if (travel) {
-          expect(await _differing(tester, bare), 0, reason: 'step $step: the glass is visible');
+          expect(
+            await _differing(tester, bare, tolerance: kBackendTolerance),
+            0,
+            reason: 'step $step: the glass is visible',
+          );
         }
       }
       retakes[travel] = (host.recorded as int) - before;
@@ -477,15 +489,17 @@ Future<({int count, double minX})> _where(WidgetTester tester, Uint8List bare) a
   return (count: count, minX: minX);
 }
 
-/// Pixels of the current frame that differ from [bare], and asserts that a
-/// whole frame was compared.
-Future<int> _differing(WidgetTester tester, Uint8List bare) async {
+/// Pixels of the current frame that differ from [bare] by more than
+/// [tolerance] in some channel, and asserts that a whole frame was compared.
+Future<int> _differing(WidgetTester tester, Uint8List bare, {int tolerance = 0}) async {
   final Uint8List now = await _pixels(tester, _frame());
   expect(now.length, bare.length);
   expect(now.length, kScreen.width * kScreen.height * 4);
   var differing = 0;
   for (var i = 0; i < now.length; i += 4) {
-    if (now[i] != bare[i] || now[i + 1] != bare[i + 1] || now[i + 2] != bare[i + 2]) {
+    if ((now[i] - bare[i]).abs() > tolerance ||
+        (now[i + 1] - bare[i + 1]).abs() > tolerance ||
+        (now[i + 2] - bare[i + 2]).abs() > tolerance) {
       differing++;
     }
   }

@@ -60,6 +60,15 @@ const double kRadius = 20;
 const Size kPanel = Size(90, 90);
 const double kTop = 60;
 
+/// The most a pixel may move between grouped and ungrouped surfaces that do not
+/// touch.
+///
+/// One code value, and only on Impeller, where the fused draw and the plain
+/// ones cover the panels with different quads and 584 edge pixels read one
+/// off. Skia reads zero. The bridge this arm exists to catch is tens of code
+/// values.
+const int kBackendTolerance = 1;
+
 /// The floats the group shader's uniform block holds, counted by hand off the
 /// declaration order in `shaders/glass_group.frag` — packed into lanes since
 /// the bind count was priced, in the order the names below always had:
@@ -186,8 +195,8 @@ void main() {
     final _Diff diff = await _compare(tester, apart, grouped);
     print('two far surfaces, grouped vs not: $diff');
     expect(
-      diff.differing,
-      0,
+      diff.maxDelta,
+      lessThanOrEqualTo(kBackendTolerance),
       reason: 'the group invented a bridge, or moved the atlas under the samples — $diff',
     );
     apart.dispose();
