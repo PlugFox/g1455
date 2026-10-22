@@ -400,11 +400,20 @@ class _TabsState extends State<_Tabs> {
     child: SizedBox(
       width: 340,
       child: GlassTabBar(
-        items: const <GlassTabItem>[
-          GlassTabItem(icon: SFIcons.sf_house_fill, label: 'Home'),
-          GlassTabItem(icon: SFIcons.sf_safari, label: 'Explore'),
-          GlassTabItem(icon: SFIcons.sf_heart_fill, label: 'Saved'),
-          GlassTabItem(icon: SFIcons.sf_person_fill, label: 'Profile'),
+        items: <GlassTabItem>[
+          // Through `SiteIcon`, which fits a symbol wider than tall in its box:
+          // as an `Icon` the house runs into its label.
+          for (final (IconData icon, String label) in const <(IconData, String)>[
+            (SFIcons.sf_house_fill, 'Home'),
+            (SFIcons.sf_safari, 'Explore'),
+            (SFIcons.sf_heart_fill, 'Saved'),
+            (SFIcons.sf_person_fill, 'Profile'),
+          ])
+            GlassTabItem(
+              label: label,
+              iconBuilder: (BuildContext context, GlassTabItemLook look) =>
+                  SiteIcon(icon, size: look.iconSize, color: look.color),
+            ),
         ],
         selectedIndex: _selected,
         onSelected: (int i) => setState(() => _selected = i),

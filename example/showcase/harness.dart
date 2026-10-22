@@ -165,7 +165,8 @@ class ShowcaseTile extends StatelessWidget {
   }
 }
 
-/// Loads Roboto and the Material icons out of the SDK's own cache.
+/// Loads Roboto and the Material icons out of the SDK's own cache, and the SF
+/// Symbols the scenes draw out of the test's asset bundle.
 ///
 /// `flutter_tester` ships no fonts and draws every glyph as a filled box; a
 /// README of boxes is worse than none, so a missing directory throws.
@@ -183,6 +184,10 @@ Future<void> loadShowcaseFonts() async {
   }
   await roboto.load();
   await (FontLoader('MaterialIcons')..addFont(read('MaterialIcons-Regular.otf'))).load();
+  // The family `IconData(fontPackage: 'flutter_sficon')` asks for.
+  await (FontLoader(
+    'packages/flutter_sficon/sficons',
+  )..addFont(rootBundle.load('packages/flutter_sficon/lib/fonts/sficons.ttf'))).load();
 }
 
 Directory _materialFontsDir() {
