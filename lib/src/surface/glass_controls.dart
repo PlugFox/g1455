@@ -608,6 +608,10 @@ class _GlassSwitchState extends State<GlassSwitch> with TickerProviderStateMixin
         },
         child: RawGestureDetector(
           behavior: HitTestBehavior.opaque,
+          // Disabled, the recognizers' callbacks are null, but the semantics
+          // delegate still exports a tap and a scroll for them, which would
+          // offer a screen reader actions that do nothing.
+          excludeFromSemantics: !enabled,
           gestures: _controlGestures(
             owner: this,
             settings: MediaQuery.maybeGestureSettingsOf(context),
@@ -1028,6 +1032,10 @@ class _GlassSliderState extends State<GlassSlider> with TickerProviderStateMixin
         },
         child: RawGestureDetector(
           behavior: HitTestBehavior.opaque,
+          // Disabled, the recognizers' callbacks are null, but the semantics
+          // delegate still exports a tap and a scroll for them, which would
+          // offer a screen reader actions that do nothing.
+          excludeFromSemantics: !enabled,
           gestures: _controlGestures(
             owner: this,
             settings: MediaQuery.maybeGestureSettingsOf(context),

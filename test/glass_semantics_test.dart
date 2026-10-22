@@ -20,7 +20,9 @@
 //  - `String get barrierLabel => dismissLabel;` -> `=> 'Dismiss';`: the
 //    sheet arm finds no barrier by the caller's name;
 //  - the switch's `onTap: enabled ? () => _commit(!widget.value) : null` ->
-//    `_commit(widget.value)`: the switch tap arm's tap changes nothing.
+//    `_commit(widget.value)`: the switch tap arm's tap changes nothing;
+//  - `excludeFromSemantics: !enabled,` dropped from the switch's or the
+//    slider's `RawGestureDetector`: the disabled arm finds a tap and a scroll.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,8 +98,8 @@ void main() {
     // the control is disabled, with their callbacks null, and the framework's
     // semantics delegate exports a tap and a horizontal scroll for any
     // recognizer it finds: a disabled switch reads [scrollLeft, scrollRight,
-    // tap], each of which does nothing.
-    skip: true,
+    // tap], each of which does nothing. The outer `Semantics` names the real
+    // ones, so the recognizers are kept out of it.
     (WidgetTester tester) async {
       final SemanticsHandle semantics = tester.ensureSemantics();
       await tester.pumpWidget(
