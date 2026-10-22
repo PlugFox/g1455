@@ -567,6 +567,77 @@ void main() {
     expect(silent.held, 0);
   });
 
+  testWidgets('a host that has not painted records rather than hold what it cannot watch', (
+    WidgetTester tester,
+  ) async {
+    // Offstage, the host's boundary is laid out and never painted, so there is
+    // no layer for the watch to read a still screen off. The declaration lets
+    // a host hold a still screen, not one it cannot see: each frame there is
+    // recorded, as an undeclared host's would be. On the screen it watches
+    // again, and a still screen is held.
+    final key = GlobalKey();
+    // Around the host, not inside it: what is offstage is the host's own
+    // boundary.
+    Widget scene({required bool offstage}) => MediaQuery(
+      data: const MediaQueryData(size: kScreen, devicePixelRatio: 1),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Offstage(
+          offstage: offstage,
+          child: GlassHost(
+            key: key,
+            content: GlassContentDeclaration.declared,
+            hardware: GlassHardware.appleMetal,
+            finish: GlassFinish.identity,
+            child: const _Scene(surface: true),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(scene(offstage: true));
+    await tester.pump();
+    final host = key.currentState! as dynamic;
+    final int before = host.recorded as int;
+    for (var i = 0; i < 4; i++) {
+      tester.binding.scheduleFrame();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(host.recorded, before + 4, reason: 'a host with nothing painted held a capture it could not watch');
+    expect(host.held, 0);
+
+    await tester.pumpWidget(scene(offstage: false));
+    await tester.pump();
+    await tester.pump();
+    final int shown = host.recorded as int;
+    expect(shown, greaterThan(1), reason: 'the screen shown was never captured');
+    final RenderGlassSurface surface = tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface));
+    expect(surface.paintsWithProxy, greaterThan(0), reason: 'the glass shown never drew from a capture');
+    for (var i = 0; i < 4; i++) {
+      surface.markNeedsPaint();
+      tester.binding.scheduleFrame();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(host.recorded, shown, reason: 'a still screen on show was re-recorded under a declaration');
+  });
+
+  testWidgets('the handle carries the hardware the host declares, and a new declaration replaces it', (
+    WidgetTester tester,
+  ) async {
+    Widget scene(GlassHardware hardware) => MediaQuery(
+      data: const MediaQueryData(size: kScreen),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: GlassHost(hardware: hardware, child: const _Scene(surface: true)),
+      ),
+    );
+    await tester.pumpWidget(scene(GlassHardware.appleMetal));
+    final GlassProxyHandle handle = tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+    expect(handle.hardware, GlassHardware.appleMetal);
+    final GlassHardware other = GlassHardware.values.firstWhere((GlassHardware h) => h != GlassHardware.appleMetal);
+    await tester.pumpWidget(scene(other));
+    expect(handle.hardware, other, reason: 'what a group below reads is the old declaration');
+  });
+
   testWidgets('a scroll under the glass is seen without the application declaring it', (
     WidgetTester tester,
   ) async {
