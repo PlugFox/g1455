@@ -85,9 +85,8 @@ class ShadowFilter {
   ///
   /// A picture's content is not reachable from Dart, so a shadow recorded
   /// into a cached `Picture` is drawn into the capture whatever the switches
-  /// say. Not
-  /// part of [dropped]: the count is of draws the filter could not look into,
-  /// not of draws it took out.
+  /// say. Not part of [dropped]: the count is of draws the filter could not
+  /// look into, not of draws it took out.
   int picturesForwarded = 0;
 
   /// `drawParagraph` calls forwarded whole so far.
