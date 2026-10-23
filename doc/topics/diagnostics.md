@@ -4,6 +4,10 @@ An application has no reason to import it.
 - The host's published proxy and its counters, [GlassProxyHandle](../glass_diagnostics/GlassProxyHandle-class.html) through
   [GlassProxyScope](../glass_diagnostics/GlassProxyScope-class.html): `snapshots` counts the captures, `readBacks` the backdrop
   readings, `throttled` the holds thermal pressure bought.
+- What the capture walk observed on the last frame, [WalkLog](../glass_diagnostics/WalkLog-class.html), as
+  `handle.frame?.log`: layers it could not reproduce (`unhandledLayers`), filters under a fade it flattened
+  (`opacityFoldedIntoFilter`), markers it reached. Diagnostics only: nothing falls back to the stock capture on what
+  it counts.
 - The switches the measured arms were priced with: the tile split of a group's
   draw ([debugGlassFusedSplit](../glass_diagnostics/debugGlassFusedSplit.html)) and the shader's anti-alias flag
   ([debugGlassShaderAntiAlias](../glass_diagnostics/debugGlassShaderAntiAlias.html)).
