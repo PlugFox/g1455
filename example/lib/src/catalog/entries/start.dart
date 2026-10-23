@@ -576,11 +576,6 @@ The bar is the cards' sibling, and sibling glass does not see sibling glass. Wra
 Levels are a declaration, not paint order: glass beside a lifted subtree is drawn into its capture even when it is
 painted on top of it. Lift the bar with the edge; `GlassScrollEdge.child` does that for you.
 
-### A surface that replaces another at the same place draws nothing
-
-A known issue, not yet fixed: when a host replaces one surface with another at exactly the same rect, it keeps the old
-capture, and the new surface draws nothing until something else under the glass changes.
-
 ### A tab bar with minimizeBehavior: onScrollDown never collapses
 
 A scroll notification travels only up the tree, and the bar is the scroll view's sibling, not its child, so it hears

@@ -373,7 +373,7 @@ without), because it is the field's resize that costs, not Cancel's paint. Under
 ## Layout
 
 - The field is [kGlassFieldHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassFieldHeight-constant.html)
-  (44) tall, and Cancel's tap target is at least 44 tall too.
+  (44) tall at the default text size and grows with a larger one; Cancel's tap target is at least 44 tall too.
 - The bar stretches to the width it is given, so the width must be bounded: an `Expanded` in a `Row`, a `Positioned`
   with a `left` and a `right`.
 

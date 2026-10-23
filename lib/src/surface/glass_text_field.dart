@@ -27,7 +27,9 @@ import 'glass_finish.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
-/// The field's height (iOS 26.5's standalone search field, 44 pt).
+/// The field's height at the default text size, and its minimum (iOS 26.5's
+/// standalone search field, 44 pt): a larger text size grows it with its
+/// line, keeping 11 above and below.
 ///
 /// {@category Panels and controls}
 const double kGlassFieldHeight = 44;

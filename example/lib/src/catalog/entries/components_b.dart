@@ -60,8 +60,8 @@ GlassTextField(
 
 - The field **stretches to the width it is given**, so the width has to be bounded. In a `Row`, wrap it in `Expanded`;
   in a `Stack`, give the `Positioned` a `left` and a `right`.
-- Its height is fixed at [kGlassFieldHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassFieldHeight-constant.html)
-  (44), which is also the minimum tap target. A tap anywhere on the capsule focuses the field.
+- Its height is at least [kGlassFieldHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassFieldHeight-constant.html)
+  (44), which is also the minimum tap target, and grows with a larger text size, keeping 11 above and below the line. A tap anywhere on the capsule focuses the field.
 
 ## Behaviour
 
@@ -161,7 +161,7 @@ class _CitySearchState extends State<CitySearch> {
 
 | Name | Value | Description |
 |---|---|---|
-| `kGlassFieldHeight` | `44` | The field's height. |
+| `kGlassFieldHeight` | `44` | The field's height at the default text size, and its minimum. |
 ''',
   ),
 

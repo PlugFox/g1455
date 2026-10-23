@@ -5,7 +5,7 @@ it is turned off: anything that adds a capture, a read-back, a shader pass or
 a ticker is a declaration on `GlassHost`, `GlassTheme` or the widget, and the
 cheap setting is reachable without a fork.
 
-## Done — branch `improvements`
+## Done — 0.1.2
 
 ### The package page
 
@@ -132,6 +132,14 @@ cheap setting is reachable without a fork.
 - [ ] A search bar switched from light glass to dark keeps a trace of the
       light finish (#34).
 - [ ] The scroll edge's hard band in the dark appearance (#36).
+- [ ] `GlassBadge`'s red in the dark appearance: it is still the light
+      appearance's `systemRed`, where alerts and menus now follow the glass.
+- [ ] The Impeller blur is softer than the Skia one the finishes were
+      calibrated on, and a tiled group may show seams on Impeller; CI has no
+      Impeller run to hold either (#33).
+- [ ] `ShadowFilter` and `WalkLog` are not exported, so `GlassHost.shadowFilter`
+      takes a type only a `src/` import reaches, and the counters they keep
+      cannot be read by an app.
 
 ## Next — what 0.2.0 left open
 
@@ -159,7 +167,7 @@ cheap setting is reachable without a fork.
 - [ ] Adaptive glass over a declared backdrop: the texture is in hand, so the
       mean level is a read-back once per texture, not per capture.
 
-## Next — what the branch left open
+## Next — what 0.1.2 left open
 
 - [ ] Adaptivity for the rest: a raw `GlassSurface`, `GlassScrollEdge` (still
       keys its tint off the declared `backdrop`) and the segmented control.

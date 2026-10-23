@@ -845,9 +845,6 @@ cyan outline. The same list, at more length:
 - **An unlifted bar shows up blurred inside a scroll edge.** Levels are a
   declaration, not paint order. Lift the bar with the edge, which
   `GlassScrollEdge.child` does.
-- **A surface that replaces another at the same place draws nothing.** A known
-  issue: a host replacing one surface with another at exactly the same rect
-  keeps the old capture until something else under the glass changes.
 - **The glass does not refract what scrolls under it.** A `GlassBackdrop`
   above it declares the backdrop, and the glass shows the declaration only.
   Wrap the part with live content in `GlassBackdrop.live`.
