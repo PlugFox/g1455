@@ -13,8 +13,9 @@
 // asked, measured with the MTF instrument of `test/proxy_blur_test.dart` on
 // that iPad, Impeller/Metal, and on `flutter_tester --enable-impeller`, which
 // agrees with the device to 0.02 on average and 0.11 at worst. The kernel is
-// computed on the CPU, the same on every Impeller backend. Skia is left as it
-// is: the calibration is its.
+// computed on the CPU, the same on every Impeller backend, and measured so: a
+// Galaxy S22 Ultra on Vulkan and on GLES reads the same to the last digit,
+// and 0.02 from the iPad. Skia is left as it is: the calibration is its.
 //
 // The renderer is told apart by `ImageFilter.isShaderFilterSupported`, true
 // on Impeller and false on Skia and on the web.
