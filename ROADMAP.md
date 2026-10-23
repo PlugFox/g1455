@@ -110,7 +110,8 @@ cheap setting is reachable without a fork.
       phone's (#16).
 - [x] Fills, reds and the grabber's grey in the appearance of the glass
       they lie on (#15), and a held segment's label in the page's (#21).
-- [x] Every control's default colours per appearance, nullable (#28).
+- [x] Every control's default colours per appearance, nullable (#28), and
+      a badge's red.
 - [x] Large text: the tab bar and the segmented control stop at the default
       size, as UIKit's do; the field grows (#20).
 - [x] Right to left: the tab bar's touches, capsule and drop (#19), menu
@@ -132,8 +133,6 @@ cheap setting is reachable without a fork.
 - [ ] A search bar switched from light glass to dark keeps a trace of the
       light finish (#34).
 - [ ] The scroll edge's hard band in the dark appearance (#36).
-- [ ] `GlassBadge`'s red in the dark appearance: it is still the light
-      appearance's `systemRed`, where alerts and menus now follow the glass.
 - [ ] The Impeller blur is softer than the Skia one the finishes were
       calibrated on, and a tiled group may show seams on Impeller; CI has no
       Impeller run to hold either (#33).

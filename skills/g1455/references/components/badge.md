@@ -54,8 +54,9 @@ GlassToolbarItem(
 ## Colour
 
 [kGlassBadgeRed](https://pub.dev/documentation/g1455/latest/g1455/kGlassBadgeRed-constant.html) is UIKit's documented
-`systemRed` in the light appearance, (255, 59, 48). The dark appearance's is (255, 69, 58); the package has no
-appearance of its own, so pass that as `color` where your app is dark. The height,
+`systemRed` in the light appearance, (255, 59, 48). By default the badge takes `systemRed` of the appearance it sits
+in, as the alert's and the menu's red do: on dark glass, or on a page whose label is light, the dark appearance's
+(255, 69, 58). A `color` passed is drawn as given. The height,
 [kGlassBadgeHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassBadgeHeight-constant.html) (18), the dot and
 the type size are layout, not readings.
 
@@ -121,7 +122,7 @@ class MailTabs extends StatelessWidget {
 | `label` | `String?` | `null` | A short text instead of a number. Not with `count`. |
 | `maxCount` | `int` | `99` | The largest number shown as it is. Above 0. |
 | `isVisible` | `bool` | `true` | Whether the badge is drawn. The child always is. |
-| `color` | `Color` | `kGlassBadgeRed` | The capsule's fill. |
+| `color` | `Color?` | `null` | The capsule's fill. Null is `systemRed` of the appearance around it. |
 | `textColor` | `Color` | `Color(0xFFFFFFFF)` | The count's or label's colour. |
 | `offset` | `Offset` | `Offset.zero` | Moves the badge from the child's top trailing corner. |
 | `semanticLabel` | `String?` | `null` | What a screen reader says. Null says the count or label; a dot then says nothing. |

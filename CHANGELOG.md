@@ -10,7 +10,8 @@ a change.
   `GlassSlider.activeColor` and `trackColor`,
   `GlassSegmentedControl.trackColor` and `thumbColor`,
   `GlassTabBar.activeColor`, `GlassTextField.cursorColor` (and
-  `GlassTextField.search`) and `GlassSearchBar.cancelColor`. A colour you
+  `GlassTextField.search`), `GlassSearchBar.cancelColor` and
+  `GlassBadge.color`. A colour you
   pass is drawn as before; reading one back needs a fallback (`??`).
 - `GlassBar.padding`, `GlassCard.padding`, `GlassButton.padding` and
   `GlassScaffold.barMargin` are `EdgeInsetsGeometry`, resolved with the
@@ -35,7 +36,8 @@ a change.
     selected tab, a field's caret and selection, and Cancel;
   - the tab bar's resting capsule and an alert's action capsules
     (`systemFill`);
-  - the destructive red in alerts and menus (`systemRed`);
+  - the destructive red in alerts and menus, and a badge's red
+    (`systemRed`);
   - a sheet's grabber (`tertiaryLabel` of the sheet's appearance; it was
     1.18 : 1 against a dark sheet).
   The slider's default blue in the light appearance is the light

@@ -17,6 +17,8 @@
 //  - in `_GlassMenuAnchorState._content`, `glassSystemRed(DefaultTextStyle.of(
 //    context).style.color!)` -> `glassSystemRed(const Color(0xFF000000))`: the
 //    menu arm fails on dark glass;
+//  - in `GlassBadge._capsule`, `glassSystemRed(glassAmbientLabel(context))` ->
+//    `kGlassBadgeRed`: the badge arm fails on dark glass;
 //  - in `_GlassSheet.build`, the grabber's `extent <= 0 ? route.finish :
 //    GlassFinish.lerp(base, large, extent)` -> `route.finish`: the large arm
 //    finds the light grey on the sheet's opaque light glass;
@@ -136,6 +138,43 @@ void main() {
       await tester.tap(find.text('open menu'));
       await tester.pumpAndSettle();
       expect(_ink(tester, 'Delete'), red, reason: 'on ${finish.name}');
+    }
+  });
+
+  testWidgets('a badge on a tab is systemRed of the bar\'s appearance, and a colour passed is kept', (
+    WidgetTester tester,
+  ) async {
+    for (final (GlassFinish finish, Color _, Color red) in kAppearances) {
+      Widget bar({Color? color}) => _App(
+        finish: finish,
+        home: Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            width: 360,
+            child: GlassTabBar(
+              items: <GlassTabItem>[
+                GlassTabItem(
+                  label: 'Mail',
+                  iconBuilder: (BuildContext context, GlassTabItemLook look) => GlassBadge(
+                    count: 3,
+                    color: color,
+                    child: Icon(Icons.mail, color: look.color, size: look.iconSize),
+                  ),
+                ),
+                const GlassTabItem(label: 'B', icon: Icons.circle),
+              ],
+              selectedIndex: 1,
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(bar());
+      await tester.pumpAndSettle();
+      expect(_stadiums(tester, within: find.byType(GlassBadge)), <Color>[red], reason: 'on ${finish.name}');
+      await tester.pumpWidget(bar(color: const Color(0xFF00FF00)));
+      await tester.pumpAndSettle();
+      expect(_stadiums(tester, within: find.byType(GlassBadge)), <Color>[const Color(0xFF00FF00)]);
     }
   });
 
