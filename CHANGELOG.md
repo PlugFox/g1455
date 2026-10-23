@@ -61,6 +61,8 @@ a change.
   track.
 - A disabled `GlassSwitch` or `GlassSlider` exposes no tap or scroll action
   to a screen reader.
+- The dim behind a sheet fades as the sheet is dragged down to close, and
+  comes back if it is let go short of closing.
 
 ### Fixed
 

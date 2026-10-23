@@ -134,6 +134,10 @@ cheap setting is reachable without a fork.
 - [ ] A search bar switched from light glass to dark keeps a trace of the
       light finish (#34).
 - [ ] The scroll edge's hard band in the dark appearance (#36).
+- [ ] A sheet dragged down to close is retaken on every frame (13 of 13 in a
+      test), where a drag between detents is one retake: the layer watch
+      reads the drop as a change under the sheet. 0.2.0 claimed one retake
+      for this drag too.
 - [ ] The Impeller blur is softer than the Skia one the finishes were
       calibrated on, and a tiled group may show seams on Impeller; CI has no
       Impeller run to hold either (#33).
@@ -146,8 +150,6 @@ cheap setting is reachable without a fork.
       shape would not agree. Measure it on Adreno before deciding.
 - [ ] A bare `setState` on a `GlassTabBar` costs one capture even when nothing
       it draws changed. Measured, not traced.
-- [ ] The dim behind a sheet does not fade while the sheet is dragged down to
-      close.
 - [ ] No trailing action circle beside the tab bar, such as the search tab
       iOS 26 sets apart from the others.
 - [ ] Content that scrolls inside a sheet does not hand the drag over to the

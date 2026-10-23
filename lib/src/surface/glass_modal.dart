@@ -608,6 +608,19 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   @override
   Color get barrierColor => kGlassModalDim;
 
+  // The dim follows the sheet down a drag to close, as iOS's does: gone when
+  // the sheet would be its whole height below its lowest detent. At rest the
+  // opacity is 1 and pushes no layer. The dim is under the sheet, in what its
+  // glass captures, but a drag down retakes on every frame without the fade
+  // (13 of 13 in the package's tests), so it adds none.
+  @override
+  Widget buildModalBarrier() => ValueListenableBuilder<double>(
+    valueListenable: _drop,
+    child: super.buildModalBarrier(),
+    builder: (BuildContext context, double drop, Widget? barrier) =>
+        Opacity(opacity: (1 - drop / _sheetHeight).clamp(0.0, 1.0), child: barrier),
+  );
+
   @override
   bool get barrierDismissible => dismissible;
 

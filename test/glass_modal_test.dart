@@ -38,7 +38,9 @@
 //    new-width arm's panel closes into the anchor's old size, or its content
 //    leaves the corner the panel shrinks into;
 //  - in `_raise`, drop `_pull.value = math.max(0, …);`: the
-//    not-dismissible arm's sheet stays pulled when the finger comes back up.
+//    not-dismissible arm's sheet stays pulled when the finger comes back up;
+//  - in `_GlassSheetRoute.buildModalBarrier`, `1 - drop / _sheetHeight` ->
+//    `1`: the dim arm finds the dim whole under a dragged sheet.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -104,6 +106,34 @@ void main() {
     await tester.drag(find.text('sheet body'), const Offset(0, 300));
     await tester.pumpAndSettle();
     expect(find.text('sheet body'), findsNothing);
+  });
+
+  testWidgets('the dim behind a sheet fades as the sheet is dragged down, and comes back with it', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_App(home: const _Page()));
+    await tester.tap(find.text('open sheet'));
+    await tester.pumpAndSettle();
+    expect(_dim(tester), 1, reason: 'a resting sheet\'s dim is whole');
+    final double height = _surfaceAbove(tester, find.text('sheet body')).size.height;
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+    // Past the slop, then a quarter of the sheet's height more.
+    await gesture.moveBy(const Offset(0, 40));
+    await tester.pump();
+    final double before = _surfaceAbove(tester, find.text('sheet body')).globalRect.top;
+    await gesture.moveBy(Offset(0, height / 4));
+    await tester.pump();
+    final double dropped = _surfaceAbove(tester, find.text('sheet body')).globalRect.top - before;
+    expect(dropped, closeTo(height / 4, 1), reason: 'the sheet did not follow the finger');
+    final double faded = _dim(tester);
+    expect(faded, lessThan(1), reason: 'the dim stayed whole under a dragged sheet');
+    expect(faded, greaterThan(0));
+    // Back up: the sheet stays, and so does its dim.
+    await gesture.moveBy(Offset(0, -height / 4 - 40));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('sheet body'), findsOneWidget);
+    expect(_dim(tester), 1, reason: 'the dim did not come back with the sheet');
   });
 
   testWidgets('a sheet that is not barrier-dismissible stays on a tap, Escape, a drag and a flick', (
@@ -554,6 +584,13 @@ void main() {
 }
 
 GlassProxyHandle _handle(WidgetTester tester) => tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+
+/// How much of the dim behind the open modal is drawn: the opacity over its
+/// barrier, 1 with none.
+double _dim(WidgetTester tester) {
+  final Finder fade = find.ancestor(of: find.byType(ModalBarrier).last, matching: find.byType(Opacity));
+  return fade.evaluate().isEmpty ? 1 : tester.widget<Opacity>(fade.first).opacity;
+}
 
 RenderGlassSurface _surfaceAbove(WidgetTester tester, Finder finder) =>
     tester.renderObject<RenderGlassSurface>(find.ancestor(of: finder, matching: find.byType(GlassSurface)).first);
