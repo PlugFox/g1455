@@ -28,6 +28,14 @@ a change.
   Unlike naming a finish, it keeps adaptive glass and the declared backdrop
   in play. A `GlassScaffold` that mounts its own host takes the defaults,
   so declare it on a host of your own.
+- `ShadowFilter` is exported from `package:g1455/g1455.dart`, so
+  `GlassHost.shadowFilter` can be given one without a `src/` import. Its
+  counters (`dropped`, `picturesForwarded`, `paragraphsForwarded`) say what
+  it left out of the capture and what it could not look into.
+- `WalkLog` is exported from `package:g1455/glass_diagnostics.dart`: what
+  the capture walk observed on a frame, read as `GlassProxyHandle.frame?.log`.
+  Diagnostics only; nothing falls back to the stock capture on what it
+  counts.
 
 ### Changed
 

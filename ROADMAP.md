@@ -122,7 +122,8 @@ cheap setting is reachable without a fork.
 - [x] The capture walk: a shader mask off the origin, a composited image
       filter at an offset, filters under a fade, and the shadow filter's
       sharp draws (#17, #18), what it forwards unseen counted (#30), and the
-      Skia resampling difference named (#31).
+      Skia resampling difference named (#31); `ShadowFilter` and `WalkLog`
+      exported, so an app can give the one and read the other.
 
 ## Next — what 0.4.0 left open
 
@@ -136,9 +137,6 @@ cheap setting is reachable without a fork.
 - [ ] The Impeller blur is softer than the Skia one the finishes were
       calibrated on, and a tiled group may show seams on Impeller; CI has no
       Impeller run to hold either (#33).
-- [ ] `ShadowFilter` and `WalkLog` are not exported, so `GlassHost.shadowFilter`
-      takes a type only a `src/` import reaches, and the counters they keep
-      cannot be read by an app.
 
 ## Next — what 0.2.0 left open
 

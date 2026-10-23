@@ -41,6 +41,12 @@ import 'package:flutter/rendering.dart';
 /// Two switches rather than one, because they catch different things and it
 /// matters which fired: `drawShadow` is the physical-model route (`Material`
 /// elevation), a blur `MaskFilter` is the `BoxShadow` route.
+///
+/// Given to `GlassHost.shadowFilter`, which leaves shadows out of the
+/// capture. The counters run over the filter's life, for an application that
+/// keeps the instance and reads them; the package reports none.
+///
+/// {@category Capture control}
 class ShadowFilter {
   /// A filter with both switches on by default.
   ShadowFilter({this.dropShadowCalls = true, this.dropMaskFiltered = true});

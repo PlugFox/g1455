@@ -57,6 +57,8 @@ export 'src/surface/glass_adaptive.dart' show GlassBackdropReadings, GlassBackdr
 // and the shader loader a test replaces to see a load fail.
 export 'src/surface/glass_host.dart'
     show GlassProxyHandle, GlassProxyScope, debugGlassShaderLoader, kGlassRippleShaderAsset, kGlassShaderAsset;
+// What the capture walk observed on a frame, read off the handle's frame.
+export 'src/proxy/proxy_walk.dart' show WalkLog;
 // The ripple's model, which a test drives without a frame.
 export 'src/surface/glass_ripple.dart' show GlassRippleField, GlassRippleWave;
 // The anti-alias flag of the surface's draw, off by default.

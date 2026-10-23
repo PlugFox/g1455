@@ -52,7 +52,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/src/proxy/occlusion.dart';
 import 'package:g1455/src/proxy/proxy_walk.dart';
-import 'package:g1455/src/proxy/shadow_filter.dart';
 
 import 'invariants.dart';
 

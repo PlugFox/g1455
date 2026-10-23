@@ -68,6 +68,14 @@ WalkAction paintEverything(RenderObject child) => WalkAction.paint;
 
 /// Everything one pass observed. A fresh instance per pass on purpose: two
 /// passes over the same tree are two measurements, not one accumulated.
+///
+/// Read off the host's published frame, `GlassProxyHandle.frame?.log`, for
+/// a report or a test. Diagnostics only: nothing in the package reads it to
+/// change what is captured, so a layer counted in [unhandledLayers] or a
+/// filter counted in [opacityFoldedIntoFilter] is drawn as the pass drew it,
+/// with no fallback to the stock capture.
+///
+/// {@category Diagnostics}
 class WalkLog {
   /// Render objects the pass reached.
   int visited = 0;
