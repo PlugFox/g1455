@@ -1007,6 +1007,66 @@ void main() {
           'rather than a cheaper one',
     );
   });
+  // A `ShaderMask` writes its rect and a fresh shader into its own layer from
+  // `paint`, and the pass runs that `paint` at its own offset. Left written,
+  // the layer watch, which reads the shader by identity, saw a change after
+  // every capture, so a mask in a row under a bar was captured on every frame
+  // of an idle screen: 40 snapshots over 20 frames, where there is nothing to
+  // take.
+  testWidgets('a shader mask under the glass does not keep an idle screen capturing', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(400, 300)),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassHost(
+            hardware: GlassHardware.appleMetal,
+            child: Stack(
+              children: <Widget>[
+                const Positioned.fill(child: ColoredBox(color: Color(0xFF406080))),
+                Positioned(
+                  left: 30,
+                  top: 90,
+                  width: 300,
+                  height: 80,
+                  child: RepaintBoundary(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 20),
+                      child: ShaderMask(
+                        shaderCallback: (Rect r) => const LinearGradient(
+                          colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+                        ).createShader(r),
+                        child: const ColoredBox(color: Color(0xFFE02020)),
+                      ),
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 20,
+                  top: 100,
+                  width: 360,
+                  height: 60,
+                  child: GlassBar(child: SizedBox.expand()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+    final GlassProxyHandle handle = tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+    expect(handle.snapshots, greaterThan(0), reason: 'the glass was never captured, so holding says nothing');
+    final int before = handle.snapshots;
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(handle.snapshots - before, 0, reason: 'an idle screen was captured again');
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -315,7 +315,7 @@ class ProxyWalkContext extends PaintingContext {
       _opacityDepth++;
     }
     final bool verbatim = marker != null && marker.role == GlassProxyRole.verbatim;
-    final _LiveOffsets? live = _LiveOffsets.of(child);
+    final _LiveLayer? live = _LiveLayer.of(child);
     composited?.begin(canvas);
     // After `begin` and before `end`, so the effect's own save/restore pair is
     // issued through the same canvas at both ends.
@@ -744,47 +744,70 @@ class ProxyWalkContext extends PaintingContext {
 // child in it without knowing what it is.
 // ---------------------------------------------------------------------------
 
-/// Where a live layer was before the walk painted the render object that owns
+/// What a live layer held before the walk painted the render object that owns
 /// it, put back afterwards.
 ///
-/// A render object that keeps its own layer writes its position into it from
-/// `paint` and then pushes it: `RenderLeaderLayer` sets `layer.offset`,
-/// `RenderFollowerLayer` the follower's offsets. That layer is the one on
+/// A render object that keeps its own layer writes into it from `paint` and
+/// then pushes it: `RenderLeaderLayer` sets `layer.offset`,
+/// `RenderFollowerLayer` the follower's offsets, `RenderShaderMask` the mask's
+/// `maskRect` (`offset & size`) and a fresh `shader`, `RenderBackdropFilter`
+/// a `filter` resolved against `offset & size`. That layer is the one on
 /// screen, and the walk calls `paint` with the root's offset rather than the
 /// one the layer's parent composites it at — so the write moves the live
 /// layer. Unrestored, a `SelectionArea` in a bar (its
 /// `CompositedTransformTarget`) shifts the bar's title whenever a level above
-/// the bar is captured, and leaves it there until the bar repaints.
-final class _LiveOffsets {
-  _LiveOffsets._(this._layer, this._offset, this._linked);
+/// the bar is captured, and leaves it there until the bar repaints; a
+/// `ShaderMask` in a list row draws its mask at the root's offset; and the
+/// layer watch, which reads a mask's shader by identity, sees a change after
+/// every capture.
+final class _LiveLayer {
+  const _LiveLayer._(this.restore);
 
-  static _LiveOffsets? of(RenderObject owner) {
+  static _LiveLayer? of(RenderObject owner) {
     // ignore: invalid_use_of_protected_member
     final ContainerLayer? layer = owner.layer;
-    return switch (layer) {
-      OffsetLayer() => _LiveOffsets._(layer, layer.offset, null),
-      LeaderLayer() => _LiveOffsets._(layer, layer.offset, null),
-      FollowerLayer() => _LiveOffsets._(layer, layer.unlinkedOffset, layer.linkedOffset),
-      _ => null,
-    };
-  }
-
-  final ContainerLayer _layer;
-  final Offset? _offset;
-  final Offset? _linked;
-
-  void restore() {
-    switch (_layer) {
-      case final OffsetLayer layer:
-        layer.offset = _offset!;
-      case final LeaderLayer layer:
-        layer.offset = _offset!;
-      case final FollowerLayer layer:
-        layer
-          ..unlinkedOffset = _offset
-          ..linkedOffset = _linked;
+    switch (layer) {
+      case OffsetLayer():
+        final Offset offset = layer.offset;
+        return _LiveLayer._(() => layer.offset = offset);
+      case LeaderLayer():
+        final Offset offset = layer.offset;
+        return _LiveLayer._(() => layer.offset = offset);
+      case FollowerLayer():
+        final Offset? unlinked = layer.unlinkedOffset;
+        final Offset? linked = layer.linkedOffset;
+        return _LiveLayer._(
+          () => layer
+            ..unlinkedOffset = unlinked
+            ..linkedOffset = linked,
+        );
+      case ShaderMaskLayer():
+        final Shader? shader = layer.shader;
+        final Rect? maskRect = layer.maskRect;
+        final BlendMode? blendMode = layer.blendMode;
+        return _LiveLayer._(
+          () => layer
+            ..shader = shader
+            ..maskRect = maskRect
+            ..blendMode = blendMode,
+        );
+      case BackdropFilterLayer():
+        final ui.ImageFilter? filter = layer.filter;
+        final BlendMode blendMode = layer.blendMode;
+        final BackdropKey? backdropKey = layer.backdropKey;
+        return _LiveLayer._(
+          () => layer
+            ..filter = filter
+            ..blendMode = blendMode
+            ..backdropKey = backdropKey,
+        );
+      default:
+        return null;
     }
   }
+
+  /// Puts back what [of] read.
+  final void Function() restore;
 }
 
 abstract class _CanvasEffect {

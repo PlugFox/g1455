@@ -99,6 +99,10 @@ a change.
   rebuild.
 - An open `GlassMenuAnchor` or `GlassPopoverAnchor` follows its anchor when
   the anchor moves by layout alone, such as a list scrolled under it.
+- A `ShaderMask` or `BackdropFilter` under glass, inside a repaint boundary
+  away from the origin (a list row, say), is left as it was by the capture.
+  The capture used to move the mask on screen until the row repainted, and
+  to keep an idle screen capturing on every frame.
 - The capture of glass on glass matches the engine in more cases:
   - an opacity at full alpha opens no layer, so a child that clears or
     blends reaches the page;

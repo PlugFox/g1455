@@ -486,6 +486,76 @@ void main() {
     expect(diff.differing, 0, reason: 'the live frame changed under the pass: $diff');
   });
 
+  // The same write, into the effect rather than the offset: `RenderShaderMask`
+  // sets its layer's `maskRect` to `offset & size` and a fresh `shader` from
+  // `paint`, and `RenderBackdropFilter` its `filter`, resolved against
+  // `offset & size`. Left as the pass wrote them, the next frame draws the mask
+  // at the root's offset and the layer watch, which reads the shader by
+  // identity, sees a change after every capture.
+  testWidgets('a pass leaves a shader mask and a backdrop filter as their own paint set them', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _mount(
+        _page(
+          Stack(
+            children: <Widget>[
+              Positioned(
+                left: 60,
+                top: 12,
+                width: 100,
+                height: 40,
+                child: RepaintBoundary(
+                  child: Row(
+                    children: <Widget>[
+                      const SizedBox(width: 14),
+                      ShaderMask(
+                        shaderCallback: (Rect r) => const LinearGradient(
+                          colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+                        ).createShader(r),
+                        child: const SizedBox(width: 40, height: 40, child: ColoredBox(color: kBox)),
+                      ),
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: BackdropFilter(
+                          filterConfig: ImageFilterConfig.blur(sigmaX: 3, sigmaY: 3, bounded: true),
+                          child: const ColoredBox(color: Color(0x40FFFFFF)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final RenderRepaintBoundary root = _boundaryOf();
+    final mask = tester.renderObject(find.byType(ShaderMask)).debugLayer! as ShaderMaskLayer;
+    final backdrop = tester.renderObject(find.byType(BackdropFilter)).debugLayer! as BackdropFilterLayer;
+    final Shader? shader = mask.shader;
+    final Rect? maskRect = mask.maskRect;
+    final ui.ImageFilter? filter = backdrop.filter;
+    // In its boundary's layer, so not where the pass reaches it.
+    expect(maskRect, const Rect.fromLTWH(14, 0, 40, 40));
+
+    final ui.Image before = root.toImageSync();
+    final _Pass pass = _passOver(root);
+    expect(pass.log.errors, isEmpty);
+    expect(mask.maskRect, maskRect, reason: 'the pass moved the live mask');
+    expect(identical(mask.shader, shader), isTrue, reason: 'the pass swapped the live shader');
+    expect(backdrop.filter, filter, reason: 'the pass re-resolved the live filter at its own offset');
+    pass.dispose();
+
+    final ui.Image after = root.toImageSync();
+    final _Diff diff = await _compare(tester, before, after);
+    before.dispose();
+    after.dispose();
+    expect(diff.differing, 0, reason: 'the live frame changed under the pass: $diff');
+  });
+
   // The stock capture leaves a hole where a platform view is, so the base
   // level is recorded with one; a pass that stubbed it showed the levels above
   // something the base did not. On the web a `SelectionArea` lays a
