@@ -148,8 +148,6 @@ cheap setting is reachable without a fork.
       +22% fragment GPU time on a Mac, and Skia draws a native
       `RSuperellipse` as an `RRect`, so on Skia the glass and the engine's own
       shape would not agree. Measure it on Adreno before deciding.
-- [ ] A bare `setState` on a `GlassTabBar` costs one capture even when nothing
-      it draws changed. Measured, not traced.
 - [ ] No trailing action circle beside the tab bar, such as the search tab
       iOS 26 sets apart from the others.
 - [ ] Content that scrolls inside a sheet does not hand the drag over to the

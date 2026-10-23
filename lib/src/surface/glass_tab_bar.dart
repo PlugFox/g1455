@@ -589,10 +589,9 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   /// Whether the bar is collapsed, or collapsing. A notifier rather than
   /// state: what follows it — where a press lands, what a screen reader is
   /// offered — is a few small widgets, and a rebuild of the whole bar costs a
-  /// capture even when nothing it draws changed. Measured, not traced: one
-  /// record per bare `setState` on the bar, before the collapse existed as
-  /// after; through `setState` the collapse took one on the first frame of
-  /// each direction, through this none.
+  /// capture where it is lifted, even when nothing it draws changed (see
+  /// [_built]): through `setState` the collapse took one on the first frame
+  /// of each direction, through this none.
   final ValueNotifier<bool> _collapsed = ValueNotifier<bool>(false);
   bool get _minimized => _collapsed.value;
   bool _reduceMotion = false;
@@ -629,6 +628,20 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     _listen();
+    _built = null;
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _built = null;
+  }
+
+  // A rebuild asked for from inside is never one to skip.
+  @override
+  void setState(VoidCallback fn) {
+    _built = null;
+    super.setState(fn);
   }
 
   @override
@@ -647,6 +660,47 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     if (widget.minimizeBehavior != oldWidget.minimizeBehavior) {
       _listen();
     }
+    if (!_drawsAlike(widget, oldWidget)) {
+      _built = null;
+    }
+  }
+
+  /// What [build] returned, kept while nothing it draws from has changed.
+  ///
+  /// A rebuild that hands the framework the same widget stops there; a new
+  /// one re-runs the `LayoutBuilder`s below, the layout marks them for paint,
+  /// and a bar lifted over other glass — in a [GlassScaffold] — is a new
+  /// picture in what that glass captures: a capture for every bare `setState`
+  /// around the bar. The bar never rebuilds itself; everything that moves in
+  /// it listens below the cut.
+  Widget? _built;
+
+  /// Whether [a] and [b] build the same bar. [onSelected] is read when a tap
+  /// lands, not when the bar is built, so only whether there is one counts.
+  /// An item's builders by identity: a closure made afresh is a new one.
+  static bool _drawsAlike(GlassTabBar a, GlassTabBar b) {
+    if (a.selectedIndex != b.selectedIndex ||
+        (a.onSelected == null) != (b.onSelected == null) ||
+        a.activeColor != b.activeColor ||
+        a.dropZoom != b.dropZoom ||
+        a.dropMotion != b.dropMotion ||
+        a.minimizeBehavior != b.minimizeBehavior ||
+        a.bottomAccessory != b.bottomAccessory ||
+        a.items.length != b.items.length) {
+      return false;
+    }
+    for (var i = 0; i < a.items.length; i++) {
+      final GlassTabItem x = a.items[i];
+      final GlassTabItem y = b.items[i];
+      if (!identical(x, y) &&
+          (x.label != y.label ||
+              x.icon != y.icon ||
+              !identical(x.iconBuilder, y.iconBuilder) ||
+              !identical(x.labelBuilder, y.labelBuilder))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// Follows the minimizer above, if this bar collapses at all.
@@ -810,7 +864,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   // a repaint boundary of its own. And one above the outer one too, for the
   // rebuild a new selection brings.
   @override
-  Widget build(BuildContext context) => RepaintBoundary(
+  Widget build(BuildContext context) => _built ??= RepaintBoundary(
     // Tab labels are not text to select, as a button's are not.
     child: SelectionContainer.disabled(
       child: LayoutBuilder(

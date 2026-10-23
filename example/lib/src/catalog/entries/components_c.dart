@@ -515,7 +515,8 @@ the type size are layout, not readings.
 
 None in the glass. A badge takes no slot in the atlas and does not count in the ledger, and a count changing on a glass
 bar is a repaint inside the glass, which is no capture. On a [tab bar](/components/tab-bar) the count reaches the badge
-through the bar's items, so changing it rebuilds the bar, which costs one capture for now.
+through the bar's items, so changing it rebuilds the bar: one capture where the bar is lifted, as in a scaffold, since
+what it draws changed.
 
 ## Accessibility
 

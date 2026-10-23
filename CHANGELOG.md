@@ -87,6 +87,10 @@ a change.
 - `GlassTabBar` no longer clips its held drop at device pixel ratios other
   than 2, and its accessory no longer clips its capsule's end (thanks to
   @akoflacko).
+- A `GlassTabBar` rebuilt with nothing changed, by a `setState` around it,
+  is no longer a capture where the bar is lifted, as in a `GlassScaffold`:
+  it keeps what it built. A new `onSelected` alone is taken without a
+  rebuild.
 - An open `GlassMenuAnchor` or `GlassPopoverAnchor` follows its anchor when
   the anchor moves by layout alone, such as a list scrolled under it.
 - The capture of glass on glass matches the engine in more cases:

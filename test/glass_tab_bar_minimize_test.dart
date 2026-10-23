@@ -18,7 +18,13 @@
 //    `setState(() => _minimizeTo(target));`: the declared run takes 2 records,
 //    one on the first frame of each direction, before the shape has moved — a
 //    rebuild of the whole bar costs a capture even when nothing it draws
-//    changed (one per bare `setState`, before this feature as after it);
+//    changed, wherever the bar is lifted;
+//  - in `_GlassTabBarState.build`, `_built ??= RepaintBoundary(` ->
+//    `RepaintBoundary(`: the lifted-rebuild arm takes a record per rebuild;
+//    in `_drawsAlike`, `(a.onSelected == null) != (b.onSelected == null)` ->
+//    `a.onSelected != b.onSelected` costs nothing a test sees, which is why
+//    the new-callback arm checks the other way: that a kept build calls the
+//    latest callback;
 //  - `debugGlassTabMinimizeTravel` is the cost arm's own control: off, every
 //    frame of the collapse is a capture.
 //  - in `_GlassTabBarState.build`, `math.min(kGlassTabAccessoryHeight,
@@ -311,6 +317,61 @@ void main() {
     // And the other way: the regions are captured instead of the boxes, so at
     // rest the atlas holds the accessory's whole travel.
     expect(on.atlasAtRest, greaterThan(off.atlasAtRest), reason: 'the regions cost the atlas nothing: $on, $off');
+  });
+
+  testWidgets('a lifted bar rebuilt with nothing changed is not retaken', (WidgetTester tester) async {
+    // In a scaffold the bar is lifted, so its own repaint is a change the
+    // capture under it watches: a rebuild that re-ran its layout repainted it,
+    // and every bare `setState` around it was a capture.
+    final behaviors = ValueNotifier<GlassTabBarMinimizeBehavior>(GlassTabBarMinimizeBehavior.onScrollDown);
+    addTearDown(behaviors.dispose);
+    final _Rig rig = await _Rig.mount(tester, accessory: true, behaviors: behaviors);
+    await tester.pumpAndSettle();
+    final int before = rig.recorded;
+    for (var i = 0; i < 3; i++) {
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      behaviors.notifyListeners();
+      await tester.pump();
+      await tester.pump();
+    }
+    expect(rig.recorded - before, 0, reason: 'a rebuild that changed nothing was a capture');
+    // And one that changes what the bar draws still draws it.
+    rig.minimizer.value = true;
+    await tester.pumpAndSettle();
+    behaviors.value = GlassTabBarMinimizeBehavior.never;
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect.width, greaterThan(rig.bar.globalRect.height * 2), reason: 'the bar did not expand');
+  });
+
+  testWidgets('a bar rebuilt with a new onSelected and nothing else calls the new one', (WidgetTester tester) async {
+    // The rebuild above is kept rather than built again, and the callback is
+    // read when a tap lands: a kept one must not hold the first.
+    final calls = <String>[];
+    var round = 0;
+    late StateSetter rebuild;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassHost(
+          hardware: GlassHardware.appleMetal,
+          child: GlassScaffold(
+            body: const SizedBox.expand(),
+            bottomBar: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) {
+                rebuild = setState;
+                final int now = round;
+                return GlassTabBar(items: kItems, selectedIndex: 0, onSelected: (int i) => calls.add('$now:$i'));
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    rebuild(() => round = 1);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(kItems[2].label));
+    await tester.pumpAndSettle();
+    expect(calls, <String>['1:2']);
   });
 
   testWidgets('under reduced motion the bar collapses on the next frame and stays still', (

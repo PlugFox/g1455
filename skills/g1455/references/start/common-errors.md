@@ -204,12 +204,6 @@ The press swells the glass inside a travel region declared from touch-down until
 the region appears and one as it goes, nothing while it moves and nothing at rest. `GlassPress.none`, on
 `GlassHost.press`, a theme or one button, keeps the box still and builds no region.
 
-### A tab bar rebuilt by a bare setState captures once
-
-A known cost, not yet traced: a `setState` that rebuilds a [GlassTabBar](../components/tab-bar.md) costs one capture even
-when nothing it draws changed. Rebuild the bar when its selection or its items change, not with every change of the
-screen around it.
-
 ### A page control captures while the pages turn
 
 It does not: the `PageView` moving under the glass does, 43 captures a swipe in the package's tests, the same with the

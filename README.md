@@ -925,9 +925,6 @@ cyan outline. The same list, at more length:
   region declared from touch-down until the spring settles: one capture as it
   appears, one as it goes, nothing at rest. `GlassPress.none` on the host, a
   theme or one button keeps the box still and builds no region.
-- **A tab bar rebuilt by a bare `setState` captures once.** A known cost, not
-  yet traced. Rebuild the bar when its selection changes, not with every
-  change of the screen around it.
 - **A page control captures while the pages turn.** The control does not: the
   `PageView` moving under the glass does: 43 captures a swipe headless, with
   the dots following it and with dots that stay put. Content that moves under glass is a capture a frame.

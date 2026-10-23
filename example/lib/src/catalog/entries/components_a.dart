@@ -1128,8 +1128,10 @@ item's icon is built once more, for the circle.
 > with the list padded to end above it, and its scrolls collapse a bar that asks to.
 
 > [!NOTE]
-> A bare `setState` that rebuilds the bar costs one capture, even when nothing it draws changed. A known cost, not yet
-> traced: rebuild the bar when its selection or its items change, not with every change of the screen around it.
+> A rebuild that changes nothing the bar draws costs nothing: the bar keeps what it built, and a new `onSelected` is
+> read when a tap lands. Items compare by their icon and label, and their builders by identity, so an `iconBuilder`
+> written inline as a closure is a new one on every rebuild — and, under a lifted bar, a capture. Keep such builders in
+> a field or a top-level function.
 ''',
     code: r'''
 import 'package:flutter/material.dart';
