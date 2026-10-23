@@ -635,7 +635,13 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   void didUpdateWidget(GlassTabBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
-    if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
+    // Disabled, or the item under the finger gone or another one: the press
+    // ends selecting nothing, as a cancelled one does.
+    if (_down && (!_enabled || widget.items.length != oldWidget.items.length)) {
+      _down = false;
+      _slideTo(widget.selectedIndex, 0);
+      _liftTo(0);
+    } else if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
       _slideTo(widget.selectedIndex, 0);
     }
     if (widget.minimizeBehavior != oldWidget.minimizeBehavior) {

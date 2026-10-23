@@ -65,6 +65,13 @@ Right to left:
   over, and the release selects it. Held while segments are added or taken
   away, the press ends selecting nothing, as a cancelled one does: the
   release selected the index held, which could be past the last segment.
+  Disabled while held, its capsule goes back under the selected segment: it
+  stayed under the one held until the selection next changed.
+- `GlassTabBar` held while items are added or taken away, or while it is
+  disabled, ends the press selecting nothing, as a cancelled one does: the
+  release selected the index held, which could be past the last item, and
+  disabled, the drop stayed lifted and its release left the capsule under
+  the item held.
 - `GlassBar`, `GlassCard` and `GlassButton` take an `EdgeInsetsGeometry`
   padding and `GlassScaffold` an `EdgeInsetsGeometry` `barMargin`, resolved
   with the ambient `Directionality`: an asymmetric inset can be given as

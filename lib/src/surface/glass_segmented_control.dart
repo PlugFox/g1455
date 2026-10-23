@@ -77,7 +77,8 @@ import 'glass_travel.dart';
 /// (116–127) at 0.12.
 ///
 /// Not glass: a flat fill, under which what is behind the control stays
-/// sharp. [GlassSegmentedControl.trackColor]'s default.
+/// sharp. [GlassSegmentedControl.trackColor]'s default in the light
+/// appearance.
 ///
 /// {@category Panels and controls}
 const Color kGlassSegmentTrack = Color.fromRGBO(118, 118, 128, 0.12);
@@ -311,20 +312,19 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   void didUpdateWidget(GlassSegmentedControl oldWidget) {
     super.didUpdateWidget(oldWidget);
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
-    if (!_enabled && _down) {
+    // Disabled, or the segment under the finger gone or another one: the
+    // press ends selecting nothing, as a lost one does, and the capsule goes
+    // back under the selected segment — slid, or placed below like any other
+    // count change.
+    final bool recounted = widget.segments.length != oldWidget.segments.length;
+    final bool ended = _down && (!_enabled || recounted);
+    if (ended) {
       _down = false;
       _liftTo(0);
     }
-    // The segment under the finger may be gone, or be another one: the press
-    // ends selecting nothing, as a lost one does, and the capsule is placed
-    // below like any other count change.
-    if (widget.segments.length != oldWidget.segments.length && _down) {
-      _down = false;
-      _liftTo(0);
-    }
-    if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
+    if ((widget.selectedIndex != oldWidget.selectedIndex || ended && !recounted) && !_down) {
       _slideTo(widget.selectedIndex, 0);
-    } else if (widget.segments.length != oldWidget.segments.length && !_down) {
+    } else if (recounted && !_down) {
       // Under rtl a segment added or taken away moves where the selected one
       // is drawn, and `_at` is where it is drawn: placed, as on a flip.
       _at.value = _visual(widget.selectedIndex).toDouble();
