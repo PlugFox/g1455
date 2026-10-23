@@ -49,8 +49,11 @@ The body is laid out under the whole scaffold, so content scrolls under the glas
 `CustomScrollView` with no padding of its own takes it from there: its first row starts below the top bar and its last
 ends above the bottom bar.
 
-A body that isn't a scroll view can read the same padding, or wrap itself in a `SafeArea`. The keyboard is not handled:
-the body sees `MediaQuery.viewInsets` as it is.
+A body that isn't a scroll view can read the same padding, or wrap itself in a `SafeArea`. The keyboard is met as
+`Scaffold` meets it: the body ends at the keyboard's top and is told no bottom inset, so a focused field in a scroll view
+is scrolled into sight, and the floating action stands on the keyboard. The bottom bar stays under the keyboard, as a tab
+bar does on iOS. `resizeToAvoidBottomInset: false` lays the body out under the keyboard and passes
+`MediaQuery.viewInsets` on as it is.
 
 ## The bars
 
@@ -186,6 +189,7 @@ class _LibraryPageState extends State<LibraryPage> {
 | `barMargin` | `EdgeInsetsGeometry` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `host` | `bool?` | `null` | Whether to mount a `GlassHost`: null when there is none above, `true` always, `false` never. |
 | `minimizeNotificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which of the body's scroll notifications collapse a tab bar that asks to: the minimizer's `notificationPredicate`. |
+| `resizeToAvoidBottomInset` | `bool` | `true` | Whether the body ends at the keyboard's top and the floating action stands on it. |
 | `key` | `Key?` | `null` | |
 
 `double topExtentFor(EdgeInsets safe)`: the top bar's extent from the top of the screen, which the body is told as its

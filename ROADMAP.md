@@ -176,8 +176,8 @@ cheap setting is reachable without a fork.
       included; the band, hold and interval are taste until then.
 - [ ] `GlassMorph`: carry the spring's velocity through a swap mid-morph, and
       keep glass inside fading content (an `Opacity` layer drops it).
-- [ ] `GlassScaffold`: the keyboard (`viewInsets`), a bottom scroll edge, and
-      a top bar shorter than `topBarHeight`.
+- [ ] `GlassScaffold`: a bottom scroll edge, and a top bar shorter than
+      `topBarHeight`.
 - [ ] Tune the drop's stretch and the morph's timing against Apple's devices;
       both are set by eye.
 

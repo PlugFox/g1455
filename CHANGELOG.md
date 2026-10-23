@@ -28,6 +28,11 @@ a change.
   Unlike naming a finish, it keeps adaptive glass and the declared backdrop
   in play. A `GlassScaffold` that mounts its own host takes the defaults,
   so declare it on a host of your own.
+- `GlassScaffold.resizeToAvoidBottomInset`, true by default, as
+  `Scaffold`'s: the body ends at the keyboard's top and is told no bottom
+  inset, so a focused field in a scroll view is scrolled into sight, and the
+  floating action stands on the keyboard. The bottom bar stays under it.
+  Before, the body ran under the keyboard; `false` keeps that.
 - `ShadowFilter` is exported from `package:g1455/g1455.dart`, so
   `GlassHost.shadowFilter` can be given one without a `src/` import. Its
   counters (`dropped`, `picturesForwarded`, `paragraphsForwarded`) say what

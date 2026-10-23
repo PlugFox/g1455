@@ -98,8 +98,13 @@ const double kGlassScaffoldActionGap = 16;
 /// **The body** fills the whole scaffold and is told the bars' extents as
 /// `MediaQuery.padding` — top and bottom, never less than the safe area's —
 /// which is what lets it scroll under them. A body that is not a scroll view
-/// can read the same padding, or wrap itself in a `SafeArea`. The keyboard is
-/// not handled: the body sees `MediaQuery.viewInsets` as it is.
+/// can read the same padding, or wrap itself in a `SafeArea`.
+///
+/// **The keyboard**, as `Scaffold` meets it: by default
+/// ([resizeToAvoidBottomInset]) the body ends at the keyboard's top and is
+/// told no bottom inset, so a focused field in a scroll view is scrolled into
+/// sight, and the floating action stands on the keyboard. The bottom bar
+/// stays at the bottom, under the keyboard, as a tab bar does on iOS.
 ///
 /// **A tab bar that collapses on scroll.** The scaffold is a
 /// [GlassTabBarMinimizer]: a [GlassTabBar] in [bottomBar] with
@@ -137,6 +142,7 @@ class GlassScaffold extends StatelessWidget {
     this.barMargin = kGlassScaffoldBarMargin,
     this.host,
     this.minimizeNotificationPredicate = defaultScrollNotificationPredicate,
+    this.resizeToAvoidBottomInset = true,
     super.key,
   }) : assert(topBarHeight >= 0);
 
@@ -188,6 +194,14 @@ class GlassScaffold extends StatelessWidget {
   /// and `(ScrollNotification n) => n.depth == 1` reaches them.
   final ScrollNotificationPredicate minimizeNotificationPredicate;
 
+  /// Whether the body ends at the keyboard's top, as `Scaffold`'s does: it is
+  /// laid out that much shorter, told no bottom `viewInsets`, and padded only
+  /// for what of the bottom bar shows above the keyboard. The floating action
+  /// stands on the keyboard too. False lays the body out under the keyboard
+  /// and passes `MediaQuery.viewInsets` on as it is. The bottom bar is under
+  /// the keyboard either way.
+  final bool resizeToAvoidBottomInset;
+
   /// The top bar's extent from the top of the screen, logical px: the safe
   /// area, [barMargin] above and below, and [topBarHeight]. What the body is
   /// told as its top padding, and the scroll edge's [GlassScrollEdge.extent].
@@ -203,13 +217,14 @@ class GlassScaffold extends StatelessWidget {
     final TextDirection direction = Directionality.maybeOf(context) ?? TextDirection.ltr;
     final EdgeInsets margin = barMargin.resolve(direction);
     final double? top = topBar == null ? null : topExtentFor(safe);
+    final double keyboard = resizeToAvoidBottomInset ? MediaQuery.viewInsetsOf(context).bottom : 0;
     final Widget screen = CustomMultiChildLayout(
-      delegate: _GlassScaffoldLayout(safe: safe, textDirection: direction),
+      delegate: _GlassScaffoldLayout(safe: safe, textDirection: direction, keyboard: keyboard),
       // In paint order: the body under everything, the top bar over all.
       children: <Widget>[
         LayoutId(
           id: _Slot.body,
-          child: _GlassScaffoldBody(top: top, child: body),
+          child: _GlassScaffoldBody(top: top, resized: keyboard > 0, child: body),
         ),
         if (bottomBar case final Widget bar)
           LayoutId(
@@ -279,10 +294,14 @@ class _GlassScaffoldConstraints extends BoxConstraints {
 
 /// Lays out the bottom bar first, so the body can be told its height.
 class _GlassScaffoldLayout extends MultiChildLayoutDelegate {
-  _GlassScaffoldLayout({required this.safe, required this.textDirection});
+  _GlassScaffoldLayout({required this.safe, required this.textDirection, required this.keyboard});
 
   final EdgeInsets safe;
   final TextDirection textDirection;
+
+  /// How far the body and the action are kept above the bottom: the
+  /// keyboard's height, or 0 when the body is not resized for it.
+  final double keyboard;
 
   @override
   void performLayout(Size size) {
@@ -299,7 +318,7 @@ class _GlassScaffoldLayout extends MultiChildLayoutDelegate {
     }
     if (hasChild(_Slot.action)) {
       final Size action = layoutChild(_Slot.action, BoxConstraints.loose(size));
-      final double above = bottom ?? safe.bottom;
+      final double above = math.max(bottom ?? safe.bottom, keyboard);
       final double y = size.height - above - kGlassScaffoldActionGap - action.height;
       final double x = switch (textDirection) {
         TextDirection.ltr => size.width - safe.right - kGlassScaffoldActionGap - action.width,
@@ -307,21 +326,31 @@ class _GlassScaffoldLayout extends MultiChildLayoutDelegate {
       };
       positionChild(_Slot.action, Offset(x, y));
     }
-    layoutChild(_Slot.body, _GlassScaffoldConstraints(bottom: bottom, size: size));
+    // What of the bottom bar stands above the keyboard is all the body is
+    // padded for; the rest of the bar is under the keyboard with it.
+    final double? showing = bottom == null ? null : math.max(0, bottom - keyboard);
+    layoutChild(
+      _Slot.body,
+      _GlassScaffoldConstraints(bottom: showing, size: Size(size.width, math.max(0, size.height - keyboard))),
+    );
     positionChild(_Slot.body, Offset.zero);
   }
 
   @override
   bool shouldRelayout(_GlassScaffoldLayout oldDelegate) =>
-      oldDelegate.safe != safe || oldDelegate.textDirection != textDirection;
+      oldDelegate.safe != safe || oldDelegate.textDirection != textDirection || oldDelegate.keyboard != keyboard;
 }
 
 /// The body, told the bars' extents as its media query's padding.
 class _GlassScaffoldBody extends StatelessWidget {
-  const _GlassScaffoldBody({required this.top, required this.child});
+  const _GlassScaffoldBody({required this.top, required this.resized, required this.child});
 
   /// The top bar's extent, or null with no top bar.
   final double? top;
+
+  /// Whether the body was laid out short of the keyboard, and so is told of
+  /// no bottom inset.
+  final bool resized;
 
   final Widget child;
 
@@ -333,6 +362,7 @@ class _GlassScaffoldBody extends StatelessWidget {
       final EdgeInsets padding = query.padding;
       return MediaQuery(
         data: query.copyWith(
+          viewInsets: resized ? query.viewInsets.copyWith(bottom: 0) : null,
           padding: padding.copyWith(
             top: math.max(padding.top, top ?? 0),
             bottom: math.max(padding.bottom, bottom ?? 0),
