@@ -38,6 +38,7 @@ import '../surface/glass_group.dart';
 import '../surface/glass_surface.dart';
 import 'occlusion.dart';
 import 'proxy_atlas.dart';
+import 'proxy_blur.dart';
 import 'proxy_layer_watch.dart';
 import 'proxy_resolution.dart';
 import 'proxy_retake.dart';
@@ -843,8 +844,12 @@ class GlassProxyPipeline {
   /// `TileMode.clamp` rather than the default `decal`: the border of the atlas
   /// is the border of a slot, and a decal there darkens it — which is where a
   /// surface at the screen's edge samples.
-  static ui.ImageFilter _blurFilter(double sigmaTexels) =>
-      ui.ImageFilter.blur(sigmaX: sigmaTexels, sigmaY: sigmaTexels, tileMode: TileMode.clamp);
+  // The sigma meant, asked of this renderer's blur so it delivers that: on
+  // Impeller a larger one (`proxy_blur.dart`).
+  static ui.ImageFilter _blurFilter(double sigmaTexels) {
+    final double asked = engineBlurSigma(sigmaTexels);
+    return ui.ImageFilter.blur(sigmaX: asked, sigmaY: asked, tileMode: TileMode.clamp);
+  }
 
   /// The sigma the pass still owes for a finish of [sigma], or null when
   /// [blurPass] asks for none.

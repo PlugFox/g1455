@@ -963,7 +963,12 @@ cyan outline. The same list, at more length:
 | Skwasm | Web | ✅ |
 | CanvasKit | Web | ✅, slow; see below |
 
-The route renders byte-identically on all of them. Every bundled shader is
+The route renders byte-identically on all of them but for the blur, which is
+each renderer's own. Impeller's blurs less than Skia's for the sigma it is
+asked, nothing under about 0.8 texels, so on Impeller the package asks for
+the sigma whose kernel delivers the one the finishes were calibrated at,
+read off a table measured on an M2 iPad Pro: `regular` at 2.6 texels lands
+on 2.62 there, where it landed on 2.13. Every bundled shader is
 compiled for all five shader targets in `test/shader_targets_test.dart`, so a
 shader that SkSL would reject fails the tests rather than a user's app.
 

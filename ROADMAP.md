@@ -123,14 +123,21 @@ cheap setting is reachable without a fork.
       filter at an offset, filters under a fade, and the shadow filter's
       sharp draws (#17, #18), what it forwards unseen counted (#30), and the
       Skia resampling difference named (#31); `ShadowFilter` and `WalkLog`
-      exported, so an app can give the one and read the other.
+      exported, so an app can give the one and read the other; on Impeller
+      the blur asked for the sigma the finishes were calibrated at, measured
+      on an M2 iPad (#33).
 
 ## Next — what 0.4.0 left open
 
 - [ ] A fallback for what the walk cannot reproduce (#32).
 - [ ] Menus that grow with large text (#26) and the tab bar's large content
       viewer (#27).
-- [ ] The remaining Impeller differences (#33).
+- [ ] The remaining Impeller differences (#33): what the blur correction
+      cannot reach — no kernel under 0.69 texels, a downsampled kernel of
+      another shape — and the dark soft scroll edge, which on Impeller reads
+      apart from the light one at the same sigma. The tiled group's seams are
+      `flutter_tester`'s: on an M2 iPad the tiles are the one quad, 0 of
+      19,200 px.
 - [ ] A search bar switched from light glass to dark keeps a trace of the
       light finish (#34).
 - [ ] The scroll edge's hard band in the dark appearance (#36).
@@ -138,9 +145,8 @@ cheap setting is reachable without a fork.
       test), where a drag between detents is one retake: the layer watch
       reads the drop as a change under the sheet. 0.2.0 claimed one retake
       for this drag too.
-- [ ] The Impeller blur is softer than the Skia one the finishes were
-      calibrated on, and a tiled group may show seams on Impeller; CI has no
-      Impeller run to hold either (#33).
+- [ ] CI has no Impeller run; `flutter test --enable-impeller` reads the
+      blur as an M2 iPad does, 0.02 apart on average (#33).
 
 ## Next — what 0.2.0 left open
 

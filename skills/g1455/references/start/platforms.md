@@ -5,7 +5,8 @@
 - Live: https://g1455.plugfox.dev/start/platforms
 
 g1455 is Dart and fragment shaders, with no platform code of its own. The glass renders byte-identically on Impeller
-and on Skia, and it works on the web.
+and on Skia but for the blur, which is each renderer's own: Impeller's blurs less for the sigma it is asked, so there
+the package asks for the sigma whose kernel delivers the calibrated one. It works on the web.
 
 ## Renderers
 

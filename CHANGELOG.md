@@ -55,6 +55,11 @@ a change.
     1.18 : 1 against a dark sheet).
   The slider's default blue in the light appearance is the light
   `systemBlue` (`0xFF007AFF`), not the dark one.
+- On Impeller the glass blurs as much as it was calibrated to. Impeller's
+  `ImageFilter.blur` delivers less than the sigma it is asked (2.13 texels
+  for 2.6 on an M2 iPad Pro, nothing under 0.8), so there the package asks
+  for the sigma whose kernel delivers the calibrated one: `regular` lands on
+  2.62, the scroll edge's 1.6 on 1.66. Skia and the web are unchanged.
 - Large text sizes:
   - `GlassTabBar` and `GlassSegmentedControl` keep their labels at no more
     than the default text size, as UIKit does; at twice the size labels were

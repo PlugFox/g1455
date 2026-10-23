@@ -34,6 +34,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import '../proxy/proxy_atlas.dart';
+import '../proxy/proxy_blur.dart';
 import '../proxy/proxy_pipeline.dart';
 import '../proxy/proxy_resolution.dart';
 import '../proxy/proxy_role.dart';
@@ -188,8 +189,9 @@ class GlassBackdropDeclaration extends ChangeNotifier {
         Offset.zero,
         Paint()
           ..imageFilter = ui.ImageFilter.blur(
-            sigmaX: residual * ratio,
-            sigmaY: residual * ratio,
+            // Asked so this renderer delivers it, as the atlas's blur is.
+            sigmaX: engineBlurSigma(residual * ratio),
+            sigmaY: engineBlurSigma(residual * ratio),
             // Clamped, as the atlas is: the edge of a declared backdrop is
             // where the declaration stops, not where the world goes dark.
             tileMode: TileMode.clamp,

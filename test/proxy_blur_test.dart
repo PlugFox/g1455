@@ -22,7 +22,11 @@
 //
 //  - **A known answer in the same run.** Our own `ImageFilter.blur` at a stated
 //    sigma is read back through the same instrument. Without it a fitted 2.0 is
-//    unfalsifiable.
+//    unfalsifiable. Asked as the package asks it (`engineBlurSigma`), so on
+//    Impeller the known answer is the corrected blur's: there it holds to 4%
+//    to sigma 4, and past that the downsampled kernel is no longer
+//    Gaussian-like, nor at a divisor of 4 at a ratio of 1, where the residual
+//    is under the smallest kernel Impeller draws (#33).
 //  - **One period per image.** Seven gratings stacked in bands would have a
 //    vertical blur of sigma 8 mixing three of them; a full-frame grating that is
 //    constant in y is exactly invariant under the vertical pass.
@@ -37,6 +41,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:g1455/src/proxy/proxy_blur.dart';
 import 'package:g1455/src/proxy/proxy_recorder.dart';
 import 'package:g1455/src/proxy/proxy_resolution.dart';
 
@@ -507,15 +512,18 @@ class _Grating extends CustomPainter {
   bool shouldRepaint(_Grating oldDelegate) => oldDelegate.period != period;
 }
 
+/// The blur the package asks of the renderer for [sigmaTexels]: the sigma
+/// itself on Skia, the one whose kernel delivers it on Impeller.
 ui.Image _blur(ui.Image source, double sigmaTexels) {
+  final double asked = engineBlurSigma(sigmaTexels);
   final recorder = ui.PictureRecorder();
   Canvas(recorder).drawImage(
     source,
     Offset.zero,
     Paint()
       ..imageFilter = ui.ImageFilter.blur(
-        sigmaX: sigmaTexels,
-        sigmaY: sigmaTexels,
+        sigmaX: asked,
+        sigmaY: asked,
         // Clamp, not the default decal: a decal darkens the border, and the
         // border of a proxy is the edge of the screen.
         tileMode: TileMode.clamp,
