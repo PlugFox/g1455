@@ -70,7 +70,9 @@ import 'glass_components.dart';
 import 'glass_controls.dart' show kGlassDropOptics;
 import 'glass_drop_motion.dart';
 import 'glass_finish.dart';
+import 'glass_host.dart' show GlassProxyScope;
 import 'glass_surface.dart';
+import 'glass_theme.dart';
 import 'glass_travel.dart';
 
 /// What a [GlassTabBar] resolved for one of its items, as it draws it.
@@ -246,6 +248,26 @@ const double kGlassTabAccessoryHeight = 48;
 
 /// Between the accessory and the bar, or the collapsed circle.
 const double _kAccessoryGap = 8;
+
+// The large content viewer, read off iOS 26.5's `UITabBarController` at the
+// largest accessibility size on an iPhone 17 (spike 38): a 220 pt square in
+// the middle of the screen, its corner about 16, in a heavy material (a blur
+// that leaves no band of the page under it: 20 here) — white
+// at about 0.7 over the page in the light appearance, near black at about
+// 0.65 in the dark — holding the item's icon, 2.7 times the bar's own (a
+// heart 60 pt wide against 22.5), centred 74 pt down, and its title, whose
+// "Saved" is 147.7 pt of ink over 42.3 pt capitals on a baseline 182 pt
+// down, both a grey. Flutter's SF matches that at 56 (153 and 41.3 on an M2
+// iPad). Up on the touch, in 80 ms; gone over 0.5 s once the finger lifts.
+const double _kViewerSide = 220;
+const double _kViewerRadius = 16;
+const double _kViewerSigma = 20;
+const double _kViewerIcon = 26 * 2.7;
+const double _kViewerIconCentre = 74;
+const double _kViewerTitle = 56;
+const double _kViewerBaseline = 182;
+const Duration _kViewerIn = Duration(milliseconds: 80);
+const Duration _kViewerOut = Duration(milliseconds: 500);
 
 /// Whether the bar's and the accessory's collapse moves inside a declared
 /// travel region. The default, and what was measured; a test turns it off to
@@ -491,7 +513,11 @@ class _TabGeometry {
 /// **Text size.** The items' labels do not grow past the default text size,
 /// as UIKit's tab bar's do not: an item is a fifth of a phone's width, and at
 /// twice the size its label is cut mid-word and its icon meets the next one.
-/// A screen reader is given each label whole.
+/// A screen reader is given each label whole. At an accessibility text size
+/// (1.5 times and up) a touch on an item shows it in iOS's large content
+/// viewer: its icon and title large, in a panel in the middle of the screen,
+/// following the finger until it lifts. The panel goes in the nearest
+/// `Overlay`; with none there is no panel.
 ///
 /// See also:
 ///
@@ -596,6 +622,16 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   bool get _minimized => _collapsed.value;
   bool _reduceMotion = false;
 
+  /// The large content viewer: shown while a finger is on the bar at an
+  /// accessibility text size, [_under] the item it names.
+  final OverlayPortalController _viewer = OverlayPortalController();
+  late final AnimationController _viewerFade = AnimationController(
+    vsync: this,
+    duration: _kViewerIn,
+    reverseDuration: _kViewerOut,
+  );
+  final ValueNotifier<int> _under = ValueNotifier<int>(0);
+
   _TabGeometry? _geometry;
   bool _down = false;
   bool _moved = false;
@@ -654,6 +690,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       _down = false;
       _slideTo(widget.selectedIndex, 0);
       _liftTo(0);
+      _hideViewer();
     } else if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
       _slideTo(widget.selectedIndex, 0);
     }
@@ -730,6 +767,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       _down = false;
       _slideTo(widget.selectedIndex, 0);
       _liftTo(0);
+      _hideViewer();
     }
     final double to = target ? 1 : 0;
     if (_reduceMotion) {
@@ -750,6 +788,8 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     _minimize.dispose();
     _collapsed.dispose();
     _stretch.dispose();
+    _viewerFade.dispose();
+    _under.dispose();
     _lift.dispose();
     _at.dispose();
     _over.dispose();
@@ -802,6 +842,31 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     // one lifts it where it is.
     final int i = _pressed = g.indexUnder(e.localPosition.dx, widget.items.length).round();
     _slideTo(i, 0);
+    _under.value = i;
+    _showViewer();
+  }
+
+  /// Puts the large content viewer up, at an accessibility text size and with
+  /// an overlay to put it in. iOS does on the touch itself, a tap included:
+  /// the labels are held at the default size (see the class), and this is
+  /// where they are read at the size asked for.
+  void _showViewer() {
+    if (glassTextScale(context) < kGlassAccessibleTextScale || Overlay.maybeOf(context) == null) {
+      return;
+    }
+    _viewer.show();
+    _viewerFade.forward();
+  }
+
+  void _hideViewer() {
+    if (!_viewer.isShowing) {
+      return;
+    }
+    _viewerFade.reverse().then((_) {
+      if (mounted && !_down) {
+        _viewer.hide();
+      }
+    });
   }
 
   void _onMove(PointerMoveEvent e) {
@@ -821,6 +886,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     }
     _moved = true;
     _at.value = g.indexUnder(e.localPosition.dx, widget.items.length);
+    _under.value = _at.value.round().clamp(0, widget.items.length - 1);
   }
 
   void _onUp(PointerUpEvent e) {
@@ -840,6 +906,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     final int i = _moved ? (_at.value + velocity * 0.08).round().clamp(0, widget.items.length - 1) : _pressed;
     _slideTo(i, velocity);
     _liftTo(0);
+    _hideViewer();
     if (i != widget.selectedIndex) {
       widget.onSelected?.call(i);
     }
@@ -852,6 +919,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     _down = false;
     _slideTo(widget.selectedIndex, 0);
     _liftTo(0);
+    _hideViewer();
   }
 
   // Two `LayoutBuilder`s, and the second is the point. A `LayoutBuilder` is a
@@ -864,7 +932,14 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   // a repaint boundary of its own. And one above the outer one too, for the
   // rebuild a new selection brings.
   @override
-  Widget build(BuildContext context) => _built ??= RepaintBoundary(
+  Widget build(BuildContext context) => _built ??= OverlayPortal(
+    controller: _viewer,
+    overlayChildBuilder: _viewerOverlay,
+    child: _tree(),
+  );
+
+  /// The bar, its accessory and the press, as [build] keeps them.
+  Widget _tree() => RepaintBoundary(
     // Tab labels are not text to select, as a button's are not.
     child: SelectionContainer.disabled(
       child: LayoutBuilder(
@@ -1020,6 +1095,131 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       ),
     ),
   );
+
+  /// The large content viewer in the overlay: the item under the finger, its
+  /// icon and title large, in the middle of the screen. Glass at rest when
+  /// there is a host above the overlay — it does not move, so it costs a
+  /// capture as it comes and none while the finger slides; a plain panel of
+  /// the same tint when there is none.
+  Widget _viewerOverlay(BuildContext context) {
+    final GlassThemeData theme = GlassTheme.of(context);
+    final bool dark =
+        (theme.regularAppearance ?? MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light) ==
+        Brightness.dark;
+    final Color tint = dark ? const Color.fromRGBO(28, 28, 30, 0.65) : const Color.fromRGBO(255, 255, 255, 0.7);
+    final Color ink = dark ? const Color.fromRGBO(255, 255, 255, 0.5) : const Color.fromRGBO(0, 0, 0, 0.55);
+    final bool hosted = GlassProxyScope.maybeOf(context) != null;
+    final content = ValueListenableBuilder<int>(
+      valueListenable: _under,
+      builder: (BuildContext context, int i, Widget? _) => _viewerContent(context, i, ink),
+    );
+    return IgnorePointer(
+      child: ExcludeSemantics(
+        child: Center(
+          child: SizedBox.square(
+            dimension: _kViewerSide,
+            child: AnimatedBuilder(
+              animation: _viewerFade,
+              builder: (BuildContext context, Widget? child) {
+                final double t = _viewerFade.value;
+                const radius = BorderRadius.all(Radius.circular(_kViewerRadius));
+                final Widget faded = Opacity(opacity: t, child: child);
+                if (!hosted) {
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: tint.a * t),
+                      borderRadius: radius,
+                    ),
+                    child: faded,
+                  );
+                }
+                return GlassSurface(
+                  borderRadius: radius,
+                  finish: GlassFinish(
+                    // A heavy material, no rim and no refraction, as Apple's
+                    // is: the page's colours smoothed out under it, not bands.
+                    // `frosted`'s table, made at 8, overstates the damage.
+                    name: GlassFinish.frosted.name,
+                    blurSigmaLogical: _kViewerSigma,
+                    tint: tint,
+                    rim: const Color(0x00000000),
+                    optics: GlassOptics.none,
+                  ),
+                  materialize: t,
+                  child: faded,
+                );
+              },
+              child: content,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Item [i]'s icon and title as the viewer draws them, in [ink].
+  Widget _viewerContent(BuildContext context, int i, Color ink) {
+    final GlassTabItem item = widget.items[i.clamp(0, widget.items.length - 1)];
+    // The app's text style where the bar is (an `OverlayPortal`'s child
+    // inherits from the portal), at Apple's regular weight.
+    final TextStyle style = DefaultTextStyle.of(context).style.merge(
+      TextStyle(fontSize: _kViewerTitle, fontWeight: FontWeight.w400, color: ink, decoration: TextDecoration.none),
+    );
+    // A title wider than the panel is set smaller, never cut: the panel is
+    // there to be read.
+    final TextPainter measure = TextPainter(
+      text: TextSpan(text: item.label, style: style),
+      textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final double room = _kViewerSide - 24;
+    final double fit = measure.width > room ? room / measure.width : 1;
+    measure.dispose();
+    final look = GlassTabItemLook(
+      index: i,
+      color: ink,
+      iconSize: _kViewerIcon,
+      labelStyle: style,
+      selected: i == widget.selectedIndex,
+      highlighted: true,
+      inline: false,
+    );
+    return Stack(
+      children: <Widget>[
+        Positioned(
+          left: 0,
+          right: 0,
+          top: _kViewerIconCentre - _kViewerIcon / 2,
+          height: _kViewerIcon,
+          child: Center(
+            child: item.iconBuilder?.call(context, look) ?? Icon(item.icon, size: _kViewerIcon, color: ink),
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          top: 0,
+          child: Baseline(
+            baseline: _kViewerBaseline,
+            baselineType: TextBaseline.alphabetic,
+            // The panel's width, or `Baseline`'s loose constraints leave the
+            // title its own and at the start.
+            child: SizedBox(
+              width: room,
+              child: Text(
+                item.label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
+                textScaler: TextScaler.noScaling,
+                style: style.copyWith(fontSize: _kViewerTitle * fit),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   /// [rect] with its edges on whole device pixels: a change under a pixel is a
   /// repaint of the glass that nobody can see.

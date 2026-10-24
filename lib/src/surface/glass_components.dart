@@ -128,6 +128,16 @@ Color glassSystemGreen(Color label) =>
 /// What the appearance helpers above are given for a default.
 Color glassAmbientLabel(BuildContext context) => DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000);
 
+/// The text scale from which a control lays out as iOS does at its
+/// accessibility text sizes: between iOS's largest standard size (body 23,
+/// 1.35) and its first accessibility one (body 28, 1.65). The menu drops its
+/// icons from here, and the tab bar shows its large content viewer.
+const double kGlassAccessibleTextScale = 1.5;
+
+/// The text scale under [context], as body text's 17 is scaled.
+double glassTextScale(BuildContext context) =>
+    (MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling).scale(17) / 17;
+
 /// [child] at no more than the default text size, for a control whose labels
 /// sit in a box that does not grow — as UIKit's tab bar and segmented control
 /// do not. A smaller text size is kept. Without a [MediaQuery] there is no

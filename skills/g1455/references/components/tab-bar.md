@@ -56,6 +56,9 @@ behind it.
 - The drop is glass over glass (the bar), so while it is held the host captures one extra level.
   At rest, the bar is one surface.
 - Each tab is a button for screen readers, labelled with its `label` and marked selected.
+- Labels stay at the default text size, as UIKit's do. From an accessibility text size (1.5 times and up), a touch on a
+  tab shows its icon and label large in a panel in the middle of the screen, which follows the finger and goes when it
+  lifts: iOS's large content viewer. It needs an `Overlay` above the bar, which an app has.
 - The held drop stretches as it sets off and squashes as it lands. `dropMotion:` tunes it or turns it off; see
   [Drop motion](../foundations/drop-motion.md).
 

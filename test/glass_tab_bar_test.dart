@@ -18,6 +18,12 @@
 //    loses its top and bottom. The arms at 1, 2.625 and 3 say so at rest; the
 //    one at 4 says so only through the lift, where the growth moves; at 2 it
 //    never happens, which is why the rest of this file missed it.
+//  - in `_GlassTabBarState._onUp`, drop `_hideViewer();`: the viewer arm
+//    finds the large content viewer still up after the finger lifted;
+//    `glassTextScale(context) < kGlassAccessibleTextScale || ` dropped from
+//    `_showViewer`: it finds one at the default size; `_under.value = …`
+//    dropped from `_onMove`: it names the item the finger left;
+//    `reverseDuration: _kViewerOut` -> `_kViewerIn`: it goes at once.
 //
 // The mechanisms the cost arms lean on — the drop as a level of its own, and
 // the watch over what the bar bears — are `GlassHost`'s, and their breaks are
@@ -53,6 +59,68 @@ void main() {
     expect(handle.frame!.keys, hasLength(1), reason: 'only the bar reads the backdrop');
     expect(handle.upper.whereType<GlassProxyFrame>(), isEmpty, reason: 'a resting drop was stacked');
     expect(_drop(tester).materialize, 0);
+  });
+
+  testWidgets('at an accessibility text size, a press shows the item large in the middle, as iOS does', (
+    WidgetTester tester,
+  ) async {
+    // Spike 38, iOS 26.5's `UITabBarController` at its largest text size: the
+    // labels stay at the default size, and a touch on an item puts it up in a
+    // 220 pt square in the middle of the screen, which follows the finger and
+    // goes once it lifts — the lift selects, as always.
+    Finder viewer() => find.byWidgetPredicate(
+      (Widget w) => w is GlassSurface && w.finish?.name == GlassFinish.frosted.name,
+    );
+    final GlobalKey hostKey = GlobalKey();
+    final selected = <int>[];
+    await _mount(tester, hostKey: hostKey, onSelected: selected.add, textScale: 2, overlay: true);
+    final dynamic host = hostKey.currentState! as dynamic;
+    expect(viewer(), findsNothing);
+    final TestGesture gesture = await tester.startGesture(_item(1));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(viewer(), findsOneWidget, reason: 'no viewer on the touch');
+    final Rect box = tester.getRect(viewer());
+    expect(box.size, const Size(220, 220));
+    expect(box.center, kScreen.center(Offset.zero));
+    expect(tester.renderObject<RenderGlassSurface>(viewer()).materialize, 1);
+    expect(find.descendant(of: viewer(), matching: find.text('Search')), findsOneWidget);
+    expect(
+      tester.getSize(find.descendant(of: viewer(), matching: find.text('Search'))).height,
+      greaterThan(2.5 * tester.getSize(find.text('Home')).height),
+      reason: 'the title is not large',
+    );
+    // Held still once the drop has lifted, the viewer costs no capture.
+    await tester.pump(const Duration(seconds: 1));
+    final int recorded = host.recorded as int;
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(host.recorded, recorded, reason: 'a still viewer is retaken');
+    // Slid to the last item, it names that one.
+    await gesture.moveTo(_item(3));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.descendant(of: viewer(), matching: find.text('Profile')), findsOneWidget);
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(viewer(), findsOneWidget, reason: 'the viewer went at once, not over half a second');
+    await tester.pumpAndSettle();
+    expect(viewer(), findsNothing);
+    expect(selected, <int>[3]);
+
+    // At the default size and at iOS's largest standard one, no viewer; and
+    // none without an overlay to put it in, where the press still selects.
+    for (final (double scale, bool overlay) in <(double, bool)>[(1, true), (1.35, true), (2, false)]) {
+      selected.clear();
+      await _mount(tester, onSelected: selected.add, textScale: scale, overlay: overlay);
+      final TestGesture press = await tester.startGesture(_item(2));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(viewer(), findsNothing, reason: 'at ${scale}x${overlay ? '' : ' with no overlay'}');
+      await press.up();
+      await tester.pumpAndSettle();
+      expect(selected, <int>[2]);
+    }
   });
 
   testWidgets('held, the drop is glass on the bar; dragged within an item, nothing is retaken', (
@@ -354,10 +422,18 @@ Future<void> _mount(
   List<GlassTabItem>? items,
   GlassDropMotion? dropMotion,
   double devicePixelRatio = 2,
+  double textScale = 1,
+  bool overlay = false,
 }) async {
+  Widget page(Widget child) =>
+      overlay ? Overlay(initialEntries: <OverlayEntry>[OverlayEntry(builder: (_) => child)]) : child;
   await tester.pumpWidget(
     MediaQuery(
-      data: MediaQueryData(size: kScreen, devicePixelRatio: devicePixelRatio),
+      data: MediaQueryData(
+        size: kScreen,
+        devicePixelRatio: devicePixelRatio,
+        textScaler: TextScaler.linear(textScale),
+      ),
       child: Directionality(
         textDirection: TextDirection.ltr,
         child: Align(
@@ -367,16 +443,18 @@ Future<void> _mount(
             hardware: GlassHardware.appleMetal,
             child: SizedBox.fromSize(
               size: kScreen,
-              child: Stack(
-                children: <Widget>[
-                  Positioned.fill(
-                    child: RepaintBoundary(child: CustomPaint(painter: _Bars())),
-                  ),
-                  Positioned.fromRect(
-                    rect: kBar,
-                    child: _Tabs(onSelected: onSelected ?? (_) {}, items: items, dropMotion: dropMotion),
-                  ),
-                ],
+              child: page(
+                Stack(
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: RepaintBoundary(child: CustomPaint(painter: _Bars())),
+                    ),
+                    Positioned.fromRect(
+                      rect: kBar,
+                      child: _Tabs(onSelected: onSelected ?? (_) {}, items: items, dropMotion: dropMotion),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

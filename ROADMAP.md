@@ -135,6 +135,8 @@ cheap setting is reachable without a fork.
       one, not held on the old one's resolution (#34).
 - [x] The hard scroll edge's band in the dark appearance: the screen's
       background at 0.90, photographed on iOS 26.5 (#36).
+- [x] The tab bar's large content viewer at accessibility text sizes, as
+      a `UITabBarController`'s (#27).
 - [x] Menus at large text: rows that wrap and grow, no icons and the
       screen's width from an accessibility size, and a scroll past 520, as
       iOS 26.5's at five text sizes (#26).
@@ -148,7 +150,6 @@ cheap setting is reachable without a fork.
       `BackdropFilter` under glass, which reads what lies below it, and a
       fold or a mask inside a subtree that holds glass, which the engine
       cannot draw for it. 0.4.0 hands every other such subtree to the engine.
-- [ ] The tab bar's large content viewer (#27).
 - [ ] The remaining Impeller differences (#33): what the blur correction
       cannot reach — no kernel under 0.69 texels, a downsampled kernel of
       another shape — and the dark soft scroll edge, which on Impeller reads

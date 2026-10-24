@@ -44,7 +44,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import 'glass_above.dart';
-import 'glass_components.dart' show glassSystemFill, glassSystemRed, glassTertiaryLabel;
+import 'glass_components.dart'
+    show glassSystemFill, glassSystemRed, glassTertiaryLabel, glassTextScale, kGlassAccessibleTextScale;
 import 'glass_finish.dart';
 import 'glass_host.dart';
 import 'glass_surface.dart';
@@ -1163,11 +1164,6 @@ double _menuRowPad(double scale) => 1.1 + 9.7 * scale;
 const double _kMenuMaxHeight = 520;
 const double _kMenuWideMaxWidth = 400;
 
-/// The text scale from which the menu lays out as iOS does at accessibility
-/// sizes: between iOS's largest standard size (body 23, 1.35) and its first
-/// accessibility one (body 28, 1.65).
-const double _kMenuAccessibleScale = 1.5;
-
 /// A glass menu that grows out of [builder]'s anchor, in the nearest
 /// `Overlay`, which has to be under the [GlassHost].
 ///
@@ -1571,8 +1567,8 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
   _MenuLayout _measure(BuildContext context, Size screen, EdgeInsets safe) {
     final TextStyle style = DefaultTextStyle.of(context).style.merge(const TextStyle(fontSize: 17));
     final TextScaler scaler = MediaQuery.textScalerOf(context);
-    final double scale = scaler.scale(17) / 17;
-    final bool accessible = scale >= _kMenuAccessibleScale;
+    final double scale = glassTextScale(context);
+    final bool accessible = scale >= kGlassAccessibleTextScale;
     final double width = accessible
         ? math.max(widget.width, math.min(screen.width - 32, _kMenuWideMaxWidth))
         : widget.width;

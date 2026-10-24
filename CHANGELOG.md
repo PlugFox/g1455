@@ -68,6 +68,11 @@ a change.
     cut mid-word. A screen reader still gets every label whole.
   - `GlassTextField` and `GlassSearchBar` grow with their line from 44 pt,
     keeping 11 pt above and below it, as a `UITextField` under Dynamic Type.
+  - `GlassTabBar` shows the large content viewer at an accessibility text
+    size (from 1.5 times): a touch on an item puts its icon and title up
+    in a 220 pt panel in the middle of the screen, as iOS 26.5's
+    `UITabBarController` does, following the finger until it lifts. Glass
+    at rest, so a still finger costs no capture (#27).
   - `GlassMenuAnchor`'s rows wrap a long label and grow to hold it, at any
     text size, as iOS 26.5's `UIMenu` does; they were cut to one line with an
     ellipsis. With the text, the rows' padding, the icon and its column grow.
