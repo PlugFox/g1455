@@ -155,12 +155,14 @@ cheap setting is reachable without a fork.
       the package's own Gaussian up to 4 texels, which closed the soft
       scroll edge (residual contrast 0.174 on an M2 iPad, Apple 0.157; it
       was 0.098), for up to 0.3 ms of GPU time a frame on an M2 iPad and
-      none an S22 can tell from noise (glass D239). Left: the
-      engine's blur past 4 texels, which downsamples and at 8 lets a period
-      of 12 through; the light soft edge, which the instrument cannot read
-      under Impeller's gradient dither; the bleed test, which draws its own
-      blur. The tiled group's seams are `flutter_tester`'s: on an M2 iPad
-      the tiles are the one quad, 0 of 19,200 px.
+      none an S22 can tell from noise (glass D239). Left: the engine's
+      blur past 4 texels, whose width is right to 2-6% and which at 5 and
+      8 texels lets a period of 12 through at 2% of its contrast; a pass of
+      ours ahead of it does not remove that, and ours alone at 12 texels
+      costs 52% of a frame on an S22, so it would take a downsampled
+      Gaussian of our own. The tiled group's seams and the cull margin are
+      `flutter_tester`'s: on an M2 iPad the tiles are the one quad, 0 of
+      19,200 px.
 
 ## Next — what 0.2.0 left open
 

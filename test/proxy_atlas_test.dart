@@ -31,6 +31,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/src/proxy/proxy_atlas.dart';
+import 'package:g1455/src/proxy/proxy_blur.dart';
 
 /// A screen with a full-contrast step just outside the surface under test, and
 /// bars everywhere else so no crop has a uniform neighbourhood to be flattered
@@ -61,14 +62,26 @@ ui.Image _screen() {
   return recorder.endRecording().toImageSync(kW, kH);
 }
 
+/// [source] blurred by [sigma]: clamped, by the pipeline's own layers —
+/// `ImageFilter.blur` on Skia, `glass_blur.frag` on Impeller up to its
+/// ceiling — and otherwise by the engine's blur with [tile].
 ui.Image _blur(ui.Image source, double sigma, TileMode tile) {
   final recorder = ui.PictureRecorder();
-  final canvas = Canvas(recorder);
-  canvas.drawImage(
-    source,
-    Offset.zero,
-    Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: tile),
-  );
+  final Rect bounds = Offset.zero & Size(source.width.toDouble(), source.height.toDouble());
+  final canvas = Canvas(recorder, bounds);
+  if (tile == TileMode.clamp) {
+    final int layers = saveBlurLayers(canvas, bounds, sigma);
+    canvas.drawImage(source, Offset.zero, Paint());
+    for (var i = 0; i < layers; i++) {
+      canvas.restore();
+    }
+  } else {
+    canvas.drawImage(
+      source,
+      Offset.zero,
+      Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: tile),
+    );
+  }
   final ui.Picture picture = recorder.endRecording();
   try {
     return picture.toImageSync(source.width, source.height);
@@ -112,7 +125,10 @@ Future<int> _errorAt(ui.Image screen, double sigmaLogical, double bleedLogical, 
   // `ceil(pixelRatio * height)` of a height that is `(top + h) - top`.
   final double sigma = sigmaLogical;
   final double bleed = bleedLogical.ceilToDouble();
-  final ui.Image ideal = _blur(screen, sigma, TileMode.decal);
+  // The whole screen, by the same blur: the surface is 30 px from the screen's
+  // edge, past what reaches it at either sigma, so the edge's tile mode is not
+  // in the answer.
+  final ui.Image ideal = _blur(screen, sigma, TileMode.clamp);
   final ui.Image reference = _crop(ideal, kSurface);
   final Rect region = kSurface.inflate(bleed);
   final ui.Image piece = _crop(screen, region);
@@ -158,7 +174,7 @@ void main() {
         previous = error;
       }
     }
-  }, tags: 'impeller-gap');
+  });
 
   test('a decal proxy needs more context than a clamped one', () async {
     // Why the rig clamps, as a number rather than as a preference: extending

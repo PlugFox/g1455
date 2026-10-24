@@ -96,11 +96,13 @@ const String kGlassBlurShaderAsset = 'packages/g1455/shaders/glass_blur.frag';
 /// The largest sigma, in texels, [saveBlurLayers] blurs through
 /// [glassBlurProgram]: 13 texels a pass.
 ///
-/// Past it the engine's blur is used, corrected. Its error is a step of the
-/// integer radius, and above 4 texels that is 2-6% of the sigma and of its
-/// spread over frequency, where under 3 it was up to 25%. And it downsamples:
-/// `frosted` at its policy divisor on a Galaxy S22 Ultra is 12 texels, which
-/// the shader drew at 52% more GPU time a frame and the engine at none.
+/// Past it the engine's blur is used, corrected. Its width is then 2-6% off
+/// the sigma, where under 3 texels it was up to 25%; its shape is not always
+/// a Gaussian's — at 5 and 8 texels it lets a period of 12 through at about
+/// 2% of its contrast, where a Gaussian leaves nothing — and a pass of this
+/// shader ahead of it does not remove that. But it downsamples: `frosted` at
+/// its policy divisor on a Galaxy S22 Ultra is 12 texels, which the shader
+/// drew at 52% more GPU time a frame and the engine at none.
 const double kGlassBlurMaxSigma = 4;
 
 /// The compiled Gaussian, once a host has loaded it (`GlassHost.precache`, or

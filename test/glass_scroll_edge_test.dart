@@ -57,6 +57,10 @@ void main() {
     expect(dark.top.a, closeTo(0.250, 0.005));
     expect(dark.top.c, closeTo(-1.0, 3));
     expect(dark.top.residual, closeTo(0.157, 0.01));
+    // The lines' own frequency, which `fit_soft.py` did not read: pinned here
+    // so that the comparison below is against a reading that did not move.
+    expect(dark.top.harmonic, closeTo(0.220, 0.005));
+    expect(light.top.harmonic, closeTo(0.229, 0.005));
     expect(dark.top.tint50, closeTo(105.5, 0.6));
     expect(dark.top.blur50, closeTo(109.9, 0.6));
     expect(light.top.a, closeTo(0.860, 0.005));
@@ -103,7 +107,17 @@ void main() {
       // these are a check on the drawing, not on a fit.
       expect(ours.top.a, closeTo(apple.top.a, 0.02));
       expect(ours.top.c, closeTo(apple.top.c, 6));
-      expect(ours.top.residual, closeTo(apple.top.residual, 0.05));
+      // Peak to peak, as `fit_soft.py` read it, except where it cannot read:
+      // the light edge's lines are 5 code values under its 0.85 tint, and
+      // Impeller dithers a gradient, the tint's too, by a code a channel,
+      // pixel by pixel, which a peak to peak counts as contrast (0.237 here,
+      // 0.235 on an M2 iPad, at the sigma the dark edge is right at).
+      if (!(ui.ImageFilter.isShaderFilterSupported && appearance == GlassScrollEdgeAppearance.light)) {
+        expect(ours.top.residual, closeTo(apple.top.residual, 0.05));
+      }
+      // And off the lines' own frequency, which the dither leaves alone: Skia
+      // and Impeller read it within 0.01 of each other, both appearances.
+      expect(ours.top.harmonic, closeTo(apple.top.harmonic, 0.04));
       // The ramps: the tint is an erf placed on Apple's centre; the blur is a
       // smoothstep through Apple's 10% and 90% points, whose middle sits 5 pt
       // off the measured one (the measured ramp is asymmetric).
@@ -122,13 +136,8 @@ void main() {
       expect(ours.bottom.a, closeTo(apple.bottom.a, 0.04));
       expect(ours.bottom.tint50, closeTo(apple.bottom.tint50, 7.5));
       // The blur is the package's own Gaussian on Impeller, and the dark edge
-      // reads 0.169 there, 0.174 on an M2 iPad (glass D239). The light one
-      // cannot be read on Impeller: its lines are 5 code values under the
-      // 0.85 tint, and Impeller dithers a gradient, the tint's too, by a code
-      // a channel, pixel by pixel, which the lines' peak to peak counts as
-      // contrast. It reads 0.237, the iPad 0.235, at the same sigma the dark
-      // edge is right at (#33).
-    }, tags: appearance == GlassScrollEdgeAppearance.light ? 'impeller-gap' : null);
+      // reads 0.169 there, 0.174 on an M2 iPad (glass D239).
+    });
   }
 
   testWidgets('our hard edge reads as Apple\'s', (WidgetTester tester) async {
@@ -344,7 +353,15 @@ class _Fixture extends CustomPainter {
 
 /// One row of the reading: the lines' contrast against the known answer's,
 /// and the means of the field and of the lines, effect and known.
-typedef _Row = ({double y, double contrast, double field, double fieldKnown, double lines, double linesKnown});
+typedef _Row = ({
+  double y,
+  double contrast,
+  double harmonic,
+  double field,
+  double fieldKnown,
+  double lines,
+  double linesKnown,
+});
 
 List<_Row> _rows(_Image a, _Image b) {
   expect(a.width, b.width);
@@ -373,6 +390,7 @@ List<_Row> _rows(_Image a, _Image b) {
     rows.add((
       y: y,
       contrast: (mxA - mnA) / math.max(1, mxB - mnB),
+      harmonic: _harmonic(a, row, lx0, lx1) / math.max(1, _harmonic(b, row, lx0, lx1)),
       field: fa / (fx1 - fx0),
       fieldKnown: fb / (fx1 - fx0),
       lines: sA / (lx1 - lx0),
@@ -382,11 +400,30 @@ List<_Row> _rows(_Image a, _Image b) {
   return rows;
 }
 
+/// The amplitude of the lines' own frequency, one every 6 pt, along [row]
+/// from [x0] to [x1]: a whole number of periods, so the window leaks nothing.
+///
+/// What a pixel-to-pixel dither adds to it is spread over every frequency, and
+/// this reads one; a peak to peak counts all of it.
+double _harmonic(_Image image, int row, int x0, int x1) {
+  const double period = 6 * kScale;
+  var re = 0.0;
+  var im = 0.0;
+  for (var x = x0; x < x1; x++) {
+    final double v = image.grey(x, row);
+    final double phase = 2 * math.pi * x / period;
+    re += v * math.cos(phase);
+    im += v * math.sin(phase);
+  }
+  return 2 * math.sqrt(re * re + im * im) / (x1 - x0);
+}
+
 class _Side {
   _Side(
     this.a,
     this.c,
     this.residual,
+    this.harmonic,
     this.tint10,
     this.tint50,
     this.tint90,
@@ -397,6 +434,10 @@ class _Side {
   );
   final double a, c, residual;
 
+  /// [residual] read off the lines' own frequency rather than their peak to
+  /// peak ([_harmonic]): the reading a dithered renderer leaves alone.
+  final double harmonic;
+
   /// The lowest tint-corrected contrast anywhere on the ramp: a blur that is
   /// not at the plateau — glass placed off the edge — shows here and nowhere
   /// else (the break that first failed to break, below).
@@ -406,6 +447,7 @@ class _Side {
   @override
   String toString() =>
       'a ${a.toStringAsFixed(3)} C ${c.toStringAsFixed(1)} residual ${residual.toStringAsFixed(3)} '
+      'harmonic ${harmonic.toStringAsFixed(3)} '
       'tint ${tint90.toStringAsFixed(1)}/${tint50.toStringAsFixed(1)}/${tint10.toStringAsFixed(1)} '
       'blur ${blur90.toStringAsFixed(1)}/${blur50.toStringAsFixed(1)}/${blur10.toStringAsFixed(1)} '
       'least ${leastContrast.toStringAsFixed(3)}';
@@ -432,6 +474,7 @@ _Fit _fit(_Image effect, _Image known) {
     final double a = 1 - (field - lines) / (fieldKnown - linesKnown);
     final double c = (field - fieldKnown * (1 - a)) / a;
     final double residual = contrast / (1 - a);
+    final double harmonic = mean((r) => r.harmonic) / (1 - a);
     final List<_Row> span = rows.where((r) => r.y >= ramp.$1 && r.y <= ramp.$2).toList();
     final mt = <(double, double)>[];
     final mb = <(double, double)>[];
@@ -459,6 +502,7 @@ _Fit _fit(_Image effect, _Image known) {
       a,
       c,
       residual,
+      harmonic,
       cross(mt, 0.1),
       cross(mt, 0.5),
       cross(mt, 0.9),
