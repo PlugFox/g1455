@@ -38,9 +38,10 @@ a change.
   counters (`dropped`, `picturesForwarded`, `paragraphsForwarded`) say what
   it left out of the capture and what it could not look into.
 - `WalkLog` is exported from `package:g1455/glass_diagnostics.dart`: what
-  the capture walk observed on a frame, read as `GlassProxyHandle.frame?.log`.
-  Diagnostics only; nothing falls back to the stock capture on what it
-  counts.
+  the capture walk observed on a frame, read as `GlassProxyHandle.frame?.log`,
+  `fellBack` included (see Fixed).
+- `debugGlassWalkFallback` in `package:g1455/glass_diagnostics.dart`, on by
+  default: a benchmark turns the capture's fallback off to price it.
 
 ### Changed
 
@@ -103,6 +104,15 @@ a change.
   away from the origin (a list row, say), is left as it was by the capture.
   The capture used to move the mask on screen until the row repainted, and
   to keep an idle screen capturing on every frame.
+- Glass over a fade of a `ColorFiltered` or `ImageFiltered` subtree, or
+  over a `ShaderMask` whose blend mode paints past its child (`srcOver`,
+  `plus`, `screen` and the like), shows what is on screen. The capture
+  draws its own copy of the screen and, there, drew what the engine does
+  not: the engine folds a fade into the filter and clips the mask to the
+  child. Such a subtree is now drawn by the engine inside the capture, one
+  more render pass on a frame that is capturing anyway, and named in
+  `WalkLog.fellBack`. A subtree that holds glass is still drawn by the
+  capture, as is a `BackdropFilter`.
 - The capture of glass on glass matches the engine in more cases:
   - an opacity at full alpha opens no layer, so a child that clears or
     blends reaches the page;

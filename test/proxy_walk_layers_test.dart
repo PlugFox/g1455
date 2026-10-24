@@ -249,6 +249,105 @@ void main() {
       alone.dispose();
     });
 
+    // The fallback, against the same two divergences. A pass given a ratio
+    // records a subtree it draws apart from the engine as the engine draws it,
+    // its live layer rasterized in place, and says so in `fellBack` rather
+    // than in the counters that named the divergence. The fixtures diverge
+    // without it, or the arm would pass on a fallback that never ran.
+    group('with a fallback ratio', () {
+      // A colour filter that paints a transparent destination: the region the
+      // engine's fold removes. Composed with a blur for the image-filter route.
+      const ColorFilter flood = ColorFilter.mode(Color(0xFF00FFFF), BlendMode.srcOver);
+      final Map<String, Widget Function()> folds = <String, Widget Function()>{
+        'a composited opacity over an image filter': () => Opacity(
+          opacity: 0.5,
+          child: ImageFiltered(
+            imageFilter: ui.ImageFilter.compose(outer: flood, inner: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2)),
+            child: _placed(const SizedBox.expand()),
+          ),
+        ),
+        'a pushed opacity over a colour filter': () => CustomScrollView(
+          slivers: <Widget>[
+            SliverOpacity(
+              opacity: 0.5,
+              sliver: SliverToBoxAdapter(
+                child: SizedBox.fromSize(
+                  size: kArea,
+                  child: ColorFiltered(
+                    colorFilter: flood,
+                    child: Center(child: SizedBox(width: 30, height: 30, child: _scene())),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      };
+      for (final MapEntry<String, Widget Function()> e in folds.entries) {
+        testWidgets('${e.key}: drawn as the engine draws it', (WidgetTester tester) async {
+          final _Shot apart = await _shoot(tester, e.value());
+          expect(apart.log.opacityFoldedIntoFilter, greaterThan(0));
+          expect(
+            await _differing(tester, apart.stock, apart.pass),
+            greaterThan(0),
+            reason: 'the fixture does not diverge, so the fallback is not tested',
+          );
+          apart.dispose();
+
+          final _Shot shot = await _shoot(tester, e.value(), fallback: 1);
+          expect(shot.log.errors, isEmpty);
+          expect(shot.log.fellBack, <String>['OpacityLayer']);
+          expect(shot.log.opacityFoldedIntoFilter, 0, reason: 'a fallen-back fold is still counted');
+          expect(shot.liveTreeChanges, isEmpty);
+          // A code value, where the pushed opacity's layer is read back at 8
+          // bits with its alpha in it and composited once more.
+          expect(await _differing(tester, shot.stock, shot.pass, tolerance: 1), 0);
+          // The engine layers the fallback built are the ones the next frame
+          // retains, and it draws what it drew.
+          await tester.pump();
+          final ui.Image next = _root().toImageSync();
+          expect(await _differing(tester, shot.stock, next), 0, reason: 'the frame after the fallback changed');
+          next.dispose();
+          shot.dispose();
+        });
+      }
+
+      testWidgets('a shader mask that paints past its children is drawn as the engine draws it', (
+        WidgetTester tester,
+      ) async {
+        for (final BlendMode mode in <BlendMode>[BlendMode.src, BlendMode.srcOver, BlendMode.plus, BlendMode.screen]) {
+          final _Shot shot = await _shoot(tester, _maskOverSmallChild(mode), fallback: 1);
+          expect(shot.log.fellBack, <String>['ShaderMaskLayer'], reason: mode.name);
+          expect(shot.log.unhandledLayers, isEmpty, reason: '${mode.name}: a fallen-back mask is still named');
+          expect(shot.liveTreeChanges, isEmpty, reason: mode.name);
+          expect(await _differing(tester, shot.stock, shot.pass), 0, reason: mode.name);
+          shot.dispose();
+        }
+        // A mode the pass reproduces is left to the pass.
+        final _Shot exact = await _shoot(tester, _maskOverSmallChild(BlendMode.srcIn), fallback: 1);
+        expect(exact.log.fellBack, isEmpty);
+        exact.dispose();
+      });
+
+      // The engine would draw what the pass subtracts, and a subtree that
+      // holds glass would hold the glass itself.
+      testWidgets('a subtree the pass subtracted from is left as the pass drew it', (WidgetTester tester) async {
+        final _Shot shot = await _shoot(
+          tester,
+          folds.values.first(),
+          fallback: 1,
+          policy: (RenderObject child) =>
+              child is RenderConstrainedBox && child.additionalConstraints == const BoxConstraints.expand()
+              ? WalkAction.skip
+              : WalkAction.paint,
+        );
+        expect(shot.log.skipped, isNotEmpty, reason: 'the policy skipped nothing, so the arm says nothing');
+        expect(shot.log.fellBack, isEmpty);
+        expect(shot.log.opacityFoldedIntoFilter, greaterThan(0));
+        shot.dispose();
+      });
+    });
+
     testWidgets('an opacity pushed without an old layer mints one, and only one, and leaves the tree', (
       WidgetTester tester,
     ) async {
@@ -726,6 +825,7 @@ void main() {
         'layers_minted': 3,
         'opacity_folded_into_filter': 5,
         'unhandled_layers': <String>['BackdropFilterLayer'],
+        'fell_back': <String>[],
         'added_layers': <String>['TextureLayer'],
         'substituted': <String>['RenderX'],
         'skipped': <String>['RenderY'],
@@ -1120,10 +1220,10 @@ class _Pass {
   }
 }
 
-_Pass _walk(RenderObject root, {WalkPolicy policy = paintEverything}) {
+_Pass _walk(RenderObject root, {WalkPolicy policy = paintEverything, double? fallback}) {
   final handle = LayerHandle<OffsetLayer>()..layer = OffsetLayer();
   final log = WalkLog();
-  ProxyWalkContext(handle.layer!, Offset.zero & kArea, log: log, policy: policy)
+  ProxyWalkContext(handle.layer!, Offset.zero & kArea, log: log, policy: policy, fallbackPixelRatio: fallback)
     ..paintChild(root, Offset.zero)
     ..finish();
   return _Pass(handle, handle.layer!.toImageSync(Offset.zero & kArea), log);
@@ -1147,7 +1247,12 @@ class _Shot {
 
 /// The engine's capture of [child] and one pass over the same tree, plus what
 /// the pass changed in the live tree (which must be nothing).
-Future<_Shot> _shoot(WidgetTester tester, Widget child, {WalkPolicy policy = paintEverything}) async {
+Future<_Shot> _shoot(
+  WidgetTester tester,
+  Widget child, {
+  WalkPolicy policy = paintEverything,
+  double? fallback,
+}) async {
   // A fresh key per shot: the fixtures' render objects take their route at
   // creation and have no `updateRenderObject`, so a reused element would keep
   // the previous shot's.
@@ -1156,12 +1261,13 @@ Future<_Shot> _shoot(WidgetTester tester, Widget child, {WalkPolicy policy = pai
   final RenderRepaintBoundary root = _root();
   final ui.Image stock = root.toImageSync();
   final TreeSnapshot before = TreeSnapshot.of(root);
-  final _Pass pass = _walk(root, policy: policy);
+  final _Pass pass = _walk(root, policy: policy, fallback: fallback);
   final List<String> changes = TreeSnapshot.of(root).diffFrom(before);
   return _Shot(stock, pass, changes);
 }
 
-Future<int> _differing(WidgetTester tester, ui.Image a, ui.Image b) async {
+/// Pixels of [a] and [b] apart by more than [tolerance] in any channel.
+Future<int> _differing(WidgetTester tester, ui.Image a, ui.Image b, {int tolerance = 0}) async {
   expect(a.width, b.width);
   expect(a.height, b.height);
   var n = 0;
@@ -1174,7 +1280,10 @@ Future<int> _differing(WidgetTester tester, ui.Image a, ui.Image b) async {
     final Uint8List pa = da.buffer.asUint8List();
     final Uint8List pb = db.buffer.asUint8List();
     for (var i = 0; i < pa.length; i += 4) {
-      if (pa[i] != pb[i] || pa[i + 1] != pb[i + 1] || pa[i + 2] != pb[i + 2] || pa[i + 3] != pb[i + 3]) {
+      if ((pa[i] - pb[i]).abs() > tolerance ||
+          (pa[i + 1] - pb[i + 1]).abs() > tolerance ||
+          (pa[i + 2] - pb[i + 2]).abs() > tolerance ||
+          (pa[i + 3] - pb[i + 3]).abs() > tolerance) {
         n++;
       }
     }

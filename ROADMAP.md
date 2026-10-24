@@ -126,10 +126,16 @@ cheap setting is reachable without a fork.
       exported, so an app can give the one and read the other; on Impeller
       the blur asked for the sigma the finishes were calibrated at, measured
       on an M2 iPad (#33).
+- [x] The walk hands a fade folded into a filter and a mask that paints past
+      its child to the engine, inside the capture (#32), and leaves a shader
+      mask's and a backdrop filter's live layers as their paint set them.
 
 ## Next — what 0.4.0 left open
 
-- [ ] A fallback for what the walk cannot reproduce (#32).
+- [ ] What the walk still draws apart from the engine (#32): a
+      `BackdropFilter` under glass, which reads what lies below it, and a
+      fold or a mask inside a subtree that holds glass, which the engine
+      cannot draw for it. 0.4.0 hands every other such subtree to the engine.
 - [ ] Menus that grow with large text (#26) and the tab bar's large content
       viewer (#27).
 - [ ] The remaining Impeller differences (#33): what the blur correction

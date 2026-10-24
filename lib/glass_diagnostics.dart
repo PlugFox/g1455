@@ -24,6 +24,8 @@
 ///   fused draw is split and culled.
 /// - [debugGlassShaderAntiAlias]: the shader's anti-alias flag.
 /// - [debugGlassShaderLoader]: the loader a test replaces to see a load fail.
+/// - [debugGlassWalkFallback]: whether the capture hands a subtree the walk
+///   draws apart from the engine to the engine.
 ///
 /// Each has a measured default; set one back when the run is over.
 ///
@@ -57,6 +59,9 @@ export 'src/surface/glass_adaptive.dart' show GlassBackdropReadings, GlassBackdr
 // and the shader loader a test replaces to see a load fail.
 export 'src/surface/glass_host.dart'
     show GlassProxyHandle, GlassProxyScope, debugGlassShaderLoader, kGlassRippleShaderAsset, kGlassShaderAsset;
+// Whether the capture hands what the walk draws apart from the engine to the
+// engine, on by default.
+export 'src/proxy/proxy_pipeline.dart' show debugGlassWalkFallback;
 // What the capture walk observed on a frame, read off the handle's frame.
 export 'src/proxy/proxy_walk.dart' show WalkLog;
 // The ripple's model, which a test drives without a frame.

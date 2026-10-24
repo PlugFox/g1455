@@ -247,6 +247,12 @@ enum ProxyBlurPass {
   static ProxyBlurPass defaultFor(GlassHardware hardware) => hardware == GlassHardware.appleMetal ? split : folded;
 }
 
+/// Whether the host's capture hands a subtree the walk draws apart from the
+/// engine to the engine (`ProxyWalkContext.fallbackPixelRatio`): an opacity
+/// folded into a filter below it, a shader mask that paints past its
+/// children. On; a benchmark turns it off to price it, and sets it back.
+bool debugGlassWalkFallback = true;
+
 /// Runs the proxy pipeline for one screen.
 ///
 /// Not a widget and not a render object: it is driven by whoever owns the
@@ -617,6 +623,11 @@ class GlassProxyPipeline {
           return occluded == WalkAction.paint ? glass(child) : occluded;
         },
         shadowFilter: shadowFilter,
+        // What the pass draws apart from the engine is drawn by the engine,
+        // over the slots' sources only: the atlas reads nothing else. A pixel
+        // out, for the texel a slot rounds up to.
+        fallbackPixelRatio: debugGlassWalkFallback ? scale : null,
+        fallbackRegion: _sourcesOf(update.layout)?.inflate(1),
       )..paintChild(root, rootOffset);
       context.finish();
 
@@ -809,6 +820,15 @@ class GlassProxyPipeline {
       canvas.restore();
     }
     return recorder.endRecording();
+  }
+
+  /// The box around every slot's source, in the scene's coordinates.
+  static Rect? _sourcesOf(AtlasLayout layout) {
+    Rect? out;
+    for (final AtlasSlot slot in layout.slots) {
+      out = out?.expandToInclude(slot.source) ?? slot.source;
+    }
+    return out;
   }
 
   /// The box around blur class [c]'s slots.

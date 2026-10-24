@@ -564,7 +564,8 @@ does both itself: its alert materializes, and a menu hides its anchor button wit
 GlassSurface(materialize: t, child: label)
 ```
 
-Content that fades *under* the glass is fine: the host sees the fade and captures it.
+Content that fades *under* the glass is fine: the host sees the fade and captures it, a fade over a `ColorFiltered`
+or an `ImageFiltered` included, as the engine draws it.
 
 ### A bar over glass cards shows the page with the cards cut out
 

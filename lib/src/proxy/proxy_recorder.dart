@@ -5,9 +5,9 @@
 // Two routes, on purpose. [ProxyRecorder.walk] runs our own pass, which is what
 // makes the capture selective (roles, occlusion, the shadow filter);
 // [ProxyRecorder.stock] goes through `OffsetLayer.toImageSync` and subtracts
-// nothing. The second is not a leftover: it is the structural fallback for a
-// subtree the pass cannot reproduce, and both producing the *same* value type is
-// what lets a caller swap them per subtree.
+// nothing. The second is the control the first is compared against: what the
+// engine draws. The pass hands a subtree it cannot reproduce to the engine
+// itself, inside the recording (`ProxyWalkContext.fallbackPixelRatio`).
 //
 // **The map is the part that costs pixels when it is wrong.** The engine's own
 // arithmetic is `texel = (logical - bounds.topLeft - layer.offset) * pixelRatio`
@@ -110,6 +110,8 @@ abstract final class ProxyRecorder {
       log: log,
       policy: policy,
       shadowFilter: shadowFilter,
+      fallbackPixelRatio: scale,
+      fallbackRegion: bounds,
     )..paintChild(root, rootOffset);
     context.finish();
     return ProxyRecording._(
@@ -121,12 +123,8 @@ abstract final class ProxyRecorder {
     );
   }
 
-  /// The fallback: the engine's own capture of the retained layer, subtracting
-  /// nothing.
-  ///
-  /// The route a subtree falls back to when the pass reports a construct it
-  /// cannot reproduce — `BackdropFilter`, or an opacity folded into a colour
-  /// filter.
+  /// The engine's own capture of the retained layer, subtracting nothing:
+  /// what [walk] is compared against.
   static ProxyRecording stock(
     RenderRepaintBoundary boundary, {
     required Rect region,

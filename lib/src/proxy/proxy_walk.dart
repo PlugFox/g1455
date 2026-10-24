@@ -70,10 +70,12 @@ WalkAction paintEverything(RenderObject child) => WalkAction.paint;
 /// passes over the same tree are two measurements, not one accumulated.
 ///
 /// Read off the host's published frame, `GlassProxyHandle.frame?.log`, for
-/// a report or a test. Diagnostics only: nothing in the package reads it to
-/// change what is captured, so a layer counted in [unhandledLayers] or a
-/// filter counted in [opacityFoldedIntoFilter] is drawn as the pass drew it,
-/// with no fallback to the stock capture.
+/// a report or a test. What the pass handed to the engine is named in
+/// [fellBack]; a layer still counted in [unhandledLayers] or a filter in
+/// [opacityFoldedIntoFilter] is one it drew as it drew it, because the
+/// subtree held something the engine must not draw for it (glass, a marker,
+/// what the policy took out) or is a backdrop filter, which reads what lies
+/// below it.
 ///
 /// {@category Diagnostics}
 class WalkLog {
@@ -128,10 +130,10 @@ class WalkLog {
   /// changes that layer's bounds from the cull rect to the content — so a
   /// filter that paints transparent black stops covering the empty area.
   /// Measured: at opacity 1.0 the region is opaque cyan and at 254/255 it is
-  /// gone, in the engine's own rendering. This pass keeps it, so a subtree with
-  /// a non-zero count here belongs on the `toImageSync` fallback — which does
-  /// not exist yet: the pipeline records through this pass whatever the count
-  /// says, and the count reaches diagnostics only (#32).
+  /// gone, in the engine's own rendering. This pass keeps it, so with a
+  /// fallback ratio the opacity's subtree is handed to the engine and named
+  /// in [fellBack] instead of counted here; what is left here was drawn as
+  /// the pass drew it.
   ///
   /// An image filter is counted for the same reason: `ImageFilterLayer`
   /// accepts its parent's opacity as `ColorFilterLayer` does, and a colour
@@ -139,6 +141,13 @@ class WalkLog {
   /// with `Opacity(0.5)` over `ImageFiltered(compose(colour filter, blur))`:
   /// 2116 px differ on Impeller and every pixel by a code value on Skia.
   int opacityFoldedIntoFilter = 0;
+
+  /// Subtrees recorded as the engine draws them rather than as the pass did,
+  /// by the type of the layer handed to the engine: an `OpacityLayer` over a
+  /// filter it folds into, a `ShaderMaskLayer` that paints past its children.
+  /// Only with a fallback ratio, which the host's pipeline gives; see
+  /// `ProxyWalkContext.fallbackPixelRatio`.
+  final List<String> fellBack = <String>[];
 
   /// Nodes whose `paint` threw. We run foreign code; this is the budget for it.
   final List<String> errors = <String>[];
@@ -155,6 +164,7 @@ class WalkLog {
     'layers_minted': layersMinted,
     'opacity_folded_into_filter': opacityFoldedIntoFilter,
     'unhandled_layers': unhandledLayers,
+    'fell_back': fellBack,
     'added_layers': addedLayers,
     'substituted': substituted,
     'skipped': skipped,
@@ -194,6 +204,8 @@ class ProxyWalkContext extends PaintingContext {
     this.policy = paintEverything,
     this.placeholderColor = const ui.Color(0xFF808080),
     this.shadowFilter,
+    this.fallbackPixelRatio,
+    this.fallbackRegion,
   }) : log = log ?? WalkLog();
 
   /// What this pass observed.
@@ -214,11 +226,42 @@ class ProxyWalkContext extends PaintingContext {
   /// plain getter and `ClipContext` reads the same one.
   final ShadowFilter? shadowFilter;
 
+  /// Texels per logical pixel of the recording this pass feeds, and with it
+  /// the switch for the fallback: null records every subtree as the pass
+  /// draws it.
+  ///
+  /// With a ratio, a subtree the pass is known to draw apart from the engine
+  /// — an opacity folded into a filter below it, a shader mask that paints
+  /// past its children — and from which it subtracted nothing is recorded as
+  /// the engine draws it instead: its live layer, rasterized at this ratio
+  /// with `Scene.toImageSync`, in place of what the pass drew. Each is named
+  /// in [WalkLog.fellBack] and leaves the counters that would have named it.
+  final double? fallbackPixelRatio;
+
+  /// The part of the scene a fallback is rasterized over, in the coordinates
+  /// the walk's root is painted in: what the recording is read in, such as
+  /// the atlas's sources. Null for the whole of [estimatedBounds]. Clipped,
+  /// either way, to the clip the subtree is drawn under.
+  final Rect? fallbackRegion;
+
+  /// Subtrees being recorded aside, innermost last; see [fallbackPixelRatio].
+  final List<_Detour> _detours = <_Detour>[];
+
+  /// The walk's root and where it was painted, which is what puts a live
+  /// layer's own coordinates into the scene's: read off the first
+  /// [paintChild].
+  RenderObject? _root;
+  Offset _rootOffset = Offset.zero;
+
   FilteringCanvas? _filtered;
+
+  /// The canvas under the shadow filter: the context's own, or the detour's
+  /// a subtree is being recorded into.
+  Canvas get _raw => _detours.isEmpty ? super.canvas : _detours.last.canvas;
 
   @override
   Canvas get canvas {
-    final Canvas inner = super.canvas;
+    final Canvas inner = _raw;
     final ShadowFilter? filter = shadowFilter;
     // `GlassProxy.verbatim` is a subtree-sized hole in the canvas policy, so it
     // has to be applied here rather than at the node: the draws it protects are
@@ -246,8 +289,9 @@ class ProxyWalkContext extends PaintingContext {
   /// the fold changes the filter's bounds from the
   /// cull rect to the content, which deletes everything the filter painted
   /// outside the content. A flattened pass keeps two layers and keeps that
-  /// region. Counted rather than fixed: reproducing the fold means knowing
-  /// bottom-up what the child will do, and this pass is top-down.
+  /// region. Counted rather than reproduced: reproducing the fold means
+  /// knowing bottom-up what the child will do, and this pass is top-down. The
+  /// opacity's live layer knows, so the fallback hands it to the engine.
   int _opacityDepth = 0;
 
   /// Open [GlassProxyRole.verbatim] subtrees above the cursor.
@@ -263,6 +307,10 @@ class ProxyWalkContext extends PaintingContext {
 
   @override
   void paintChild(RenderObject child, Offset offset) {
+    if (_root == null) {
+      _root = child;
+      _rootOffset = offset;
+    }
     log.visited++;
     if (child.isRepaintBoundary) {
       log.boundariesCrossed++;
@@ -306,6 +354,9 @@ class ProxyWalkContext extends PaintingContext {
         break;
     }
 
+    // Opened before anything is drawn for the child, its own effect included:
+    // the engine's rendering of its layer carries that effect too.
+    final _Detour? detour = _detourFor(child);
     final _CanvasEffect? composited = child.isRepaintBoundary ? _compositedEffect(child, offset) : null;
 
     // A throwing `paint` leaves the save stack unbalanced, and the next node
@@ -344,6 +395,160 @@ class ProxyWalkContext extends PaintingContext {
         canvas.restore();
       }
     }
+    // After the live layer is put back: a shader mask's own `paint` wrote the
+    // walk's rect into it, and the engine is to draw it at its own.
+    if (detour != null) {
+      _close(detour);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // The fallback.
+  // ---------------------------------------------------------------------
+
+  /// Starts recording [child] aside when its own layer is one the pass draws
+  /// apart from the engine, or can: a live opacity, which may fold into a
+  /// filter below it, or a shader mask under a mode that paints past its
+  /// children.
+  ///
+  /// The child's own layer, because it is the one the pass can still hand to
+  /// the engine once it knows: retained from the frame just composited and,
+  /// unlike the walk, read bottom-up.
+  _Detour? _detourFor(RenderObject child) {
+    if (fallbackPixelRatio == null || identical(child, _root)) {
+      return null;
+    }
+    // ignore: invalid_use_of_protected_member
+    final ContainerLayer? layer = child.layer;
+    final bool mask = layer is ShaderMaskLayer && !_ShaderMask.staysInside.contains(layer.blendMode);
+    final bool alpha = layer is OpacityLayer && _live(layer.alpha ?? 255);
+    if (!mask && !alpha) {
+      return null;
+    }
+    final detour = _Detour(layer!, _toScene, log, alpha: alpha);
+    _detours.add(detour);
+    return detour;
+  }
+
+  /// From the current canvas to the scene the walk's root is painted in.
+  Matrix4 get _toScene {
+    final here = Matrix4.fromFloat64List(_raw.getTransform());
+    return _detours.isEmpty ? here : (_detours.last.toScene.clone()..multiply(here));
+  }
+
+  /// Ends [detour] and draws, onto the canvas it was opened over, either what
+  /// the pass recorded or the engine's rendering of its layer.
+  void _close(_Detour detour) {
+    _detours.removeLast();
+    final ui.Picture picture = detour.end();
+    try {
+      if (detour.diverged && detour.cleanIn(log) && _drawEngineImage(detour)) {
+        log
+          ..opacityFoldedIntoFilter -= detour.folds
+          ..fellBack.add(detour.layer.runtimeType.toString());
+        log.unhandledLayers.length = detour.unhandled;
+        return;
+      }
+      _raw.drawPicture(picture);
+    } finally {
+      picture.dispose();
+    }
+  }
+
+  /// Draws [detour]'s layer as the engine renders it, where the pass would
+  /// have drawn it; false when there is nothing to place it by.
+  ///
+  /// The layer is rasterized in the scene's own texels, so a texel of it is a
+  /// texel of the recording wherever it sits: its place in the scene is read
+  /// off the live layer tree, from its parent up to the walk's root, and the
+  /// root is where [paintChild] first put it.
+  bool _drawEngineImage(_Detour detour) {
+    final double ratio = fallbackPixelRatio!;
+    final Matrix4? layerToScene = _layerToScene(detour.layer);
+    final Matrix4 canvasToScene = _toScene;
+    final Matrix4? sceneToCanvas = Matrix4.tryInvert(canvasToScene);
+    if (layerToScene == null || sceneToCanvas == null) {
+      return false;
+    }
+    final Rect clip = MatrixUtils.transformRect(
+      _detours.isEmpty ? Matrix4.identity() : _detours.last.toScene,
+      _raw.getDestinationClipBounds(),
+    );
+    final Rect region = (fallbackRegion ?? estimatedBounds).intersect(clip);
+    if (region.isEmpty) {
+      return false;
+    }
+    final snapped = Rect.fromLTRB(
+      (region.left * ratio).floorToDouble() / ratio,
+      (region.top * ratio).floorToDouble() / ratio,
+      (region.right * ratio).ceilToDouble() / ratio,
+      (region.bottom * ratio).ceilToDouble() / ratio,
+    );
+    final int width = (snapped.width * ratio).round();
+    final int height = (snapped.height * ratio).round();
+    if (width <= 0 || height <= 0) {
+      return false;
+    }
+    final builder = ui.SceneBuilder()
+      ..pushTransform(
+        (Matrix4.diagonal3Values(ratio, ratio, 1)
+              ..translateByDouble(-snapped.left, -snapped.top, 0, 1)
+              ..multiply(layerToScene))
+            .storage,
+      );
+    // As `OffsetLayer.toImageSync` does on any layer it is called on: the
+    // engine layers this builds are retained by the next frame, which is
+    // what they would have been.
+    final ui.Scene scene = detour.layer.buildScene(builder);
+    final ui.Image image;
+    try {
+      image = scene.toImageSync(width, height);
+    } finally {
+      scene.dispose();
+    }
+    _raw
+      ..save()
+      ..transform(sceneToCanvas.storage)
+      ..drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+        snapped,
+        ui.Paint()..filterQuality = FilterQuality.low,
+      )
+      ..restore();
+    // The recording holds the image; this handle is ours.
+    image.dispose();
+    return true;
+  }
+
+  /// Where [layer]'s parent's coordinates land in the scene, or null when
+  /// [layer] is not under the walk's root in the live layer tree.
+  ///
+  /// The root's content is at zero in its own layer and was painted at the
+  /// first offset, so the chain stops at the root without applying its own.
+  Matrix4? _layerToScene(Layer layer) {
+    final RenderObject? owner = _root;
+    // ignore: invalid_use_of_protected_member
+    final ContainerLayer? root = owner != null && owner.isRepaintBoundary ? owner.layer : null;
+    if (root == null) {
+      return null;
+    }
+    final links = <(ContainerLayer, Layer)>[];
+    Layer child = layer;
+    ContainerLayer? parent = layer.parent;
+    while (parent != null && !identical(parent, root)) {
+      links.add((parent, child));
+      child = parent;
+      parent = parent.parent;
+    }
+    if (parent == null) {
+      return null;
+    }
+    final m = Matrix4.translationValues(_rootOffset.dx, _rootOffset.dy, 0);
+    for (final (ContainerLayer above, Layer below) in links.reversed) {
+      above.applyTransform(below, m);
+    }
+    return m;
   }
 
   /// The effect a repaint boundary carries in `updateCompositedLayer`, which is
@@ -638,12 +843,19 @@ class ProxyWalkContext extends PaintingContext {
   /// child advertises that it can absorb one, and this counts every colour or
   /// image filter under any live alpha — a blur that would have survived the
   /// fold included, because Dart cannot ask a filter whether it holds a colour
-  /// filter. Over-reporting would send a subtree back to a plain
-  /// `toImageSync`, which is the direction a fallback should err in, once
-  /// there is one (#32).
+  /// filter. Over-reporting sends a subtree to the engine that the pass would
+  /// have drawn as well, which is the direction a fallback should err in: a
+  /// render pass, never a pixel.
   void _noteFilter() {
     if (_opacityDepth > 0) {
       log.opacityFoldedIntoFilter++;
+      // To the innermost opacity: it is the one that folds into this filter.
+      for (var i = _detours.length - 1; i >= 0; i--) {
+        if (_detours[i].alpha) {
+          _detours[i].folds++;
+          break;
+        }
+      }
     }
   }
 
@@ -743,6 +955,73 @@ class ProxyWalkContext extends PaintingContext {
 // Canvas effects. Each is a matched save/restore pair so the walk can wrap a
 // child in it without knowing what it is.
 // ---------------------------------------------------------------------------
+
+/// A subtree recorded aside until the pass below it says whether the engine
+/// is to draw it instead; see [ProxyWalkContext.fallbackPixelRatio].
+final class _Detour {
+  _Detour(this.layer, this.toScene, WalkLog log, {required this.alpha})
+    : _skipped = log.skipped.length,
+      _substituted = log.substituted.length,
+      _markers = _sum(log.proxyRoles),
+      _errors = log.errors.length,
+      _added = log.addedLayers.length,
+      unhandled = log.unhandledLayers.length {
+    canvas = Canvas(_recorder);
+  }
+
+  /// The child's own layer, live.
+  final ContainerLayer layer;
+
+  /// From [canvas] to the scene.
+  final Matrix4 toScene;
+
+  /// Whether [layer] is a live opacity, which [folds] are counted against; a
+  /// shader mask otherwise.
+  final bool alpha;
+
+  final ui.PictureRecorder _recorder = ui.PictureRecorder();
+
+  /// Where the subtree is recorded.
+  late final Canvas canvas;
+
+  /// Filters counted folded into this opacity.
+  int folds = 0;
+
+  /// The length of [WalkLog.unhandledLayers] when this opened.
+  final int unhandled;
+
+  final int _skipped;
+  final int _substituted;
+  final int _markers;
+  final int _errors;
+  final int _added;
+
+  /// Whether the pass drew this subtree apart from the engine: a shader mask
+  /// is opened only under a mode that does.
+  bool get diverged => !alpha || folds > 0;
+
+  /// Whether the pass subtracted nothing from the subtree and met nothing in
+  /// it that it could not read, so the engine's rendering of it is the right
+  /// one. A glass surface or a marker in it is not: the engine draws the
+  /// glass, and the capture of glass must not hold itself. Nor is an error,
+  /// a platform view or another layer the pass could not reproduce. The one
+  /// unhandled layer allowed is a shader mask's own.
+  bool cleanIn(WalkLog log) =>
+      log.skipped.length == _skipped &&
+      log.substituted.length == _substituted &&
+      _sum(log.proxyRoles) == _markers &&
+      log.errors.length == _errors &&
+      log.addedLayers.length == _added &&
+      log.unhandledLayers.length == unhandled + (alpha ? 0 : 1);
+
+  /// Closes the recording, balanced whatever the subtree left open.
+  ui.Picture end() {
+    canvas.restoreToCount(1);
+    return _recorder.endRecording();
+  }
+
+  static int _sum(Map<GlassProxyRole, int> roles) => roles.values.fold(0, (int a, int b) => a + b);
+}
 
 /// What a live layer held before the walk painted the render object that owns
 /// it, put back afterwards.
@@ -1021,10 +1300,9 @@ class _ShaderMask extends _CanvasEffect {
   /// `S·(1 − Da)` term, which is the whole of the source — src, srcOver,
   /// dstOver, srcOut, dstATop, xor, plus, screen and every separable and
   /// non-separable mode after it — and paints the mask across the empty part
-  /// of its rect. Those are named as unhandled, so diagnostics show where the
-  /// pass and the engine part — the pipeline has no fallback to send them to
-  /// yet (#32); the masking modes a `ShaderMask` is nearly always used for are
-  /// exact here.
+  /// of its rect. Those are named as unhandled and, with a fallback ratio,
+  /// handed to the engine; the masking modes a `ShaderMask` is nearly always
+  /// used for are exact here.
   static const Set<BlendMode> staysInside = <BlendMode>{
     BlendMode.clear,
     BlendMode.dst,
