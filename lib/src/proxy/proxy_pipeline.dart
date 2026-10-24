@@ -30,6 +30,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/rendering.dart';
 
 import '../hardware.dart';
@@ -458,6 +459,22 @@ class GlassProxyPipeline {
 
   GlassProxyFrame? _current;
 
+  /// Whether the last [captureIfNeeded] recorded only because a surface's
+  /// finish changed, over a screen the oracle would have held: what is under
+  /// the glass is what it was, so what was read of it still stands.
+  bool get refinished => _refinished;
+  bool _refinished = false;
+
+  /// The finishes [_current] was recorded for, as [_worn] reads them.
+  List<(String, double)>? _currentWorn;
+
+  /// What the capture reads off [finishes]: each one's name, which picks the
+  /// divisor, and its sigma, which the residual blur is baked from — or the
+  /// host's own when every surface wears it.
+  List<(String, double)> _worn(List<GlassFinish>? finishes) => finishes == null
+      ? <(String, double)>[(finish, finishSigmaLogical)]
+      : <(String, double)>[for (final GlassFinish f in finishes) (f.name, f.blurSigmaLogical)];
+
   /// The frame [captureIfNeeded] is holding, if any.
   ///
   /// Owned by the pipeline, unlike the one [capture] hands back. The two are
@@ -489,7 +506,17 @@ class GlassProxyPipeline {
     // [watched] when glass stands on glass: the levels above are recorded on
     // this decision, so the oracle has to see their surfaces move too.
     oracle.noteSurfaces(watched ?? surfaces);
-    final RetakeReason reason = oracle.decide();
+    final List<(String, double)> worn = _worn(finishes);
+    RetakeReason reason = oracle.decide();
+    // The finishes decide the divisor and the blur baked into the atlas, and
+    // the oracle watches the screen, not them: a surface that changed its
+    // finish over a still screen kept the capture taken for the old one — a
+    // search bar turned from light glass to dark kept light's 1/4 where dark
+    // takes 1/2 (#34).
+    _refinished = reason.holds && _current != null && !listEquals(worn, _currentWorn);
+    if (_refinished) {
+      reason = RetakeReason.changed;
+    }
     if (reason.holds) {
       oracle.noteFrame();
       return (frame: _current, reason: reason);
@@ -510,6 +537,7 @@ class GlassProxyPipeline {
     }
     _current?.dispose();
     _current = frame;
+    _currentWorn = worn;
     // What the divisor cost comes out of the same allowance staleness draws on,
     // and it is only knowable here: the density arrives with the frame.
     oracle.noteResolutionDamage(frame.resolution.damage?.deltaE ?? 0);
@@ -521,6 +549,7 @@ class GlassProxyPipeline {
   void dispose() {
     _current?.dispose();
     _current = null;
+    _currentWorn = null;
   }
 
   /// Records one frame of proxy for [surfaces], or null when there is nothing

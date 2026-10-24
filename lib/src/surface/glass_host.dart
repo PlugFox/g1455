@@ -1255,8 +1255,10 @@ class _GlassHostState extends State<GlassHost> {
     _captureUpper(root, levels, present, rects, finishes, dpr);
     _readCounters();
     // On a frame that published: a held frame has nothing new under the glass,
-    // which is what makes the read-back per capture and not per frame.
-    if (reader != null) {
+    // which is what makes the read-back per capture and not per frame. Nor has
+    // one recorded only for a new finish — an adaptive verdict's own, among
+    // them — which is read as a held one is.
+    if (reader != null && (!_pipeline.refinished || reader.hungry || reader.moved(boxes!))) {
       _feed(reader, boxes!);
     }
   }

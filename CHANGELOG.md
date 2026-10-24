@@ -113,6 +113,12 @@ a change.
   more render pass on a frame that is capturing anyway, and named in
   `WalkLog.fellBack`. A subtree that holds glass is still drawn by the
   capture, as is a `BackdropFilter`.
+- Glass that changes finish over a still screen, such as a `GlassSearchBar`
+  turned from light glass to dark, or adaptive glass whose verdict moves,
+  is captured again for the new finish. It used to keep the capture taken
+  for the old one, at the old one's resolution, which showed as a trace of
+  the first finish (6 code values, 15 on Impeller) until something under it
+  moved. The new capture reads nothing back: the screen is what it was.
 - The hard scroll edge's band is the screen's background at 0.90, as on
   iOS: the host's declared `backdrop`, or black in the dark appearance
   (`kGlassScrollEdgeHardFillDark`, new) and white in the light one. Before,
