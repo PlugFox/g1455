@@ -113,6 +113,11 @@ comparable:
 | Android, Impeller/Vulkan, Adreno 830 (GPU cycles) | ×0.99…1.08 | ×1.78…3.15 |
 | iPad, Impeller/Metal (GPU ms, scrolling screen) | ×1.93…2.02, or ×1.46…1.54 with thermal throttling | — |
 
+These are 0.1.0's. Since 0.4.0 Impeller blurs the atlas with the package's
+own Gaussian (see [Platforms](#platforms)), which adds up to 0.3 ms of GPU
+time a frame on the iPad, 7 to 9% on its scrolling screens, and on a
+Galaxy S22 Ultra nothing its noise shows.
+
 #### Where the numbers come from
 
 Every number in this README and on the site was measured in a profile build,
@@ -964,11 +969,16 @@ cyan outline. The same list, at more length:
 | CanvasKit | Web | ✅, slow; see below |
 
 The route renders byte-identically on all of them but for the blur, which is
-each renderer's own. Impeller's blurs less than Skia's for the sigma it is
-asked, nothing under about 0.8 texels, so on Impeller the package asks for
-the sigma whose kernel delivers the one the finishes were calibrated at,
-read off a table measured on an M2 iPad Pro: `regular` at 2.6 texels lands
-on 2.62 there, where it landed on 2.13. Every bundled shader is
+each renderer's own. Impeller's `ImageFilter.blur` delivers less than the
+sigma it is asked (2.13 texels for `regular`'s 2.6 on an M2 iPad Pro,
+nothing under about 0.8) and cuts its kernel short, so on Impeller the
+package blurs the atlas with a Gaussian of its own,
+`shaders/glass_blur.frag`, which delivers the sigma asked to 1-2% on Metal,
+Vulkan and GLES. It costs up to 0.3 ms of GPU time a frame on that iPad,
+and on a Galaxy S22 Ultra less than its noise; `GlassHost.precache` loads it
+with the other shaders. Until it has loaded, and past 4 texels, the engine's
+blur is asked for the sigma whose kernel delivers the calibrated one, read
+off a table measured on the iPad. Every bundled shader is
 compiled for all five shader targets in `test/shader_targets_test.dart`, so a
 shader that SkSL would reject fails the tests rather than a user's app.
 
