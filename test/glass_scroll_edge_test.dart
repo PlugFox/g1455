@@ -15,7 +15,8 @@
 //  2. our effect, drawn over the same fixture at the same size and read by
 //     the same instrument, lands on Apple's numbers inside a stated
 //     tolerance per quantity;
-//  3. the hard style the same way.
+//  3. the hard style the same way, in both appearances: its band is the
+//     screen's background at 0.90.
 //
 // Breaks, each undone by swapping the string back:
 //  - `kGlassScrollEdgeSigma = 1.6` -> `0.0` (no blur): arm 2's top plateau
@@ -141,6 +142,59 @@ void main() {
       expect(o.level, closeTo(a.level, 4));
     }
   });
+
+  // The band is the screen's background at 0.90, not the bars' appearance:
+  // Apple's frames with the bars dark over a white background are the white
+  // band above, and over the dark appearance's own background, black, the
+  // band is black (51 -> 5, 230 -> 23). Ours takes the host's appearance, or
+  // the backdrop it is told. The light field is told `light` content, as in
+  // the arm above, so a band that followed the soft edge's `appearance` would
+  // be white there.
+  testWidgets('our hard edge in the dark appearance reads as Apple\'s', (WidgetTester tester) async {
+    for (final String field in <String>['dark', 'light']) {
+      final _Image appleKnown = (await tester.runAsync(() => _frame('hidden_dark_appearance_$field')))!;
+      final _Image apple = (await tester.runAsync(() => _frame('hard_dark_appearance_$field')))!;
+      final GlassScrollEdgeAppearance content = field == 'dark'
+          ? GlassScrollEdgeAppearance.dark
+          : GlassScrollEdgeAppearance.light;
+      final ({double edgeTop, double edgeBottom, double level}) a = _band(apple, appleKnown);
+      for (final (String arm, Brightness? host, Color? backdrop) in <(String, Brightness?, Color?)>[
+        ('the host in the dark appearance', Brightness.dark, null),
+        ('a declared black backdrop', null, const Color(0xFF000000)),
+      ]) {
+        final _Image known = await _ours(tester, content, style: null, hostAppearance: host, backdrop: backdrop);
+        final _Image ours = await _ours(
+          tester,
+          content,
+          style: GlassScrollEdgeStyle.hard,
+          hostAppearance: host,
+          backdrop: backdrop,
+        );
+        final ({double edgeTop, double edgeBottom, double level}) o = _band(ours, known);
+        // ignore: avoid_print
+        print('hard, dark appearance, $field field, $arm: apple $a, ours $o');
+        expect(o.edgeTop, closeTo(a.edgeTop, 1.5), reason: arm);
+        expect(o.edgeBottom, closeTo(a.edgeBottom, 5), reason: arm);
+        expect(o.level, closeTo(a.level, 4), reason: '$field field, $arm');
+      }
+    }
+  });
+
+  test('the hard band is the declared backdrop, then the host\'s appearance, then the platform\'s', () {
+    const theme = GlassThemeData();
+    expect(GlassScrollEdge.hardFillFor(theme, Brightness.light), kGlassScrollEdgeHardFill);
+    expect(GlassScrollEdge.hardFillFor(theme, Brightness.dark), kGlassScrollEdgeHardFillDark);
+    expect(
+      GlassScrollEdge.hardFillFor(theme.copyWith(regularAppearance: Brightness.dark), Brightness.light),
+      kGlassScrollEdgeHardFillDark,
+    );
+    final Color declared = GlassScrollEdge.hardFillFor(
+      theme.copyWith(backdrop: const Color(0xFF2040C0), regularAppearance: Brightness.dark),
+      Brightness.dark,
+    );
+    expect(declared.toARGB32() & 0xFFFFFF, 0x2040C0);
+    expect(declared.a, closeTo(0.90, 0.005));
+  });
 }
 
 /// One frame, RGBA, device pixels.
@@ -175,6 +229,8 @@ Future<_Image> _ours(
   WidgetTester tester,
   GlassScrollEdgeAppearance appearance, {
   required GlassScrollEdgeStyle? style,
+  Brightness? hostAppearance,
+  Color? backdrop,
 }) async {
   final bool dark = appearance == GlassScrollEdgeAppearance.dark;
   tester.view
@@ -189,6 +245,8 @@ Future<_Image> _ours(
         child: GlassHost(
           key: UniqueKey(),
           hardware: GlassHardware.appleMetal,
+          appearance: hostAppearance,
+          backdrop: backdrop,
           child: RepaintBoundary(
             key: _shotKey,
             child: SizedBox.fromSize(

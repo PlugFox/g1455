@@ -217,8 +217,9 @@ class GlassThemeData {
   /// What lets a reading pick the branch again for one glass ([adaptedTo]): a
   /// [finish] that is [GlassFinish.regularDark] because the screen is dark and
   /// one that is because the application said so look the same, and only the
-  /// first may move. Set by a [GlassHost] that reads its backdrop, and cleared
-  /// by [copyWith] when it is given a finish.
+  /// first may move. Set by a [GlassHost] whose finish is not named — the
+  /// host's appearance, which the hard scroll edge's band also follows — and
+  /// cleared by [copyWith] when it is given a finish.
   final Brightness? regularAppearance;
 
   /// What the glass this theme was installed for read of its backdrop, or

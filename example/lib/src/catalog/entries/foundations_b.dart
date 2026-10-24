@@ -1127,10 +1127,11 @@ On the glass (`RenderGlassSurface`, and `RenderGlassGroup` for a fused group):
       'kGlassScrollEdgeLightTint',
       'kGlassScrollEdgeDarkTint',
       'kGlassScrollEdgeHardFill',
+      'kGlassScrollEdgeHardFillDark',
     ],
     source: 'lib/src/surface/glass_scroll_edge.dart',
     guide: r'''
-`GlassScrollEdge` draws what iOS 26 draws where a list scrolls under a bar. In the **soft** style (iOS's default), content blurs slightly and fades into a tint as it goes under the bar. In the **hard** style (macOS's default), it meets an opaque white band with a sharp edge. The values were read off Apple's own effect on iOS 26 simulators.
+`GlassScrollEdge` draws what iOS 26 draws where a list scrolls under a bar. In the **soft** style (iOS's default), content blurs slightly and fades into a tint as it goes under the bar. In the **hard** style (macOS's default), it meets a near-opaque band of the screen's background with a sharp edge. The values were read off Apple's own effect on iOS 26 simulators.
 
 It also **holds your bar**: pass the bar as `child` and it is laid out inside `extent` and lifted together with the effect, so it shows glass scrolling under it (see [Glass on glass](/foundations/above)). Touches outside the bar pass through to the list.
 
@@ -1171,7 +1172,7 @@ Stack(
 | | Top | Bottom |
 |---|---|---|
 | `soft` | A light blur (σ [`kGlassScrollEdgeSigma`](https://pub.dev/documentation/g1455/latest/g1455/kGlassScrollEdgeSigma-constant.html) = 1.6) plus a tint that fades in toward the edge. This is a glass surface. | A tint only, no blur, as Apple draws it. A gradient, nothing captured. |
-| `hard` | A near-opaque white band (`kGlassScrollEdgeHardFill`, 90%) with a sharp edge. | The same band at the bottom. |
+| `hard` | The screen's background at 90% with a sharp edge: the host's declared `backdrop`, or white (`kGlassScrollEdgeHardFill`) in the light appearance and black (`kGlassScrollEdgeHardFillDark`) in the dark one. | The same band at the bottom. |
 
 The effect reaches **past** `extent` into the content, by about 40 px at the soft top. That is the fade.
 
@@ -1274,7 +1275,8 @@ class LibraryPage extends StatelessWidget {
 | `kGlassScrollEdgeHardSigma` | `2.15` | The hard band's blur. |
 | `kGlassScrollEdgeLightTint` | `Color.fromRGBO(255, 255, 255, 0.85)` | The soft tint at the edge, light appearance. |
 | `kGlassScrollEdgeDarkTint` | `Color.fromRGBO(0, 0, 0, 0.25)` | The soft tint at the edge, dark appearance. |
-| `kGlassScrollEdgeHardFill` | `Color.fromRGBO(255, 255, 255, 0.90)` | The hard band. |
+| `kGlassScrollEdgeHardFill` | `Color.fromRGBO(255, 255, 255, 0.90)` | The hard band in the light appearance, with no backdrop declared. |
+| `kGlassScrollEdgeHardFillDark` | `Color.fromRGBO(0, 0, 0, 0.90)` | The hard band in the dark appearance, with no backdrop declared. |
 ''',
   ),
   // ---------------------------------------------------------------------------

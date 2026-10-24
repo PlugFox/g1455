@@ -126,6 +126,8 @@ cheap setting is reachable without a fork.
       exported, so an app can give the one and read the other; on Impeller
       the blur asked for the sigma the finishes were calibrated at, measured
       on an M2 iPad (#33).
+- [x] The hard scroll edge's band in the dark appearance: the screen's
+      background at 0.90, photographed on iOS 26.5 (#36).
 - [x] The walk hands a fade folded into a filter and a mask that paints past
       its child to the engine, inside the capture (#32), and leaves a shader
       mask's and a backdrop filter's live layers as their paint set them.
@@ -146,7 +148,6 @@ cheap setting is reachable without a fork.
       19,200 px.
 - [ ] A search bar switched from light glass to dark keeps a trace of the
       light finish (#34).
-- [ ] The scroll edge's hard band in the dark appearance (#36).
 - [ ] A sheet dragged down to close is retaken on every frame (13 of 13 in a
       test), where a drag between detents is one retake: the layer watch
       reads the drop as a change under the sheet. 0.2.0 claimed one retake

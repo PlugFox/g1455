@@ -1573,8 +1573,10 @@ class _GlassHostState extends State<GlassHost> {
           dropMotion: widget.dropMotion,
           press: widget.press,
           adaptive: widget.adaptive,
-          // Only for a reader: off, the theme is the one it always was.
-          regularAppearance: widget.adaptive == null ? null : _regularAppearance,
+          // For a reading to pick `.regular`'s branch again, and for what
+          // follows the screen's appearance rather than the glass's, such as
+          // the hard scroll edge's band.
+          regularAppearance: _regularAppearance,
         ),
         child: GlassProxyScope(
           handle: _handle,

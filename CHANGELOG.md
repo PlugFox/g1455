@@ -113,6 +113,11 @@ a change.
   more render pass on a frame that is capturing anyway, and named in
   `WalkLog.fellBack`. A subtree that holds glass is still drawn by the
   capture, as is a `BackdropFilter`.
+- The hard scroll edge's band is the screen's background at 0.90, as on
+  iOS: the host's declared `backdrop`, or black in the dark appearance
+  (`kGlassScrollEdgeHardFillDark`, new) and white in the light one. Before,
+  it was white in both, a light band over a dark screen. Measured against
+  iOS 26.5 in the dark appearance.
 - The capture of glass on glass matches the engine in more cases:
   - an opacity at full alpha opens no layer, so a child that clears or
     blends reaches the page;

@@ -120,6 +120,7 @@ export 'src/surface/glass_scroll_edge.dart'
         GlassScrollEdgeStyle,
         kGlassScrollEdgeDarkTint,
         kGlassScrollEdgeHardFill,
+        kGlassScrollEdgeHardFillDark,
         kGlassScrollEdgeHardSigma,
         kGlassScrollEdgeLightTint,
         kGlassScrollEdgeSigma;
