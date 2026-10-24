@@ -138,7 +138,12 @@ vec2 sdRoundedBoxNormal(vec2 p, vec2 b, float r) {
         float len = length(m);
         return len == 0.0 ? vec2(0.0) : s * m / len;
     }
-    return q.x > q.y ? vec2(s.x, 0.0) : vec2(0.0, s.y);
+    // Off the diagonal by a 256th: a pixel on it is a tie, which the last bit
+    // of FlutterFragCoord breaks, and that bit is the draw's — on Vulkan and
+    // GLES a rectangle split in three put 36 pixels along the diagonals the
+    // other way from the one rectangle (glass D240). Past the tie, either side
+    // is the same field; this only says which side the tie is on.
+    return q.x > q.y + 1.0 / 256.0 ? vec2(s.x, 0.0) : vec2(0.0, s.y);
 }
 
 void main() {

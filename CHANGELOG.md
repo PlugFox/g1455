@@ -96,6 +96,11 @@ a change.
 
 ### Fixed
 
+- On Android, a fused group drawn as tiles is the picture of the one
+  rectangle: a pixel on a rounded box's diagonal, where the refraction turns
+  from one side to the other, went whichever way the last bit of its
+  coordinate said, and on Vulkan and GLES that bit depends on the rectangle
+  drawn. A lone surface's diagonal is broken the same way.
 - Right to left:
   - `GlassTabBar` maps touches, its resting capsule and its held drop from
     the start edge: a tap selected the mirrored tab (thanks to @sb-dor).

@@ -160,9 +160,11 @@ cheap setting is reachable without a fork.
       8 texels lets a period of 12 through at 2% of its contrast; a pass of
       ours ahead of it does not remove that, and ours alone at 12 texels
       costs 52% of a frame on an S22, so it would take a downsampled
-      Gaussian of our own. The tiled group's seams and the cull margin are
-      `flutter_tester`'s: on an M2 iPad the tiles are the one quad, 0 of
-      19,200 px.
+      Gaussian of our own. The tiled group's seams were not seams: a pixel on
+      a rounded box's diagonal is a tie the last bit of FlutterFragCoord
+      broke, and that bit is the draw's on Vulkan and GLES (glass D240).
+      Broken one way now; what is left is a code value on up to 17 of
+      92,400 px on an S22, where the interpolated coordinate is the draw's.
 
 ## Next — what 0.2.0 left open
 
