@@ -17,6 +17,15 @@
 // Galaxy S22 Ultra on Vulkan and on GLES reads the same to the last digit,
 // and 0.02 from the iPad. Skia is left as it is: the calibration is its.
 //
+// That correction gets the width right and not the shape: the kernel is still
+// cut short and its steps still show, as a soft edge that reads 0.09 of its
+// contrast where Skia's reads 0.17. So on Impeller the atlas is blurred by
+// the package's own Gaussian, `glass_blur.frag` ([saveBlurLayers]), which
+// delivers the sigma asked to 1-2% on Metal, Vulkan and GLES and costs up
+// to 0.3 ms of GPU time a frame on an M2 iPad (FINDINGS D239). The
+// correction is what is used until that program has loaded, and past
+// [kGlassBlurMaxSigma], where the integer radius is a step of a few percent.
+//
 // The renderer is told apart by `ImageFilter.isShaderFilterSupported`, true
 // on Impeller and false on Skia and on the web.
 
@@ -79,4 +88,60 @@ double engineBlurSigma(double sigma, {bool? impeller}) {
     }
   }
   return best / 10;
+}
+
+/// The separable Gaussian of `glass_blur.frag`, one pass a layer.
+const String kGlassBlurShaderAsset = 'packages/g1455/shaders/glass_blur.frag';
+
+/// The largest sigma, in texels, [saveBlurLayers] blurs through
+/// [glassBlurProgram]: 13 texels a pass.
+///
+/// Past it the engine's blur is used, corrected. Its error is a step of the
+/// integer radius, and above 4 texels that is 2-6% of the sigma and of its
+/// spread over frequency, where under 3 it was up to 25%. And it downsamples:
+/// `frosted` at its policy divisor on a Galaxy S22 Ultra is 12 texels, which
+/// the shader drew at 52% more GPU time a frame and the engine at none.
+const double kGlassBlurMaxSigma = 4;
+
+/// The compiled Gaussian, once a host has loaded it (`GlassHost.precache`, or
+/// the first host's own load); null on Skia, where `ImageFilter.shader` does
+/// not exist and `ImageFilter.blur` is the Gaussian, and until it arrives.
+ui.FragmentProgram? glassBlurProgram;
+
+/// Whether the atlas is blurred through [glassBlurProgram] when there is one,
+/// or always through `ImageFilter.blur` corrected by [engineBlurSigma]: the
+/// comparison the bench's `glass_gauss` axis draws.
+bool debugGlassBlurShader = true;
+
+/// Opens the layers that blur what is drawn into them by [sigmaTexels] over
+/// [bounds], and returns how many to restore.
+///
+/// Through [glassBlurProgram] on Impeller, once it is loaded and for a sigma
+/// up to [kGlassBlurMaxSigma]; otherwise one layer of `ImageFilter.blur`,
+/// asked [engineBlurSigma] of it and clamped.
+///
+/// Two nested layers, across and then down, rather than one layer of
+/// `ImageFilter.compose`: the composed filter hands its outer pass an input
+/// padded with transparency, so the second pass cannot clamp to the edge.
+int saveBlurLayers(ui.Canvas canvas, ui.Rect bounds, double sigmaTexels) {
+  final ui.FragmentProgram? program = debugGlassBlurShader ? glassBlurProgram : null;
+  if (program == null || sigmaTexels > kGlassBlurMaxSigma) {
+    final double asked = engineBlurSigma(sigmaTexels);
+    canvas.saveLayer(
+      bounds,
+      ui.Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: asked, sigmaY: asked, tileMode: ui.TileMode.clamp),
+    );
+    return 1;
+  }
+  ui.Paint pass(double dx, double dy) => ui.Paint()
+    ..imageFilter = ui.ImageFilter.shader(
+      program.fragmentShader()
+        ..setFloat(2, dx)
+        ..setFloat(3, dy)
+        ..setFloat(4, sigmaTexels),
+    );
+  canvas
+    ..saveLayer(bounds, pass(0, 1))
+    ..saveLayer(bounds, pass(1, 0));
+  return 2;
 }

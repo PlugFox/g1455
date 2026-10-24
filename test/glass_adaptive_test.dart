@@ -80,6 +80,12 @@ GlassBackdropReading _grey(double level) {
 Duration _ms(int ms) => Duration(milliseconds: ms);
 
 void main() {
+  // What the last test's bars saw is not this one's: [_land] waits on these.
+  setUp(() {
+    _seen.clear();
+    _label.clear();
+  });
+
   // -------------------------------------------------------------------------
   // 1. The verdict does not flicker.
   // -------------------------------------------------------------------------
@@ -953,6 +959,14 @@ Future<void> _land(WidgetTester tester, {bool settle = true}) async {
     await tester.pump();
   }
   if (settle) {
+    // And until every adaptive bar has its reading: a read-back lands when the
+    // rasterizer is done with the frame, which on `flutter_tester` under
+    // Impeller, blurring the atlas through `glass_blur.frag`, can take more
+    // turns than four.
+    for (var i = 0; i < 50 && _seen.values.any((t) => t.adaptive != null && t.reading == null); i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+      await tester.pump();
+    }
     await tester.pump(const Duration(milliseconds: 400));
   }
 }

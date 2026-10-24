@@ -184,19 +184,16 @@ class GlassBackdropDeclaration extends ChangeNotifier {
         : ProxyResolution.divisor(divisor).residualSigmaFor(sigmaLogical, dpr);
     if (residual != null && residual > 0) {
       final blurRecorder = ui.PictureRecorder();
-      Canvas(blurRecorder).drawImage(
-        image,
-        Offset.zero,
-        Paint()
-          ..imageFilter = ui.ImageFilter.blur(
-            // Asked so this renderer delivers it, as the atlas's blur is.
-            sigmaX: engineBlurSigma(residual * ratio),
-            sigmaY: engineBlurSigma(residual * ratio),
-            // Clamped, as the atlas is: the edge of a declared backdrop is
-            // where the declaration stops, not where the world goes dark.
-            tileMode: TileMode.clamp,
-          ),
-      );
+      final bounds = Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble());
+      // Blurred as the atlas is, by the same layers: clamped, since the edge
+      // of a declared backdrop is where the declaration stops, not where the
+      // world goes dark.
+      final blurCanvas = Canvas(blurRecorder, bounds);
+      final int layers = saveBlurLayers(blurCanvas, bounds, residual * ratio);
+      blurCanvas.drawImage(image, Offset.zero, Paint());
+      for (var i = 0; i < layers; i++) {
+        blurCanvas.restore();
+      }
       final ui.Picture blurred = blurRecorder.endRecording();
       final ui.Image sharp = image;
       image = blurred.toImageSync(width, height);

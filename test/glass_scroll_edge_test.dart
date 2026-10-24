@@ -121,11 +121,14 @@ void main() {
       expect(ours.bottom.leastContrast, greaterThan(0.85), reason: 'the bottom blurs, and Apple\'s does not');
       expect(ours.bottom.a, closeTo(apple.bottom.a, 0.04));
       expect(ours.bottom.tint50, closeTo(apple.bottom.tint50, 7.5));
-      // On Impeller the dark edge leaves 0.09 of the lines, on the devices too
-      // (glass D238): its 1.57 texels fall between two of Impeller's integer
-      // radii. The light one reads a few code values under its 0.85 tint and
-      // cannot tell (#33).
-    }, tags: appearance == GlassScrollEdgeAppearance.dark ? 'impeller-gap' : null);
+      // The blur is the package's own Gaussian on Impeller, and the dark edge
+      // reads 0.169 there, 0.174 on an M2 iPad (glass D239). The light one
+      // cannot be read on Impeller: its lines are 5 code values under the
+      // 0.85 tint, and Impeller dithers a gradient, the tint's too, by a code
+      // a channel, pixel by pixel, which the lines' peak to peak counts as
+      // contrast. It reads 0.237, the iPad 0.235, at the same sigma the dark
+      // edge is right at (#33).
+    }, tags: appearance == GlassScrollEdgeAppearance.light ? 'impeller-gap' : null);
   }
 
   testWidgets('our hard edge reads as Apple\'s', (WidgetTester tester) async {

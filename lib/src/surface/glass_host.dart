@@ -25,6 +25,7 @@ import 'package:flutter/widgets.dart';
 import '../hardware.dart';
 import '../thermal.dart';
 import '../proxy/occlusion.dart';
+import '../proxy/proxy_blur.dart';
 import '../proxy/proxy_layer_watch.dart';
 import '../proxy/proxy_pipeline.dart';
 import '../proxy/proxy_resolution.dart';
@@ -738,7 +739,10 @@ class GlassHost extends StatefulWidget {
   ///  - a fused [GlassGroup] with no group program draws nothing at all, and
   ///    its members leave their glass to it;
   ///  - a touched surface under a [GlassRipple] with no ripple program draws
-  ///    the surface program, which is the picture without the wave.
+  ///    the surface program, which is the picture without the wave;
+  ///  - on Impeller, a proxy captured before the atlas's Gaussian arrives is
+  ///    blurred by the engine's `ImageFilter.blur`, whose kernel is cut short,
+  ///    and is captured again on the frame after it does.
   ///
   /// The content on the glass — a bar's title, a button's icon — is drawn in
   /// every case. Once this future completes, every host mounted afterwards
@@ -776,6 +780,7 @@ class GlassHost extends StatefulWidget {
       if (_GlassHostState._cachedProgram == null) _GlassHostState._loadBase(),
       if (group && _GlassHostState._cachedGroupProgram == null) _GlassHostState._loadGroup(),
       if (ripple && GlassProxyHandle._cachedRippleProgram == null) GlassProxyHandle._loadRipple(),
+      if (ui.ImageFilter.isShaderFilterSupported && glassBlurProgram == null) _GlassHostState._loadBlur(),
     ]);
   }
 
@@ -921,6 +926,15 @@ class _GlassHostState extends State<GlassHost> {
     () => _loadingGroup = null,
   );
 
+  static Future<ui.FragmentProgram>? _loadingBlur;
+
+  /// The Gaussian the pipeline blurs with on Impeller (`proxy_blur.dart`).
+  static Future<ui.FragmentProgram> _loadBlur() => _loadingBlur ??= _loadShader(
+    kGlassBlurShaderAsset,
+    (ui.FragmentProgram program) => glassBlurProgram = program,
+    () => _loadingBlur = null,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -932,6 +946,7 @@ class _GlassHostState extends State<GlassHost> {
     _adapt();
     _loadProgram();
     _loadGroupProgram();
+    _loadBlurProgram();
   }
 
   void _noteDeclaredChange() => _oracle.noteChange();
@@ -973,6 +988,25 @@ class _GlassHostState extends State<GlassHost> {
     _loadGroup().then((ui.FragmentProgram program) {
       if (mounted) {
         _handle.groupProgram = program;
+      }
+    }, onError: _reportShaderLoadError);
+  }
+
+  /// The same, for the Gaussian the atlas is blurred with on Impeller, which
+  /// the pipeline reads from `proxy_blur.dart` rather than from the handle.
+  ///
+  /// Until it arrives the atlas is blurred by `ImageFilter.blur`, corrected,
+  /// and a proxy captured so is held like any other; so its arrival is
+  /// declared as a change, and a frame is asked for to capture through it —
+  /// a still screen draws none of its own, and the capture runs after one.
+  void _loadBlurProgram() {
+    if (!ui.ImageFilter.isShaderFilterSupported || glassBlurProgram != null) {
+      return;
+    }
+    _loadBlur().then((ui.FragmentProgram program) {
+      if (mounted) {
+        _handle.noteChange();
+        SchedulerBinding.instance.ensureVisualUpdate();
       }
     }, onError: _reportShaderLoadError);
   }

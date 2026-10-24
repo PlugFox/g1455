@@ -821,10 +821,12 @@ class GlassProxyPipeline {
         return packed;
       }
       final recorder = ui.PictureRecorder();
-      Canvas(recorder, bounds)
-        ..saveLayer(bounds, Paint()..imageFilter = _blurFilter(residual * scale))
-        ..drawPicture(packed)
-        ..restore();
+      final canvas = Canvas(recorder, bounds);
+      final int layers = saveBlurLayers(canvas, bounds, residual * scale);
+      canvas.drawPicture(packed);
+      for (var i = 0; i < layers; i++) {
+        canvas.restore();
+      }
       return recorder.endRecording();
     }
     final recorder = ui.PictureRecorder();
@@ -840,11 +842,13 @@ class GlassProxyPipeline {
       if (residual == null) {
         canvas.drawPicture(packed);
       } else {
+        final int layers = saveBlurLayers(canvas, region, residual * scale);
         canvas
-          ..saveLayer(region, Paint()..imageFilter = _blurFilter(residual * scale))
           ..clipRect(region)
-          ..drawPicture(packed)
-          ..restore();
+          ..drawPicture(packed);
+        for (var i = 0; i < layers; i++) {
+          canvas.restore();
+        }
       }
       canvas.restore();
     }
@@ -890,16 +894,6 @@ class GlassProxyPipeline {
     return path;
   }
 
-  /// `TileMode.clamp` rather than the default `decal`: the border of the atlas
-  /// is the border of a slot, and a decal there darkens it — which is where a
-  /// surface at the screen's edge samples.
-  // The sigma meant, asked of this renderer's blur so it delivers that: on
-  // Impeller a larger one (`proxy_blur.dart`).
-  static ui.ImageFilter _blurFilter(double sigmaTexels) {
-    final double asked = engineBlurSigma(sigmaTexels);
-    return ui.ImageFilter.blur(sigmaX: asked, sigmaY: asked, tileMode: TileMode.clamp);
-  }
-
   /// The sigma the pass still owes for a finish of [sigma], or null when
   /// [blurPass] asks for none.
   ///
@@ -942,7 +936,15 @@ class GlassProxyPipeline {
     final canvas = Canvas(recorder);
     if (single != null) {
       // In texels, which is what the filter works in.
-      canvas.drawImage(atlas, Offset.zero, Paint()..imageFilter = _blurFilter(single * scale));
+      final int layers = saveBlurLayers(
+        canvas,
+        Offset.zero & Size(atlas.width.toDouble(), atlas.height.toDouble()),
+        single * scale,
+      );
+      canvas.drawImage(atlas, Offset.zero, Paint());
+      for (var i = 0; i < layers; i++) {
+        canvas.restore();
+      }
     } else {
       var any = false;
       for (var c = 0; c < blurs.sigmas.length; c++) {
@@ -952,14 +954,13 @@ class GlassProxyPipeline {
         final Rect region = _classBounds(layout, blurs, c);
         canvas
           ..save()
-          ..clipPath(_classClip(layout, blurs, c))
-          ..drawImageRect(
-            atlas,
-            region,
-            region,
-            residual == null ? Paint() : (Paint()..imageFilter = _blurFilter(residual * scale)),
-          )
-          ..restore();
+          ..clipPath(_classClip(layout, blurs, c));
+        final int layers = residual == null ? 0 : saveBlurLayers(canvas, region, residual * scale);
+        canvas.drawImageRect(atlas, region, region, Paint());
+        for (var i = 0; i < layers; i++) {
+          canvas.restore();
+        }
+        canvas.restore();
       }
       if (!any) {
         recorder.endRecording().dispose();

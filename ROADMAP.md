@@ -124,8 +124,9 @@ cheap setting is reachable without a fork.
       sharp draws (#17, #18), what it forwards unseen counted (#30), and the
       Skia resampling difference named (#31); `ShadowFilter` and `WalkLog`
       exported, so an app can give the one and read the other; on Impeller
-      the blur asked for the sigma the finishes were calibrated at, measured
-      on an M2 iPad (#33).
+      the atlas blurred by a Gaussian of the package's own, and past 4
+      texels the engine's blur asked for the sigma the finishes were
+      calibrated at, measured on an M2 iPad (#33).
 - [x] CI runs the tests on Impeller too, the known differences tagged
       `impeller-gap` and left to the Skia run (#33).
 - [x] A sheet pulled below its lowest detent is not retaken on every frame:
@@ -150,16 +151,16 @@ cheap setting is reachable without a fork.
       `BackdropFilter` under glass, which reads what lies below it, and a
       fold or a mask inside a subtree that holds glass, which the engine
       cannot draw for it. 0.4.0 hands every other such subtree to the engine.
-- [ ] The remaining Impeller differences (#33): what the blur correction
-      cannot reach — no kernel under 0.69 texels, a downsampled kernel of
-      another shape — and the soft scroll edge, which on Impeller is blurrier
-      than Apple's on the devices too (residual contrast 0.098 on an M2 iPad,
-      0.089 on an S22, Apple 0.157): its 1.57 texels fall between two of
-      Impeller's integer radii, which leave 0.25 and 0.09. A divisor that
-      puts more texels under the sigma, two passes, or a Gaussian of our own
-      would reach it; each is a cost (glass D238). The tiled group's seams are
-      `flutter_tester`'s: on an M2 iPad the tiles are the one quad, 0 of
-      19,200 px.
+- [ ] The remaining Impeller differences (#33). The atlas is blurred by
+      the package's own Gaussian up to 4 texels, which closed the soft
+      scroll edge (residual contrast 0.174 on an M2 iPad, Apple 0.157; it
+      was 0.098), for up to 0.3 ms of GPU time a frame on an M2 iPad and
+      none an S22 can tell from noise (glass D239). Left: the
+      engine's blur past 4 texels, which downsamples and at 8 lets a period
+      of 12 through; the light soft edge, which the instrument cannot read
+      under Impeller's gradient dither; the bleed test, which draws its own
+      blur. The tiled group's seams are `flutter_tester`'s: on an M2 iPad
+      the tiles are the one quad, 0 of 19,200 px.
 
 ## Next — what 0.2.0 left open
 

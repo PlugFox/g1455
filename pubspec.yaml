@@ -70,3 +70,4 @@ flutter:
     - packages/g1455/shaders/glass_surface.frag
     - packages/g1455/shaders/glass_group.frag
     - packages/g1455/shaders/glass_surface_ripple.frag
+    - packages/g1455/shaders/glass_blur.frag

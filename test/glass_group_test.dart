@@ -332,7 +332,16 @@ void main() {
       'full-screen group vs tight group: $diff; quad ${looseQuad.size} vs '
       '${tightQuad.size}',
     );
-    expect(diff.differing, 0, reason: 'the group\'s own box reached the picture');
+    if (ui.ImageFilter.isShaderFilterSupported) {
+      // On Impeller the atlas is blurred by `glass_blur.frag`, and the two
+      // arms place the group's slot differently: two pixels inside the panels
+      // came out one code apart in one channel, and `ImageFilter.blur` in the
+      // same place reads none. A box that reached the picture shows along its
+      // edge, at full contrast, which a code of rounding is not.
+      expect(diff.maxDelta, lessThanOrEqualTo(1), reason: 'the group\'s own box reached the picture');
+    } else {
+      expect(diff.differing, 0, reason: 'the group\'s own box reached the picture');
+    }
     expect(diff.total, kScreen.width * kScreen.height);
     // And the quad itself is the same in both, which is what makes the arm
     // above a statement about the mechanism rather than about two screens that

@@ -53,6 +53,9 @@ export 'src/surface/glass_group.dart'
 // The verdicts a host that reads its backdrop publishes, and the band-and-hold
 // rule each one is kept by — which a test drives without a frame. The count of
 // read-backs is `GlassProxyHandle.readBacks`.
+// Whether the atlas is blurred by the package's own Gaussian on Impeller or by
+// `ImageFilter.blur`, which a bench draws the one against the other with.
+export 'src/proxy/proxy_blur.dart' show debugGlassBlurShader;
 export 'src/surface/glass_adaptive.dart' show GlassBackdropReadings, GlassBackdropVerdict;
 // The host's published proxy and its counters — `recorded`, `held`,
 // `readBacks` — which is what a report reads to say whether a frame captured,

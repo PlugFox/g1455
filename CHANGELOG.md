@@ -56,12 +56,18 @@ a change.
     1.18 : 1 against a dark sheet).
   The slider's default blue in the light appearance is the light
   `systemBlue` (`0xFF007AFF`), not the dark one.
-- On Impeller the glass blurs as much as it was calibrated to. Impeller's
+- On Impeller the glass blurs as it was calibrated to. Impeller's
   `ImageFilter.blur` delivers less than the sigma it is asked (2.13 texels
-  for 2.6 on an M2 iPad Pro, nothing under 0.8), so there the package asks
-  for the sigma whose kernel delivers the calibrated one: `regular` lands on
-  2.62, the scroll edge's 1.6 on 1.66. The same on Android, Vulkan and GLES
-  alike. Skia and the web are unchanged.
+  for 2.6 on an M2 iPad Pro, nothing under 0.8) and cuts its kernel short,
+  so there the package blurs with a Gaussian of its own,
+  `shaders/glass_blur.frag`, which delivers the sigma asked to 1-2% on
+  Metal, Vulkan and GLES. The soft scroll edge, which on Impeller left 0.09
+  of what lies under it where Apple's leaves 0.16, leaves 0.17. It costs up
+  to 0.3 ms of GPU time a frame on an M2 iPad, and on a Galaxy S22 Ultra
+  less than its noise. `GlassHost.precache` loads it with the
+  other shaders; until it has loaded, and past 4 texels, the engine's blur
+  is asked for the sigma whose kernel delivers the calibrated one. Skia and
+  the web are unchanged.
 - Large text sizes:
   - `GlassTabBar` and `GlassSegmentedControl` keep their labels at no more
     than the default text size, as UIKit does; at twice the size labels were
