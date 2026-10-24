@@ -68,6 +68,13 @@ a change.
     cut mid-word. A screen reader still gets every label whole.
   - `GlassTextField` and `GlassSearchBar` grow with their line from 44 pt,
     keeping 11 pt above and below it, as a `UITextField` under Dynamic Type.
+  - `GlassMenuAnchor`'s rows wrap a long label and grow to hold it, at any
+    text size, as iOS 26.5's `UIMenu` does; they were cut to one line with an
+    ellipsis. With the text, the rows' padding, the icon and its column grow.
+    From 1.5 times the text the icons go and the menu takes the screen's
+    width less 16 a side, up to 400; past 520 tall it scrolls, from the end
+    nearest the anchor. The side it opens to is chosen from the measured
+    height (#26).
 - A held segment's label fades from the capsule's ink to the page's as the
   capsule fades into the drop; on a dark control it was black on the dark
   track.

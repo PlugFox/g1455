@@ -1084,7 +1084,8 @@ class _RenderSheetFrame extends RenderShiftedBox {
 // ---------------------------------------------------------------------------
 // Menu
 
-/// One row of a [GlassMenuAnchor]'s menu, [kGlassMenuRowHeight] tall.
+/// One row of a [GlassMenuAnchor]'s menu, at least [kGlassMenuRowHeight]
+/// tall and taller for a label of more lines.
 ///
 /// {@category Modals}
 @immutable
@@ -1092,11 +1093,12 @@ class GlassMenuItem {
   /// A row labelled [label], enabled when [onPressed] is not null.
   const GlassMenuItem({required this.label, this.icon, this.onPressed, this.isDestructive = false});
 
-  /// The row's text, on one line and ellipsized when it does not fit.
+  /// The row's text. Wrapped, as iOS wraps it, and the row grown to fit.
   final String label;
 
-  /// Drawn ahead of [label], centred 40 px in, in the label colour at 20 px.
-  /// Null leaves the space empty, so labels stay aligned.
+  /// Drawn ahead of [label], centred 40 px in, in the label colour at 20 px;
+  /// both grow with the text scale. Null leaves the space empty, so labels
+  /// stay aligned. Not drawn at accessibility text sizes, as iOS draws none.
   final Widget? icon;
 
   /// Null disables it. The menu closes after it runs.
@@ -1135,8 +1137,9 @@ class GlassMenuController {
 /// {@category Modals}
 const double kGlassMenuWidth = 250;
 
-/// The height of one [GlassMenuItem], logical px (iOS 26.5: rows of 42, with
-/// 10 above the first and below the last).
+/// The height of one [GlassMenuItem] of one line at the default text size,
+/// logical px (iOS 26.5: rows of 42, with 10 above the first and below the
+/// last). A row of more lines, or of larger text, is taller.
 ///
 /// {@category Modals}
 const double kGlassMenuRowHeight = 42;
@@ -1148,6 +1151,22 @@ const double kGlassMenuRowHeight = 42;
 /// {@category Modals}
 const double kGlassMenuRadius = 31.5;
 const double _kMenuPad = 10;
+
+/// What the menu does at large text, read off iOS 26.5's `UIMenu` at five
+/// text sizes on three iPhones (spike 37): a row is its label with
+/// 1.1 + 9.7 pt per unit of text scale above and below (10.8 at the default
+/// size, so a row of one line is 42; within 0.43 pt of all five), from the
+/// first accessibility size the icons go, the menu takes the screen's width
+/// less 16 a side up to 400 and the label runs 28 from either edge, and the
+/// menu stops at 520 tall and scrolls.
+double _menuRowPad(double scale) => 1.1 + 9.7 * scale;
+const double _kMenuMaxHeight = 520;
+const double _kMenuWideMaxWidth = 400;
+
+/// The text scale from which the menu lays out as iOS does at accessibility
+/// sizes: between iOS's largest standard size (body 23, 1.35) and its first
+/// accessibility one (body 28, 1.65).
+const double _kMenuAccessibleScale = 1.5;
 
 /// A glass menu that grows out of [builder]'s anchor, in the nearest
 /// `Overlay`, which has to be under the [GlassHost].
@@ -1171,6 +1190,11 @@ const double _kMenuPad = 10;
 ///
 /// A tap on a row runs its [GlassMenuItem.onPressed] and closes the menu; a
 /// tap anywhere outside closes it with nothing chosen.
+///
+/// At large text it does what iOS 26.5's does: a long label wraps and its
+/// row grows; from 1.5 times the text the icons go and the menu is the
+/// screen's width less 16 a side, up to 400; past 520 tall it scrolls, from
+/// the end nearest the anchor.
 ///
 /// ```dart
 /// GlassMenuAnchor(
@@ -1323,7 +1347,7 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
   String get _barrierLabel;
 
   /// Where the panel goes for an anchor at [at] on [screen].
-  _Placement _place(Rect at, Size screen, EdgeInsets safe);
+  _Placement _place(BuildContext context, Rect at, Size screen, EdgeInsets safe);
 
   /// The panel's content, in the label colour.
   Widget _content(BuildContext context, _Placement placement);
@@ -1472,7 +1496,7 @@ abstract class _AnchoredState<W extends StatefulWidget> extends State<W> with Si
     }
     final Rect at = MatrixUtils.transformRect(anchor.getTransformTo(overlay), Offset.zero & anchor.size);
     _follow(at, overlay);
-    final _Placement place = _place(at, overlay.size, MediaQuery.paddingOf(context));
+    final _Placement place = _place(context, at, overlay.size, MediaQuery.paddingOf(context));
     final GlassThemeData theme = GlassTheme.of(context);
     final Color label = theme.legibility(_finish ?? theme.finish).label;
     // Grown from the anchor's own capsule: at nought the glass is the button.
@@ -1531,22 +1555,68 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
   @override
   GlassFinish? get _finish => widget.finish;
   @override
-  double get _width => widget.width;
+  double get _width => _layout?.width ?? widget.width;
   @override
   double get _radius => kGlassMenuRadius;
   @override
   String get _barrierLabel => widget.barrierLabel;
 
-  double get _height => widget.items.length * kGlassMenuRowHeight + 2 * _kMenuPad;
+  /// The rows as the last placement measured them, for the content to lay
+  /// out as the placement assumed.
+  _MenuLayout? _layout;
+
+  /// Measures the rows before they are laid out: the side the menu opens to
+  /// and whether it scrolls depend on its height, and a row's height on how
+  /// many lines its label takes at this text scale and width.
+  _MenuLayout _measure(BuildContext context, Size screen, EdgeInsets safe) {
+    final TextStyle style = DefaultTextStyle.of(context).style.merge(const TextStyle(fontSize: 17));
+    final TextScaler scaler = MediaQuery.textScalerOf(context);
+    final double scale = scaler.scale(17) / 17;
+    final bool accessible = scale >= _kMenuAccessibleScale;
+    final double width = accessible
+        ? math.max(widget.width, math.min(screen.width - 32, _kMenuWideMaxWidth))
+        : widget.width;
+    // Spike 37: the icon's column, 48 at the default size, is 62 at 1.35.
+    final double column = accessible ? 0 : 48 + 40 * (scale - 1);
+    final double pad = _menuRowPad(scale);
+    final double icon = 20 * scale;
+    final TextPainter painter = TextPainter(
+      textDirection: Directionality.of(context),
+      textScaler: scaler,
+      textHeightBehavior: DefaultTextStyle.of(context).textHeightBehavior,
+    );
+    var content = 2 * _kMenuPad;
+    for (final GlassMenuItem item in widget.items) {
+      painter
+        ..text = TextSpan(text: item.label, style: style)
+        ..layout(maxWidth: math.max(0, width - (accessible ? 28 : 16 + column) - 28));
+      final double lines = math.max(painter.height, accessible || item.icon == null ? 0 : icon);
+      content += math.max(kGlassMenuRowHeight, lines + 2 * pad);
+    }
+    painter.dispose();
+    // Spike 37: past 520 the menu stops and scrolls, and it never runs past
+    // the safe area either.
+    final double room = math.max(kGlassMenuRowHeight, screen.height - safe.vertical - 16);
+    return (
+      width: width,
+      accessible: accessible,
+      column: column,
+      pad: pad,
+      icon: icon,
+      content: content,
+      height: math.min(content, math.min(_kMenuMaxHeight, room)),
+    );
+  }
 
   @override
-  _Placement _place(Rect at, Size screen, EdgeInsets safe) {
+  _Placement _place(BuildContext context, Rect at, Size screen, EdgeInsets safe) {
+    final double height = (_layout = _measure(context, screen, safe)).height;
     final side = _side(at, screen);
     // Spike 34: opening down, the menu's top is 1 pt above the anchor's; up,
     // its bottom 1 pt below the anchor's — unless that would put its top
     // under the status bar, and then the top is pinned there instead.
-    final bool down = at.top - 1 + _height <= screen.height - safe.bottom - 8;
-    final double top = down ? at.top - 1 : math.max(safe.top + 8, at.bottom + 1 - _height);
+    final bool down = at.top - 1 + height <= screen.height - safe.bottom - 8;
+    final double top = down ? at.top - 1 : math.max(safe.top + 8, at.bottom + 1 - height);
     final bool bottomPinned = !down && top > safe.top + 8;
     return (
       down: down,
@@ -1560,34 +1630,59 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
 
   @override
   Widget _content(BuildContext context, _Placement placement) {
+    final _MenuLayout layout = _layout!;
     // Reversed whenever it opens upward, whichever end is pinned: the first
     // item nearest the finger.
     final List<GlassMenuItem> items = placement.down ? widget.items : widget.items.reversed.toList();
-    return Padding(
+    final Color destructive = glassSystemRed(DefaultTextStyle.of(context).style.color!);
+    final Widget column = Padding(
       padding: const EdgeInsets.symmetric(vertical: _kMenuPad),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          for (final GlassMenuItem item in items)
-            _row(item, kGlassMenuRowHeight, glassSystemRed(DefaultTextStyle.of(context).style.color!)),
-        ],
+        children: <Widget>[for (final GlassMenuItem item in items) _row(item, layout, destructive)],
       ),
+    );
+    if (layout.content <= layout.height) {
+      return column;
+    }
+    // Spike 37: a menu taller than it may be scrolls, and one that opened
+    // upward starts at its end, the first item still nearest the finger.
+    return SizedBox(
+      height: layout.height,
+      child: SingleChildScrollView(reverse: !placement.down, child: column),
     );
   }
 
-  Widget _row(GlassMenuItem item, double height, Color destructive) {
+  Widget _row(GlassMenuItem item, _MenuLayout layout, Color destructive) {
     final bool enabled = item.onPressed != null;
     // Spike 34: the icon ahead of the label, centred 40 pt in; the label from
     // 64 pt to 28 pt short of the end edge — mirrored under rtl, as the row is.
-    final Widget content = Row(
-      children: <Widget>[
-        SizedBox(width: 48, child: Center(child: item.icon ?? const SizedBox.shrink())),
-        Expanded(child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis)),
-        const SizedBox(width: 28),
-      ],
+    // Spike 37: both further in as the text grows, and no icon at all at
+    // accessibility sizes, where the label runs from 28 pt.
+    Widget row = Padding(
+      padding: EdgeInsetsDirectional.only(
+        start: layout.accessible ? 28 : 16,
+        end: 28,
+        top: layout.pad,
+        bottom: layout.pad,
+      ),
+      child: Row(
+        children: <Widget>[
+          if (!layout.accessible)
+            SizedBox(
+              width: layout.column,
+              child: Center(
+                child: IconTheme.merge(
+                  data: IconThemeData(size: layout.icon),
+                  child: item.icon ?? const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          Expanded(child: Text(item.label)),
+        ],
+      ),
     );
-    Widget row = Padding(padding: const EdgeInsetsDirectional.only(start: 16), child: content);
     if (item.isDestructive) {
       row = DefaultTextStyle.merge(
         style: TextStyle(color: destructive),
@@ -1608,14 +1703,30 @@ class _GlassMenuAnchorState extends _AnchoredState<GlassMenuAnchor> {
                 item.onPressed!();
               }
             : null,
-        child: SizedBox(
-          height: height,
-          child: enabled ? row : Opacity(opacity: 0.3, child: row),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: kGlassMenuRowHeight),
+          child: Center(
+            child: enabled ? row : Opacity(opacity: 0.3, child: row),
+          ),
         ),
       ),
     );
   }
 }
+
+/// A menu's rows as measured for its placement: its width, whether it lays
+/// out as at accessibility sizes, the icon's column and size, the pad above
+/// and below each label, all the rows' height and the height the menu stands
+/// at, which is less when it scrolls.
+typedef _MenuLayout = ({
+  double width,
+  bool accessible,
+  double column,
+  double pad,
+  double icon,
+  double content,
+  double height,
+});
 
 class _GlassPopoverAnchorState extends _AnchoredState<GlassPopoverAnchor> {
   @override
@@ -1632,7 +1743,7 @@ class _GlassPopoverAnchorState extends _AnchoredState<GlassPopoverAnchor> {
   String get _barrierLabel => widget.barrierLabel;
 
   @override
-  _Placement _place(Rect at, Size screen, EdgeInsets safe) {
+  _Placement _place(BuildContext context, Rect at, Size screen, EdgeInsets safe) {
     final side = _side(at, screen);
     final bool down = at.center.dy < screen.height / 2;
     return (

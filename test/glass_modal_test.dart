@@ -41,8 +41,15 @@
 //    not-dismissible arm's sheet stays pulled when the finger comes back up;
 //  - in `_GlassSheetRoute.buildModalBarrier`, `1 - drop / _sheetHeight` ->
 //    `1`: the dim arm finds the dim whole under a dragged sheet.
+//  - in `_GlassMenuAnchorState`, `reverse: !placement.down` -> `reverse:
+//    false`: the large-text arm finds Rename scrolled out of the 3x menu
+//    opened upward; `start: layout.accessible ? 28 : 16` -> `start: 16`: it
+//    finds the 2x label 16 in; `content += math.max(kGlassMenuRowHeight,
+//    lines + 2 * pad)` -> `content += kGlassMenuRowHeight`: the 3x menu,
+//    measured short, does not scroll.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
@@ -274,6 +281,110 @@ void main() {
       double fromStart(double x) => rtl ? panel.right - x : x - panel.left;
       expect(fromStart(icon.center.dx), closeTo(40, 0.5), reason: '$direction: the icon');
       expect(fromStart(rtl ? label.right : label.left), closeTo(64, 0.5), reason: '$direction: the label');
+    }
+  });
+
+  testWidgets('a menu at large text wraps its labels and grows its rows, as iOS\'s does', (WidgetTester tester) async {
+    // Spike 37, iOS 26.5's `UIMenu` on an iPhone 17 (402 x 874) at five
+    // text sizes: a long label wraps from the default size on, and its row
+    // grows to hold it; from the first accessibility size the icons go and
+    // the menu is the screen less 16 a side, the labels 28 in; past 520 it
+    // stops and scrolls. Each anchor of the reference, at each scale.
+    tester.view
+      ..physicalSize = const Size(1206, 2622)
+      ..devicePixelRatio = 3
+      ..padding = const FakeViewPadding(top: 62 * 3, bottom: 34 * 3);
+    addTearDown(tester.view.reset);
+    const screen = Size(402, 874);
+    const long = 'Move to another folder and archive';
+    for (final double scale in <double>[1, 1.35, 2, 3]) {
+      for (final bool top in <bool>[true, false]) {
+        final chosen = <String>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ValueKey<(double, bool)>((scale, top)),
+            builder: (BuildContext context, Widget? child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+              child: GlassHost(hardware: GlassHardware.appleMetal, backdrop: const Color(0xFF406080), child: child!),
+            ),
+            home: Stack(
+              children: <Widget>[
+                Positioned.fromRect(
+                  rect: top
+                      ? Rect.fromLTWH(screen.width - 136, 120, 120, 44)
+                      : Rect.fromLTWH(16, screen.height - 160, 120, 44),
+                  child: GlassMenuAnchor(
+                    items: <GlassMenuItem>[
+                      for (final String label in <String>['Rename', 'Duplicate', 'Delete', long])
+                        GlassMenuItem(
+                          label: label,
+                          icon: const Icon(IconData(0x41)),
+                          isDestructive: label == 'Delete',
+                          onPressed: () => chosen.add(label),
+                        ),
+                    ],
+                    builder: (BuildContext context, GlassMenuController c) => GestureDetector(
+                      onTap: c.open,
+                      child: const SizedBox.expand(child: Text('anchor', textScaler: TextScaler.noScaling)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.tap(find.text('anchor'));
+        await tester.pumpAndSettle();
+        final why = 'at ${scale}x, the ${top ? 'top' : 'bottom'} anchor';
+        final Rect panel = _surfaceAbove(tester, find.text('Rename')).globalRect;
+        final bool accessible = scale >= 1.5;
+        expect(panel.width, accessible ? screen.width - 32 : kGlassMenuWidth, reason: why);
+        // Inside the screen's safe area, whichever way it opened.
+        expect(panel.top, greaterThanOrEqualTo(62 + 8 - 1), reason: why);
+        expect(panel.bottom, lessThanOrEqualTo(screen.height - 34 - 8 + 1), reason: why);
+        expect(panel.height, lessThanOrEqualTo(520), reason: why);
+        if (scale == 3) {
+          expect(panel.height, 520, reason: '$why: the rows fit, so nothing here scrolls');
+        }
+        // The long label is wrapped, whole, not cut to one line.
+        final RenderParagraph label = tester.renderObject<RenderParagraph>(find.text(long));
+        expect(label.text.toPlainText(), long);
+        expect(label.didExceedMaxLines, isFalse, reason: why);
+        expect(
+          label.size.height,
+          greaterThan(tester.getSize(find.text('Rename')).height * 1.5),
+          reason: '$why: the long label is on one line',
+        );
+        expect(
+          find.descendant(of: find.byType(Column), matching: find.byType(Icon)),
+          accessible ? findsNothing : findsNWidgets(4),
+          reason: why,
+        );
+        final Rect rename = tester.getRect(find.text('Rename'));
+        if (accessible) {
+          expect(rename.left - panel.left, closeTo(28, 0.5), reason: why);
+        }
+        // Every row holds its label with room above and below it.
+        for (final String text in <String>['Rename', long]) {
+          final Rect row = tester.getRect(
+            find.ancestor(of: find.text(text), matching: find.byType(ConstrainedBox)).first,
+          );
+          final Rect line = tester.getRect(find.text(text));
+          expect(row.height, greaterThanOrEqualTo(kGlassMenuRowHeight), reason: '$why: $text');
+          expect(line.top - row.top, greaterThanOrEqualTo(1.1 + 9.7 * scale - 0.5), reason: '$why: $text');
+        }
+        // The first item is still the one nearest the finger, and shown,
+        // even when the menu scrolls.
+        expect(panel.contains(rename.center), isTrue, reason: '$why: Rename is scrolled away');
+        if (find.text('Duplicate').hitTestable().evaluate().isNotEmpty) {
+          final double toDuplicate = tester.getCenter(find.text('Duplicate')).dy - rename.center.dy;
+          expect(top ? toDuplicate : -toDuplicate, greaterThan(0), reason: '$why: the order');
+        }
+        expect(find.byType(Scrollable).evaluate().isNotEmpty, panel.height == 520, reason: why);
+        await tester.tap(find.text('Rename'));
+        await tester.pumpAndSettle();
+        expect(chosen, <String>['Rename'], reason: why);
+      }
     }
   });
 

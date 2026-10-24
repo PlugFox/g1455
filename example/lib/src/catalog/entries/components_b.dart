@@ -784,8 +784,13 @@ GlassMenuAnchor(
 
 ## Items
 
-- Each row is [kGlassMenuRowHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassMenuRowHeight-constant.html)
-  (42) high, with the icon in a 48 px column before the label. Labels are one line and end with an ellipsis.
+- Each row is at least [kGlassMenuRowHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassMenuRowHeight-constant.html)
+  (42) high, with the icon in a 48 px column before the label. A long label wraps, and its row grows to hold it.
+- Large text works as it does on iOS. The rows, the icons and their column grow with the text. From an accessibility size
+  (1.5 times the text and up) the icons go, the menu is the screen's width less 16 px a side (at most 400), and past 520 px
+  tall it scrolls, opening at the end nearest the button.
+- Flutter sets text in SF without the tracking UIKit gives it (-0.43 at 17 pt), so a label can wrap a line sooner than
+  Apple's. With `letterSpacing: -0.43` in your text style, the menu's rows matched an iPhone's at the default size.
 - `isDestructive` draws the row in iOS red. `onPressed: null` disables the row and dims it to 30%.
 - The menu is [kGlassMenuWidth](https://pub.dev/documentation/g1455/latest/g1455/kGlassMenuWidth-constant.html) (250)
   wide unless you pass `width`, with corners of
@@ -874,7 +879,7 @@ class _NoteHeaderState extends State<NoteHeader> {
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `label` | `String` | **required** | The row's text, one line. |
+| `label` | `String` | **required** | The row's text. Wraps when long. |
 | `icon` | `Widget?` | `null` | Drawn before the label. |
 | `onPressed` | `VoidCallback?` | `null` | The action. Null disables the row. The menu closes after it runs. |
 | `isDestructive` | `bool` | `false` | Draws the row in iOS red. |
@@ -886,7 +891,7 @@ class _NoteHeaderState extends State<NoteHeader> {
 | Name | Value | Description |
 |---|---|---|
 | `kGlassMenuWidth` | `250` | The menu's default width. |
-| `kGlassMenuRowHeight` | `42` | Each row's height. |
+| `kGlassMenuRowHeight` | `42` | The height of a row of one line at the default text size. |
 | `kGlassMenuRadius` | `31.5` | The menu's corner radius, and the popover's default. |
 ''',
   ),
