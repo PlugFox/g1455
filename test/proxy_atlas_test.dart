@@ -158,7 +158,7 @@ void main() {
         previous = error;
       }
     }
-  });
+  }, tags: 'impeller-gap');
 
   test('a decal proxy needs more context than a clamped one', () async {
     // Why the rig clamps, as a number rather than as a preference: extending

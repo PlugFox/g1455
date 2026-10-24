@@ -594,7 +594,7 @@ void main() {
       greaterThan(0),
       reason: 'a tile that forgot a shape drew the same picture, so the subsets are not read',
     );
-  });
+  }, tags: 'impeller-gap');
 
   testWidgets('the split changes no pixel through the render object either', (
     WidgetTester tester,
@@ -882,7 +882,7 @@ void main() {
           'a tile that keeps only the shapes whose own box touches it drew the same picture, '
           'so this fixture has no bridges and the scan measures nothing',
     );
-  });
+  }, tags: 'impeller-gap');
 
   test('the tiles are a partition, and their union is the boxes they came from', () {
     // The geometry on its own, at a scale no rendering arm can reach: two

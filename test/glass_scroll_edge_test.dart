@@ -121,7 +121,9 @@ void main() {
       expect(ours.bottom.leastContrast, greaterThan(0.85), reason: 'the bottom blurs, and Apple\'s does not');
       expect(ours.bottom.a, closeTo(apple.bottom.a, 0.04));
       expect(ours.bottom.tint50, closeTo(apple.bottom.tint50, 7.5));
-    });
+      // The dark edge reads apart from the light one on Impeller at the same
+      // sigma, which is not traced yet (#33).
+    }, tags: appearance == GlassScrollEdgeAppearance.dark ? 'impeller-gap' : null);
   }
 
   testWidgets('our hard edge reads as Apple\'s', (WidgetTester tester) async {

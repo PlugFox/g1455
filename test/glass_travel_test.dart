@@ -260,7 +260,10 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(host.recorded, greaterThan(before), reason: 'a surface outside its region was held');
-    expect(await _differing(tester, bare), 0, reason: 'outside the region the glass is visible');
+    // One code value on Impeller, as in `glass_host_test`'s
+    // `kBackendTolerance`: the capture cut to the screen packs the atlas
+    // differently, and 3 px of one column read one off. Skia reads 0.
+    expect(await _differing(tester, bare, tolerance: 1), 0, reason: 'outside the region the glass is visible');
 
     // Back inside, then the whole region moves: the slot no longer holds it.
     x.value = 40;

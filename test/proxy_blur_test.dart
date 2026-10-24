@@ -90,7 +90,7 @@ void main() {
       // Gaussian returns a different sigma at every frequency.
       expect(fit.spread / fit.sigma, lessThan(0.25), reason: 'not Gaussian-like: $fit');
     }
-  });
+  }, tags: 'impeller-gap');
 
   testWidgets('a divisor is a low-pass, and this is how much of one', (WidgetTester tester) async {
     final delivered = <int, double>{};
@@ -165,7 +165,7 @@ void main() {
         );
       }
     }
-  });
+  }, tags: 'impeller-gap');
 
   testWidgets('rendering at the corrected residual lands on the finish', (
     WidgetTester tester,
@@ -195,7 +195,7 @@ void main() {
         reason: 'divisor $divisor: the correction did not help',
       );
     }
-  });
+  }, tags: 'impeller-gap');
 
   test('the ceiling a finish puts on the divisor', () {
     expect(ProxyResolution.maxDivisorFor(kRegularSigma, 1), 8);

@@ -69,6 +69,14 @@ jobs:
       - name: Test
         run: flutter test --coverage --reporter=github
 
+      # The same tests on Impeller, which is what iOS and Android draw with.
+      # `flutter_tester` reads Impeller's blur as an M2 iPad does, 0.02 apart
+      # on average (#33). What it still reads apart from Skia and is not traced
+      # is tagged `impeller-gap` (see dart_test.yaml) and left to the Skia run.
+      - name: Test on Impeller
+        if: matrix.name == 'stable'
+        run: flutter test --enable-impeller --exclude-tags impeller-gap --reporter=github
+
       # Plays every showcase loop headless and checks each meets itself at the
       # seam, so a change that breaks the README's animations fails here.
       - name: Test example

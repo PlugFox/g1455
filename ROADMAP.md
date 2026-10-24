@@ -126,6 +126,8 @@ cheap setting is reachable without a fork.
       exported, so an app can give the one and read the other; on Impeller
       the blur asked for the sigma the finishes were calibrated at, measured
       on an M2 iPad (#33).
+- [x] CI runs the tests on Impeller too, the known differences tagged
+      `impeller-gap` and left to the Skia run (#33).
 - [x] A sheet pulled below its lowest detent is not retaken on every frame:
       the capture is cut to the screen. A drag to close is, because the dim
       under the sheet fades, which is a change under its glass.
@@ -151,8 +153,6 @@ cheap setting is reachable without a fork.
       apart from the light one at the same sigma. The tiled group's seams are
       `flutter_tester`'s: on an M2 iPad the tiles are the one quad, 0 of
       19,200 px.
-- [ ] CI has no Impeller run; `flutter test --enable-impeller` reads the
-      blur as an M2 iPad does, 0.02 apart on average (#33).
 
 ## Next — what 0.2.0 left open
 
