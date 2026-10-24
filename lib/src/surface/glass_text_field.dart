@@ -17,15 +17,19 @@
 // `glass_text_field_test.dart`: a focused field over a still screen records
 // nothing for seconds of blinking.
 
+import 'dart:math' as math;
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_components.dart' show glassSystemBlue, kGlassMinTapTarget;
 import 'glass_finish.dart';
 import 'glass_surface.dart';
 import 'glass_theme.dart';
 
-/// The field's height (iOS 26.5's standalone search field, 44 pt).
+/// The field's height at the default text size, and its minimum (iOS 26.5's
+/// standalone search field, 44 pt): a larger text size grows it with its
+/// line, keeping 11 above and below.
 ///
 /// {@category Panels and controls}
 const double kGlassFieldHeight = 44;
@@ -80,7 +84,7 @@ class GlassTextField extends StatefulWidget {
     this.autofocus = false,
     this.obscureText = false,
     this.finish,
-    this.cursorColor = const Color(0xFF007AFF),
+    this.cursorColor,
     super.key,
   });
 
@@ -96,7 +100,7 @@ class GlassTextField extends StatefulWidget {
     this.onSubmitted,
     this.autofocus = false,
     this.finish,
-    this.cursorColor = const Color(0xFF007AFF),
+    this.cursorColor,
     super.key,
   }) : keyboardType = TextInputType.text,
        textInputAction = TextInputAction.search,
@@ -139,8 +143,9 @@ class GlassTextField extends StatefulWidget {
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
 
-  /// The caret, and the selection at 0.3 of it. iOS's blue by default.
-  final Color cursorColor;
+  /// The caret, and the selection at 0.3 of it. Null for iOS's `systemBlue`
+  /// in the appearance of the field's own label.
+  final Color? cursorColor;
 
   @override
   State<GlassTextField> createState() => _GlassTextFieldState();
@@ -160,6 +165,23 @@ class _GlassTextFieldState extends State<GlassTextField> {
     super.dispose();
   }
 
+  /// [kGlassFieldHeight], or taller when a larger text size makes the line
+  /// taller than it leaves room for: the capsule keeps 11 above and below the
+  /// line, as a `UITextField` grows under Dynamic Type. Fixed for a style, not
+  /// read off the text, so the field stays a box of its own size and typing
+  /// lays out nothing around it.
+  double _height(TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: ' ', style: style),
+      textScaler: MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final double line = painter.height;
+    painter.dispose();
+    return math.max(kGlassFieldHeight, line + 22);
+  }
+
   @override
   Widget build(BuildContext context) {
     final GlassThemeData theme = GlassTheme.of(context);
@@ -170,13 +192,14 @@ class _GlassTextFieldState extends State<GlassTextField> {
     final Color label = theme.legibility(finish).label;
     final TextStyle base = DefaultTextStyle.of(context).style.copyWith(color: label, fontSize: 17);
     final TextStyle hint = base.copyWith(color: label.withValues(alpha: label.a * 0.3));
+    final Color cursor = widget.cursorColor ?? glassSystemBlue(label);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _focus.requestFocus,
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: kGlassMinTapTarget.height),
         child: SizedBox(
-          height: kGlassFieldHeight,
+          height: _height(base),
           child: GlassSurface(
             borderRadius: kGlassCapsule,
             finish: widget.finish,
@@ -202,9 +225,9 @@ class _GlassTextFieldState extends State<GlassTextField> {
                             controller: _controller,
                             focusNode: _focus,
                             style: base,
-                            cursorColor: widget.cursorColor,
+                            cursorColor: cursor,
                             backgroundCursorColor: const Color(0xFF8E8E93),
-                            selectionColor: widget.cursorColor.withValues(alpha: 0.3),
+                            selectionColor: cursor.withValues(alpha: 0.3),
                             keyboardType: widget.keyboardType,
                             textInputAction: widget.textInputAction,
                             autofocus: widget.autofocus,

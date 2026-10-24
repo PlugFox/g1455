@@ -1,0 +1,4 @@
+tags:
+  # What `flutter test --enable-impeller` reads apart from Skia and is not
+  # traced or fixed yet (#33): excluded from CI's Impeller leg, run on Skia.
+  impeller-gap:

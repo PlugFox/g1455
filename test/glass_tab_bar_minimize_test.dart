@@ -18,14 +18,30 @@
 //    `setState(() => _minimizeTo(target));`: the declared run takes 2 records,
 //    one on the first frame of each direction, before the shape has moved — a
 //    rebuild of the whole bar costs a capture even when nothing it draws
-//    changed (one per bare `setState`, before this feature as after it);
+//    changed, wherever the bar is lifted;
+//  - in `_GlassTabBarState.build`, `_built ??= RepaintBoundary(` ->
+//    `RepaintBoundary(`: the lifted-rebuild arm takes a record per rebuild;
+//    in `_drawsAlike`, `(a.onSelected == null) != (b.onSelected == null)` ->
+//    `a.onSelected != b.onSelected` costs nothing a test sees, which is why
+//    the new-callback arm checks the other way: that a kept build calls the
+//    latest callback;
 //  - `debugGlassTabMinimizeTravel` is the cost arm's own control: off, every
 //    frame of the collapse is a capture.
 //  - in `_GlassTabBarState.build`, `math.min(kGlassTabAccessoryHeight,
 //    circle.height) / 2` -> `kGlassTabAccessoryHeight / 2`: the accessory is
 //    48 tall beside a 44-tall circle and hangs past the box, and the 44-tall
-//    arm fails.
+//    arm fails;
+//  - `clipBehavior: Clip.none` dropped from the accessory's `Stack`: at 2.625
+//    the snapped bar ends past the box, and the ratio arm finds a clip;
+//  - in `_GlassTabBarState.didUpdateWidget`, the `_listen();` for a new
+//    `minimizeBehavior` dropped: the behaviour-change arm's bar stays open
+//    over content already scrolled;
+//  - in `_GlassTabBarState._minimizeTo`, `_down = false;` dropped: the held
+//    arm's release selects the tab the collapse took the finger off;
+//  - in `_GlassTabBarState.build`, `rtl ? circle.left - _kAccessoryGap :
+//    width` -> `width`: the rtl arm's accessory runs over the circle.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,6 +122,20 @@ void main() {
     expect(box.top <= inline.top && inline.bottom <= box.bottom, isTrue, reason: '$inline is not inside $box');
   });
 
+  testWidgets('at a ratio its width does not land on, nothing clips the accessory', (WidgetTester tester) async {
+    // 393 less the margins is 369 wide, 968.625 device px at 2.625: snapped,
+    // the accessory's bar ends a fraction past its box, which must not clip.
+    await _Rig.mount(tester, accessory: true, screen: const Size(393, 852), devicePixelRatio: 2.625);
+    await tester.pumpAndSettle();
+    expect(find.text('Now playing'), findsOneWidget);
+    // The body's viewport clips to the screen, and only that.
+    expect(
+      tester.layers.whereType<ClipRectLayer>().where((ClipRectLayer l) => l.clipRect!.width < 393),
+      isEmpty,
+      reason: 'the accessory clipped its own bar',
+    );
+  });
+
   testWidgets('a bar that does not ask to collapse does not', (WidgetTester tester) async {
     final _Rig rig = await _Rig.mount(tester, behavior: GlassTabBarMinimizeBehavior.never);
     final Rect open = rig.bar.globalRect;
@@ -114,6 +144,71 @@ void main() {
     expect(rig.scroll.offset, greaterThan(100), reason: 'the content did not scroll');
     expect(rig.bar.globalRect, open);
     expect(rig.minimizer.value, isTrue, reason: 'the scaffold\'s minimizer did not see the scroll');
+  });
+
+  testWidgets('a bar told to collapse after the content scrolled follows the minimizer from then on', (
+    WidgetTester tester,
+  ) async {
+    final behavior = ValueNotifier<GlassTabBarMinimizeBehavior>(GlassTabBarMinimizeBehavior.never);
+    addTearDown(behavior.dispose);
+    final _Rig rig = await _Rig.mount(tester, behaviors: behavior);
+    final Rect open = rig.bar.globalRect;
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(rig.minimizer.value, isTrue);
+    expect(rig.bar.globalRect, open, reason: 'collapsed before it was asked to');
+
+    behavior.value = GlassTabBarMinimizeBehavior.onScrollDown;
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect.width, 60, reason: 'the new behaviour did not take up the minimizer\'s state');
+    // And from then on it follows the scroll.
+    await tester.drag(find.byType(ListView), const Offset(0, 60));
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect, open);
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect.width, 60);
+
+    // Told not to again, it opens and stops following.
+    behavior.value = GlassTabBarMinimizeBehavior.never;
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect, open, reason: 'a bar that no longer collapses stayed collapsed');
+    await tester.drag(find.byType(ListView), const Offset(0, 60));
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect, open, reason: 'it still followed the minimizer');
+  });
+
+  testWidgets('a finger held on a tab as the bar collapses lets go, and selects nothing', (
+    WidgetTester tester,
+  ) async {
+    final _Rig rig = await _Rig.mount(tester);
+    final Rect open = rig.bar.globalRect;
+    final TestGesture finger = await tester.startGesture(
+      Offset(kBarLeft + 7 + (kBarWidth - 14) / 5 * 4.5, open.center.dy),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    rig.minimizer.value = true;
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect.width, 60);
+    await finger.up();
+    await tester.pumpAndSettle();
+    expect(rig.selections, isEmpty, reason: 'the hold the collapse ended selected its tab on release');
+  });
+
+  testWidgets('under right to left the collapsed circle is at the start and the accessory beside it, before it', (
+    WidgetTester tester,
+  ) async {
+    final _Rig rig = await _Rig.mount(tester, selected: 2, accessory: true, direction: TextDirection.rtl);
+    final Rect open = rig.bar.globalRect;
+    rig.minimizer.value = true;
+    await tester.pumpAndSettle();
+    final Rect shut = rig.bar.globalRect;
+    expect(shut, Rect.fromLTWH(kBarLeft + kBarWidth - 60, open.top, 60, 60), reason: 'not at the right, the start');
+    final Rect inline = rig.accessory.globalRect;
+    expect(inline.right, closeTo(shut.left - 8, 0.01), reason: 'the accessory is not before the circle');
+    expect(inline.left, closeTo(kBarLeft, 0.01), reason: 'the accessory does not run to the end edge');
+    expect(inline.center.dy, closeTo(shut.center.dy, 0.01));
   });
 
   testWidgets('a tap on the collapsed circle expands the bar and selects nothing', (WidgetTester tester) async {
@@ -222,6 +317,61 @@ void main() {
     // And the other way: the regions are captured instead of the boxes, so at
     // rest the atlas holds the accessory's whole travel.
     expect(on.atlasAtRest, greaterThan(off.atlasAtRest), reason: 'the regions cost the atlas nothing: $on, $off');
+  });
+
+  testWidgets('a lifted bar rebuilt with nothing changed is not retaken', (WidgetTester tester) async {
+    // In a scaffold the bar is lifted, so its own repaint is a change the
+    // capture under it watches: a rebuild that re-ran its layout repainted it,
+    // and every bare `setState` around it was a capture.
+    final behaviors = ValueNotifier<GlassTabBarMinimizeBehavior>(GlassTabBarMinimizeBehavior.onScrollDown);
+    addTearDown(behaviors.dispose);
+    final _Rig rig = await _Rig.mount(tester, accessory: true, behaviors: behaviors);
+    await tester.pumpAndSettle();
+    final int before = rig.recorded;
+    for (var i = 0; i < 3; i++) {
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      behaviors.notifyListeners();
+      await tester.pump();
+      await tester.pump();
+    }
+    expect(rig.recorded - before, 0, reason: 'a rebuild that changed nothing was a capture');
+    // And one that changes what the bar draws still draws it.
+    rig.minimizer.value = true;
+    await tester.pumpAndSettle();
+    behaviors.value = GlassTabBarMinimizeBehavior.never;
+    await tester.pumpAndSettle();
+    expect(rig.bar.globalRect.width, greaterThan(rig.bar.globalRect.height * 2), reason: 'the bar did not expand');
+  });
+
+  testWidgets('a bar rebuilt with a new onSelected and nothing else calls the new one', (WidgetTester tester) async {
+    // The rebuild above is kept rather than built again, and the callback is
+    // read when a tap lands: a kept one must not hold the first.
+    final calls = <String>[];
+    var round = 0;
+    late StateSetter rebuild;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassHost(
+          hardware: GlassHardware.appleMetal,
+          child: GlassScaffold(
+            body: const SizedBox.expand(),
+            bottomBar: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) {
+                rebuild = setState;
+                final int now = round;
+                return GlassTabBar(items: kItems, selectedIndex: 0, onSelected: (int i) => calls.add('$now:$i'));
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    rebuild(() => round = 1);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(kItems[2].label));
+    await tester.pumpAndSettle();
+    expect(calls, <String>['1:2']);
   });
 
   testWidgets('under reduced motion the bar collapses on the next frame and stays still', (
@@ -350,40 +500,52 @@ class _Rig {
     Widget Function(Widget list)? around,
     bool reverse = false,
     Size screen = kScreen,
+    double devicePixelRatio = 2,
+    ValueListenable<GlassTabBarMinimizeBehavior>? behaviors,
+    TextDirection? direction,
   }) async {
     await tester.pumpWidget(const SizedBox());
     tester.view
-      ..physicalSize = screen * 2
-      ..devicePixelRatio = 2;
+      ..physicalSize = screen * devicePixelRatio
+      ..devicePixelRatio = devicePixelRatio;
     addTearDown(tester.view.reset);
     final hostKey = GlobalKey();
     final scroll = ScrollController();
     addTearDown(scroll.dispose);
     final selections = <int>[];
+    Widget bar(GlassTabBarMinimizeBehavior behavior) => GlassTabBar(
+      items: kItems,
+      selectedIndex: selected,
+      onSelected: selections.add,
+      minimizeBehavior: behavior,
+      bottomAccessory: accessory ? const Text('Now playing') : null,
+    );
     await tester.pumpWidget(
       MaterialApp(
         builder: (BuildContext context, Widget? child) => reduceMotion
             ? MediaQuery(data: MediaQuery.of(context).copyWith(disableAnimations: true), child: child!)
             : child!,
-        home: GlassHost(
-          key: hostKey,
-          hardware: GlassHardware.appleMetal,
-          child: GlassScaffold(
-            bottomBar: GlassTabBar(
-              items: kItems,
-              selectedIndex: selected,
-              onSelected: selections.add,
-              minimizeBehavior: behavior,
-              bottomAccessory: accessory ? const Text('Now playing') : null,
-            ),
-            minimizeNotificationPredicate: predicate,
-            body: (around ?? (Widget list) => list)(
-              ListView.builder(
-                controller: scroll,
-                reverse: reverse,
-                itemCount: 60,
-                itemExtent: 40,
-                itemBuilder: (BuildContext context, int i) => _Row(i),
+        home: _directed(
+          direction,
+          GlassHost(
+            key: hostKey,
+            hardware: GlassHardware.appleMetal,
+            child: GlassScaffold(
+              bottomBar: behaviors == null
+                  ? bar(behavior)
+                  : ValueListenableBuilder<GlassTabBarMinimizeBehavior>(
+                      valueListenable: behaviors,
+                      builder: (BuildContext context, GlassTabBarMinimizeBehavior b, _) => bar(b),
+                    ),
+              minimizeNotificationPredicate: predicate,
+              body: (around ?? (Widget list) => list)(
+                ListView.builder(
+                  controller: scroll,
+                  reverse: reverse,
+                  itemCount: 60,
+                  itemExtent: 40,
+                  itemBuilder: (BuildContext context, int i) => _Row(i),
+                ),
               ),
             ),
           ),
@@ -423,6 +585,9 @@ class _Rig {
     return n;
   }
 }
+
+Widget _directed(TextDirection? direction, Widget child) =>
+    direction == null ? child : Directionality(textDirection: direction, child: child);
 
 class _Row extends StatelessWidget {
   const _Row(this.i);

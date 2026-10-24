@@ -36,8 +36,12 @@
 // toolbar on the phone and on its edge on the iPad (5 pt used). Under it the
 // lines are at one code value, which says the blur is at least σ 2.15 and
 // nothing more: no blur behind 0.9 white can be read off these frames, so the
-// bound is what is drawn. Not chosen by the content in these frames; a dark
-// appearance was not photographed.
+// bound is what is drawn. Not chosen by the content: it is the screen's
+// background at 0.90. Photographed again with the bars in the dark appearance:
+// over a white background the band stays white (235 / 253, as before); over
+// the dark appearance's own background, black, it is black at 0.90 (51 → 5,
+// 230 → 23). So the package takes the declared backdrop, and the host's
+// appearance when none is declared.
 //
 // What it costs: the soft top is one glass surface of the screen's width and
 // B + 14 tall — a slot in the atlas, captured when what is under it changes,
@@ -131,11 +135,20 @@ const Color kGlassScrollEdgeLightTint = Color.fromRGBO(255, 255, 255, 0.85);
 /// {@category Panels and controls}
 const Color kGlassScrollEdgeDarkTint = Color.fromRGBO(0, 0, 0, 0.25);
 
-/// The hard edge's band: a near-opaque white, 0.90 over both a dark and a
-/// light field. A dark appearance was not photographed.
+/// The hard edge's band in the light appearance: a near-opaque white, 0.90
+/// over both a dark and a light field.
+///
+/// Apple's band is the screen's background at 0.90; this is the light
+/// appearance's, white. See [GlassScrollEdge.hardFillFor].
 ///
 /// {@category Panels and controls}
 const Color kGlassScrollEdgeHardFill = Color.fromRGBO(255, 255, 255, 0.90);
+
+/// The hard edge's band in the dark appearance: the dark background, black,
+/// at 0.90 (51 → 5 and 230 → 23 over the two fields).
+///
+/// {@category Panels and controls}
+const Color kGlassScrollEdgeHardFillDark = Color.fromRGBO(0, 0, 0, 0.90);
 
 /// Where the soft top's tint is centred and how wide its erf is, against the
 /// bar's edge, logical px.
@@ -182,7 +195,7 @@ const double _kHardBottom = -5;
 /// | | [GlassScrollEdgeSide.top] | [GlassScrollEdgeSide.bottom] |
 /// |---|---|---|
 /// | [GlassScrollEdgeStyle.soft] | a glass strip of [blurSigma] under an erf tint | an erf tint, no glass |
-/// | [GlassScrollEdgeStyle.hard] | a band of [kGlassScrollEdgeHardFill] | the same band |
+/// | [GlassScrollEdgeStyle.hard] | a band of [hardFillFor] | the same band |
 ///
 /// The soft tint is [kGlassScrollEdgeLightTint] or [kGlassScrollEdgeDarkTint],
 /// by [appearanceFor].
@@ -226,7 +239,9 @@ class GlassScrollEdge extends StatelessWidget {
   /// Soft, iOS's, by default; hard is macOS's.
   final GlassScrollEdgeStyle style;
 
-  /// Which way a soft edge tints. Null reads the theme's declared backdrop —
+  /// Which way a soft edge tints. Not the hard band's colour, which is the
+  /// screen's background: see [hardFillFor]. Null reads the theme's declared
+  /// backdrop —
   /// dark below a relative luminance of 0.4, light otherwise or undeclared.
   /// Apple reads the content itself: mid-grey content (code 128) went dark,
   /// light content (code 217) light; the threshold is somewhere between,
@@ -257,6 +272,21 @@ class GlassScrollEdge extends StatelessWidget {
         : GlassScrollEdgeAppearance.light;
   }
 
+  /// The hard band in force for [theme], with the platform in [platform]:
+  /// the declared backdrop at 0.90, as Apple's band is the screen's
+  /// background at 0.90; with none declared, [kGlassScrollEdgeHardFillDark]
+  /// in the dark appearance — the host's ([GlassHost.appearance]), or the
+  /// platform's when the host names a finish — and [kGlassScrollEdgeHardFill]
+  /// in the light one.
+  static Color hardFillFor(GlassThemeData theme, Brightness platform) {
+    if (theme.backdrop case final Color backdrop) {
+      return backdrop.withValues(alpha: backdrop.a * 0.90);
+    }
+    return (theme.regularAppearance ?? platform) == Brightness.dark
+        ? kGlassScrollEdgeHardFillDark
+        : kGlassScrollEdgeHardFill;
+  }
+
   @override
   Widget build(BuildContext context) {
     final GlassThemeData theme = GlassTheme.of(context);
@@ -265,7 +295,9 @@ class GlassScrollEdge extends StatelessWidget {
     final double height = math.max(reach, extent);
     final Widget effect = switch (style) {
       GlassScrollEdgeStyle.soft => _soft(theme, reach),
-      GlassScrollEdgeStyle.hard => _hard(reach),
+      GlassScrollEdgeStyle.hard => _hard(
+        hardFillFor(theme, MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light),
+      ),
     };
     return GlassAbove(
       child: SizedBox(
@@ -369,16 +401,16 @@ class GlassScrollEdge extends StatelessWidget {
     );
   }
 
-  Widget _hard(double reach) => GlassSurface(
+  Widget _hard(Color fill) => GlassSurface(
     borderRadius: BorderRadius.zero,
-    finish: const GlassFinish(
+    finish: GlassFinish(
       // `regularDark`'s table: it transmits 0.307 of the backdrop and this
       // 0.10, so the borrowed damage is an overestimate (see the soft edge's
       // name).
       name: 'regularDark',
       blurSigmaLogical: kGlassScrollEdgeHardSigma,
-      tint: kGlassScrollEdgeHardFill,
-      rim: Color(0x00000000),
+      tint: fill,
+      rim: const Color(0x00000000),
       optics: GlassOptics.none,
     ),
     labelled: false,

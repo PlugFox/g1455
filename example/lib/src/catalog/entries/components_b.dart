@@ -60,15 +60,15 @@ GlassTextField(
 
 - The field **stretches to the width it is given**, so the width has to be bounded. In a `Row`, wrap it in `Expanded`;
   in a `Stack`, give the `Positioned` a `left` and a `right`.
-- Its height is fixed at [kGlassFieldHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassFieldHeight-constant.html)
-  (44), which is also the minimum tap target. A tap anywhere on the capsule focuses the field.
+- Its height is at least [kGlassFieldHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassFieldHeight-constant.html)
+  (44), which is also the minimum tap target, and grows with a larger text size, keeping 11 above and below the line. A tap anywhere on the capsule focuses the field.
 
 ## Behaviour
 
 - `controller` and `focusNode` are optional. Without them the field makes its own and disposes of them.
 - There is no built-in clear button. Pass one as `trailing` and wire it to `controller.clear()`, as the code example does.
   Icons in `leading` and `trailing` are themed at 20 px.
-- `cursorColor` defaults to iOS blue (`0xFF007AFF`); the selection is the same colour at 30%.
+- `cursorColor` defaults to iOS blue in the field's appearance (`0xFF007AFF` light, `0xFF0A84FF` dark); the selection is the same colour at 30%.
 - The field is an `EditableText`, so it needs what an app provides: `MediaQuery`, `Directionality` and an `Overlay` for
   the selection handles. Any `MaterialApp` or `WidgetsApp` has them.
 
@@ -155,13 +155,13 @@ class _CitySearchState extends State<CitySearch> {
 | `autofocus` | `bool` | `false` | Focus the field when it first appears. |
 | `obscureText` | `bool` | `false` | Main constructor only. Hides the text, for passwords. |
 | `finish` | `GlassFinish?` | `null` | The glass. Null takes the theme's. |
-| `cursorColor` | `Color` | `Color(0xFF007AFF)` | The caret, and the selection at 30%. |
+| `cursorColor` | `Color?` | `null` | The caret, and the selection at 30%. Null for iOS's blue in the field's appearance. |
 
 ## Constants
 
 | Name | Value | Description |
 |---|---|---|
-| `kGlassFieldHeight` | `44` | The field's height. |
+| `kGlassFieldHeight` | `44` | The field's height at the default text size, and its minimum. |
 ''',
   ),
 
@@ -588,9 +588,11 @@ one that was measured.
 
 ### Moving
 
-While the sheet is dragged, between detents or down to close, it declares where it travels, so the drag is one retake
-rather than one a frame (1 against 16 in the package's tests). Two known gaps: the dim does not fade while the sheet is
-dragged down, and a list inside the sheet does not hand the drag over to the sheet when it reaches its top.
+While the sheet is dragged between detents it declares where it travels, so the drag is one retake rather than one a
+frame (1 against 16 in the package's tests), and so is a pull below its lowest detent. Dragged down to close, the dim
+behind it fades with it, and that drag is retaken on every frame: the dim is under the glass, and the glass shows the
+screen brightening. A known gap: a list inside the sheet does not hand the drag over to the sheet when it reaches its
+top.
 
 ## Content
 
@@ -782,8 +784,13 @@ GlassMenuAnchor(
 
 ## Items
 
-- Each row is [kGlassMenuRowHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassMenuRowHeight-constant.html)
-  (42) high, with the icon in a 48 px column before the label. Labels are one line and end with an ellipsis.
+- Each row is at least [kGlassMenuRowHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassMenuRowHeight-constant.html)
+  (42) high, with the icon in a 48 px column before the label. A long label wraps, and its row grows to hold it.
+- Large text works as it does on iOS. The rows, the icons and their column grow with the text. From an accessibility size
+  (1.5 times the text and up) the icons go, the menu is the screen's width less 16 px a side (at most 400), and past 520 px
+  tall it scrolls, opening at the end nearest the button.
+- Flutter sets text in SF without the tracking UIKit gives it (-0.43 at 17 pt), so a label can wrap a line sooner than
+  Apple's. With `letterSpacing: -0.43` in your text style, the menu's rows matched an iPhone's at the default size.
 - `isDestructive` draws the row in iOS red. `onPressed: null` disables the row and dims it to 30%.
 - The menu is [kGlassMenuWidth](https://pub.dev/documentation/g1455/latest/g1455/kGlassMenuWidth-constant.html) (250)
   wide unless you pass `width`, with corners of
@@ -872,7 +879,7 @@ class _NoteHeaderState extends State<NoteHeader> {
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `label` | `String` | **required** | The row's text, one line. |
+| `label` | `String` | **required** | The row's text. Wraps when long. |
 | `icon` | `Widget?` | `null` | Drawn before the label. |
 | `onPressed` | `VoidCallback?` | `null` | The action. Null disables the row. The menu closes after it runs. |
 | `isDestructive` | `bool` | `false` | Draws the row in iOS red. |
@@ -884,7 +891,7 @@ class _NoteHeaderState extends State<NoteHeader> {
 | Name | Value | Description |
 |---|---|---|
 | `kGlassMenuWidth` | `250` | The menu's default width. |
-| `kGlassMenuRowHeight` | `42` | Each row's height. |
+| `kGlassMenuRowHeight` | `42` | The height of a row of one line at the default text size. |
 | `kGlassMenuRadius` | `31.5` | The menu's corner radius, and the popover's default. |
 ''',
   ),
@@ -1228,8 +1235,11 @@ The body is laid out under the whole scaffold, so content scrolls under the glas
 `CustomScrollView` with no padding of its own takes it from there: its first row starts below the top bar and its last
 ends above the bottom bar.
 
-A body that isn't a scroll view can read the same padding, or wrap itself in a `SafeArea`. The keyboard is not handled:
-the body sees `MediaQuery.viewInsets` as it is.
+A body that isn't a scroll view can read the same padding, or wrap itself in a `SafeArea`. The keyboard is met as
+`Scaffold` meets it: the body ends at the keyboard's top and is told no bottom inset, so a focused field in a scroll view
+is scrolled into sight, and the floating action stands on the keyboard. The bottom bar stays under the keyboard, as a tab
+bar does on iOS. `resizeToAvoidBottomInset: false` lays the body out under the keyboard and passes
+`MediaQuery.viewInsets` on as it is.
 
 ## The bars
 
@@ -1249,7 +1259,8 @@ the body sees `MediaQuery.viewInsets` as it is.
 ## The host
 
 With `host: null`, the default, the scaffold mounts a [GlassHost](/foundations/host) only when there is none above it,
-and that host takes every default. `host: true` always mounts one, `host: false` never does.
+and that host takes every default — the platform's appearance among them, so an app whose theme does not follow the
+phone's declares its `appearance:` on a host of its own. `host: true` always mounts one, `host: false` never does.
 
 > [!WARNING]
 > Dialogs, sheets, menus and popovers are built in the navigator's overlay, which a host inside the route does not
@@ -1357,9 +1368,10 @@ class _LibraryPageState extends State<LibraryPage> {
 | `scrollEdge` | `GlassScrollEdgeStyle?` | `GlassScrollEdgeStyle.soft` | The scroll edge under the top bar. Null for none: the bar is only lifted. |
 | `bottomBar` | `Widget?` | `null` | The bar at the bottom, usually a `GlassTabBar`, at its own height. Lifted. |
 | `floatingAction` | `Widget?` | `null` | A control at the end edge above the bottom bar, usually a `GlassButton`, at its own size. Lifted. |
-| `barMargin` | `EdgeInsets` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. |
+| `barMargin` | `EdgeInsetsGeometry` | `kGlassScaffoldBarMargin` | The space around each bar, inside the safe area. Under the bottom bar, the larger of this and the safe area. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `host` | `bool?` | `null` | Whether to mount a `GlassHost`: null when there is none above, `true` always, `false` never. |
 | `minimizeNotificationPredicate` | `ScrollNotificationPredicate` | `defaultScrollNotificationPredicate` | Which of the body's scroll notifications collapse a tab bar that asks to: the minimizer's `notificationPredicate`. |
+| `resizeToAvoidBottomInset` | `bool` | `true` | Whether the body ends at the keyboard's top and the floating action stands on it. |
 | `key` | `Key?` | `null` | |
 
 `double topExtentFor(EdgeInsets safe)`: the top bar's extent from the top of the screen, which the body is told as its

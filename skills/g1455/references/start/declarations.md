@@ -1,6 +1,6 @@
 # What the app declares
 
-> What the package cannot read from the render tree: the backdrop, reduce transparency, contrast, thermal state.
+> What the package cannot read from the render tree: the backdrop, the appearance, reduce transparency, contrast, thermal state.
 
 - Live: https://g1455.plugfox.dev/start/declarations
 - API: [`GlassHost`](https://pub.dev/documentation/g1455/latest/g1455/GlassHost-class.html), [`GlassTierPolicy`](https://pub.dev/documentation/g1455/latest/g1455/GlassTierPolicy-class.html), [`GlassThermalState`](https://pub.dev/documentation/g1455/latest/g1455/GlassThermalState.html), [`GlassHardware`](https://pub.dev/documentation/g1455/latest/g1455/GlassHardware.html)
@@ -24,6 +24,31 @@ well, the host needs to know what the glass sits over:
 
 Without any of these, labels are picked against the worst case, and in debug the package warns once when a finish
 cannot be read over it. More on [Legibility & theme](../foundations/legibility.md).
+
+## An appearance of the app's own
+
+Unless a finish is named, the glass is Apple's `.regular`: dark or light glass, picked from the backdrop and the
+**platform's** appearance. An app whose theme does not follow the phone's has to say which appearance it is in, or a
+dark-themed app on a phone in the light appearance gets light glass over its dark content — in the light appearance
+`.regular` turns light over anything above a luma of 54, and an ordinary dark grey page is above that.
+
+```dart
+MaterialApp(
+  themeMode: mode,
+  builder: (context, child) => GlassHost(
+    // Null follows the phone, as ThemeMode.system does.
+    appearance: switch (mode) {
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.light => Brightness.light,
+      ThemeMode.system => null,
+    },
+    child: child!,
+  ),
+)
+```
+
+Naming a finish (`finish: GlassFinish.regularDark`) gives dark glass too, but holds it: the backdrop and
+[adaptive glass](../foundations/adaptive.md) no longer move it between branches. `appearance:` keeps `.regular` a choice.
 
 ## Reduce transparency
 

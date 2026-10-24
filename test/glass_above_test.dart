@@ -25,7 +25,12 @@
 //    in the bar's capture, which publishes again;
 //  - the occupancy ranking (`rank[...]`) -> identity: a lifted bar with no
 //    glass under it records an empty base and a level of its own — two
-//    snapshots a frame for nothing, which the plain arm counts.
+//    snapshots a frame for nothing, which the plain arm counts;
+//  - in `_noteCompositedChanges`, a borne group's `? cluster.drawLayer` ->
+//    `? null`: the group's draw, replaced by every publish above it, is a
+//    change, and the still group arm records on every frame;
+//  - the same -> `? cluster.compositedLayer`: the group's whole subtree is
+//    left out of the watch, and the group label arm holds the change over.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -173,15 +178,47 @@ void main() {
     expect(differing, 0, reason: 'the bar still shows the old label');
     colour.dispose();
   });
+
+  testWidgets('a still screen with a lifted bar over a blend group records nothing', (WidgetTester tester) async {
+    // The group's own draw is replaced by every publish of the level above it,
+    // so the watch has to leave that draw out — and only that — when glass
+    // stands on one of its members.
+    await _pump(tester, const _Scene(bar: true, group: true), frames: 6);
+    final GlassProxyHandle handle = _handle(tester);
+    expect(handle.upper, hasLength(1), reason: 'the arm is not glass on a group');
+    expect(tester.renderObject<RenderGlassGroup>(find.byType(GlassGroup)).fusedPaints, greaterThan(0));
+    final int before = handle.generation;
+    for (var i = 0; i < 20; i++) {
+      tester.binding.scheduleFrame();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(handle.generation - before, 0, reason: 'a still screen over a group kept recording');
+  });
+
+  testWidgets('a label changed inside a group member under the lifted bar is seen', (WidgetTester tester) async {
+    final colour = ValueNotifier<Color>(const Color(0xFF00C853));
+    addTearDown(colour.dispose);
+    await _pump(tester, _Scene(bar: true, group: true, label: colour), frames: 6);
+    final GlassProxyHandle handle = _handle(tester);
+    final int before = handle.generation;
+    colour.value = const Color(0xFF2962FF);
+    for (var i = 0; i < 4; i++) {
+      await tester.pump();
+    }
+    expect(handle.generation - before, greaterThan(0), reason: 'the change inside the group was held over');
+  });
 }
 
 class _Scene extends StatelessWidget {
-  const _Scene({required this.bar, this.lift = true, this.card = true, this.label});
+  const _Scene({required this.bar, this.lift = true, this.card = true, this.label, this.group = false});
 
   final bool bar;
   final bool lift;
   final bool card;
   final ValueNotifier<Color>? label;
+
+  /// The card as one member of a blend group, a second card fused below it.
+  final bool group;
 
   @override
   Widget build(BuildContext context) {
@@ -197,6 +234,17 @@ class _Scene extends StatelessWidget {
       key: ValueKey<String>('bar'),
       borderRadius: BorderRadius.all(Radius.circular(24)),
     );
+    final Widget cardSurface = GlassSurface(
+      key: const ValueKey<String>('card'),
+      // In a group the group's finish is the one drawn.
+      finish: group ? null : _tinted,
+      borderRadius: const BorderRadius.all(Radius.circular(30)),
+      child: Stack(
+        children: <Widget>[
+          Positioned(left: 60, top: 20, width: 60, height: 30, child: labelBox),
+        ],
+      ),
+    );
     return RepaintBoundary(
       key: _shotKey,
       child: SizedBox.fromSize(
@@ -206,19 +254,26 @@ class _Scene extends StatelessWidget {
             Positioned.fill(
               child: RepaintBoundary(child: CustomPaint(painter: _Bars())),
             ),
-            if (card)
+            if (card && !group) Positioned(left: 20, top: 60, width: 360, height: 160, child: cardSurface),
+            if (card && group)
               Positioned(
                 left: 20,
                 top: 60,
                 width: 360,
-                height: 160,
-                child: GlassSurface(
-                  key: const ValueKey<String>('card'),
+                height: 220,
+                child: GlassGroup(
+                  spacing: 16,
                   finish: _tinted,
-                  borderRadius: const BorderRadius.all(Radius.circular(30)),
                   child: Stack(
                     children: <Widget>[
-                      Positioned(left: 60, top: 20, width: 60, height: 30, child: labelBox),
+                      Positioned(left: 0, top: 0, width: 360, height: 160, child: cardSurface),
+                      const Positioned(
+                        left: 40,
+                        top: 170,
+                        width: 120,
+                        height: 40,
+                        child: GlassSurface(borderRadius: BorderRadius.all(Radius.circular(20))),
+                      ),
                     ],
                   ),
                 ),

@@ -113,6 +113,11 @@ comparable:
 | Android, Impeller/Vulkan, Adreno 830 (GPU cycles) | ×0.99…1.08 | ×1.78…3.15 |
 | iPad, Impeller/Metal (GPU ms, scrolling screen) | ×1.93…2.02, or ×1.46…1.54 with thermal throttling | — |
 
+These are 0.1.0's. Since 0.4.0 Impeller blurs the atlas with the package's
+own Gaussian (see [Platforms](#platforms)), which adds up to 0.3 ms of GPU
+time a frame on the iPad, 7 to 9% on its scrolling screens, and on a
+Galaxy S22 Ultra nothing its noise shows.
+
 #### Where the numbers come from
 
 Every number in this README and on the site was measured in a profile build,
@@ -375,7 +380,10 @@ every number as `GlassFinish` holds it:
 `.regularDark` and `.regularLight` are the two branches of Apple's `.regular`,
 which is dark over a dark backdrop and light over a light one.
 `GlassFinish.regular(appearance:, backdrop:)` picks the branch, and `GlassHost`
-calls it unless a finish is named. `.clear` and `.frosted` differ only in blur.
+calls it unless a finish is named, in the platform's appearance — or in
+`GlassHost.appearance`, which an app whose theme does not follow the phone's
+declares, so a dark app on a light-mode phone is not given light glass.
+`.clear` and `.frosted` differ only in blur.
 `.frosted` is a heavy blur kept under its old name: scored against Apple's
 material, it is a `UIVisualEffectView` blur rather than Liquid Glass.
 
@@ -661,6 +669,10 @@ Three more declarations do the rest of what the capture cannot know:
 | `GlassProxy.opaque` | takes the subtree as covering its box, and looks no further under it | a full-bleed image or panel |
 | `GlassProxy.verbatim` | exempts the subtree from the shadow filter | a highlight blurred through a `MaskFilter` on purpose |
 
+The shadow filter sees the draws a subtree makes, not what is inside them: a
+shadow recorded into a cached `Picture`, and a text's `TextStyle.shadows`, are
+drawn into the capture whatever the filter says.
+
 A stand-in changes what the glass sees, not when the host captures: a video
 that composites a new frame is still a change. Live, with each declaration:
 [Capture control](https://g1455.plugfox.dev/foundations/capture).
@@ -838,9 +850,6 @@ cyan outline. The same list, at more length:
 - **An unlifted bar shows up blurred inside a scroll edge.** Levels are a
   declaration, not paint order. Lift the bar with the edge, which
   `GlassScrollEdge.child` does.
-- **A surface that replaces another at the same place draws nothing.** A known
-  issue: a host replacing one surface with another at exactly the same rect
-  keeps the old capture until something else under the glass changes.
 - **The glass does not refract what scrolls under it.** A `GlassBackdrop`
   above it declares the backdrop, and the glass shows the declaration only.
   Wrap the part with live content in `GlassBackdrop.live`.
@@ -921,9 +930,6 @@ cyan outline. The same list, at more length:
   region declared from touch-down until the spring settles: one capture as it
   appears, one as it goes, nothing at rest. `GlassPress.none` on the host, a
   theme or one button keeps the box still and builds no region.
-- **A tab bar rebuilt by a bare `setState` captures once.** A known cost, not
-  yet traced. Rebuild the bar when its selection changes, not with every
-  change of the screen around it.
 - **A page control captures while the pages turn.** The control does not: the
   `PageView` moving under the glass does: 43 captures a swipe headless, with
   the dots following it and with dots that stay put. Content that moves under glass is a capture a frame.
@@ -962,7 +968,17 @@ cyan outline. The same list, at more length:
 | Skwasm | Web | ✅ |
 | CanvasKit | Web | ✅, slow; see below |
 
-The route renders byte-identically on all of them. Every bundled shader is
+The route renders byte-identically on all of them but for the blur, which is
+each renderer's own. Impeller's `ImageFilter.blur` delivers less than the
+sigma it is asked (2.13 texels for `regular`'s 2.6 on an M2 iPad Pro,
+nothing under about 0.8) and cuts its kernel short, so on Impeller the
+package blurs the atlas with a Gaussian of its own,
+`shaders/glass_blur.frag`, which delivers the sigma asked to 1-2% on Metal,
+Vulkan and GLES. It costs up to 0.3 ms of GPU time a frame on that iPad,
+and on a Galaxy S22 Ultra less than its noise; `GlassHost.precache` loads it
+with the other shaders. Until it has loaded, and past 4 texels, the engine's
+blur is asked for the sigma whose kernel delivers the calibrated one, read
+off a table measured on the iPad. Every bundled shader is
 compiled for all five shader targets in `test/shader_targets_test.dart`, so a
 shader that SkSL would reject fails the tests rather than a user's app.
 

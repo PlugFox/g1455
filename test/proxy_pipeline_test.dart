@@ -14,6 +14,21 @@
 // the policy's scale, the atlas's map, the walk's drawing and the recording's
 // clip — and the control it cannot do without is an arm that reads the *wrong*
 // slot and must fail.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `_blurred`, `if (!any) {` -> `if (false) {`: two classes with nothing
+//    owed take a second snapshot, and the spent-classes arm counts two;
+//  - in `RetainedAtlas.update`, `if (!_sameClasses(_classes, classes)) {` ->
+//    `if (false) {`: surfaces that trade finishes keep their slots, and the
+//    trade arm finds `kept` where it wants `blur`;
+//  - `uniformsFor(int surface) => slotFor(surface).uniforms` ->
+//    `slotFor(0).uniforms`, `get layout => _retained?.layout` -> `null`, or
+//    `get current => _current` -> `null`: each fails the held-frame arm;
+//  - in `captureIfNeeded`, the `oracle.noteFrame();` dropped from the
+//    `frame == null` branch: the held-frame arm finds the oracle no frames
+//    behind;
+//  - `get slotsMoved => _retained?.slotsMoved ?? 0` -> `0`: the moving arm
+//    finds the grown slot not counted.
 
 import 'dart:ui' as ui;
 
@@ -296,6 +311,7 @@ void main() {
     final GlassProxyFrame moved = _capture(tester, pipeline, ledger)!;
     expect(moved.retention, RetentionOutcome.kept, reason: 'moving a panel repacked the atlas');
     expect(moved.slotFor(0).rect, slotRect);
+    expect(pipeline.slotsMoved, 0);
     expect(
       moved.slotFor(0).source.topLeft,
       isNot(first.slotFor(0).source.topLeft),
@@ -307,6 +323,7 @@ void main() {
     await tester.pump();
     final GlassProxyFrame grew = _capture(tester, pipeline, ledger)!;
     expect(grew.retention, RetentionOutcome.grew);
+    expect(pipeline.slotsMoved, 1, reason: 'the grown slot was not counted as moved');
     grew.dispose();
     expect(pipeline.repacks, 2, reason: 'the pipeline repacked on a frame that did not need it');
   });
@@ -529,6 +546,97 @@ void main() {
     // has to be far away from both.
     expect(_worst(split, bare), greaterThan(8));
     expect(_worst(folded, bare), greaterThan(8));
+  });
+
+  testWidgets('two blur classes the divisor has already spent take no second snapshot', (
+    WidgetTester tester,
+  ) async {
+    // Two finishes, so two classes and the per-class route; a divisor coarse
+    // enough that neither owes the pass anything. The pass then draws nothing,
+    // and drawing the atlas through a clip with a plain paint would be a second
+    // snapshot that changes no pixel.
+    const soft = GlassFinish(name: 'soft', blurSigmaLogical: 0.5, tint: Color(0x00000000));
+    const ProxyResolution coarse = ProxyResolution.divisor(8);
+    // The control: the arm is about classes with nothing owed, so both are.
+    expect(coarse.residualSigmaFor(soft.blurSigmaLogical, 2), isNull);
+    final ledger = GlassLedger();
+    await _mount(tester, ledger, _twoPanels());
+    final List<GlassFinish> finishes = <GlassFinish>[GlassFinish.clear, soft];
+
+    final frames = <ProxyBlurPass, GlassProxyFrame>{};
+    final snapshots = <ProxyBlurPass, int>{};
+    for (final ProxyBlurPass pass in <ProxyBlurPass>[ProxyBlurPass.split, ProxyBlurPass.none]) {
+      final pipeline = GlassProxyPipeline(
+        finishSigmaLogical: 2.6,
+        hardware: GlassHardware.appleMetal,
+        pinnedResolution: coarse,
+        blurPass: pass,
+      );
+      frames[pass] = pipeline.capture(_root(), _rects(ledger), devicePixelRatio: 2, finishes: finishes)!;
+      snapshots[pass] = pipeline.snapshots;
+      addTearDown(frames[pass]!.dispose);
+    }
+    expect(snapshots[ProxyBlurPass.split], 1, reason: 'a pass with nothing to blur rasterized the atlas again');
+    final Uint8List split = await _bytes(tester, frames[ProxyBlurPass.split]!.image);
+    final Uint8List bare = await _bytes(tester, frames[ProxyBlurPass.none]!.image);
+    expect(_worst(split, bare), 0);
+  });
+
+  testWidgets('surfaces that trade finishes repack, and the same finishes again do not', (
+    WidgetTester tester,
+  ) async {
+    // The slots are where each class is blurred, so a surface that changes
+    // class sits in a slot blurred for the other one until the layout is
+    // packed again.
+    final ledger = GlassLedger();
+    await _mount(tester, ledger, _twoPanels());
+    final pipeline = GlassProxyPipeline(finishSigmaLogical: 2.6, hardware: GlassHardware.adrenoVulkan);
+    RetentionOutcome run(List<GlassFinish> finishes) {
+      final GlassProxyFrame frame = pipeline.capture(
+        _root(),
+        _rects(ledger),
+        devicePixelRatio: 2,
+        finishes: finishes,
+      )!;
+      final RetentionOutcome outcome = frame.retention;
+      frame.dispose();
+      return outcome;
+    }
+
+    expect(run(<GlassFinish>[GlassFinish.regularDark, GlassFinish.frosted]), RetentionOutcome.first);
+    expect(run(<GlassFinish>[GlassFinish.regularDark, GlassFinish.frosted]), RetentionOutcome.kept);
+    expect(run(<GlassFinish>[GlassFinish.frosted, GlassFinish.regularDark]), RetentionOutcome.blur);
+    expect(pipeline.repacks, 2);
+  });
+
+  testWidgets('a frame the capture drops leaves the held one standing', (WidgetTester tester) async {
+    // `captureIfNeeded` owns what it holds. A decision to record that records
+    // nothing must not take the last good frame with it, and the frame it did
+    // not record is a frame the proxy fell behind by.
+    final ledger = GlassLedger();
+    await _mount(tester, ledger, _twoPanels());
+    final pipeline = GlassProxyPipeline(finishSigmaLogical: 2.6, hardware: GlassHardware.adrenoVulkan);
+    addTearDown(pipeline.dispose);
+    final oracle = RetakeOracle(finish: 'regularDark');
+    addTearDown(oracle.dispose);
+
+    final first = pipeline.captureIfNeeded(_root(), _rects(ledger), devicePixelRatio: 2, oracle: oracle);
+    expect(first.reason, RetakeReason.first);
+    final GlassProxyFrame held = first.frame!;
+    expect(identical(pipeline.current, held), isTrue);
+    expect(identical(pipeline.layout, held.layout), isTrue);
+    expect(held.uniformsFor(1), held.slotFor(1).uniforms);
+    expect(held.uniformsFor(1), isNot(held.uniformsFor(0)));
+    expect(oracle.framesSinceCapture, 0);
+
+    // The geometry changed, so the oracle says record; there is nothing to
+    // record, so the capture says no.
+    final dropped = pipeline.captureIfNeeded(_root(), const <Rect>[], devicePixelRatio: 2, oracle: oracle);
+    expect(dropped.reason, RetakeReason.changed);
+    expect(identical(dropped.frame, held), isTrue);
+    expect(identical(pipeline.current, held), isTrue);
+    expect(held.image.debugDisposed, isFalse);
+    expect(oracle.framesSinceCapture, 1, reason: 'a dropped frame was counted as a capture');
   });
 
   // -------------------------------------------------------------------------

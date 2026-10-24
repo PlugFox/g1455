@@ -25,6 +25,7 @@ import 'package:flutter/widgets.dart';
 import '../hardware.dart';
 import '../thermal.dart';
 import '../proxy/occlusion.dart';
+import '../proxy/proxy_blur.dart';
 import '../proxy/proxy_layer_watch.dart';
 import '../proxy/proxy_pipeline.dart';
 import '../proxy/proxy_resolution.dart';
@@ -458,6 +459,7 @@ class GlassHost extends StatefulWidget {
     required this.child,
     this.hardware,
     this.finish,
+    this.appearance,
     this.tier = GlassTierChoice.byDefault,
     this.backdrop,
     this.highContrast,
@@ -505,6 +507,30 @@ class GlassHost extends StatefulWidget {
   /// hold it — a dark glass on a light screen is a choice Apple's material
   /// does not make, and this is where an application makes it.
   final GlassFinish? finish;
+
+  /// The appearance `.regular` picks its branch in when [finish] is null, or
+  /// null to follow the platform's (`MediaQuery.platformBrightnessOf`).
+  ///
+  /// Declare it when the application's theme does not follow the phone's. A
+  /// dark-themed application on a phone in the light appearance otherwise
+  /// gets light glass over its dark content: in the light appearance
+  /// `.regular` takes its light branch over anything above a luma of 54
+  /// ([GlassFinish.kRegularSwitchLight]), and an ordinary dark grey page is above that.
+  ///
+  /// ```dart
+  /// MaterialApp(
+  ///   themeMode: mode,
+  ///   builder: (context, child) => GlassHost(
+  ///     appearance: mode == ThemeMode.system ? null : (mode == ThemeMode.dark ? Brightness.dark : Brightness.light),
+  ///     child: child!,
+  ///   ),
+  /// )
+  /// ```
+  ///
+  /// Unlike naming a branch in [finish], this keeps `.regular` a choice:
+  /// [backdrop] and [adaptive] still move the glass between its branches, in
+  /// the appearance declared here. Ignored when [finish] is named.
+  final Brightness? appearance;
 
   /// Which rung of the finish ladder every surface under this host draws.
   ///
@@ -627,9 +653,9 @@ class GlassHost extends StatefulWidget {
   /// this is the cheapest by a wide margin: under 0.2 ΔE behind the glass.
   ///
   /// Null means "draw them", which is the conservative default rather than the
-  /// cheap one — half of `ShadowFilter` is a heuristic (anything painted
-  /// through a `MaskFilter` is *usually* a shadow), and a design that blurs a
-  /// highlight on purpose would lose it silently.
+  /// cheap one — half of `ShadowFilter` is a heuristic (a shape, line, point
+  /// or image painted through a `MaskFilter` is *usually* a shadow), and a
+  /// design that blurs a highlight on purpose would lose it silently.
   final ShadowFilter? shadowFilter;
 
   /// Where the descent may stop, if the application has worked it out.
@@ -713,7 +739,10 @@ class GlassHost extends StatefulWidget {
   ///  - a fused [GlassGroup] with no group program draws nothing at all, and
   ///    its members leave their glass to it;
   ///  - a touched surface under a [GlassRipple] with no ripple program draws
-  ///    the surface program, which is the picture without the wave.
+  ///    the surface program, which is the picture without the wave;
+  ///  - on Impeller, a proxy captured before the atlas's Gaussian arrives is
+  ///    blurred by the engine's `ImageFilter.blur`, whose kernel is cut short,
+  ///    and is captured again on the frame after it does.
   ///
   /// The content on the glass — a bar's title, a button's icon — is drawn in
   /// every case. Once this future completes, every host mounted afterwards
@@ -751,6 +780,7 @@ class GlassHost extends StatefulWidget {
       if (_GlassHostState._cachedProgram == null) _GlassHostState._loadBase(),
       if (group && _GlassHostState._cachedGroupProgram == null) _GlassHostState._loadGroup(),
       if (ripple && GlassProxyHandle._cachedRippleProgram == null) GlassProxyHandle._loadRipple(),
+      if (ui.ImageFilter.isShaderFilterSupported && glassBlurProgram == null) _GlassHostState._loadBlur(),
     ]);
   }
 
@@ -846,8 +876,11 @@ class _GlassHostState extends State<GlassHost> {
 
   /// The appearance `.regular` was picked in, or null when a finish was named —
   /// what lets a reading pick the branch again for one glass.
-  Brightness? get _regularAppearance =>
-      widget.finish != null ? null : (MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light);
+  Brightness? get _regularAppearance => widget.finish != null ? null : _appearance;
+
+  /// [GlassHost.appearance], or the platform's. Read only when it is not
+  /// declared, so a declared one does not depend on the platform's.
+  Brightness get _appearance => widget.appearance ?? MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light;
 
   /// Reads the backdrop back for [GlassHost.adaptive]; null — and nothing at
   /// all — without it.
@@ -871,11 +904,7 @@ class _GlassHostState extends State<GlassHost> {
   }
 
   GlassFinish _resolveFinish() =>
-      widget.finish ??
-      GlassFinish.regular(
-        appearance: MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light,
-        backdrop: widget.backdrop,
-      );
+      widget.finish ?? GlassFinish.regular(appearance: _appearance, backdrop: widget.backdrop);
 
   static ui.FragmentProgram? _cachedProgram;
   static Future<ui.FragmentProgram>? _loading;
@@ -897,6 +926,15 @@ class _GlassHostState extends State<GlassHost> {
     () => _loadingGroup = null,
   );
 
+  static Future<ui.FragmentProgram>? _loadingBlur;
+
+  /// The Gaussian the pipeline blurs with on Impeller (`proxy_blur.dart`).
+  static Future<ui.FragmentProgram> _loadBlur() => _loadingBlur ??= _loadShader(
+    kGlassBlurShaderAsset,
+    (ui.FragmentProgram program) => glassBlurProgram = program,
+    () => _loadingBlur = null,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -908,6 +946,7 @@ class _GlassHostState extends State<GlassHost> {
     _adapt();
     _loadProgram();
     _loadGroupProgram();
+    _loadBlurProgram();
   }
 
   void _noteDeclaredChange() => _oracle.noteChange();
@@ -949,6 +988,25 @@ class _GlassHostState extends State<GlassHost> {
     _loadGroup().then((ui.FragmentProgram program) {
       if (mounted) {
         _handle.groupProgram = program;
+      }
+    }, onError: _reportShaderLoadError);
+  }
+
+  /// The same, for the Gaussian the atlas is blurred with on Impeller, which
+  /// the pipeline reads from `proxy_blur.dart` rather than from the handle.
+  ///
+  /// Until it arrives the atlas is blurred by `ImageFilter.blur`, corrected,
+  /// and a proxy captured so is held like any other; so its arrival is
+  /// declared as a change, and a frame is asked for to capture through it —
+  /// a still screen draws none of its own, and the capture runs after one.
+  void _loadBlurProgram() {
+    if (!ui.ImageFilter.isShaderFilterSupported || glassBlurProgram != null) {
+      return;
+    }
+    _loadBlur().then((ui.FragmentProgram program) {
+      if (mounted) {
+        _handle.noteChange();
+        SchedulerBinding.instance.ensureVisualUpdate();
       }
     }, onError: _reportShaderLoadError);
   }
@@ -1107,6 +1165,11 @@ class _GlassHostState extends State<GlassHost> {
         if (cluster.bridgeReach > 0)
           for (final GlassSurfaceGeometry member in cluster.members) member: cluster.bridgeReach,
     };
+    // What the host's subtree covers: nothing past it is drawn, so nothing past
+    // it is captured.
+    final Rect? scene = root is RenderBox && root.hasSize
+        ? MatrixUtils.transformRect(root.getTransformTo(null), Offset.zero & root.size)
+        : null;
     final rects = <Rect>[];
     final present = <GlassSurfaceGeometry>[];
     final finishes = <GlassFinish>[];
@@ -1133,11 +1196,14 @@ class _GlassHostState extends State<GlassHost> {
         // A widened or minifying glass samples past its box; by its
         // full reach rather than the presence-scaled one, so a drop lifting in
         // does not change the capture's input on every frame of it.
-        rects.add(
-          record.captureRect.inflate(
-            (reachOf[surface] ?? 0) + finish.optics.reach(record.rect.size / 2),
-          ),
+        final Rect wanted = record.captureRect.inflate(
+          (reachOf[surface] ?? 0) + finish.optics.reach(record.rect.size / 2),
         );
+        // Cut to the screen: a sheet dragged down to close goes on past the
+        // bottom of the area it travels in, and the part below the screen grew
+        // the rectangle on every frame, which the oracle read as a move — a
+        // retake a frame, where a drag between detents is one.
+        rects.add(scene != null && scene.overlaps(wanted) ? wanted.intersect(scene) : wanted);
         present.add(surface);
         finishes.add(finish);
         boxes?.add((surface: surface, box: record.rect));
@@ -1231,8 +1297,10 @@ class _GlassHostState extends State<GlassHost> {
     _captureUpper(root, levels, present, rects, finishes, dpr);
     _readCounters();
     // On a frame that published: a held frame has nothing new under the glass,
-    // which is what makes the read-back per capture and not per frame.
-    if (reader != null) {
+    // which is what makes the read-back per capture and not per frame. Nor has
+    // one recorded only for a new finish — an adaptive verdict's own, among
+    // them — which is read as a held one is.
+    if (reader != null && (!_pipeline.refinished || reader.hungry || reader.moved(boxes!))) {
       _feed(reader, boxes!);
     }
   }
@@ -1549,8 +1617,10 @@ class _GlassHostState extends State<GlassHost> {
           dropMotion: widget.dropMotion,
           press: widget.press,
           adaptive: widget.adaptive,
-          // Only for a reader: off, the theme is the one it always was.
-          regularAppearance: widget.adaptive == null ? null : _regularAppearance,
+          // For a reading to pick `.regular`'s branch again, and for what
+          // follows the screen's appearance rather than the glass's, such as
+          // the hard scroll edge's band.
+          regularAppearance: _regularAppearance,
         ),
         child: GlassProxyScope(
           handle: _handle,

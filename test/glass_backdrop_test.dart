@@ -14,19 +14,36 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart';
 import 'package:g1455/src/proxy/proxy_atlas.dart' show AtlasSlot;
-import 'package:g1455/src/proxy/proxy_pipeline.dart' show GlassProxyFrame;
-import 'package:g1455/src/surface/glass_backdrop.dart' show debugDeclaredTexturesAlive;
+import 'package:g1455/src/proxy/proxy_pipeline.dart' show GlassProxyFrame, GlassSampleSource;
+import 'package:g1455/src/surface/glass_backdrop.dart' show debugDeclaredTexturesAlive, declaredTextureFor;
 
 const Size kScreen = Size(400, 600);
 const Color _kGrey = Color(0xFF6A6A6A);
 const Color _kOrange = Color(0xFFE0782A);
 const Rect _kPanel = Rect.fromLTWH(100, 250, 200, 100);
+
+/// Two panels fused by a group behind a boundary of its own: nothing but the
+/// group's own listeners repaints it.
+const Widget _pair = RepaintBoundary(
+  child: GlassGroup(
+    spacing: 24,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        SizedBox(width: 160, height: 80, child: GlassSurface()),
+        SizedBox(height: 20),
+        SizedBox(width: 160, height: 80, child: GlassSurface()),
+      ],
+    ),
+  ),
+);
 final GlobalKey _shotKey = GlobalKey();
 
 void main() {
@@ -295,6 +312,72 @@ void main() {
     expect(group.paintsWithDeclaredBackdrop, greaterThan(0), reason: 'the fused draw did not read the declaration');
     expect(group.fusedPaints, greaterThan(0));
     expect((hostKey.currentState! as dynamic).recorded, 0);
+  });
+
+  testWidgets('a fused group that comes under a declaration while mounted repaints when it changes', (
+    WidgetTester tester,
+  ) async {
+    // The same group, first under `GlassBackdrop.live` and then under a colour:
+    // the declaration reaches a group already on the screen, and the group
+    // must listen to it from then on — a new colour is a new texture to draw
+    // with, and nothing else repaints a group behind a boundary of its own.
+    Widget scene({required bool live, Color color = _kGrey}) => _wrap(
+      GlassHost(
+        hardware: GlassHardware.appleMetal,
+        finish: GlassFinish.regularDark,
+        child: GlassBackdrop.color(
+          color,
+          child: Center(
+            child: live ? GlassBackdrop.live(child: _pair) : GlassBackdrop.color(color, child: _pair),
+          ),
+        ),
+      ),
+    );
+    await _pump(tester, scene(live: true));
+    final RenderGlassGroup group = tester.renderObject<RenderGlassGroup>(find.byType(GlassGroup));
+    expect(group.readsDeclaredBackdrop, isFalse);
+    expect(group.paintsWithDeclaredBackdrop, 0);
+
+    await _pump(tester, scene(live: false));
+    expect(tester.renderObject<RenderGlassGroup>(find.byType(GlassGroup)), same(group), reason: 'not the setter');
+    expect(group.readsDeclaredBackdrop, isTrue);
+    final int before = group.paintsWithDeclaredBackdrop;
+    expect(before, greaterThan(0), reason: 'the group never drew from the declaration it came under');
+
+    await _pump(tester, scene(live: false, color: _kOrange));
+    expect(group.paintsWithDeclaredBackdrop, greaterThan(before), reason: 'the group drew on with the old colour');
+  });
+
+  testWidgets('a surface that comes under a declaration while mounted repaints when it changes', (
+    WidgetTester tester,
+  ) async {
+    // The lone surface's half of the arm above: its own setter, its own
+    // listener.
+    const Widget lone = RepaintBoundary(child: SizedBox(width: 160, height: 80, child: GlassSurface()));
+    Widget scene({required bool live, Color color = _kGrey}) => _wrap(
+      GlassHost(
+        hardware: GlassHardware.appleMetal,
+        finish: GlassFinish.regularDark,
+        child: GlassBackdrop.color(
+          color,
+          child: Center(
+            child: live ? GlassBackdrop.live(child: lone) : GlassBackdrop.color(color, child: lone),
+          ),
+        ),
+      ),
+    );
+    await _pump(tester, scene(live: true));
+    final RenderGlassSurface surface = _surface(tester);
+    expect(surface.readsDeclaredBackdrop, isFalse);
+
+    await _pump(tester, scene(live: false));
+    expect(_surface(tester), same(surface), reason: 'not the setter');
+    expect(surface.readsDeclaredBackdrop, isTrue);
+    final int before = surface.paintsWithDeclaredBackdrop;
+    expect(before, greaterThan(0), reason: 'the surface never drew from the declaration it came under');
+
+    await _pump(tester, scene(live: false, color: _kOrange));
+    expect(surface.paintsWithDeclaredBackdrop, greaterThan(before), reason: 'the surface drew on with the old colour');
   });
 
   testWidgets('a texture the application holds is declared as it is, and replacing it re-renders', (
@@ -628,6 +711,115 @@ void main() {
     expect(await _redAt(tester, _grab(), _kPanel.center) - glassOverGrey, greaterThan(50), reason: 'still grey');
   });
 
+  testWidgets('a backdrop too large for one texture is rendered coarser, and still maps the whole box', (
+    WidgetTester tester,
+  ) async {
+    // 2000 x 1000 at a ratio of 3 is 6000 texels across at a divisor of 1,
+    // past what a GPU is asked to hold; a coarser divisor halves it to 3000.
+    const painter = GradientProxyPainter(LinearGradient(colors: <Color>[Color(0xFF000000), Color(0xFFFFFFFF)]));
+    await _pump(
+      tester,
+      MediaQuery(
+        data: const MediaQueryData(size: kScreen, devicePixelRatio: 3),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassHost(
+            hardware: GlassHardware.appleMetal,
+            finish: GlassFinish.clear,
+            child: OverflowBox(
+              alignment: Alignment.topLeft,
+              minWidth: 2000,
+              maxWidth: 2000,
+              minHeight: 1000,
+              maxHeight: 1000,
+              child: GlassBackdrop.painter(
+                painter,
+                child: Stack(
+                  children: <Widget>[Positioned.fromRect(rect: _kPanel, child: const GlassSurface())],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final GlassBackdropDeclaration declaration = _declaration(tester);
+    final GlassSampleSource texture = declaredTextureFor(declaration, 0)!;
+    expect(texture.image.width, 3000, reason: 'rendered at a divisor that leaves it past the largest side');
+    expect(texture.image.height, 1500);
+    final AtlasSlot slot = texture.slotForKey(_surface(tester))!;
+    expect(slot.source, const Rect.fromLTWH(0, 0, 2000, 1000), reason: 'the texture no longer covers the box');
+    expect(slot.pixelRatio, 1.5);
+    expect(_surface(tester).readsDeclaredBackdrop, isTrue);
+  });
+
+  testWidgets('an image delivered again as a clone of the one shown keeps one handle and renders nothing', (
+    WidgetTester tester,
+  ) async {
+    // An image stream may deliver the image it already delivered — a cache
+    // that hands out the same decode again. The backdrop holds one handle on
+    // it whatever it was handed, and the texture made of it stands.
+    final ui.Image image = _solidImage(_kOrange);
+    addTearDown(image.dispose);
+    int handles() => image.debugGetOpenHandleStackTraces()!.length;
+    final completer = _ManualCompleter();
+    await _pump(
+      tester,
+      _wrap(
+        GlassHost(
+          hardware: GlassHardware.appleMetal,
+          finish: GlassFinish.clear,
+          child: GlassBackdrop.image(
+            _ManualImageProvider(completer),
+            child: Stack(
+              children: <Widget>[Positioned.fromRect(rect: _kPanel, child: const GlassSurface())],
+            ),
+          ),
+        ),
+      ),
+    );
+    // The test's own, and the stream's current image.
+    completer.deliver(ImageInfo(image: image.clone()));
+    await tester.pump();
+    await tester.pump();
+    final RenderGlassSurface surface = _surface(tester);
+    expect(surface.readsDeclaredBackdrop, isTrue);
+    final int renders = _declaration(tester).renders;
+    final int held = handles();
+    expect(held, 3, reason: 'the test\'s, the stream\'s, and the backdrop\'s');
+
+    for (var i = 0; i < 3; i++) {
+      completer.deliver(ImageInfo(image: image.clone()));
+      await tester.pump();
+      await tester.pump();
+      expect(handles(), held, reason: 'delivery ${i + 2} of the same image left a handle behind');
+    }
+    expect(_declaration(tester).renders, renders, reason: 'the same image was rendered again');
+    expect(surface.readsDeclaredBackdrop, isTrue);
+
+    await tester.pumpWidget(const SizedBox());
+    // The stream's own handle is the completer's to let go of; the backdrop's is gone.
+    expect(handles(), 2, reason: 'the image shown outlived its backdrop');
+  });
+
+  test('GlassBackdrop names what it declares in its diagnostics', () {
+    String shown(GlassBackdrop backdrop) => backdrop.toDiagnosticsNode().toStringDeep();
+    const child = SizedBox();
+    expect(shown(const GlassBackdrop.color(_kGrey, child: child)), contains('color: Color('));
+    expect(shown(const GlassBackdrop.color(_kGrey, child: child)), isNot(contains('declared only')));
+    expect(shown(const GlassBackdrop.color(_kGrey, paintBackdrop: false, child: child)), contains('declared only'));
+    expect(shown(const GlassBackdrop.live(child: child)), contains('live'));
+    expect(shown(const GlassBackdrop.color(_kGrey, child: child)), isNot(contains('live')));
+    const painter = GradientProxyPainter(LinearGradient(colors: <Color>[Color(0xFF000000), Color(0xFFFFFFFF)]));
+    expect(shown(const GlassBackdrop.painter(painter, child: child)), contains('painter: $painter'));
+    expect(shown(const GlassBackdrop.painter(painter, child: child)), isNot(contains('color:')));
+    final provider = MemoryImage(Uint8List(0));
+    expect(shown(GlassBackdrop.image(provider, child: child)), contains('image: $provider'));
+    final ui.Image texture = _solidImage(_kGrey);
+    addTearDown(texture.dispose);
+    expect(shown(GlassBackdrop.texture(texture, child: child)), contains('texture: $texture'));
+  });
+
   testWidgets('glass with no declaration above it is unchanged', (WidgetTester tester) async {
     await _pump(tester, _scene(declared: false));
     final RenderGlassSurface surface = _surface(tester);
@@ -826,4 +1018,22 @@ class _FailingImageProvider extends ImageProvider<_FailingImageProvider> {
 
   @override
   ImageStreamCompleter loadImage(_FailingImageProvider key, ImageDecoderCallback decode) => throw UnimplementedError();
+}
+
+/// An image stream the test delivers on, when and as often as it likes.
+class _ManualCompleter extends ImageStreamCompleter {
+  void deliver(ImageInfo info) => setImage(info);
+}
+
+class _ManualImageProvider extends ImageProvider<_ManualImageProvider> {
+  const _ManualImageProvider(this.completer);
+
+  final _ManualCompleter completer;
+
+  @override
+  Future<_ManualImageProvider> obtainKey(ImageConfiguration configuration) =>
+      SynchronousFuture<_ManualImageProvider>(this);
+
+  @override
+  ImageStreamCompleter loadImage(_ManualImageProvider key, ImageDecoderCallback decode) => completer;
 }

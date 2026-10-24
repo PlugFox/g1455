@@ -16,13 +16,21 @@
 //     after — and the control, the same focus under reduced motion, costs at
 //     most one, so the 16 are the slide's. (A `GlassTravel` around the row
 //     was tried and left the 16 where they were; see the file comment.)
+//  5. **Glass turned from light to dark draws what glass mounted dark draws,**
+//     over a still screen, for one capture (#34).
 //
 // Breaks, each undone by swapping the string back:
 //  - in `glass_search_bar.dart`, `value.text.isEmpty ? const SizedBox.shrink()`
 //    -> `value.text.isNotEmpty && false ? const SizedBox.shrink()`: arm 1
 //    finds a clear button over an empty field;
 //  - `if (reduce) {` -> `if (!reduce) {`: arm 2's reduced-motion Cancel
-//    slides, and arm 4's slide is a jump.
+//    slides, and arm 4's slide is a jump;
+//  - in `GlassProxyPipeline.captureIfNeeded`, `_refinished = reason.holds &&`
+//    -> `_refinished = false &&`: the switch is held on light's capture and
+//    arm 5 finds no capture for it.
+
+import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
@@ -66,6 +74,61 @@ void main() {
     expect(focus.hasFocus, isTrue, reason: 'clearing let go of the focus');
     expect(_clear, findsNothing);
     handle.dispose();
+  });
+
+  testWidgets('the clear button takes the colour of the glass it is on when that changes under it', (
+    WidgetTester tester,
+  ) async {
+    // The glyph is a painter of its own over the glass's kept content: a new
+    // colour has to repaint it, as the glass under it repaints for its finish.
+    final controller = TextEditingController(text: 'glass');
+    addTearDown(controller.dispose);
+    Widget bar(GlassFinish finish) => _bar(GlassSearchBar(controller: controller, finish: finish));
+    Future<List<int>> glyph(ComponentScene scene) async {
+      final Rect box = tester.getRect(find.byType(CustomPaint).last);
+      // Inside the disc, clear of the cross cut out of it.
+      return rgbAt(await scene.pixels(), box.center - Offset(0, box.height * 0.35));
+    }
+
+    final ComponentScene scene = await ComponentScene.mount(tester, bar(GlassFinish.regularLight));
+    expect(_clear, findsOneWidget);
+    final List<int> onLight = await glyph(scene);
+    await scene.pump(bar(GlassFinish.regularDark));
+    final List<int> live = await glyph(scene);
+    final ComponentScene fresh = await ComponentScene.mount(tester, bar(GlassFinish.regularDark));
+    final List<int> onDark = await glyph(fresh);
+    int apart(List<int> a, List<int> b) => <int>[for (var i = 0; i < 3; i++) (a[i] - b[i]).abs()].reduce(math.max);
+    // ignore: avoid_print
+    print('glyph on light $onLight, turned dark $live, mounted dark $onDark');
+    expect(apart(onDark, onLight), greaterThan(20), reason: 'the two finishes draw the glyph alike: nothing to see');
+    expect(apart(live, onDark), lessThanOrEqualTo(2), reason: 'the glyph kept the colour of the glass it was on');
+  });
+
+  // The finish decides the capture's divisor and its baked blur, and the
+  // retake oracle watches the screen: a surface that changed finish over a
+  // still screen kept the capture taken for the old one, 1/4 for light where
+  // dark takes 1/2, and showed it, 6 code values out across the glass (15 on
+  // Impeller) for as long as nothing moved (#34). The whole glass is compared
+  // with a fresh mount, and the switch costs one capture and no more.
+  testWidgets('glass turned from light to dark draws what glass mounted dark draws', (WidgetTester tester) async {
+    final controller = TextEditingController(text: 'glass');
+    addTearDown(controller.dispose);
+    Widget bar(GlassFinish finish) => _bar(GlassSearchBar(controller: controller, finish: finish));
+    final ComponentScene scene = await ComponentScene.mount(tester, bar(GlassFinish.regularLight));
+    final int before = scene.recorded;
+    await scene.pump(bar(GlassFinish.regularDark));
+    final int switched = scene.recorded - before;
+    await scene.frames(30);
+    expect(scene.recorded - before, switched, reason: 'the switch kept capturing');
+    expect(switched, greaterThan(0), reason: 'the switch was held on the capture for light glass');
+    final Uint8List live = await scene.pixels();
+    final ComponentScene fresh = await ComponentScene.mount(tester, bar(GlassFinish.regularDark));
+    final Uint8List mounted = await fresh.pixels();
+    var apart = 0;
+    for (var i = 0; i < live.length; i++) {
+      apart = math.max(apart, (live[i] - mounted[i]).abs());
+    }
+    expect(apart, 0, reason: 'the glass kept a trace of the finish it was mounted in');
   });
 
   testWidgets('Cancel slides in on focus and out on blur; a tap empties, blurs and calls onCancel', (

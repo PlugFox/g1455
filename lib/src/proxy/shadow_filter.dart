@@ -20,6 +20,16 @@
 // forward *to*), so every one is written out. A method added to `Canvas`
 // upstream is a compile error here rather than a silently dropped draw, which
 // is the right way round.
+//
+// **What it cannot see into.** A `Picture` is opaque to Dart and a `Paragraph`
+// keeps its styles to itself, so `drawPicture` and `drawParagraph` are
+// forwarded whole: a blurred rect or a `drawShadow` recorded into a cached
+// picture, and a `TextStyle.shadows` or a mask-filtered text `foreground`, all
+// reach the capture. Measured on Skia and Impeller, a picture's blurred rect
+// changes 3428 / 3208 px. Text shadows are kept on purpose — they are part of
+// the glyphs, not a drop shadow under a box — and both draws are counted
+// instead, on the filter, for an application that reads it to see where the
+// filter was blind (#30). Nothing in the package reports them.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -31,6 +41,12 @@ import 'package:flutter/rendering.dart';
 /// Two switches rather than one, because they catch different things and it
 /// matters which fired: `drawShadow` is the physical-model route (`Material`
 /// elevation), a blur `MaskFilter` is the `BoxShadow` route.
+///
+/// Given to `GlassHost.shadowFilter`, which leaves shadows out of the
+/// capture. The counters run over the filter's life, for an application that
+/// keeps the instance and reads them; the package reports none.
+///
+/// {@category Capture control}
 class ShadowFilter {
   /// A filter with both switches on by default.
   ShadowFilter({this.dropShadowCalls = true, this.dropMaskFiltered = true});
@@ -39,22 +55,57 @@ class ShadowFilter {
   /// heuristic.
   final bool dropShadowCalls;
 
-  /// Anything painted through a `MaskFilter`.
+  /// Every draw the engine blurs through a `MaskFilter`.
+  ///
+  /// That is every draw that takes a paint except four: the shapes (`drawRect`,
+  /// `drawRRect`, `drawDRRect`, `drawRSuperellipse`, `drawOval`, `drawCircle`,
+  /// `drawArc`, `drawPath`), `drawPaint`, `drawLine`, `drawPoints`,
+  /// `drawRawPoints`, `drawImage` and `drawImageRect` are dropped when their
+  /// paint carries a mask filter. `drawImageNine`, `drawVertices`, `drawAtlas`
+  /// and `drawRawAtlas` are forwarded whatever their paint carries, because
+  /// the engine ignores the mask filter on them: measured on Skia and on
+  /// Impeller, the same draw with and without a blur differs by no pixel,
+  /// while the draws above differ by thousands. Those four are therefore
+  /// never a soft shadow-like smear, and dropping them would take sharp,
+  /// visible content out of the capture.
   ///
   /// Heuristic, and it has to be named as one: a blurred draw is *usually* a
   /// shadow, and a design that blurs a highlight on purpose would lose it. The
-  /// two counters below are what makes the difference visible in a report
-  /// instead of in a screenshot.
+  /// two counters below are what makes the difference visible to an
+  /// application that reads them, instead of in a screenshot.
   final bool dropMaskFiltered;
 
   /// `drawShadow` calls dropped so far.
+  ///
+  /// This and the counters below run over the filter's life, across every
+  /// pass that draws through it, not per pass: a filter given to a host counts
+  /// every frame it records. Compare two readings for one pass's share.
   int shadowCalls = 0;
 
   /// Mask-filtered draws dropped so far.
+  ///
+  /// A forwarded draw is not counted even when its paint carries a mask
+  /// filter: the counter is the report of what the capture lost, and the four
+  /// draws [dropMaskFiltered] forwards lose nothing.
   int maskFilteredDraws = 0;
 
   /// Every draw dropped so far, of either kind.
   int get dropped => shadowCalls + maskFilteredDraws;
+
+  /// `drawPicture` calls forwarded whole so far.
+  ///
+  /// A picture's content is not reachable from Dart, so a shadow recorded
+  /// into a cached `Picture` is drawn into the capture whatever the switches
+  /// say. Not part of [dropped]: the count is of draws the filter could not
+  /// look into, not of draws it took out.
+  int picturesForwarded = 0;
+
+  /// `drawParagraph` calls forwarded whole so far.
+  ///
+  /// `TextStyle.shadows` and a mask-filtered text `foreground` are inside the
+  /// paragraph, out of the filter's reach, and kept: text is drawn as laid
+  /// out. Not part of [dropped], for the same reason as [picturesForwarded].
+  int paragraphsForwarded = 0;
 
   bool _dropPaint(ui.Paint paint) {
     if (dropMaskFiltered && paint.maskFilter != null) {
@@ -67,6 +118,10 @@ class ShadowFilter {
 
 /// A `Canvas` that forwards everything and refuses the draws a [ShadowFilter]
 /// names.
+///
+/// Shadows inside a `Picture` or a `Paragraph` are not filtered: both are
+/// forwarded whole and counted in [ShadowFilter.picturesForwarded] and
+/// [ShadowFilter.paragraphsForwarded].
 class FilteringCanvas implements Canvas {
   /// Wraps [inner], dropping what [filter] names.
   FilteringCanvas(this.inner, this.filter);
@@ -186,14 +241,6 @@ class FilteringCanvas implements Canvas {
   }
 
   @override
-  void drawImageNine(ui.Image image, Rect center, Rect dst, Paint paint) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawImageNine(image, center, dst, paint);
-  }
-
-  @override
   void drawPoints(ui.PointMode pointMode, List<Offset> points, Paint paint) {
     if (filter._dropPaint(paint)) {
       return;
@@ -209,13 +256,19 @@ class FilteringCanvas implements Canvas {
     inner.drawRawPoints(pointMode, points, paint);
   }
 
+  // --- the draws that carry a paint and are forwarded whatever it holds ---
+  //
+  // The engine draws these four sharp through a mask filter, measured on Skia
+  // and on Impeller, so there is no shadow in them to drop; see
+  // [ShadowFilter.dropMaskFiltered].
+
   @override
-  void drawVertices(ui.Vertices vertices, BlendMode blendMode, Paint paint) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawVertices(vertices, blendMode, paint);
-  }
+  void drawImageNine(ui.Image image, Rect center, Rect dst, Paint paint) =>
+      inner.drawImageNine(image, center, dst, paint);
+
+  @override
+  void drawVertices(ui.Vertices vertices, BlendMode blendMode, Paint paint) =>
+      inner.drawVertices(vertices, blendMode, paint);
 
   @override
   void drawAtlas(
@@ -226,12 +279,7 @@ class FilteringCanvas implements Canvas {
     BlendMode? blendMode,
     Rect? cullRect,
     Paint paint,
-  ) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawAtlas(atlas, transforms, rects, colors, blendMode, cullRect, paint);
-  }
+  ) => inner.drawAtlas(atlas, transforms, rects, colors, blendMode, cullRect, paint);
 
   @override
   void drawRawAtlas(
@@ -242,12 +290,7 @@ class FilteringCanvas implements Canvas {
     BlendMode? blendMode,
     Rect? cullRect,
     Paint paint,
-  ) {
-    if (filter._dropPaint(paint)) {
-      return;
-    }
-    inner.drawRawAtlas(atlas, rstTransforms, rects, colors, blendMode, cullRect, paint);
-  }
+  ) => inner.drawRawAtlas(atlas, rstTransforms, rects, colors, blendMode, cullRect, paint);
 
   // --- everything else, forwarded unchanged ---
 
@@ -307,9 +350,17 @@ class FilteringCanvas implements Canvas {
   @override
   void drawColor(Color color, BlendMode blendMode) => inner.drawColor(color, blendMode);
 
-  @override
-  void drawPicture(ui.Picture picture) => inner.drawPicture(picture);
+  // --- the draws the filter cannot look into, forwarded whole and counted ---
 
   @override
-  void drawParagraph(ui.Paragraph paragraph, Offset offset) => inner.drawParagraph(paragraph, offset);
+  void drawPicture(ui.Picture picture) {
+    filter.picturesForwarded++;
+    inner.drawPicture(picture);
+  }
+
+  @override
+  void drawParagraph(ui.Paragraph paragraph, Offset offset) {
+    filter.paragraphsForwarded++;
+    inner.drawParagraph(paragraph, offset);
+  }
 }

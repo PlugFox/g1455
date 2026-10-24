@@ -60,6 +60,9 @@ export 'src/proxy/proxy_pipeline.dart' show ProxyBlurPass;
 // default, so what an application reaches for here is the
 // opt-out. The oracle itself is not API — the host owns it — but the permission
 // and the decision a report quotes are.
+// The shadows a host leaves out of its capture, and the counts of what the
+// filter dropped and what it forwarded unseen.
+export 'src/proxy/shadow_filter.dart' show ShadowFilter;
 export 'src/proxy/proxy_retake.dart' show GlassContentDeclaration, GlassThermalPolicy, RetakeReason;
 export 'src/proxy/proxy_resolution.dart'
     show
@@ -117,6 +120,7 @@ export 'src/surface/glass_scroll_edge.dart'
         GlassScrollEdgeStyle,
         kGlassScrollEdgeDarkTint,
         kGlassScrollEdgeHardFill,
+        kGlassScrollEdgeHardFillDark,
         kGlassScrollEdgeHardSigma,
         kGlassScrollEdgeLightTint,
         kGlassScrollEdgeSigma;

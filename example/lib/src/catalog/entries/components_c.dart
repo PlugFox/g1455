@@ -373,7 +373,7 @@ without), because it is the field's resize that costs, not Cancel's paint. Under
 ## Layout
 
 - The field is [kGlassFieldHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassFieldHeight-constant.html)
-  (44) tall, and Cancel's tap target is at least 44 tall too.
+  (44) tall at the default text size and grows with a larger one; Cancel's tap target is at least 44 tall too.
 - The bar stretches to the width it is given, so the width must be bounded: an `Expanded` in a `Row`, a `Positioned`
   with a `left` and a `right`.
 
@@ -437,7 +437,7 @@ class _ContactsState extends State<Contacts> {
 | `onCancel` | `VoidCallback?` | `null` | Called after Cancel has emptied the field and let go of the focus. |
 | `showsCancelButton` | `bool` | `true` | Whether Cancel slides in while the field has the focus. `false` keeps the field's box still. |
 | `cancelLabel` | `String` | `'Cancel'` | Cancel's text. |
-| `cancelColor` | `Color` | `Color(0xFF007AFF)` | Cancel's colour. |
+| `cancelColor` | `Color?` | `null` | Cancel's colour, and the caret's. Null for iOS's blue in the appearance of the label beside the field. |
 | `cancelDuration` | `Duration` | `Duration(milliseconds: 250)` | How long Cancel takes to slide in or out: a capture a frame for as long. |
 | `autofocus` | `bool` | `false` | Focus the field as soon as it is built. |
 | `finish` | `GlassFinish?` | `null` | The glass. Null takes the theme's. |
@@ -505,8 +505,9 @@ GlassToolbarItem(
 ## Colour
 
 [kGlassBadgeRed](https://pub.dev/documentation/g1455/latest/g1455/kGlassBadgeRed-constant.html) is UIKit's documented
-`systemRed` in the light appearance, (255, 59, 48). The dark appearance's is (255, 69, 58); the package has no
-appearance of its own, so pass that as `color` where your app is dark. The height,
+`systemRed` in the light appearance, (255, 59, 48). By default the badge takes `systemRed` of the appearance it sits
+in, as the alert's and the menu's red do: on dark glass, or on a page whose label is light, the dark appearance's
+(255, 69, 58). A `color` passed is drawn as given. The height,
 [kGlassBadgeHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassBadgeHeight-constant.html) (18), the dot and
 the type size are layout, not readings.
 
@@ -514,7 +515,8 @@ the type size are layout, not readings.
 
 None in the glass. A badge takes no slot in the atlas and does not count in the ledger, and a count changing on a glass
 bar is a repaint inside the glass, which is no capture. On a [tab bar](/components/tab-bar) the count reaches the badge
-through the bar's items, so changing it rebuilds the bar, which costs one capture for now.
+through the bar's items, so changing it rebuilds the bar: one capture where the bar is lifted, as in a scaffold, since
+what it draws changed.
 
 ## Accessibility
 
@@ -568,7 +570,7 @@ class MailTabs extends StatelessWidget {
 | `label` | `String?` | `null` | A short text instead of a number. Not with `count`. |
 | `maxCount` | `int` | `99` | The largest number shown as it is. Above 0. |
 | `isVisible` | `bool` | `true` | Whether the badge is drawn. The child always is. |
-| `color` | `Color` | `kGlassBadgeRed` | The capsule's fill. |
+| `color` | `Color?` | `null` | The capsule's fill. Null is `systemRed` of the appearance around it. |
 | `textColor` | `Color` | `Color(0xFFFFFFFF)` | The count's or label's colour. |
 | `offset` | `Offset` | `Offset.zero` | Moves the badge from the child's top trailing corner. |
 | `semanticLabel` | `String?` | `null` | What a screen reader says. Null says the count or label; a dot then says nothing. |

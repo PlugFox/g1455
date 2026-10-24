@@ -10,6 +10,10 @@ subtree is, and changes nothing in the frame the user sees.
 | [GlassProxy.opaque](../g1455/GlassProxy/GlassProxy.opaque.html) | takes the subtree as covering its own box | a full-bleed image or panel: the capture stops looking under it |
 | [GlassProxy.verbatim](../g1455/GlassProxy/GlassProxy.verbatim.html) | exempts the subtree from the shadow filter | a highlight blurred through a `MaskFilter` on purpose |
 
+The shadow filter sees the draws a subtree makes, not what is inside them: a
+shadow recorded into a cached `Picture`, and a text's `TextStyle.shadows`, are
+drawn into the capture whatever the filter says.
+
 ## A stand-in for a video
 
 ```dart

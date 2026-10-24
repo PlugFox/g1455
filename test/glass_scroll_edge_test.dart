@@ -15,7 +15,8 @@
 //  2. our effect, drawn over the same fixture at the same size and read by
 //     the same instrument, lands on Apple's numbers inside a stated
 //     tolerance per quantity;
-//  3. the hard style the same way.
+//  3. the hard style the same way, in both appearances: its band is the
+//     screen's background at 0.90.
 //
 // Breaks, each undone by swapping the string back:
 //  - `kGlassScrollEdgeSigma = 1.6` -> `0.0` (no blur): arm 2's top plateau
@@ -25,7 +26,9 @@
 //    the bottom acquires a blur Apple's does not have. Read first at the
 //    bottom's plateau alone, this broke nothing — the glass the break lays
 //    sits above the plateau — so the arm reads the least contrast over the
-//    whole ramp instead.
+//    whole ramp instead;
+//  - in `appearanceFor`, `computeLuminance() < 0.4` -> `< 0.2`: the
+//    appearance arm finds the grey just below the threshold light.
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -54,6 +57,10 @@ void main() {
     expect(dark.top.a, closeTo(0.250, 0.005));
     expect(dark.top.c, closeTo(-1.0, 3));
     expect(dark.top.residual, closeTo(0.157, 0.01));
+    // The lines' own frequency, which `fit_soft.py` did not read: pinned here
+    // so that the comparison below is against a reading that did not move.
+    expect(dark.top.harmonic, closeTo(0.220, 0.005));
+    expect(light.top.harmonic, closeTo(0.229, 0.005));
     expect(dark.top.tint50, closeTo(105.5, 0.6));
     expect(dark.top.blur50, closeTo(109.9, 0.6));
     expect(light.top.a, closeTo(0.860, 0.005));
@@ -61,6 +68,28 @@ void main() {
     expect(dark.bottom.a, closeTo(0.260, 0.01));
     expect(light.bottom.a, closeTo(0.862, 0.01));
     expect(dark.bottom.tint50, closeTo(808.5, 1));
+  });
+
+  test('an edge that names no appearance reads the declared backdrop, dark below a luminance of 0.4', () {
+    const edge = GlassScrollEdge(side: GlassScrollEdgeSide.top, extent: 100);
+    GlassScrollEdgeAppearance over(Color? backdrop) => edge.appearanceFor(GlassThemeData(backdrop: backdrop));
+    // Two greys a code apart, one each side of the threshold.
+    const below = Color(0xFFA9A9A9);
+    const above = Color(0xFFAAAAAA);
+    expect(below.computeLuminance(), lessThan(0.4));
+    expect(above.computeLuminance(), greaterThan(0.4));
+    expect(over(null), GlassScrollEdgeAppearance.light, reason: 'undeclared is light');
+    expect(over(const Color(0xFF000000)), GlassScrollEdgeAppearance.dark);
+    expect(over(below), GlassScrollEdgeAppearance.dark);
+    expect(over(above), GlassScrollEdgeAppearance.light);
+    expect(over(const Color(0xFFFFFFFF)), GlassScrollEdgeAppearance.light);
+    // One the edge names holds against any backdrop.
+    const named = GlassScrollEdge(
+      side: GlassScrollEdgeSide.top,
+      extent: 100,
+      appearance: GlassScrollEdgeAppearance.light,
+    );
+    expect(named.appearanceFor(const GlassThemeData(backdrop: Color(0xFF000000))), GlassScrollEdgeAppearance.light);
   });
 
   for (final GlassScrollEdgeAppearance appearance in GlassScrollEdgeAppearance.values) {
@@ -78,7 +107,17 @@ void main() {
       // these are a check on the drawing, not on a fit.
       expect(ours.top.a, closeTo(apple.top.a, 0.02));
       expect(ours.top.c, closeTo(apple.top.c, 6));
-      expect(ours.top.residual, closeTo(apple.top.residual, 0.05));
+      // Peak to peak, as `fit_soft.py` read it, except where it cannot read:
+      // the light edge's lines are 5 code values under its 0.85 tint, and
+      // Impeller dithers a gradient, the tint's too, by a code a channel,
+      // pixel by pixel, which a peak to peak counts as contrast (0.237 here,
+      // 0.235 on an M2 iPad, at the sigma the dark edge is right at).
+      if (!(ui.ImageFilter.isShaderFilterSupported && appearance == GlassScrollEdgeAppearance.light)) {
+        expect(ours.top.residual, closeTo(apple.top.residual, 0.05));
+      }
+      // And off the lines' own frequency, which the dither leaves alone: Skia
+      // and Impeller read it within 0.01 of each other, both appearances.
+      expect(ours.top.harmonic, closeTo(apple.top.harmonic, 0.04));
       // The ramps: the tint is an erf placed on Apple's centre; the blur is a
       // smoothstep through Apple's 10% and 90% points, whose middle sits 5 pt
       // off the measured one (the measured ramp is asymmetric).
@@ -96,6 +135,8 @@ void main() {
       expect(ours.bottom.leastContrast, greaterThan(0.85), reason: 'the bottom blurs, and Apple\'s does not');
       expect(ours.bottom.a, closeTo(apple.bottom.a, 0.04));
       expect(ours.bottom.tint50, closeTo(apple.bottom.tint50, 7.5));
+      // The blur is the package's own Gaussian on Impeller, and the dark edge
+      // reads 0.169 there, 0.174 on an M2 iPad (glass D239).
     });
   }
 
@@ -116,6 +157,59 @@ void main() {
       expect(o.edgeBottom, closeTo(a.edgeBottom, 5));
       expect(o.level, closeTo(a.level, 4));
     }
+  });
+
+  // The band is the screen's background at 0.90, not the bars' appearance:
+  // Apple's frames with the bars dark over a white background are the white
+  // band above, and over the dark appearance's own background, black, the
+  // band is black (51 -> 5, 230 -> 23). Ours takes the host's appearance, or
+  // the backdrop it is told. The light field is told `light` content, as in
+  // the arm above, so a band that followed the soft edge's `appearance` would
+  // be white there.
+  testWidgets('our hard edge in the dark appearance reads as Apple\'s', (WidgetTester tester) async {
+    for (final String field in <String>['dark', 'light']) {
+      final _Image appleKnown = (await tester.runAsync(() => _frame('hidden_dark_appearance_$field')))!;
+      final _Image apple = (await tester.runAsync(() => _frame('hard_dark_appearance_$field')))!;
+      final GlassScrollEdgeAppearance content = field == 'dark'
+          ? GlassScrollEdgeAppearance.dark
+          : GlassScrollEdgeAppearance.light;
+      final ({double edgeTop, double edgeBottom, double level}) a = _band(apple, appleKnown);
+      for (final (String arm, Brightness? host, Color? backdrop) in <(String, Brightness?, Color?)>[
+        ('the host in the dark appearance', Brightness.dark, null),
+        ('a declared black backdrop', null, const Color(0xFF000000)),
+      ]) {
+        final _Image known = await _ours(tester, content, style: null, hostAppearance: host, backdrop: backdrop);
+        final _Image ours = await _ours(
+          tester,
+          content,
+          style: GlassScrollEdgeStyle.hard,
+          hostAppearance: host,
+          backdrop: backdrop,
+        );
+        final ({double edgeTop, double edgeBottom, double level}) o = _band(ours, known);
+        // ignore: avoid_print
+        print('hard, dark appearance, $field field, $arm: apple $a, ours $o');
+        expect(o.edgeTop, closeTo(a.edgeTop, 1.5), reason: arm);
+        expect(o.edgeBottom, closeTo(a.edgeBottom, 5), reason: arm);
+        expect(o.level, closeTo(a.level, 4), reason: '$field field, $arm');
+      }
+    }
+  });
+
+  test('the hard band is the declared backdrop, then the host\'s appearance, then the platform\'s', () {
+    const theme = GlassThemeData();
+    expect(GlassScrollEdge.hardFillFor(theme, Brightness.light), kGlassScrollEdgeHardFill);
+    expect(GlassScrollEdge.hardFillFor(theme, Brightness.dark), kGlassScrollEdgeHardFillDark);
+    expect(
+      GlassScrollEdge.hardFillFor(theme.copyWith(regularAppearance: Brightness.dark), Brightness.light),
+      kGlassScrollEdgeHardFillDark,
+    );
+    final Color declared = GlassScrollEdge.hardFillFor(
+      theme.copyWith(backdrop: const Color(0xFF2040C0), regularAppearance: Brightness.dark),
+      Brightness.dark,
+    );
+    expect(declared.toARGB32() & 0xFFFFFF, 0x2040C0);
+    expect(declared.a, closeTo(0.90, 0.005));
   });
 }
 
@@ -151,6 +245,8 @@ Future<_Image> _ours(
   WidgetTester tester,
   GlassScrollEdgeAppearance appearance, {
   required GlassScrollEdgeStyle? style,
+  Brightness? hostAppearance,
+  Color? backdrop,
 }) async {
   final bool dark = appearance == GlassScrollEdgeAppearance.dark;
   tester.view
@@ -165,6 +261,8 @@ Future<_Image> _ours(
         child: GlassHost(
           key: UniqueKey(),
           hardware: GlassHardware.appleMetal,
+          appearance: hostAppearance,
+          backdrop: backdrop,
           child: RepaintBoundary(
             key: _shotKey,
             child: SizedBox.fromSize(
@@ -255,7 +353,15 @@ class _Fixture extends CustomPainter {
 
 /// One row of the reading: the lines' contrast against the known answer's,
 /// and the means of the field and of the lines, effect and known.
-typedef _Row = ({double y, double contrast, double field, double fieldKnown, double lines, double linesKnown});
+typedef _Row = ({
+  double y,
+  double contrast,
+  double harmonic,
+  double field,
+  double fieldKnown,
+  double lines,
+  double linesKnown,
+});
 
 List<_Row> _rows(_Image a, _Image b) {
   expect(a.width, b.width);
@@ -284,6 +390,7 @@ List<_Row> _rows(_Image a, _Image b) {
     rows.add((
       y: y,
       contrast: (mxA - mnA) / math.max(1, mxB - mnB),
+      harmonic: _harmonic(a, row, lx0, lx1) / math.max(1, _harmonic(b, row, lx0, lx1)),
       field: fa / (fx1 - fx0),
       fieldKnown: fb / (fx1 - fx0),
       lines: sA / (lx1 - lx0),
@@ -293,11 +400,30 @@ List<_Row> _rows(_Image a, _Image b) {
   return rows;
 }
 
+/// The amplitude of the lines' own frequency, one every 6 pt, along [row]
+/// from [x0] to [x1]: a whole number of periods, so the window leaks nothing.
+///
+/// What a pixel-to-pixel dither adds to it is spread over every frequency, and
+/// this reads one; a peak to peak counts all of it.
+double _harmonic(_Image image, int row, int x0, int x1) {
+  const double period = 6 * kScale;
+  var re = 0.0;
+  var im = 0.0;
+  for (var x = x0; x < x1; x++) {
+    final double v = image.grey(x, row);
+    final double phase = 2 * math.pi * x / period;
+    re += v * math.cos(phase);
+    im += v * math.sin(phase);
+  }
+  return 2 * math.sqrt(re * re + im * im) / (x1 - x0);
+}
+
 class _Side {
   _Side(
     this.a,
     this.c,
     this.residual,
+    this.harmonic,
     this.tint10,
     this.tint50,
     this.tint90,
@@ -308,6 +434,10 @@ class _Side {
   );
   final double a, c, residual;
 
+  /// [residual] read off the lines' own frequency rather than their peak to
+  /// peak ([_harmonic]): the reading a dithered renderer leaves alone.
+  final double harmonic;
+
   /// The lowest tint-corrected contrast anywhere on the ramp: a blur that is
   /// not at the plateau — glass placed off the edge — shows here and nowhere
   /// else (the break that first failed to break, below).
@@ -317,6 +447,7 @@ class _Side {
   @override
   String toString() =>
       'a ${a.toStringAsFixed(3)} C ${c.toStringAsFixed(1)} residual ${residual.toStringAsFixed(3)} '
+      'harmonic ${harmonic.toStringAsFixed(3)} '
       'tint ${tint90.toStringAsFixed(1)}/${tint50.toStringAsFixed(1)}/${tint10.toStringAsFixed(1)} '
       'blur ${blur90.toStringAsFixed(1)}/${blur50.toStringAsFixed(1)}/${blur10.toStringAsFixed(1)} '
       'least ${leastContrast.toStringAsFixed(3)}';
@@ -343,6 +474,7 @@ _Fit _fit(_Image effect, _Image known) {
     final double a = 1 - (field - lines) / (fieldKnown - linesKnown);
     final double c = (field - fieldKnown * (1 - a)) / a;
     final double residual = contrast / (1 - a);
+    final double harmonic = mean((r) => r.harmonic) / (1 - a);
     final List<_Row> span = rows.where((r) => r.y >= ramp.$1 && r.y <= ramp.$2).toList();
     final mt = <(double, double)>[];
     final mb = <(double, double)>[];
@@ -370,6 +502,7 @@ _Fit _fit(_Image effect, _Image known) {
       a,
       c,
       residual,
+      harmonic,
       cross(mt, 0.1),
       cross(mt, 0.5),
       cross(mt, 0.9),

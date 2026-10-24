@@ -151,7 +151,7 @@ class _PhotoActionsState extends State<PhotoActions> {
 | `child` | `Widget` | **required** | The label or icon, centred, in a legible colour. |
 | `onPressed` | `VoidCallback?` | `null` | Called on a tap. Null disables the button. |
 | `borderRadius` | `BorderRadius` | `kGlassCapsule` | Corner radii. |
-| `padding` | `EdgeInsets` | `EdgeInsets.symmetric(horizontal: 20, vertical: 10)` | Space between the glass and the label. |
+| `padding` | `EdgeInsetsGeometry` | `EdgeInsets.symmetric(horizontal: 20, vertical: 10)` | Space between the glass and the label. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `minSize` | `Size` | `kGlassMinTapTarget` | The smallest the button may be. |
 | `pressedOverlay` | `Color?` | `null` | Added over the whole shape while held. Null takes the finish's `rim`; `Color(0x00000000)` disables it. |
 | `press` | `GlassPress?` | `null` | How the glass swells and leans while held. Null takes the theme's; `GlassPress.none` keeps the box. |

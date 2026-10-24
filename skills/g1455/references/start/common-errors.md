@@ -70,7 +70,8 @@ does both itself: its alert materializes, and a menu hides its anchor button wit
 GlassSurface(materialize: t, child: label)
 ```
 
-Content that fades *under* the glass is fine: the host sees the fade and captures it.
+Content that fades *under* the glass is fine: the host sees the fade and captures it, a fade over a `ColorFiltered`
+or an `ImageFiltered` included, as the engine draws it.
 
 ### A bar over glass cards shows the page with the cards cut out
 
@@ -82,11 +83,6 @@ The bar is the cards' sibling, and sibling glass does not see sibling glass. Wra
 
 Levels are a declaration, not paint order: glass beside a lifted subtree is drawn into its capture even when it is
 painted on top of it. Lift the bar with the edge; `GlassScrollEdge.child` does that for you.
-
-### A surface that replaces another at the same place draws nothing
-
-A known issue, not yet fixed: when a host replaces one surface with another at exactly the same rect, it keeps the old
-capture, and the new surface draws nothing until something else under the glass changes.
 
 ### A tab bar with minimizeBehavior: onScrollDown never collapses
 
@@ -208,12 +204,6 @@ content animates may be cheaper with a translucent `largeFinish`. See [Sheet](..
 The press swells the glass inside a travel region declared from touch-down until the spring settles: one capture as
 the region appears and one as it goes, nothing while it moves and nothing at rest. `GlassPress.none`, on
 `GlassHost.press`, a theme or one button, keeps the box still and builds no region.
-
-### A tab bar rebuilt by a bare setState captures once
-
-A known cost, not yet traced: a `setState` that rebuilds a [GlassTabBar](../components/tab-bar.md) costs one capture even
-when nothing it draws changed. Rebuild the bar when its selection or its items change, not with every change of the
-screen around it.
 
 ### A page control captures while the pages turn
 

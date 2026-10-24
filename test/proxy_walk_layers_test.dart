@@ -19,6 +19,37 @@
 //  3. **The live tree is left as found.** A layer the pass had to mint, a
 //     throwing `paint`, an offset written into a live layer: each is checked
 //     with `invariants.dart`, not assumed.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `_ShaderMask.end`, `..translate(maskRect.left, maskRect.top)` ->
+//    `..translate(0, 0)`: the mask is drawn in the layer's space rather than
+//    its own, and the arm with the `ShaderMask` off the origin differs by
+//    9000 px;
+//  - in `_effectOf`, `!_ShaderMask.staysInside.contains(blend)` -> `false`:
+//    a shader mask under src, srcOver and every other mode that paints over a
+//    transparent destination goes unnamed, though the pass paints it across
+//    the whole mask rect and the engine only over the child;
+//  - in `_compositedEffect`, `_FilterAt(offset, ` -> `_SaveLayer(`: a
+//    composited image filter is applied about the canvas's origin rather than
+//    its layer's, and the scaled `ImageFiltered` off the origin lands at half
+//    its offset;
+//  - in `_compositedEffect`, the `_noteFilter();` before
+//    `return _FilterAt(` -> nothing, or in `_effectOf`'s `ImageFilterLayer`
+//    case the one before `return _OffsetThen(` -> nothing: an image filter
+//    under a live alpha goes uncounted on that route, and the fold arm says
+//    which;
+//  - in `ProxyWalkContext._live`, `alpha > 0 && alpha < 255` -> `alpha < 255`:
+//    an alpha of 0 is counted open on every route that paints under it, and
+//    the zero-alpha arm sees a colour filter counted as folded;
+//  - in `pushOpacity`, `if (alpha < 255) {` -> `if (false) {`, or in
+//    `_effectOf`, the `log.compositedEffectsApplied++;` before the image
+//    filter's `return _OffsetThen(` -> nothing: that route stops counting what
+//    it applies, and the counting arm names the case. (Before this rule
+//    `pushLayer` also counted an opacity at 255, which the arm's 255 cases
+//    catch.)
+//  - in `pushOpacity`, the `if (alpha < 255) {` around `canvas.saveLayer` ->
+//    `if (true) {`: a full alpha opens a layer the engine does not, and the
+//    clearing child leaves the page intact by 2400 px.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -55,6 +86,33 @@ void main() {
         blendMode: BlendMode.dstIn,
         child: c,
       ),
+      // Off the origin, because the shader is built at `Offset.zero & size` and
+      // the engine draws it from the mask rect's corner: at the origin a mask
+      // drawn in the layer's space and one drawn in its own are the same.
+      'ShaderMask at an offset': (Widget c) => Padding(
+        padding: const EdgeInsets.only(left: 30, top: 20),
+        child: ShaderMask(
+          shaderCallback: (Rect r) => const LinearGradient(
+            colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+          ).createShader(r),
+          blendMode: BlendMode.dstIn,
+          child: c,
+        ),
+      ),
+      // A scale, because a blur or a translate is the same about any origin and
+      // could not tell a filter applied about the layer's offset from one
+      // applied about the canvas's. `FilterQuality.none`, because a matrix
+      // filter that samples is not byte-exact on Skia even at the origin (#31).
+      'ImageFiltered at an offset': (Widget c) => Padding(
+        padding: const EdgeInsets.only(left: 30, top: 20),
+        child: ImageFiltered(
+          imageFilter: ui.ImageFilter.matrix(
+            Matrix4.diagonal3Values(0.5, 0.5, 1).storage,
+            filterQuality: FilterQuality.none,
+          ),
+          child: c,
+        ),
+      ),
       'SliverOpacity': (Widget c) => CustomScrollView(
         slivers: <Widget>[
           SliverOpacity(
@@ -89,6 +147,40 @@ void main() {
       });
     }
 
+    // The engine's shader-mask layer covers the children's paint bounds and the
+    // pass's covers the whole mask rect, so a mode that paints over a
+    // transparent destination paints the mask where the children did not. The
+    // fixture is a 60 x 60 mask over a 20 x 20 child, so that region is most of
+    // the mask. Each mode is either exact here or named, and a named one has to
+    // diverge: naming a mode that does not would send its subtree to the stock
+    // capture for nothing.
+    testWidgets('a shader mask is exact under the modes that keep transparency, and named under the rest', (
+      WidgetTester tester,
+    ) async {
+      const exact = <BlendMode>{
+        BlendMode.clear,
+        BlendMode.dst,
+        BlendMode.srcIn,
+        BlendMode.dstIn,
+        BlendMode.dstOut,
+        BlendMode.srcATop,
+        BlendMode.modulate,
+      };
+      for (final BlendMode mode in BlendMode.values) {
+        final _Shot shot = await _shoot(tester, _maskOverSmallChild(mode));
+        final int differing = await _differing(tester, shot.stock, shot.pass);
+        expect(shot.log.errors, isEmpty, reason: mode.name);
+        if (exact.contains(mode)) {
+          expect(shot.log.unhandledLayers, isEmpty, reason: '${mode.name} keeps transparency and was named');
+          expect(differing, 0, reason: mode.name);
+        } else {
+          expect(shot.log.unhandledLayers, <String>['ShaderMaskLayer'], reason: '${mode.name} went unnamed');
+          expect(differing, greaterThan(0), reason: '${mode.name} is named but the pass reproduces it');
+        }
+        shot.dispose();
+      }
+    });
+
     testWidgets('a colour filter under a live alpha is counted as the one known divergence', (
       WidgetTester tester,
     ) async {
@@ -119,6 +211,146 @@ void main() {
       expect(folded.log.opacityFoldedIntoFilter, 1);
       alone.dispose();
       folded.dispose();
+    });
+
+    // The engine folds an opacity into an image filter below it as into a
+    // colour filter, and a colour filter can travel as an image filter. So an
+    // image filter under a live alpha is counted, through a composited boundary
+    // and through `pushLayer` alike, and the subtree goes to the stock capture.
+    testWidgets('an image filter under a live alpha is counted as folded, on both routes', (
+      WidgetTester tester,
+    ) async {
+      final ui.ImageFilter filter = ui.ImageFilter.compose(
+        outer: const ColorFilter.mode(Color(0xFF00FFFF), BlendMode.srcOver),
+        inner: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+      );
+      final routes = <String, Widget>{
+        'a composited boundary': Opacity(
+          opacity: 0.5,
+          child: ImageFiltered(imageFilter: filter, child: _scene()),
+        ),
+        'pushLayer': _Pusher(
+          route: _Route.offset((Offset o) => OpacityLayer(alpha: 128, offset: o)),
+          child: _Pusher(
+            route: _Route.offset((Offset o) => ImageFilterLayer(imageFilter: filter, offset: o)),
+            child: _scene(),
+          ),
+        ),
+      };
+      for (final MapEntry<String, Widget> route in routes.entries) {
+        final _Shot shot = await _shoot(tester, route.value);
+        expect(shot.log.errors, isEmpty, reason: route.key);
+        expect(shot.log.opacityFoldedIntoFilter, 1, reason: '${route.key}: the fold went uncounted');
+        shot.dispose();
+      }
+      // The control: the same filter under no alpha folds nothing.
+      final _Shot alone = await _shoot(tester, ImageFiltered(imageFilter: filter, child: _scene()));
+      expect(alone.log.opacityFoldedIntoFilter, 0);
+      alone.dispose();
+    });
+
+    // The fallback, against the same two divergences. A pass given a ratio
+    // records a subtree it draws apart from the engine as the engine draws it,
+    // its live layer rasterized in place, and says so in `fellBack` rather
+    // than in the counters that named the divergence. The fixtures diverge
+    // without it, or the arm would pass on a fallback that never ran.
+    group('with a fallback ratio', () {
+      // A colour filter that paints a transparent destination: the region the
+      // engine's fold removes. Composed with a blur for the image-filter route.
+      const ColorFilter flood = ColorFilter.mode(Color(0xFF00FFFF), BlendMode.srcOver);
+      final Map<String, Widget Function()> folds = <String, Widget Function()>{
+        'a composited opacity over an image filter': () => Opacity(
+          opacity: 0.5,
+          child: ImageFiltered(
+            imageFilter: ui.ImageFilter.compose(outer: flood, inner: ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2)),
+            child: _placed(const SizedBox.expand()),
+          ),
+        ),
+        'a pushed opacity over a colour filter': () => CustomScrollView(
+          slivers: <Widget>[
+            SliverOpacity(
+              opacity: 0.5,
+              sliver: SliverToBoxAdapter(
+                child: SizedBox.fromSize(
+                  size: kArea,
+                  child: ColorFiltered(
+                    colorFilter: flood,
+                    child: Center(child: SizedBox(width: 30, height: 30, child: _scene())),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      };
+      for (final MapEntry<String, Widget Function()> e in folds.entries) {
+        testWidgets('${e.key}: drawn as the engine draws it', (WidgetTester tester) async {
+          final _Shot apart = await _shoot(tester, e.value());
+          expect(apart.log.opacityFoldedIntoFilter, greaterThan(0));
+          // The composited fold diverges on Impeller and on Skia only where it
+          // rounds: by a code value on macOS, not at all on Linux or a phone.
+          // The pushed one diverges everywhere.
+          if (e.key != 'a composited opacity over an image filter' || ui.ImageFilter.isShaderFilterSupported) {
+            expect(
+              await _differing(tester, apart.stock, apart.pass),
+              greaterThan(0),
+              reason: 'the fixture does not diverge, so the fallback is not tested',
+            );
+          }
+          apart.dispose();
+
+          final _Shot shot = await _shoot(tester, e.value(), fallback: 1);
+          expect(shot.log.errors, isEmpty);
+          expect(shot.log.fellBack, <String>['OpacityLayer']);
+          expect(shot.log.opacityFoldedIntoFilter, 0, reason: 'a fallen-back fold is still counted');
+          expect(shot.liveTreeChanges, isEmpty);
+          // A code value, where the pushed opacity's layer is read back at 8
+          // bits with its alpha in it and composited once more.
+          expect(await _differing(tester, shot.stock, shot.pass, tolerance: 1), 0);
+          // The engine layers the fallback built are the ones the next frame
+          // retains, and it draws what it drew.
+          await tester.pump();
+          final ui.Image next = _root().toImageSync();
+          expect(await _differing(tester, shot.stock, next), 0, reason: 'the frame after the fallback changed');
+          next.dispose();
+          shot.dispose();
+        });
+      }
+
+      testWidgets('a shader mask that paints past its children is drawn as the engine draws it', (
+        WidgetTester tester,
+      ) async {
+        for (final BlendMode mode in <BlendMode>[BlendMode.src, BlendMode.srcOver, BlendMode.plus, BlendMode.screen]) {
+          final _Shot shot = await _shoot(tester, _maskOverSmallChild(mode), fallback: 1);
+          expect(shot.log.fellBack, <String>['ShaderMaskLayer'], reason: mode.name);
+          expect(shot.log.unhandledLayers, isEmpty, reason: '${mode.name}: a fallen-back mask is still named');
+          expect(shot.liveTreeChanges, isEmpty, reason: mode.name);
+          expect(await _differing(tester, shot.stock, shot.pass), 0, reason: mode.name);
+          shot.dispose();
+        }
+        // A mode the pass reproduces is left to the pass.
+        final _Shot exact = await _shoot(tester, _maskOverSmallChild(BlendMode.srcIn), fallback: 1);
+        expect(exact.log.fellBack, isEmpty);
+        exact.dispose();
+      });
+
+      // The engine would draw what the pass subtracts, and a subtree that
+      // holds glass would hold the glass itself.
+      testWidgets('a subtree the pass subtracted from is left as the pass drew it', (WidgetTester tester) async {
+        final _Shot shot = await _shoot(
+          tester,
+          folds.values.first(),
+          fallback: 1,
+          policy: (RenderObject child) =>
+              child is RenderConstrainedBox && child.additionalConstraints == const BoxConstraints.expand()
+              ? WalkAction.skip
+              : WalkAction.paint,
+        );
+        expect(shot.log.skipped, isNotEmpty, reason: 'the policy skipped nothing, so the arm says nothing');
+        expect(shot.log.fellBack, isEmpty);
+        expect(shot.log.opacityFoldedIntoFilter, greaterThan(0));
+        shot.dispose();
+      });
     });
 
     testWidgets('an opacity pushed without an old layer mints one, and only one, and leaves the tree', (
@@ -262,7 +494,7 @@ void main() {
         (Offset o) => ShaderMaskLayer(
           shader: const LinearGradient(
             colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
-          ).createShader(o & kArea),
+          ).createShader(Offset.zero & kArea),
           maskRect: o & kArea,
           blendMode: BlendMode.dstIn,
         ),
@@ -304,6 +536,31 @@ void main() {
         pushed.dispose();
       }
       plain.dispose();
+    });
+
+    // The engine adds no layer for an opacity at full alpha, so a child that
+    // blends with what is under it reaches the page: `clear` punches through
+    // it. In an offscreen layer of the pass's own it would clear nothing.
+    testWidgets('pushOpacity at full alpha opens no layer: a child that clears punches through the page', (
+      WidgetTester tester,
+    ) async {
+      final _Shot plain = await _shoot(tester, _scene());
+      final _Shot pushed = await _shoot(
+        tester,
+        _OpacityPusher(
+          alpha: 255,
+          child: const CustomPaint(size: kArea, painter: _Clearing()),
+        ),
+      );
+      expect(pushed.log.errors, isEmpty);
+      expect(
+        await _differing(tester, plain.stock, pushed.stock),
+        greaterThan(0),
+        reason: 'the fixture cannot tell a punched page from an intact one',
+      );
+      expect(await _differing(tester, pushed.stock, pushed.pass), 0);
+      plain.dispose();
+      pushed.dispose();
     });
 
     testWidgets('a layer whose effect was never set draws its content unaltered', (WidgetTester tester) async {
@@ -353,6 +610,116 @@ void main() {
         shot.dispose();
       },
     );
+    // Alpha 255 is no live alpha on any route: a colour filter under it folds
+    // nothing, so nothing is counted and the subtree keeps the pass (#18).
+    testWidgets('a colour filter under full alpha is not counted as folded, on any route', (
+      WidgetTester tester,
+    ) async {
+      Widget filtered() => ColorFiltered(
+        colorFilter: const ColorFilter.mode(kRed, BlendMode.modulate),
+        child: _scene(),
+      );
+      final routes = <String, Widget>{
+        'pushOpacity': _OpacityPusher(alpha: 255, child: filtered()),
+        'pushLayer': _Pusher(
+          route: _Route.offset((Offset o) => OpacityLayer(alpha: 255, offset: o)),
+          child: filtered(),
+        ),
+        'a composited boundary': FadeTransition(opacity: const AlwaysStoppedAnimation<double>(1), child: filtered()),
+      };
+      for (final MapEntry<String, Widget> route in routes.entries) {
+        final _Shot shot = await _shoot(tester, route.value);
+        expect(shot.log.errors, isEmpty, reason: route.key);
+        expect(shot.log.opacityFoldedIntoFilter, 0, reason: '${route.key}: full alpha was counted as open');
+        expect(await _differing(tester, shot.stock, shot.pass), 0, reason: route.key);
+        shot.dispose();
+      }
+      // The control: the same pushOpacity at a live alpha is counted.
+      final _Shot live = await _shoot(tester, _OpacityPusher(alpha: 128, child: filtered()));
+      expect(live.log.opacityFoldedIntoFilter, 1);
+      live.dispose();
+    });
+
+    // The other end of the same rule. At alpha 0 nothing under the opacity is
+    // drawn, by the engine or by the pass, so there is nothing for a fold to
+    // change: `Opacity(0)` and `FadeTransition(0)` count nothing because they
+    // do not paint their child, and the routes that do paint it must agree.
+    testWidgets('a colour filter under zero alpha is not counted as folded, on any route', (
+      WidgetTester tester,
+    ) async {
+      Widget filtered() => ColorFiltered(
+        colorFilter: const ColorFilter.mode(kRed, BlendMode.srcOver),
+        child: _scene(),
+      );
+      final routes = <String, Widget>{
+        'pushOpacity': _OpacityPusher(alpha: 0, child: filtered()),
+        'pushLayer': _Pusher(
+          route: _Route.offset((Offset o) => OpacityLayer(alpha: 0, offset: o)),
+          child: filtered(),
+        ),
+        'a composited boundary': _AlphaBoundary(alpha: 0, child: filtered()),
+      };
+      for (final MapEntry<String, Widget> route in routes.entries) {
+        final _Shot shot = await _shoot(tester, route.value);
+        expect(shot.log.errors, isEmpty, reason: route.key);
+        expect(shot.log.opacityFoldedIntoFilter, 0, reason: '${route.key}: zero alpha was counted as open');
+        expect(await _differing(tester, shot.stock, shot.pass), 0, reason: route.key);
+        // Still walked, so a marker under it is still seen.
+        expect(shot.log.visited, greaterThan(4), reason: '${route.key}: the subtree was skipped');
+        shot.dispose();
+      }
+    });
+
+    // `compositedEffectsApplied` counts an opacity or an image filter the pass
+    // applied, by the same rule whichever route brought it.
+    testWidgets('an opacity or image filter is counted when it is applied, whatever the route', (
+      WidgetTester tester,
+    ) async {
+      final ui.ImageFilter blur = ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2);
+      final cases = <String, (Widget, int)>{
+        'pushOpacity 128': (_OpacityPusher(alpha: 128, child: _scene()), 1),
+        'pushOpacity 0': (_OpacityPusher(alpha: 0, child: _scene()), 1),
+        'pushOpacity 255': (_OpacityPusher(alpha: 255, child: _scene()), 0),
+        'pushLayer opacity 128': (
+          _Pusher(
+            route: _Route.offset((Offset o) => OpacityLayer(alpha: 128, offset: o)),
+            child: _scene(),
+          ),
+          1,
+        ),
+        'pushLayer opacity 0': (
+          _Pusher(
+            route: _Route.offset((Offset o) => OpacityLayer(alpha: 0, offset: o)),
+            child: _scene(),
+          ),
+          1,
+        ),
+        'pushLayer opacity 255': (
+          _Pusher(
+            route: _Route.offset((Offset o) => OpacityLayer(alpha: 255, offset: o)),
+            child: _scene(),
+          ),
+          0,
+        ),
+        'pushLayer image filter': (
+          _Pusher(
+            route: _Route.offset((Offset o) => ImageFilterLayer(imageFilter: blur, offset: o)),
+            child: _scene(),
+          ),
+          1,
+        ),
+        'composited opacity 128': (_AlphaBoundary(alpha: 128, child: _scene()), 1),
+        'composited opacity 0': (_AlphaBoundary(alpha: 0, child: _scene()), 1),
+        'composited opacity 255': (_AlphaBoundary(alpha: 255, child: _scene()), 0),
+        'composited image filter': (ImageFiltered(imageFilter: blur, child: _scene()), 1),
+      };
+      for (final MapEntry<String, (Widget, int)> c in cases.entries) {
+        final _Shot shot = await _shoot(tester, c.value.$1);
+        expect(shot.log.errors, isEmpty, reason: c.key);
+        expect(shot.log.compositedEffectsApplied, c.value.$2, reason: c.key);
+        shot.dispose();
+      }
+    });
   });
 
   group('the bookkeeping routes', () {
@@ -463,6 +830,7 @@ void main() {
         'layers_minted': 3,
         'opacity_folded_into_filter': 5,
         'unhandled_layers': <String>['BackdropFilterLayer'],
+        'fell_back': <String>[],
         'added_layers': <String>['TextureLayer'],
         'substituted': <String>['RenderX'],
         'skipped': <String>['RenderY'],
@@ -499,6 +867,35 @@ Widget _scene() => SizedBox.fromSize(
       Positioned(left: 0, top: 0, width: 70, height: 50, child: ColoredBox(color: kRed)),
       Positioned(left: 50, top: 60, width: 70, height: 60, child: ColoredBox(color: kGreen)),
     ],
+  ),
+);
+
+/// A 60 x 60 shader mask at (30, 20) whose child paints only its top-left
+/// 20 x 20.
+///
+/// The gradient is one opaque colour across everything the child covers: Skia
+/// dithers a gradient by device position, and a layer whose origin differs from
+/// the engine's moves the dither by a code value wherever the blend leaves a
+/// fraction, which is a different question from where the mask paints.
+Widget _maskOverSmallChild(BlendMode mode) => Padding(
+  padding: const EdgeInsets.only(left: 30, top: 20),
+  child: Align(
+    alignment: Alignment.topLeft,
+    child: SizedBox(
+      width: 60,
+      height: 60,
+      child: ShaderMask(
+        shaderCallback: (Rect r) => const LinearGradient(
+          colors: <Color>[Color(0xFFFFE000), Color(0xFFFFE000), Color(0x802040FF), Color(0x802040FF)],
+          stops: <double>[0, 0.5, 0.5, 1],
+        ).createShader(r),
+        blendMode: mode,
+        child: const Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(width: 20, height: 20, child: ColoredBox(color: kRed)),
+        ),
+      ),
+    ),
   ),
 );
 
@@ -590,6 +987,69 @@ class _RenderPusher extends RenderProxyBox {
     _handle.layer = null;
     super.dispose();
   }
+}
+
+/// Pushes its child through `pushOpacity` at [alpha], on screen and in the
+/// pass alike.
+class _OpacityPusher extends SingleChildRenderObjectWidget {
+  const _OpacityPusher({required this.alpha, super.child});
+
+  final int alpha;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderOpacityPusher(alpha);
+}
+
+class _RenderOpacityPusher extends RenderProxyBox {
+  _RenderOpacityPusher(this.alpha);
+
+  final int alpha;
+
+  @override
+  bool get alwaysNeedsCompositing => true;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    layer = context.pushOpacity(offset, alpha, super.paint, oldLayer: layer as OpacityLayer?);
+  }
+}
+
+/// Clears a rect of whatever is under it.
+class _Clearing extends CustomPainter {
+  const _Clearing();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(const Rect.fromLTWH(20, 20, 60, 40), Paint()..blendMode = BlendMode.clear);
+  }
+
+  @override
+  bool shouldRepaint(_Clearing oldDelegate) => false;
+}
+
+/// A repaint boundary whose composited layer is an opacity at [alpha], as
+/// `RenderOpacity`'s is, but at any alpha: the framework's own boundaries stop
+/// painting their child at 0, and this one goes on.
+class _AlphaBoundary extends SingleChildRenderObjectWidget {
+  const _AlphaBoundary({required this.alpha, super.child});
+
+  final int alpha;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderAlphaBoundary(alpha);
+}
+
+class _RenderAlphaBoundary extends RenderProxyBox {
+  _RenderAlphaBoundary(this.alpha);
+
+  final int alpha;
+
+  @override
+  bool get isRepaintBoundary => true;
+
+  @override
+  OffsetLayer updateCompositedLayer({required covariant OpacityLayer? oldLayer}) =>
+      (oldLayer ?? OpacityLayer())..alpha = alpha;
 }
 
 /// Reaches the three routes the pass overrides only to record that they were
@@ -765,10 +1225,10 @@ class _Pass {
   }
 }
 
-_Pass _walk(RenderObject root, {WalkPolicy policy = paintEverything}) {
+_Pass _walk(RenderObject root, {WalkPolicy policy = paintEverything, double? fallback}) {
   final handle = LayerHandle<OffsetLayer>()..layer = OffsetLayer();
   final log = WalkLog();
-  ProxyWalkContext(handle.layer!, Offset.zero & kArea, log: log, policy: policy)
+  ProxyWalkContext(handle.layer!, Offset.zero & kArea, log: log, policy: policy, fallbackPixelRatio: fallback)
     ..paintChild(root, Offset.zero)
     ..finish();
   return _Pass(handle, handle.layer!.toImageSync(Offset.zero & kArea), log);
@@ -792,7 +1252,12 @@ class _Shot {
 
 /// The engine's capture of [child] and one pass over the same tree, plus what
 /// the pass changed in the live tree (which must be nothing).
-Future<_Shot> _shoot(WidgetTester tester, Widget child, {WalkPolicy policy = paintEverything}) async {
+Future<_Shot> _shoot(
+  WidgetTester tester,
+  Widget child, {
+  WalkPolicy policy = paintEverything,
+  double? fallback,
+}) async {
   // A fresh key per shot: the fixtures' render objects take their route at
   // creation and have no `updateRenderObject`, so a reused element would keep
   // the previous shot's.
@@ -801,12 +1266,13 @@ Future<_Shot> _shoot(WidgetTester tester, Widget child, {WalkPolicy policy = pai
   final RenderRepaintBoundary root = _root();
   final ui.Image stock = root.toImageSync();
   final TreeSnapshot before = TreeSnapshot.of(root);
-  final _Pass pass = _walk(root, policy: policy);
+  final _Pass pass = _walk(root, policy: policy, fallback: fallback);
   final List<String> changes = TreeSnapshot.of(root).diffFrom(before);
   return _Shot(stock, pass, changes);
 }
 
-Future<int> _differing(WidgetTester tester, ui.Image a, ui.Image b) async {
+/// Pixels of [a] and [b] apart by more than [tolerance] in any channel.
+Future<int> _differing(WidgetTester tester, ui.Image a, ui.Image b, {int tolerance = 0}) async {
   expect(a.width, b.width);
   expect(a.height, b.height);
   var n = 0;
@@ -819,7 +1285,10 @@ Future<int> _differing(WidgetTester tester, ui.Image a, ui.Image b) async {
     final Uint8List pa = da.buffer.asUint8List();
     final Uint8List pb = db.buffer.asUint8List();
     for (var i = 0; i < pa.length; i += 4) {
-      if (pa[i] != pb[i] || pa[i + 1] != pb[i + 1] || pa[i + 2] != pb[i + 2] || pa[i + 3] != pb[i + 3]) {
+      if ((pa[i] - pb[i]).abs() > tolerance ||
+          (pa[i + 1] - pb[i + 1]).abs() > tolerance ||
+          (pa[i + 2] - pb[i + 2]).abs() > tolerance ||
+          (pa[i + 3] - pb[i + 3]).abs() > tolerance) {
         n++;
       }
     }

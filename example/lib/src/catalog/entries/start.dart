@@ -101,7 +101,8 @@ catch it if the app should start regardless.
 ## Next steps
 
 - [How it works](/start/how-it-works): one capture for the whole screen, and only when something changed.
-- [What the app declares](/start/declarations): the backdrop, reduce transparency, contrast, thermal state.
+- [What the app declares](/start/declarations): the backdrop, the appearance, reduce transparency, contrast, thermal
+  state.
 - [GlassHost](/foundations/host) and [GlassSurface](/foundations/surface): the two building blocks.
 - [Finishes](/foundations/finishes): regular, clear and frosted glass.
 - [Scaffold](/components/scaffold): a whole screen, a bar, a tab bar and a list scrolling under them, wired for you.
@@ -301,7 +302,9 @@ another, and they are not frame times.
     id: 'declarations',
     title: 'What the app declares',
     icon: 'visibility',
-    summary: 'What the package cannot read from the render tree: the backdrop, reduce transparency, contrast, thermal state.',
+    summary:
+        'What the package cannot read from the render tree: the backdrop, the appearance, reduce transparency, contrast, '
+        'thermal state.',
     api: <String>['GlassHost', 'GlassTierPolicy', 'GlassThermalState', 'GlassHardware'],
     source: 'lib/src/surface/glass_host.dart',
     guide: r'''
@@ -323,6 +326,31 @@ well, the host needs to know what the glass sits over:
 
 Without any of these, labels are picked against the worst case, and in debug the package warns once when a finish
 cannot be read over it. More on [Legibility & theme](/foundations/legibility).
+
+## An appearance of the app's own
+
+Unless a finish is named, the glass is Apple's `.regular`: dark or light glass, picked from the backdrop and the
+**platform's** appearance. An app whose theme does not follow the phone's has to say which appearance it is in, or a
+dark-themed app on a phone in the light appearance gets light glass over its dark content — in the light appearance
+`.regular` turns light over anything above a luma of 54, and an ordinary dark grey page is above that.
+
+```dart
+MaterialApp(
+  themeMode: mode,
+  builder: (context, child) => GlassHost(
+    // Null follows the phone, as ThemeMode.system does.
+    appearance: switch (mode) {
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.light => Brightness.light,
+      ThemeMode.system => null,
+    },
+    child: child!,
+  ),
+)
+```
+
+Naming a finish (`finish: GlassFinish.regularDark`) gives dark glass too, but holds it: the backdrop and
+[adaptive glass](/foundations/adaptive) no longer move it between branches. `appearance:` keeps `.regular` a choice.
 
 ## Reduce transparency
 
@@ -422,7 +450,9 @@ class DeclaredApp extends StatelessWidget {
     summary: 'The same glass on Impeller (Metal, Vulkan, GLES), on Skia, and on the web with CanvasKit and Skwasm.',
     guide: r'''
 g1455 is Dart and fragment shaders, with no platform code of its own. The glass renders byte-identically on Impeller
-and on Skia, and it works on the web.
+and on Skia but for the blur, which is each renderer's own: Impeller's blurs less for the sigma it is asked and cuts its
+kernel short, so there the package blurs with a Gaussian of its own, and past 4 texels asks the engine for the sigma
+whose kernel delivers the calibrated one. It works on the web.
 
 ## Renderers
 
@@ -535,7 +565,8 @@ does both itself: its alert materializes, and a menu hides its anchor button wit
 GlassSurface(materialize: t, child: label)
 ```
 
-Content that fades *under* the glass is fine: the host sees the fade and captures it.
+Content that fades *under* the glass is fine: the host sees the fade and captures it, a fade over a `ColorFiltered`
+or an `ImageFiltered` included, as the engine draws it.
 
 ### A bar over glass cards shows the page with the cards cut out
 
@@ -547,11 +578,6 @@ The bar is the cards' sibling, and sibling glass does not see sibling glass. Wra
 
 Levels are a declaration, not paint order: glass beside a lifted subtree is drawn into its capture even when it is
 painted on top of it. Lift the bar with the edge; `GlassScrollEdge.child` does that for you.
-
-### A surface that replaces another at the same place draws nothing
-
-A known issue, not yet fixed: when a host replaces one surface with another at exactly the same rect, it keeps the old
-capture, and the new surface draws nothing until something else under the glass changes.
 
 ### A tab bar with minimizeBehavior: onScrollDown never collapses
 
@@ -673,12 +699,6 @@ content animates may be cheaper with a translucent `largeFinish`. See [Sheet](/c
 The press swells the glass inside a travel region declared from touch-down until the spring settles: one capture as
 the region appears and one as it goes, nothing while it moves and nothing at rest. `GlassPress.none`, on
 `GlassHost.press`, a theme or one button, keeps the box still and builds no region.
-
-### A tab bar rebuilt by a bare setState captures once
-
-A known cost, not yet traced: a `setState` that rebuilds a [GlassTabBar](/components/tab-bar) costs one capture even
-when nothing it draws changed. Rebuild the bar when its selection or its items change, not with every change of the
-screen around it.
 
 ### A page control captures while the pages turn
 

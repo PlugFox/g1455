@@ -5,6 +5,13 @@
 // No pixels: the scaffold draws nothing of its own, so what can be wrong with
 // it is a rect or a number — the body's padding, a bar's box, how many hosts
 // there are. The glass the bars draw is tested where the bars are.
+//
+// Breaks, each undone by swapping the string back:
+//  - in `GlassScaffold.build`, `barMargin.resolve(direction)` ->
+//    `barMargin.resolve(TextDirection.ltr)`: a directional margin's start
+//    stays at the left under rtl;
+//  - in `_GlassScaffoldLayout.performLayout`, `size.height - keyboard` ->
+//    `size.height`: the keyboard arm finds the body running under it.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,6 +56,81 @@ void main() {
       tester.getRect(find.byKey(kAction)),
       const Rect.fromLTWH(400 - 16 - 50, 800 - kBottomExtent - 16 - 50, 50, 50),
     );
+  });
+
+  testWidgets('over the keyboard the body ends at it and the action stands on it; the bottom bar stays under', (
+    WidgetTester tester,
+  ) async {
+    for (final bool resize in <bool>[true, false]) {
+      ({EdgeInsets padding, EdgeInsets insets})? told;
+      await _mount(
+        tester,
+        keyboard: 300,
+        GlassScaffold(
+          resizeToAvoidBottomInset: resize,
+          bottomBar: const SizedBox(key: kBottom, height: 60),
+          floatingAction: const SizedBox(key: kAction, width: 50, height: 50),
+          body: Builder(
+            key: const Key('body'),
+            builder: (BuildContext context) {
+              told = (padding: MediaQuery.paddingOf(context), insets: MediaQuery.viewInsetsOf(context));
+              return const SizedBox.expand();
+            },
+          ),
+        ),
+      );
+      final Rect body = tester.getRect(find.byKey(const Key('body')));
+      if (resize) {
+        expect(body, const Rect.fromLTWH(0, 0, 400, 800 - 300), reason: 'the body runs under the keyboard');
+        expect(told!.insets.bottom, 0, reason: 'the body is told of a keyboard it already ends at');
+        // The bar is under the keyboard, so nothing of it is left to pad for.
+        expect(told!.padding.bottom, 0);
+        expect(tester.getRect(find.byKey(kAction)).bottom, 800 - 300 - 16, reason: 'the action is under the keyboard');
+      } else {
+        expect(body, const Rect.fromLTWH(0, 0, 400, 800));
+        expect(told!.insets.bottom, 300);
+        expect(told!.padding.bottom, 8 + 60 + 8);
+      }
+      // The bar stays at the bottom, where the keyboard covers it, as a tab
+      // bar does on iOS: its margin under it, the safe area gone with the
+      // keyboard up.
+      expect(tester.getRect(find.byKey(kBottom)).bottom, 800 - 8);
+    }
+  });
+
+  testWidgets('the body\'s constraints carry the bottom bar\'s extent: equal while it is, and hashed alike', (
+    WidgetTester tester,
+  ) async {
+    // The extent rides on the constraints, so a body is laid out again when
+    // only the bar's height changed — and two that are equal are one key to a
+    // cache keyed on constraints, as the framework's equal sizes are.
+    Future<BoxConstraints> bodyUnder(double bar) async {
+      late BoxConstraints seen;
+      await _mount(
+        tester,
+        GlassScaffold(
+          bottomBar: SizedBox(key: kBottom, height: bar),
+          body: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              seen = constraints;
+              return const SizedBox.expand();
+            },
+          ),
+        ),
+      );
+      return seen;
+    }
+
+    final BoxConstraints a = await bodyUnder(60);
+    await _mount(tester, const SizedBox());
+    final BoxConstraints again = await bodyUnder(60);
+    final BoxConstraints taller = await bodyUnder(80);
+    expect(identical(a, again), isFalse);
+    expect(again, a);
+    expect(again.hashCode, a.hashCode, reason: 'two equal constraints hash apart');
+    expect(taller == a, isFalse, reason: 'a new bar height left the body\'s constraints equal');
+    expect(a == BoxConstraints.tight(kScreen), isFalse, reason: 'the extent is not part of what is compared');
+    expect(taller.biggest, a.biggest, reason: 'the arm is about the extent, not the size');
   });
 
   testWidgets('the body fills the screen, starts below the top bar and scrolls under it', (
@@ -115,6 +197,27 @@ void main() {
       textDirection: TextDirection.rtl,
     );
     expect(tester.getTopLeft(find.byKey(kAction)).dx, 16);
+  });
+
+  testWidgets('a directional bar margin puts its start at the right, right to left', (WidgetTester tester) async {
+    for (final TextDirection direction in TextDirection.values) {
+      await _mount(
+        tester,
+        const GlassScaffold(
+          barMargin: EdgeInsetsDirectional.fromSTEB(30, 8, 4, 8),
+          topBar: SizedBox.expand(key: kTop),
+          bottomBar: SizedBox(key: kBottom, height: 60),
+          body: SizedBox.expand(),
+        ),
+        textDirection: direction,
+      );
+      final (double left, double right) = direction == TextDirection.rtl ? (4, 30) : (30, 4);
+      for (final Key bar in <Key>[kTop, kBottom]) {
+        final Rect box = tester.getRect(find.byKey(bar));
+        expect((box.left, kScreen.width - box.right), (left, right), reason: '$bar, $direction');
+      }
+      expect(tester.getTopLeft(find.byKey(kTop)).dy, 47 + 8);
+    }
   });
 
   testWidgets('the top bar stands in a soft scroll edge by default, lifted alone without one', (
@@ -233,14 +336,26 @@ void main() {
 GlassProxyHandle? _handleOf(WidgetTester tester) =>
     tester.widgetList<GlassProxyScope>(find.byType(GlassProxyScope)).firstOrNull?.handle;
 
-Future<void> _mount(WidgetTester tester, Widget child, {TextDirection textDirection = TextDirection.ltr}) async {
+/// [keyboard] is the keyboard's height: the bottom inset, which takes the
+/// safe area's bottom padding with it, as the engine reports them.
+Future<void> _mount(
+  WidgetTester tester,
+  Widget child, {
+  TextDirection textDirection = TextDirection.ltr,
+  double keyboard = 0,
+}) async {
   tester.view
     ..physicalSize = kScreen
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MediaQuery(
-      data: const MediaQueryData(size: kScreen, padding: kSafe, viewPadding: kSafe),
+      data: MediaQueryData(
+        size: kScreen,
+        padding: kSafe.copyWith(bottom: keyboard > 0 ? 0 : kSafe.bottom),
+        viewPadding: kSafe,
+        viewInsets: EdgeInsets.only(bottom: keyboard),
+      ),
       child: Directionality(textDirection: textDirection, child: child),
     ),
   );

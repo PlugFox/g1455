@@ -42,6 +42,14 @@ import 'package:g1455/src/proxy/proxy_retake.dart';
 const Size kScreen = Size(400, 600);
 final GlobalKey _shotKey = GlobalKey();
 
+/// The most a pixel of an identity glass may differ from the bare frame, in the
+/// arms whose slot is off the origin or off the device grid.
+///
+/// One code value, and only on Impeller, where a few pixels read one off (10 of
+/// 843750 at dpr 1.875, 16 of 240000 for the pair). Skia reads zero. The defect
+/// these arms guard against was 72 code values on the device.
+const int kBackendTolerance = 1;
+
 void main() {
   testWidgets('an identity glass is invisible, and a shifted sample is not', (
     WidgetTester tester,
@@ -83,7 +91,7 @@ void main() {
       final ui.Image bare = await _shot(tester, const _Scene(surface: false), dpr: dpr);
       final ui.Image glass = await _shot(tester, const _Scene(surface: true, second: true), dpr: dpr);
       final _Diff diff = await _compare(tester, bare, glass);
-      expect(diff.differing, 0, reason: 'identity visible at dpr $dpr: $diff');
+      expect(diff.maxDelta, lessThanOrEqualTo(kBackendTolerance), reason: 'identity visible at dpr $dpr: $diff');
     }
     tester.view.resetDevicePixelRatio();
   });
@@ -99,7 +107,11 @@ void main() {
     final ui.Image bare = await _shot(tester, const _Scene());
     final ui.Image both = await _shot(tester, const _Scene(surface: true, second: true));
     final _Diff diff = await _compare(tester, bare, both);
-    expect(diff.differing, 0, reason: 'a surface away from the atlas origin is visible: $diff');
+    expect(
+      diff.maxDelta,
+      lessThanOrEqualTo(kBackendTolerance),
+      reason: 'a surface away from the atlas origin is visible: $diff',
+    );
     // And the slots really are in different places, or the arm is the same one
     // as before wearing two panels.
     final List<RenderGlassSurface> surfaces = tester
@@ -567,6 +579,77 @@ void main() {
     expect(silent.held, 0);
   });
 
+  testWidgets('a host that has not painted records rather than hold what it cannot watch', (
+    WidgetTester tester,
+  ) async {
+    // Offstage, the host's boundary is laid out and never painted, so there is
+    // no layer for the watch to read a still screen off. The declaration lets
+    // a host hold a still screen, not one it cannot see: each frame there is
+    // recorded, as an undeclared host's would be. On the screen it watches
+    // again, and a still screen is held.
+    final key = GlobalKey();
+    // Around the host, not inside it: what is offstage is the host's own
+    // boundary.
+    Widget scene({required bool offstage}) => MediaQuery(
+      data: const MediaQueryData(size: kScreen, devicePixelRatio: 1),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Offstage(
+          offstage: offstage,
+          child: GlassHost(
+            key: key,
+            content: GlassContentDeclaration.declared,
+            hardware: GlassHardware.appleMetal,
+            finish: GlassFinish.identity,
+            child: const _Scene(surface: true),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(scene(offstage: true));
+    await tester.pump();
+    final host = key.currentState! as dynamic;
+    final int before = host.recorded as int;
+    for (var i = 0; i < 4; i++) {
+      tester.binding.scheduleFrame();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(host.recorded, before + 4, reason: 'a host with nothing painted held a capture it could not watch');
+    expect(host.held, 0);
+
+    await tester.pumpWidget(scene(offstage: false));
+    await tester.pump();
+    await tester.pump();
+    final int shown = host.recorded as int;
+    expect(shown, greaterThan(1), reason: 'the screen shown was never captured');
+    final RenderGlassSurface surface = tester.renderObject<RenderGlassSurface>(find.byType(GlassSurface));
+    expect(surface.paintsWithProxy, greaterThan(0), reason: 'the glass shown never drew from a capture');
+    for (var i = 0; i < 4; i++) {
+      surface.markNeedsPaint();
+      tester.binding.scheduleFrame();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(host.recorded, shown, reason: 'a still screen on show was re-recorded under a declaration');
+  });
+
+  testWidgets('the handle carries the hardware the host declares, and a new declaration replaces it', (
+    WidgetTester tester,
+  ) async {
+    Widget scene(GlassHardware hardware) => MediaQuery(
+      data: const MediaQueryData(size: kScreen),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: GlassHost(hardware: hardware, child: const _Scene(surface: true)),
+      ),
+    );
+    await tester.pumpWidget(scene(GlassHardware.appleMetal));
+    final GlassProxyHandle handle = tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+    expect(handle.hardware, GlassHardware.appleMetal);
+    final GlassHardware other = GlassHardware.values.firstWhere((GlassHardware h) => h != GlassHardware.appleMetal);
+    await tester.pumpWidget(scene(other));
+    expect(handle.hardware, other, reason: 'what a group below reads is the old declaration');
+  });
+
   testWidgets('a scroll under the glass is seen without the application declaring it', (
     WidgetTester tester,
   ) async {
@@ -923,6 +1006,66 @@ void main() {
           'the fold moved the screen ($diff), so it is a different material '
           'rather than a cheaper one',
     );
+  });
+  // A `ShaderMask` writes its rect and a fresh shader into its own layer from
+  // `paint`, and the pass runs that `paint` at its own offset. Left written,
+  // the layer watch, which reads the shader by identity, saw a change after
+  // every capture, so a mask in a row under a bar was captured on every frame
+  // of an idle screen: 40 snapshots over 20 frames, where there is nothing to
+  // take.
+  testWidgets('a shader mask under the glass does not keep an idle screen capturing', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(400, 300)),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassHost(
+            hardware: GlassHardware.appleMetal,
+            child: Stack(
+              children: <Widget>[
+                const Positioned.fill(child: ColoredBox(color: Color(0xFF406080))),
+                Positioned(
+                  left: 30,
+                  top: 90,
+                  width: 300,
+                  height: 80,
+                  child: RepaintBoundary(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 20),
+                      child: ShaderMask(
+                        shaderCallback: (Rect r) => const LinearGradient(
+                          colors: <Color>[Color(0xFFFFFFFF), Color(0x00FFFFFF)],
+                        ).createShader(r),
+                        child: const ColoredBox(color: Color(0xFFE02020)),
+                      ),
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 20,
+                  top: 100,
+                  width: 360,
+                  height: 60,
+                  child: GlassBar(child: SizedBox.expand()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+    final GlassProxyHandle handle = tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
+    expect(handle.snapshots, greaterThan(0), reason: 'the glass was never captured, so holding says nothing');
+    final int before = handle.snapshots;
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(handle.snapshots - before, 0, reason: 'an idle screen was captured again');
   });
 }
 

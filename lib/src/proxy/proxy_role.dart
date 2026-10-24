@@ -71,9 +71,10 @@ enum GlassProxyRole {
   /// Exempt from canvas-level policy inside the subtree.
   ///
   /// Today that policy is exactly the shadow filter, and this exists because
-  /// half of it is a heuristic: `ShadowFilter.dropMaskFiltered` drops anything
-  /// painted through a `MaskFilter`, which is *usually* a shadow. A design that
-  /// blurs a highlight on purpose has no other way to keep it.
+  /// half of it is a heuristic: `ShadowFilter.dropMaskFiltered` drops a shape,
+  /// line, point or image draw painted through a `MaskFilter`, which is
+  /// *usually* a shadow. A design that blurs a highlight on purpose has no
+  /// other way to keep it.
   verbatim,
 }
 

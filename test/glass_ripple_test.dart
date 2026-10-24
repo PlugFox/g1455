@@ -364,6 +364,73 @@ void main() {
     expect((host.recorded as int) - held, greaterThan(0), reason: 'the capture counter cannot move');
   });
 
+  testWidgets('a rippling surface moved to another host ripples there, from that host\'s capture', (
+    WidgetTester tester,
+  ) async {
+    // Kept by a global key, the surface is the same render object under its
+    // new host: the host's handle is handed to it attached, and that handle is
+    // the one that must load the ripple program and publish its frames to it.
+    final surfaceKey = GlobalKey();
+    final hosts = <GlobalKey>[GlobalKey(), GlobalKey()];
+    Widget scene(int at) => MediaQuery(
+      data: const MediaQueryData(size: kScreen),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Stack(
+          children: <Widget>[
+            for (var i = 0; i < 2; i++)
+              Positioned(
+                left: i * 200.0,
+                top: 0,
+                width: 200,
+                height: 300,
+                child: GlassHost(
+                  key: hosts[i],
+                  hardware: GlassHardware.appleMetal,
+                  child: Stack(
+                    children: <Widget>[
+                      const Positioned.fill(child: ColoredBox(color: Color(0xFF336699))),
+                      if (at == i)
+                        Positioned(
+                          left: 20,
+                          top: 40,
+                          width: 160,
+                          height: 120,
+                          child: GlassSurface(key: surfaceKey, ripple: const GlassRipple()),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    GlassProxyHandle handleOf(int i) => tester
+        .widget<GlassProxyScope>(find.descendant(of: find.byKey(hosts[i]), matching: find.byType(GlassProxyScope)))
+        .handle;
+
+    await tester.pumpWidget(scene(0));
+    await tester.pump();
+    await tester.pump();
+    final RenderGlassSurface glass = tester.renderObject(find.byKey(surfaceKey));
+    expect(handleOf(0).frame!.keys, contains(glass));
+
+    await tester.pumpWidget(scene(1));
+    await tester.pump();
+    await tester.pump();
+    expect(tester.renderObject(find.byKey(surfaceKey)), same(glass), reason: 'not moved, rebuilt');
+    expect(handleOf(1).frame!.keys, contains(glass), reason: 'the new host does not capture for it');
+    expect(handleOf(1).rippleProgram, isNotNull, reason: 'the new host has no ripple program to draw it with');
+    final int draws = glass.rippleDraws;
+    await tester.tapAt(tester.getCenter(find.byKey(surfaceKey)));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(glass.rippleDraws, greaterThan(draws), reason: 'the moved surface did not ripple');
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('reduced motion, a theme, and a touch that goes through', (WidgetTester tester) async {
     // Reduced motion: declared, and nothing happens.
     final paints = _Counter();

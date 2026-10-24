@@ -25,9 +25,31 @@
 //  - the anchor's semantics left to `Visibility` (`maintainSemantics: true,`
 //    dropped and `ExcludeSemantics` not excluding): closing the popover over
 //    an anchor with a semantics node trips the framework's
-//    `!semantics.parentDataDirty` in the grow arm, which holds semantics on.
+//    `!semantics.parentDataDirty` in the grow arm, which holds semantics on;
+//  - the grabber's `glassTertiaryLabel(theme.legibility(route.finish).label)`
+//    -> `kGlassDisabledDarkLabel`: the grabber arm finds it dark on dark glass;
+//  - in `_row`, `EdgeInsetsDirectional.only(start: 16)` ->
+//    `EdgeInsets.only(left: 16)`: the menu row arm finds the rtl icon 24 in;
+//  - in `_AnchoredState._follow`, `if (now != _placedAt) {` -> `if (false) {`:
+//    the moving-anchor arm finds the panel where the anchor was;
+//  - in `_RenderGrow`'s `width` setter, drop `markNeedsLayout();`: the
+//    new-width arm finds the open panel at its old width;
+//  - in `_RenderGrow`'s `from` or `corner` setter, drop the assignment: the
+//    new-width arm's panel closes into the anchor's old size, or its content
+//    leaves the corner the panel shrinks into;
+//  - in `_raise`, drop `_pull.value = math.max(0, …);`: the
+//    not-dismissible arm's sheet stays pulled when the finger comes back up;
+//  - in `_GlassSheetRoute.buildModalBarrier`, `1 - drop / _sheetHeight` ->
+//    `1`: the dim arm finds the dim whole under a dragged sheet.
+//  - in `_GlassMenuAnchorState`, `reverse: !placement.down` -> `reverse:
+//    false`: the large-text arm finds Rename scrolled out of the 3x menu
+//    opened upward; `start: layout.accessible ? 28 : 16` -> `start: 16`: it
+//    finds the 2x label 16 in; `content += math.max(kGlassMenuRowHeight,
+//    lines + 2 * pad)` -> `content += kGlassMenuRowHeight`: the 3x menu,
+//    measured short, does not scroll.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
@@ -93,6 +115,34 @@ void main() {
     expect(find.text('sheet body'), findsNothing);
   });
 
+  testWidgets('the dim behind a sheet fades as the sheet is dragged down, and comes back with it', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_App(home: const _Page()));
+    await tester.tap(find.text('open sheet'));
+    await tester.pumpAndSettle();
+    expect(_dim(tester), 1, reason: 'a resting sheet\'s dim is whole');
+    final double height = _surfaceAbove(tester, find.text('sheet body')).size.height;
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+    // Past the slop, then a quarter of the sheet's height more.
+    await gesture.moveBy(const Offset(0, 40));
+    await tester.pump();
+    final double before = _surfaceAbove(tester, find.text('sheet body')).globalRect.top;
+    await gesture.moveBy(Offset(0, height / 4));
+    await tester.pump();
+    final double dropped = _surfaceAbove(tester, find.text('sheet body')).globalRect.top - before;
+    expect(dropped, closeTo(height / 4, 1), reason: 'the sheet did not follow the finger');
+    final double faded = _dim(tester);
+    expect(faded, lessThan(1), reason: 'the dim stayed whole under a dragged sheet');
+    expect(faded, greaterThan(0));
+    // Back up: the sheet stays, and so does its dim.
+    await gesture.moveBy(Offset(0, -height / 4 - 40));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('sheet body'), findsOneWidget);
+    expect(_dim(tester), 1, reason: 'the dim did not come back with the sheet');
+  });
+
   testWidgets('a sheet that is not barrier-dismissible stays on a tap, Escape, a drag and a flick', (
     WidgetTester tester,
   ) async {
@@ -139,6 +189,15 @@ void main() {
     await pull.moveBy(const Offset(0, 2000));
     await tester.pump();
     expect(tester.getBottomLeft(find.text('close')).dy - bottom, closeTo(height / 2, 1), reason: 'past half');
+    // Back up in the same drag, the pull gives way at the rate it was felt:
+    // half the finger's way back is half the pull, and the rest of the way
+    // back sets the sheet where it rests, and no higher.
+    await pull.moveBy(Offset(0, -height));
+    await tester.pump();
+    expect(tester.getBottomLeft(find.text('close')).dy - bottom, closeTo(height / 4, 1), reason: 'the pull held');
+    await pull.moveBy(Offset(0, -3 * height));
+    await tester.pump();
+    expect(tester.getBottomLeft(find.text('close')).dy, closeTo(bottom, 0.01), reason: 'not back where it rests');
     await pull.up();
     await tester.pumpAndSettle();
     expect(tester.getBottomLeft(find.text('close')).dy, closeTo(bottom, 0.01), reason: 'it did not spring back');
@@ -150,6 +209,183 @@ void main() {
     await tester.tap(find.text('close'));
     await tester.pumpAndSettle();
     expect(find.text('close'), findsNothing);
+  });
+
+  testWidgets('a sheet\'s grabber is the tertiary label of its own appearance', (WidgetTester tester) async {
+    // iOS's grabber is `tertiaryLabel`: dark grey on light glass, light grey on
+    // dark, where the dark one all but disappears (#15).
+    for (final (GlassFinish finish, Color grey) in <(GlassFinish, Color)>[
+      (GlassFinish.regularDark, kGlassDisabledLightLabel),
+      (GlassFinish.regularLight, kGlassDisabledDarkLabel),
+    ]) {
+      await tester.pumpWidget(
+        _App(
+          key: UniqueKey(),
+          home: Builder(
+            builder: (BuildContext context) => Center(
+              child: GestureDetector(
+                onTap: () => showGlassSheet<void>(
+                  context: context,
+                  finish: finish,
+                  builder: (_) => const SizedBox(height: 200, child: Center(child: Text('grabbed body'))),
+                ),
+                child: const Text('open grabbed sheet'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open grabbed sheet'));
+      await tester.pumpAndSettle();
+      final Iterable<DecoratedBox> grabbers = tester.widgetList<DecoratedBox>(
+        find.byWidgetPredicate(
+          (Widget w) =>
+              w is DecoratedBox &&
+              w.decoration is ShapeDecoration &&
+              (w.decoration as ShapeDecoration).shape is StadiumBorder,
+        ),
+      );
+      expect(grabbers, hasLength(1));
+      expect((grabbers.single.decoration as ShapeDecoration).color, grey, reason: 'on ${finish.name}');
+    }
+  });
+
+  testWidgets('a menu row runs from its start edge, mirrored under rtl', (WidgetTester tester) async {
+    // The icon centred 40 in from the start edge and the label from 64, as on
+    // iOS, which mirrors the row under right to left.
+    for (final TextDirection direction in TextDirection.values) {
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey<TextDirection>(direction),
+          builder: (BuildContext context, Widget? child) => Directionality(
+            textDirection: direction,
+            child: GlassHost(hardware: GlassHardware.appleMetal, backdrop: const Color(0xFF406080), child: child!),
+          ),
+          home: Center(
+            child: GlassMenuAnchor(
+              items: <GlassMenuItem>[
+                GlassMenuItem(label: 'Rename', icon: const Icon(IconData(0x41)), onPressed: () {}),
+              ],
+              builder: (BuildContext context, GlassMenuController c) =>
+                  GestureDetector(onTap: c.open, child: const Text('row menu')),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('row menu'));
+      await tester.pumpAndSettle();
+      final Rect panel = _surfaceAbove(tester, find.text('Rename')).globalRect;
+      final Rect icon = tester.getRect(find.byType(Icon));
+      final Rect label = tester.getRect(find.text('Rename'));
+      final bool rtl = direction == TextDirection.rtl;
+      double fromStart(double x) => rtl ? panel.right - x : x - panel.left;
+      expect(fromStart(icon.center.dx), closeTo(40, 0.5), reason: '$direction: the icon');
+      expect(fromStart(rtl ? label.right : label.left), closeTo(64, 0.5), reason: '$direction: the label');
+    }
+  });
+
+  testWidgets('a menu at large text wraps its labels and grows its rows, as iOS\'s does', (WidgetTester tester) async {
+    // Spike 37, iOS 26.5's `UIMenu` on an iPhone 17 (402 x 874) at five
+    // text sizes: a long label wraps from the default size on, and its row
+    // grows to hold it; from the first accessibility size the icons go and
+    // the menu is the screen less 16 a side, the labels 28 in; past 520 it
+    // stops and scrolls. Each anchor of the reference, at each scale.
+    tester.view
+      ..physicalSize = const Size(1206, 2622)
+      ..devicePixelRatio = 3
+      ..padding = const FakeViewPadding(top: 62 * 3, bottom: 34 * 3);
+    addTearDown(tester.view.reset);
+    const screen = Size(402, 874);
+    const long = 'Move to another folder and archive';
+    for (final double scale in <double>[1, 1.35, 2, 3]) {
+      for (final bool top in <bool>[true, false]) {
+        final chosen = <String>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ValueKey<(double, bool)>((scale, top)),
+            builder: (BuildContext context, Widget? child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+              child: GlassHost(hardware: GlassHardware.appleMetal, backdrop: const Color(0xFF406080), child: child!),
+            ),
+            home: Stack(
+              children: <Widget>[
+                Positioned.fromRect(
+                  rect: top
+                      ? Rect.fromLTWH(screen.width - 136, 120, 120, 44)
+                      : Rect.fromLTWH(16, screen.height - 160, 120, 44),
+                  child: GlassMenuAnchor(
+                    items: <GlassMenuItem>[
+                      for (final String label in <String>['Rename', 'Duplicate', 'Delete', long])
+                        GlassMenuItem(
+                          label: label,
+                          icon: const Icon(IconData(0x41)),
+                          isDestructive: label == 'Delete',
+                          onPressed: () => chosen.add(label),
+                        ),
+                    ],
+                    builder: (BuildContext context, GlassMenuController c) => GestureDetector(
+                      onTap: c.open,
+                      child: const SizedBox.expand(child: Text('anchor', textScaler: TextScaler.noScaling)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.tap(find.text('anchor'));
+        await tester.pumpAndSettle();
+        final why = 'at ${scale}x, the ${top ? 'top' : 'bottom'} anchor';
+        final Rect panel = _surfaceAbove(tester, find.text('Rename')).globalRect;
+        final bool accessible = scale >= 1.5;
+        expect(panel.width, accessible ? screen.width - 32 : kGlassMenuWidth, reason: why);
+        // Inside the screen's safe area, whichever way it opened.
+        expect(panel.top, greaterThanOrEqualTo(62 + 8 - 1), reason: why);
+        expect(panel.bottom, lessThanOrEqualTo(screen.height - 34 - 8 + 1), reason: why);
+        expect(panel.height, lessThanOrEqualTo(520), reason: why);
+        if (scale == 3) {
+          expect(panel.height, 520, reason: '$why: the rows fit, so nothing here scrolls');
+        }
+        // The long label is wrapped, whole, not cut to one line.
+        final RenderParagraph label = tester.renderObject<RenderParagraph>(find.text(long));
+        expect(label.text.toPlainText(), long);
+        expect(label.didExceedMaxLines, isFalse, reason: why);
+        expect(
+          label.size.height,
+          greaterThan(tester.getSize(find.text('Rename')).height * 1.5),
+          reason: '$why: the long label is on one line',
+        );
+        expect(
+          find.descendant(of: find.byType(Column), matching: find.byType(Icon)),
+          accessible ? findsNothing : findsNWidgets(4),
+          reason: why,
+        );
+        final Rect rename = tester.getRect(find.text('Rename'));
+        if (accessible) {
+          expect(rename.left - panel.left, closeTo(28, 0.5), reason: why);
+        }
+        // Every row holds its label with room above and below it.
+        for (final String text in <String>['Rename', long]) {
+          final Rect row = tester.getRect(
+            find.ancestor(of: find.text(text), matching: find.byType(ConstrainedBox)).first,
+          );
+          final Rect line = tester.getRect(find.text(text));
+          expect(row.height, greaterThanOrEqualTo(kGlassMenuRowHeight), reason: '$why: $text');
+          expect(line.top - row.top, greaterThanOrEqualTo(1.1 + 9.7 * scale - 0.5), reason: '$why: $text');
+        }
+        // The first item is still the one nearest the finger, and shown,
+        // even when the menu scrolls.
+        expect(panel.contains(rename.center), isTrue, reason: '$why: Rename is scrolled away');
+        if (find.text('Duplicate').hitTestable().evaluate().isNotEmpty) {
+          final double toDuplicate = tester.getCenter(find.text('Duplicate')).dy - rename.center.dy;
+          expect(top ? toDuplicate : -toDuplicate, greaterThan(0), reason: '$why: the order');
+        }
+        expect(find.byType(Scrollable).evaluate().isNotEmpty, panel.height == 520, reason: why);
+        await tester.tap(find.text('Rename'));
+        await tester.pumpAndSettle();
+        expect(chosen, <String>['Rename'], reason: why);
+      }
+    }
   });
 
   testWidgets('a sheet with a max width is that wide, centred over the bottom', (WidgetTester tester) async {
@@ -284,6 +520,119 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('an open popover takes a new width at once, and closes into its anchor as it is now', (
+    WidgetTester tester,
+  ) async {
+    final width = ValueNotifier<double>(200);
+    final left = ValueNotifier<double>(20);
+    final label = ValueNotifier<String>('pop');
+    addTearDown(width.dispose);
+    addTearDown(left.dispose);
+    addTearDown(label.dispose);
+    await tester.pumpWidget(
+      _App(
+        home: ListenableBuilder(
+          listenable: Listenable.merge(<Listenable>[width, left, label]),
+          builder: (BuildContext context, _) => Stack(
+            children: <Widget>[
+              Positioned(
+                left: left.value,
+                top: 30,
+                child: GlassPopoverAnchor(
+                  width: width.value,
+                  popoverBuilder: (_) => const SizedBox(height: 160, child: Center(child: Text('popover body'))),
+                  builder: (BuildContext context, GlassMenuController c) =>
+                      GestureDetector(onTap: c.open, child: Text(label.value)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    Rect anchor() => tester.getRect(find.byType(GlassPopoverAnchor));
+    await tester.tap(find.text('pop'));
+    await tester.pumpAndSettle();
+    final RenderGlassSurface panel = _surfaceAbove(tester, find.text('popover body'));
+    expect(panel.globalRect.width, 200);
+    expect(panel.globalRect.left, anchor().left - 4);
+
+    // Open and at rest, nothing else lays the panel out: the width alone must.
+    width.value = 240;
+    await tester.pump();
+    expect(panel.globalRect.width, 240, reason: 'the open panel kept its old width');
+
+    // Moved to the right half and relabelled: the panel stands on the
+    // anchor's right now, and that is the corner it grows from.
+    left.value = 440;
+    label.value = 'popo';
+    await tester.pump();
+    width.value = 250;
+    await tester.pump();
+    expect(panel.globalRect.right, closeTo(anchor().right + 3, 0.01), reason: 'not on the anchor\'s right');
+    final double inset = panel.globalRect.right - tester.getRect(find.text('popover body')).right;
+
+    await tester.tapAt(const Offset(4, 4));
+    Rect last = panel.globalRect;
+    for (var i = 0; i < 60 && find.text('popover body').evaluate().isNotEmpty; i++) {
+      last = panel.globalRect;
+      expect(
+        last.right - tester.getRect(find.text('popover body')).right,
+        closeTo(inset, 0.01),
+        reason: 'the content left the corner the panel shrinks into',
+      );
+      await tester.pump(const Duration(milliseconds: 8));
+    }
+    // Its last frame is the anchor's capsule — the new label's, not the old.
+    expect(last.width, closeTo(anchor().width, 8), reason: 'closed into the anchor\'s old size');
+    expect(last.height, closeTo(anchor().height, 8));
+  });
+
+  testWidgets(
+    'an open popover whose anchor moves stands over where the anchor is now',
+    (WidgetTester tester) async {
+      // `_AnchoredState._overlay` reads the anchor's box in the build that
+      // moves it, which is before the layout that does: the panel was placed
+      // where the anchor had been, and stayed over the left half while the
+      // anchor stood 420 px to the right. `_follow` reads it again after the
+      // frame, and the panel follows a frame late.
+      final left = ValueNotifier<double>(20);
+      addTearDown(left.dispose);
+      await tester.pumpWidget(
+        _App(
+          home: ValueListenableBuilder<double>(
+            valueListenable: left,
+            builder: (BuildContext context, double at, _) => Stack(
+              children: <Widget>[
+                Positioned(
+                  left: at,
+                  top: 30,
+                  child: GlassPopoverAnchor(
+                    width: 200,
+                    popoverBuilder: (_) => const SizedBox(height: 160, child: Center(child: Text('popover body'))),
+                    builder: (BuildContext context, GlassMenuController c) =>
+                        GestureDetector(onTap: c.open, child: const Text('pop')),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('pop'));
+      await tester.pumpAndSettle();
+      left.value = 440;
+      await tester.pump();
+      await tester.pump();
+      final Rect anchor = tester.getRect(find.byType(GlassPopoverAnchor));
+      expect(
+        _surfaceAbove(tester, find.text('popover body')).globalRect.right,
+        closeTo(anchor.right + 3, 0.01),
+        reason: 'the panel stayed where the anchor was',
+      );
+    },
+  );
+
   testWidgets('a toolbar group of three is one surface; a press brightens one cell', (WidgetTester tester) async {
     final pressed = <int>[];
     await tester.pumpWidget(
@@ -347,12 +696,19 @@ void main() {
 
 GlassProxyHandle _handle(WidgetTester tester) => tester.widget<GlassProxyScope>(find.byType(GlassProxyScope)).handle;
 
+/// How much of the dim behind the open modal is drawn: the opacity over its
+/// barrier, 1 with none.
+double _dim(WidgetTester tester) {
+  final Finder fade = find.ancestor(of: find.byType(ModalBarrier).last, matching: find.byType(Opacity));
+  return fade.evaluate().isEmpty ? 1 : tester.widget<Opacity>(fade.first).opacity;
+}
+
 RenderGlassSurface _surfaceAbove(WidgetTester tester, Finder finder) =>
     tester.renderObject<RenderGlassSurface>(find.ancestor(of: finder, matching: find.byType(GlassSurface)).first);
 
 /// The host where a modal needs it: above the navigator.
 class _App extends StatelessWidget {
-  const _App({required this.home});
+  const _App({super.key, required this.home});
 
   final Widget home;
 

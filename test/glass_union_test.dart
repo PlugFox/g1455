@@ -60,6 +60,13 @@ const double kRadius = 20;
 const double kSide = 90;
 const double kTop = 70;
 
+/// The most a pixel may move between two drawings the arms call the same frame.
+///
+/// One code value, and only on Impeller, where the fused draw and the two plain
+/// ones cover the panels with different quads and 19 edge pixels read one off.
+/// Skia reads zero. A bridge is the whole range.
+const int kBackendTolerance = 1;
+
 void main() {
   test('the bound a moving union is captured for holds wherever its members go', () {
     // `unionBlendRadiusBound` sizes the capture of a union whose members
@@ -259,8 +266,8 @@ void main() {
     // A group with no spacing is the two panels and nothing between them, which
     // is what makes the bridge below attributable to the solving.
     expect(
-      (await _compare(tester, plainGroup, bare)).differing,
-      0,
+      (await _compare(tester, plainGroup, bare)).maxDelta,
+      lessThanOrEqualTo(kBackendTolerance),
       reason: 'spacing 0 is not a plain union',
     );
 

@@ -33,7 +33,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show kGlassDisabledDarkLabel, kGlassDisabledLightLabel, kGlassMinTapTarget;
+import 'glass_components.dart' show glassTertiaryLabel, kGlassMinTapTarget;
 import 'glass_finish.dart';
 import 'glass_focus.dart';
 import 'glass_surface.dart';
@@ -316,7 +316,7 @@ class _GlassStepperState extends State<GlassStepper> {
     final GlassThemeData theme = GlassTheme.of(context);
     final GlassFinish finish = widget.finish ?? theme.finish;
     final Color label = theme.legibility(finish).label;
-    final Color dimmed = label.computeLuminance() < 0.5 ? kGlassDisabledDarkLabel : kGlassDisabledLightLabel;
+    final Color dimmed = glassTertiaryLabel(label);
     final Color overlay = widget.pressedOverlay ?? finish.rim;
     final double value = widget.value.clamp(widget.min, widget.max);
     final double? up = _enabled ? _next(_Half.increment) : null;

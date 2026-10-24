@@ -11,11 +11,14 @@
 //    follows it, and the slide arm retakes on every frame of the slide;
 //  - in `_DropLayout._rect`, `return inside.isEmpty ? drop : inside;` ->
 //    `return drop;`: the drop stretched setting off from the first segment
-//    stands out of its region, and the fling arm says so.
+//    stands out of its region, and the fling arm says so;
+//  - in `_onThumb`, `Color.lerp(ink, text, t)` -> `ink`: held, the selected
+//    label stays black on the track, and the ink arm says so.
 
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/glass_diagnostics.dart';
@@ -168,6 +171,33 @@ void main() {
     expect(colourOf('c'), const Color(0xFFFF0000));
   });
 
+  testWidgets('held, the selected label leaves the capsule\'s ink for the page\'s, and takes it back', (
+    WidgetTester tester,
+  ) async {
+    // The capsule fades into the drop, so a black label on it would be black
+    // on the track while held — on a dark page, black on dark (#21).
+    // A white capsule named, so its black ink differs from the page's white:
+    // the default on a dark page is iOS's dark capsule, under the page's ink.
+    const white = Color(0xFFFFFFFF);
+    await _mount(tester, textColour: white, thumbColour: white);
+    Color? ink(String label) => tester.renderObject<RenderParagraph>(find.text(label)).text.style?.color;
+    expect(ink('Day'), const Color(0xFF000000), reason: 'at rest, on the white capsule');
+    expect(ink('Week'), white);
+
+    final TestGesture gesture = await tester.startGesture(_segment(0));
+    final seen = <Color?>[];
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      seen.add(ink('Day'));
+    }
+    expect(ink('Day'), white, reason: 'held, the label kept the capsule\'s ink on the track');
+    expect(seen.toSet().length, greaterThan(2), reason: 'the ink jumped rather than followed the lift');
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(ink('Day'), const Color(0xFF000000), reason: 'settled, the capsule is back and so is its ink');
+  });
+
   testWidgets('disabled, a press lifts nothing', (WidgetTester tester) async {
     await _mount(tester, enabled: false);
     final TestGesture gesture = await tester.startGesture(_segment(1));
@@ -191,6 +221,8 @@ Future<void> _mount(
   GlassDropMotion? dropMotion,
   List<Widget>? segments,
   Color? iconColour,
+  Color? textColour,
+  Color? thumbColour,
 }) async {
   await tester.pumpWidget(
     MediaQuery(
@@ -211,12 +243,16 @@ Future<void> _mount(
                   ),
                   Positioned.fromRect(
                     rect: kControl,
-                    child: IconTheme(
-                      data: IconThemeData(color: iconColour),
-                      child: _Segments(
-                        onSelected: enabled ? (onSelected ?? (_) {}) : null,
-                        dropMotion: dropMotion,
-                        segments: segments,
+                    child: DefaultTextStyle(
+                      style: TextStyle(color: textColour),
+                      child: IconTheme(
+                        data: IconThemeData(color: iconColour),
+                        child: _Segments(
+                          onSelected: enabled ? (onSelected ?? (_) {}) : null,
+                          dropMotion: dropMotion,
+                          segments: segments,
+                          thumbColour: thumbColour,
+                        ),
                       ),
                     ),
                   ),
@@ -234,11 +270,12 @@ Future<void> _mount(
 }
 
 class _Segments extends StatefulWidget {
-  const _Segments({required this.onSelected, this.dropMotion, this.segments});
+  const _Segments({required this.onSelected, this.dropMotion, this.segments, this.thumbColour});
 
   final ValueChanged<int>? onSelected;
   final GlassDropMotion? dropMotion;
   final List<Widget>? segments;
+  final Color? thumbColour;
 
   @override
   State<_Segments> createState() => _SegmentsState();
@@ -251,6 +288,7 @@ class _SegmentsState extends State<_Segments> {
   Widget build(BuildContext context) => GlassSegmentedControl(
     segments: widget.segments ?? const <Widget>[Text('Day'), Text('Week'), Text('Month'), Text('Year')],
     dropMotion: widget.dropMotion,
+    thumbColor: widget.thumbColour,
     selectedIndex: _index,
     onSelected: widget.onSelected == null
         ? null

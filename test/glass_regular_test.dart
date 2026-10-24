@@ -13,7 +13,9 @@
 //  3. **The host follows it.** Unnamed, a light screen gets the light branch,
 //     a dark one the dark, a dark band declared on a light screen the dark;
 //     the appearance changing under a mounted host moves the branch; a named
-//     finish holds whatever the appearance does; with no host above,
+//     finish holds whatever the appearance does; an appearance the
+//     application declares is followed instead of the platform's, and keeps
+//     `.regular` a choice; with no host above,
 //     `GlassTheme.of` answers the same way.
 //
 // Breaks, each undone by swapping the string back:
@@ -26,7 +28,9 @@
 //    the appearance arm fails;
 //  - in `_GlassHostState.didUpdateWidget`, `final GlassFinish resolved =
 //    _resolveFinish();` -> `final GlassFinish resolved = _finish;`: a newly
-//    declared level or finish is not seen, and the declared-level arm fails.
+//    declared level or finish is not seen, and the declared-level arm fails;
+//  - in `_GlassHostState._appearance`, `widget.appearance ??` dropped: the
+//    declared-appearance arm finds light glass over the dark page.
 
 import 'dart:convert';
 import 'dart:io';
@@ -221,6 +225,67 @@ void main() {
     expect(await mount(backdrop: const Color(0xFFF4F1EA)), GlassFinish.regularLight);
     // Named, it holds.
     expect(await mount(finish: GlassFinish.regularDark), GlassFinish.regularDark);
+  });
+
+  testWidgets('a declared appearance picks the branch whatever the platform says, and .regular stays a choice', (
+    WidgetTester tester,
+  ) async {
+    // A dark-themed application on a phone in the light appearance (#16): its
+    // dark grey page, luma about 65, is above the light appearance's switch,
+    // so undeclared it gets light glass over dark content.
+    const page = Color(0xFF41414A);
+    final platform = ValueNotifier<Brightness>(Brightness.light);
+    addTearDown(platform.dispose);
+    GlassThemeData? seen;
+    Future<void> mount({Brightness? appearance, GlassFinish? finish}) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: ValueListenableBuilder<Brightness>(
+            valueListenable: platform,
+            builder: (BuildContext context, Brightness b, Widget? child) => MediaQuery(
+              data: MediaQueryData(platformBrightness: b),
+              child: child!,
+            ),
+            child: GlassHost(
+              hardware: GlassHardware.appleMetal,
+              backdrop: page,
+              appearance: appearance,
+              finish: finish,
+              // Adaptive, so the theme says which appearance a reading would
+              // pick the branch in again.
+              adaptive: const GlassAdaptive(),
+              child: Builder(
+                builder: (BuildContext context) {
+                  seen = GlassTheme.of(context);
+                  return const SizedBox.expand();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await mount();
+    expect(seen!.finish, GlassFinish.regularLight, reason: 'the report: light glass over a dark page');
+    await mount(appearance: Brightness.dark);
+    expect(seen!.finish, GlassFinish.regularDark);
+    // Still `.regular`, in the declared appearance: a reading may move it.
+    expect(seen!.regularAppearance, Brightness.dark);
+    // The platform's appearance moving does not move a declared one.
+    platform.value = Brightness.dark;
+    await tester.pump();
+    platform.value = Brightness.light;
+    await tester.pump();
+    expect(seen!.finish, GlassFinish.regularDark, reason: 'the platform moved a declared appearance');
+    // A named finish holds over a declared appearance.
+    await mount(appearance: Brightness.dark, finish: GlassFinish.regularLight);
+    expect(seen!.finish, GlassFinish.regularLight);
+    expect(seen!.regularAppearance, isNull);
+    // And taken away, the platform's is followed again.
+    await mount();
+    expect(seen!.finish, GlassFinish.regularLight);
   });
 
   testWidgets('with no host above, the theme answers the same way', (WidgetTester tester) async {

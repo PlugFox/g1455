@@ -108,7 +108,7 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
           Icon(icon),
           const SizedBox(width: 12),
           Expanded(child: Text(label)),
-          GlassSwitch(value: value, onChanged: onChanged, activeColor: color ?? const Color(0xFF34C759)),
+          GlassSwitch(value: value, onChanged: onChanged, activeColor: color),
         ],
       ),
     ),
@@ -148,8 +148,8 @@ class _ConnectivitySettingsState extends State<ConnectivitySettings> {
 |---|---|---|---|
 | `value` | `bool` | **required** | Whether the switch is on. |
 | `onChanged` | `ValueChanged<bool>?` | **required** | Called with the new value. Null disables the switch (drawn at 50% opacity). |
-| `activeColor` | `Color` | `Color(0xFF34C759)` | Track colour when on (iOS green). |
-| `trackColor` | `Color` | `Color(0x29787880)` | Track colour when off. |
+| `activeColor` | `Color?` | `null` | Track colour when on. Null for iOS's green in the appearance of the label around the switch: `0xFF34C759` light, `0xFF30D158` dark. |
+| `trackColor` | `Color?` | `null` | Track colour when off. Null for iOS's `secondarySystemFill`: `0x29787880` light, `0x52787880` dark. |
 | `dropScale` | `double` | `kGlassDropScale` | Size of the held drop relative to the knob. At least 1. |
 | `dropWiden` | `double` | `kGlassSwitchDropWiden` | How many px of the surroundings the drop pulls in (a slight zoom-out). 0 for none. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](../foundations/drop-motion.md). |

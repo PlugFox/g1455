@@ -22,7 +22,11 @@
 //
 //  - **A known answer in the same run.** Our own `ImageFilter.blur` at a stated
 //    sigma is read back through the same instrument. Without it a fitted 2.0 is
-//    unfalsifiable.
+//    unfalsifiable. Asked as the package asks it (`engineBlurSigma`), so on
+//    Impeller the known answer is the corrected blur's: there it holds to 4%
+//    to sigma 4, and past that the downsampled kernel is no longer
+//    Gaussian-like, nor at a divisor of 4 at a ratio of 1, where the residual
+//    is under the smallest kernel Impeller draws (#33).
 //  - **One period per image.** Seven gratings stacked in bands would have a
 //    vertical blur of sigma 8 mixing three of them; a full-frame grating that is
 //    constant in y is exactly invariant under the vertical pass.
@@ -37,6 +41,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:g1455/src/proxy/proxy_blur.dart';
 import 'package:g1455/src/proxy/proxy_recorder.dart';
 import 'package:g1455/src/proxy/proxy_resolution.dart';
 
@@ -68,11 +73,8 @@ const double kFrostedSigma = 8.0;
 const double kSigmaPerDivisor = ProxyResolution.sigmaPerTexel;
 
 void main() {
-  testWidgets('the instrument returns a sigma it was given', (WidgetTester tester) async {
-    // The known answer. `ImageFilter.blur` is a box approximation rather than a
-    // true Gaussian, so this also measures how much that costs — and everything
-    // below is quoted against this arm rather than against the ideal.
-    for (final double sigma in <double>[1.5, 2.6, 4.0, 8.0]) {
+  Future<void> known(WidgetTester tester, List<double> sigmas) async {
+    for (final double sigma in sigmas) {
       final _Fit fit = await _fit(tester, (ui.Image ref) => _blur(ref, sigma));
       debugPrint('control sigma $sigma -> ${fit.describe()}');
       expect(fit.periods, isNotEmpty, reason: 'nothing was readable at sigma $sigma');
@@ -85,7 +87,22 @@ void main() {
       // Gaussian returns a different sigma at every frequency.
       expect(fit.spread / fit.sigma, lessThan(0.25), reason: 'not Gaussian-like: $fit');
     }
+  }
+
+  // The known answer. `ImageFilter.blur` is a box approximation rather than a
+  // true Gaussian, so this also measures how much that costs — and everything
+  // below is quoted against this arm rather than against the ideal. On Impeller
+  // it is `glass_blur.frag` up to `kGlassBlurMaxSigma`, and the engine's blur
+  // past it.
+  testWidgets('the instrument returns a sigma it was given', (WidgetTester tester) async {
+    await known(tester, <double>[1.5, 2.6, 4.0]);
   });
+
+  testWidgets('and a large one', (WidgetTester tester) async {
+    await known(tester, <double>[8.0]);
+    // On Impeller this is the engine's blur, which downsamples, and at 8 texels
+    // lets a period of 12 through as if it were 5.3 (#33).
+  }, tags: 'impeller-gap');
 
   testWidgets('a divisor is a low-pass, and this is how much of one', (WidgetTester tester) async {
     final delivered = <int, double>{};
@@ -507,20 +524,17 @@ class _Grating extends CustomPainter {
   bool shouldRepaint(_Grating oldDelegate) => oldDelegate.period != period;
 }
 
+/// The blur the package draws for [sigmaTexels], by the pipeline's own layers:
+/// `ImageFilter.blur` on Skia, `glass_blur.frag` on Impeller.
 ui.Image _blur(ui.Image source, double sigmaTexels) {
   final recorder = ui.PictureRecorder();
-  Canvas(recorder).drawImage(
-    source,
-    Offset.zero,
-    Paint()
-      ..imageFilter = ui.ImageFilter.blur(
-        sigmaX: sigmaTexels,
-        sigmaY: sigmaTexels,
-        // Clamp, not the default decal: a decal darkens the border, and the
-        // border of a proxy is the edge of the screen.
-        tileMode: TileMode.clamp,
-      ),
-  );
+  final Rect bounds = Offset.zero & Size(source.width.toDouble(), source.height.toDouble());
+  final canvas = Canvas(recorder, bounds);
+  final int layers = saveBlurLayers(canvas, bounds, sigmaTexels);
+  canvas.drawImage(source, Offset.zero, Paint());
+  for (var i = 0; i < layers; i++) {
+    canvas.restore();
+  }
   final ui.Picture picture = recorder.endRecording();
   try {
     return picture.toImageSync(source.width, source.height);

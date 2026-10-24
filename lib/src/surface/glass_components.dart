@@ -86,6 +86,82 @@ const Color kGlassDisabledDarkLabel = Color(0x4D3C3C43);
 /// {@category Panels and controls}
 const Color kGlassDisabledLightLabel = Color(0x4DEBEBF5);
 
+/// `tertiaryLabel` in the appearance whose label is [label]: the grey that
+/// sits at 0.3 next to a black or white label on the same glass — a disabled
+/// label, a sheet's grabber.
+Color glassTertiaryLabel(Color label) =>
+    label.computeLuminance() < 0.5 ? kGlassDisabledDarkLabel : kGlassDisabledLightLabel;
+
+/// `systemFill` in the appearance whose label is [label]: (120, 120, 128) at
+/// 0.20 in light and 0.36 in dark — a capsule laid on the glass that is not
+/// glass, as a tab bar's selection and an alert's actions are.
+Color glassSystemFill(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0x33787880) : const Color(0x5C787880);
+
+/// `systemRed` in the appearance whose label is [label], for a destructive
+/// action: (255, 59, 48) in light, (255, 69, 58) in dark.
+Color glassSystemRed(Color label) => label.computeLuminance() < 0.5 ? const Color(0xFFFF3B30) : const Color(0xFFFF453A);
+
+/// `secondarySystemFill` in the appearance whose label is [label]: (120, 120,
+/// 128) at 0.16 in light and 0.32 in dark — an off switch's track, a
+/// slider's.
+Color glassSecondarySystemFill(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0x29787880) : const Color(0x52787880);
+
+/// `tertiarySystemFill` in the appearance whose label is [label]: (118, 118,
+/// 128) at 0.12 in light and 0.24 in dark — a segmented control's track.
+Color glassTertiarySystemFill(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0x1F767680) : const Color(0x3D767680);
+
+/// `systemBlue` in the appearance whose label is [label]: (0, 122, 255) in
+/// light, (10, 132, 255) in dark — a slider's fill, a selected tab, a cursor.
+Color glassSystemBlue(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0xFF007AFF) : const Color(0xFF0A84FF);
+
+/// `systemGreen` in the appearance whose label is [label]: (52, 199, 89) in
+/// light, (48, 209, 88) in dark — an on switch's track.
+Color glassSystemGreen(Color label) =>
+    label.computeLuminance() < 0.5 ? const Color(0xFF34C759) : const Color(0xFF30D158);
+
+/// The label colour [context] draws in — on glass, the one the glass chose
+/// for its finish ([GlassBar] and the others set it) — or black without one.
+/// What the appearance helpers above are given for a default.
+Color glassAmbientLabel(BuildContext context) => DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000);
+
+/// The text scale from which a control lays out as iOS does at its
+/// accessibility text sizes: between iOS's largest standard size (body 23,
+/// 1.35) and its first accessibility one (body 28, 1.65). The menu drops its
+/// icons from here, and the tab bar shows its large content viewer.
+const double kGlassAccessibleTextScale = 1.5;
+
+/// The text scale under [context], as body text's 17 is scaled.
+double glassTextScale(BuildContext context) =>
+    (MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling).scale(17) / 17;
+
+/// [child] at no more than the default text size, for a control whose labels
+/// sit in a box that does not grow — as UIKit's tab bar and segmented control
+/// do not. A smaller text size is kept. Without a [MediaQuery] there is no
+/// scale to clamp.
+class GlassAtMostDefaultTextSize extends StatelessWidget {
+  /// Clamps the text scale under it to at most 1.
+  const GlassAtMostDefaultTextSize({super.key, required this.child});
+
+  /// What the clamp applies to.
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final MediaQueryData? data = MediaQuery.maybeOf(context);
+    if (data == null) {
+      return child;
+    }
+    return MediaQuery(
+      data: data.copyWith(textScaler: data.textScaler.clamp(maxScaleFactor: 1)),
+      child: child,
+    );
+  }
+}
+
 /// A glass bar: the navigation layer, which is where Apple's guidelines put this
 /// material.
 ///
@@ -145,8 +221,9 @@ class GlassBar extends StatelessWidget {
   ///
   /// **Layout taste, not a measurement**: the package's optics were calibrated
   /// against Apple's material — its transmission, its blur, its rim — but none
-  /// of its layout metrics were.
-  final EdgeInsets padding;
+  /// of its layout metrics were. An [EdgeInsetsDirectional] is resolved with
+  /// the ambient [Directionality], left to right without one.
+  final EdgeInsetsGeometry padding;
 
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
@@ -220,7 +297,7 @@ class GlassCard extends StatelessWidget {
 
   /// Space between the glass and the content. Layout taste — see
   /// [GlassBar.padding].
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
 
   /// The optics. Null takes the theme's.
   final GlassFinish? finish;
@@ -326,7 +403,7 @@ class GlassButton extends StatefulWidget {
 
   /// Space between the glass and the label. Layout taste — see
   /// [GlassBar.padding].
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
 
   /// The smallest the control may be. [kGlassMinTapTarget] by default.
   final Size minSize;
@@ -613,7 +690,7 @@ class _GlassPanel extends StatefulWidget {
   });
 
   final BorderRadius borderRadius;
-  final EdgeInsets padding;
+  final EdgeInsetsGeometry padding;
   final GlassFinish? finish;
   final Color? overlay;
 
@@ -808,7 +885,7 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
               ? null
               : _GlassOverlay(widget.borderRadius, widget.overlay, focusRing: widget.focusRing),
           child: Padding(
-            padding: widget.padding,
+            padding: widget.padding.resolve(Directionality.maybeOf(context) ?? TextDirection.ltr),
             // Hides the panel's scope from what it holds, there with or without
             // a share so that one coming or going keeps the tree's shape.
             child: GlassSharedReadingScope(share: null, child: _labelled(theme, shown, widget.child)),
@@ -840,11 +917,7 @@ class _GlassPanelState extends State<_GlassPanel> with SingleTickerProviderState
         legibility.finish.worstContrast(legibility.label) < kTextContrastAA) {
       _reportIllegible(legibility.finish.worstContrast(legibility.label));
     }
-    final Color foreground = widget.enabled
-        ? legibility.label
-        : legibility.label.computeLuminance() < 0.5
-        ? kGlassDisabledDarkLabel
-        : kGlassDisabledLightLabel;
+    final Color foreground = widget.enabled ? legibility.label : glassTertiaryLabel(legibility.label);
     return IconTheme.merge(
       data: IconThemeData(color: foreground),
       child: DefaultTextStyle.merge(

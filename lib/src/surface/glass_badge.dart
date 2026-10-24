@@ -9,15 +9,18 @@
 // small capsule — inside the glass's subtree when the badge sits on glass,
 // where it is no capture (asserted in `glass_badge_test.dart`).
 //
-// **Not measured:** the sizes. The red is UIKit's documented `systemRed`; the
-// height, the dot and the type size are layout, named as such.
+// **Not measured:** the sizes. The red is UIKit's documented `systemRed` of
+// the appearance around it; the height, the dot and the type size are
+// layout, named as such.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'glass_components.dart' show glassAmbientLabel, glassSystemRed;
+
 /// iOS's `systemRed` in the light appearance, (255, 59, 48): the badge's
-/// fill by default. The dark appearance's is (255, 69, 58); the package has
-/// no appearance of its own, so pass that one where yours is dark.
+/// fill on light glass and a light page. On dark glass, or a page whose
+/// label is light, the badge is the dark appearance's, (255, 69, 58).
 ///
 /// {@category Panels and controls}
 const Color kGlassBadgeRed = Color(0xFFFF3B30);
@@ -72,7 +75,7 @@ class GlassBadge extends StatelessWidget {
     this.label,
     this.maxCount = 99,
     this.isVisible = true,
-    this.color = kGlassBadgeRed,
+    this.color,
     this.textColor = const Color(0xFFFFFFFF),
     this.offset = Offset.zero,
     this.semanticLabel,
@@ -95,8 +98,9 @@ class GlassBadge extends StatelessWidget {
   /// Whether the badge is drawn. [child] is drawn either way.
   final bool isVisible;
 
-  /// The fill. [kGlassBadgeRed] by default.
-  final Color color;
+  /// The fill. Null is `systemRed` of the appearance the badge sits in —
+  /// on glass, the glass's: [kGlassBadgeRed] in light, (255, 69, 58) in dark.
+  final Color? color;
 
   /// The text. White by default, whatever the glass's label colour is: the
   /// badge is opaque, so what reads on it is fixed by [color] alone.
@@ -157,6 +161,7 @@ class GlassBadge extends StatelessWidget {
   Widget _capsule(BuildContext context, {bool rtl = false}) {
     final String? text = this.text;
     final String? said = semanticLabel ?? text;
+    final Color color = this.color ?? glassSystemRed(glassAmbientLabel(context));
     final Widget body = text == null
         ? SizedBox.square(
             dimension: kGlassBadgeDot,
@@ -208,7 +213,7 @@ class GlassBadge extends StatelessWidget {
       ..add(StringProperty('label', label, defaultValue: null))
       ..add(IntProperty('maxCount', maxCount, defaultValue: 99))
       ..add(FlagProperty('isVisible', value: isVisible, ifFalse: 'hidden'))
-      ..add(ColorProperty('color', color, defaultValue: kGlassBadgeRed))
+      ..add(ColorProperty('color', color, defaultValue: null))
       ..add(ColorProperty('textColor', textColor, defaultValue: const Color(0xFFFFFFFF)))
       ..add(DiagnosticsProperty<Offset>('offset', offset, defaultValue: Offset.zero))
       ..add(StringProperty('semanticLabel', semanticLabel, defaultValue: null));

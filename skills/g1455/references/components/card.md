@@ -114,6 +114,6 @@ class WeatherCard extends StatelessWidget {
 |---|---|---|---|
 | `child` | `Widget` | **required** | The content. Gets the card's label colour. |
 | `borderRadius` | `BorderRadius` | `BorderRadius.all(Radius.circular(24))` | Corner radii. |
-| `padding` | `EdgeInsets` | `EdgeInsets.all(16)` | Space between the glass and the content. |
+| `padding` | `EdgeInsetsGeometry` | `EdgeInsets.all(16)` | Space between the glass and the content. An `EdgeInsetsDirectional` mirrors under rtl. |
 | `finish` | `GlassFinish?` | `null` | The material. Null takes the theme's. |
 | `key` | `Key?` | `null` | |

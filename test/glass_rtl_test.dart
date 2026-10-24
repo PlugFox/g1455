@@ -25,7 +25,24 @@
 //    `_TabGeometry.indexUnder`, `indexAt(rtl ? width - x : x, count)` ->
 //    `indexAt(x, count)`: a tap selects the item at the mirrored position; in
 //    `_onUp`, `* (g.rtl ? -1 : 1)` -> `* 1`: a flick carries the drop back
-//    toward the item it left.
+//    toward the item it left;
+//  - in `_GlassSegmentedControlState.didUpdateWidget`, the `else if` that
+//    places `_at` when the count changes dropped: under rtl the capsule stays
+//    where the old first segment was drawn; in `didChangeDependencies`,
+//    `_at.value = widget.segments.length - 1 - _at.value` dropped: held over A
+//    while the direction flips, the release selects C; the `_slideTo(_pressed,
+//    0)` after it dropped: pressed on C as the direction flips, the drop stays
+//    near A; in `didUpdateWidget`, `|| recounted` dropped from `ended`: held
+//    over C as segments are taken away, the release selects 2 of two;
+//    `|| ended && !recounted` dropped: held over C and disabled, the capsule
+//    stays under C while A is selected.
+//  - in `_GlassTabBarState.didUpdateWidget`, the block that ends a held press
+//    dropped: held over D as items are taken away, the release selects 3 of
+//    three; held over D and disabled, the drop stays lifted and its release
+//    slides the capsule to D.
+//  - in `_GlassPanel.build`, `widget.padding.resolve(Directionality.maybeOf(
+//    context) ?? TextDirection.ltr)` -> `.resolve(TextDirection.ltr)`: a
+//    directional padding's start stays at the left under rtl.
 
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -139,6 +156,214 @@ void main() {
     }
   });
 
+  testWidgets('a segmented control keeps its capsule under the selected segment as segments come and go', (
+    WidgetTester tester,
+  ) async {
+    // `_at` is where the capsule is drawn; under rtl a segment added moves
+    // where the selected one is drawn, so the capsule is placed again.
+    for (final TextDirection direction in TextDirection.values) {
+      Widget control(List<String> labels) => SizedBox(
+        width: 300,
+        child: GlassSegmentedControl(
+          segments: <Widget>[for (final String l in labels) Text(l)],
+          selectedIndex: 0,
+          onSelected: (_) {},
+        ),
+      );
+      await _mount(tester, direction, control(<String>['A', 'B', 'C']));
+      await _mount(tester, direction, control(<String>['A', 'B', 'C', 'D']), keep: true);
+      await tester.pumpAndSettle();
+      final Rect box = tester.getRect(find.byType(GlassSegmentedControl));
+      final int count = 4;
+      final double pitch = (box.width - 4) / count;
+      final double at = _capsuleAt(tester);
+      final double drawnX = box.left + 2 + pitch * (at + 0.5);
+      expect(drawnX, closeTo(tester.getCenter(find.text('A')).dx, 1), reason: '$direction: the capsule left A');
+    }
+  });
+
+  testWidgets('a segmented control held while the direction flips selects the segment it was held over', (
+    WidgetTester tester,
+  ) async {
+    final selected = <int>[];
+    Widget control() => SizedBox(
+      width: 300,
+      child: GlassSegmentedControl(
+        segments: const <Widget>[Text('A'), Text('B'), Text('C')],
+        selectedIndex: 1,
+        onSelected: selected.add,
+      ),
+    );
+    await _mount(tester, TextDirection.ltr, control());
+    // Dragged a little, so the release reads where the drop is, not the
+    // segment pressed.
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('A')));
+    await gesture.moveBy(const Offset(8, 0));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await _mount(tester, TextDirection.rtl, control(), keep: true);
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selected, <int>[0], reason: 'the release selected the segment mirrored from the one held');
+  });
+
+  testWidgets('a segmented control pressed as the direction flips slides its drop on to the segment pressed', (
+    WidgetTester tester,
+  ) async {
+    // Placing the drop on a flip stops the slide the press started; in its
+    // first frames that leaves the drop between segments until the finger
+    // moves.
+    Widget control() => SizedBox(
+      width: 300,
+      child: GlassSegmentedControl(
+        segments: const <Widget>[Text('A'), Text('B'), Text('C')],
+        selectedIndex: 0,
+        onSelected: (_) {},
+      ),
+    );
+    await _mount(tester, TextDirection.ltr, control());
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('C')));
+    await tester.pump(const Duration(milliseconds: 16));
+    await _mount(tester, TextDirection.rtl, control(), keep: true);
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final RenderGlassSurface drop = tester.renderObject(find.byType(GlassSurface));
+    expect(
+      drop.globalRect.center.dx,
+      closeTo(tester.getCenter(find.text('C')).dx, 2),
+      reason: 'the drop is not under C',
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a segmented control held while segments are taken away selects nothing', (WidgetTester tester) async {
+    // Held over C, the last of three; with two left, the index held is past
+    // the end, and a release that selected it handed the parent a `RangeError`.
+    for (final TextDirection direction in TextDirection.values) {
+      final selected = <int>[];
+      Widget control(List<String> labels) => SizedBox(
+        width: 300,
+        child: GlassSegmentedControl(
+          segments: <Widget>[for (final String l in labels) Text(l)],
+          selectedIndex: 0,
+          onSelected: selected.add,
+        ),
+      );
+      await _mount(tester, direction, control(<String>['A', 'B', 'C']));
+      final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('C')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await _mount(tester, direction, control(<String>['A', 'B']), keep: true);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(selected, isEmpty, reason: '$direction: the release selected a segment after the count changed');
+      final Rect box = tester.getRect(find.byType(GlassSegmentedControl));
+      final double pitch = (box.width - 4) / 2;
+      final double drawnX = box.left + 2 + pitch * (_capsuleAt(tester) + 0.5);
+      expect(drawnX, closeTo(tester.getCenter(find.text('A')).dx, 1), reason: '$direction: the capsule left A');
+    }
+  });
+
+  testWidgets('a segmented control disabled while held puts its capsule back under the selected segment', (
+    WidgetTester tester,
+  ) async {
+    // Held over C and disabled: the press ends, and with it the slide toward
+    // C — which left the capsule under C while A stayed selected, until the
+    // selection next changed.
+    for (final TextDirection direction in TextDirection.values) {
+      Widget control({required bool enabled}) => SizedBox(
+        width: 300,
+        child: GlassSegmentedControl(
+          segments: const <Widget>[Text('A'), Text('B'), Text('C')],
+          selectedIndex: 0,
+          onSelected: enabled ? (_) {} : null,
+        ),
+      );
+      await _mount(tester, direction, control(enabled: true));
+      final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('C')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await _mount(tester, direction, control(enabled: false), keep: true);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      final Rect box = tester.getRect(find.byType(GlassSegmentedControl));
+      final double pitch = (box.width - 4) / 3;
+      final double drawnX = box.left + 2 + pitch * (_capsuleAt(tester) + 0.5);
+      expect(drawnX, closeTo(tester.getCenter(find.text('A')).dx, 1), reason: '$direction: the capsule left A');
+    }
+  });
+
+  testWidgets('a tab bar held while items are taken away selects nothing', (WidgetTester tester) async {
+    // Held over D, the last of four; with three left, the index held is past
+    // the end, and a release that selected it handed the parent a `RangeError`.
+    for (final TextDirection direction in TextDirection.values) {
+      final selected = <int>[];
+      Widget bar(List<String> labels) => SizedBox(
+        width: 300,
+        child: GlassTabBar(
+          items: <GlassTabItem>[for (final String l in labels) GlassTabItem(label: l, icon: Icons.circle)],
+          selectedIndex: 0,
+          onSelected: selected.add,
+        ),
+      );
+      await _mount(tester, direction, bar(<String>['A', 'B', 'C', 'D']));
+      final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('D')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await _mount(tester, direction, bar(<String>['A', 'B', 'C']), keep: true);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(selected, isEmpty, reason: '$direction: the release selected an item after the count changed');
+      // Three items draw the capsule a little off its label's centre, so A's
+      // is where a bar mounted with three puts it.
+      final double settled = _tabCapsule(tester).center.dx;
+      await _mount(tester, direction, bar(<String>['A', 'B', 'C']));
+      await tester.pumpAndSettle();
+      expect(settled, closeTo(_tabCapsule(tester).center.dx, 1), reason: '$direction: the capsule left A');
+    }
+  });
+
+  testWidgets('a tab bar disabled while held ends the press with its capsule under the selected item', (
+    WidgetTester tester,
+  ) async {
+    // Disabled, the bar took no new press, but the one already held stayed
+    // lifted, and its release slid the capsule to D while A stayed selected.
+    for (final TextDirection direction in TextDirection.values) {
+      Widget bar({required bool enabled}) => SizedBox(
+        width: 300,
+        child: GlassTabBar(
+          items: const <GlassTabItem>[
+            GlassTabItem(label: 'A', icon: Icons.circle),
+            GlassTabItem(label: 'B', icon: Icons.circle),
+            GlassTabItem(label: 'C', icon: Icons.circle),
+            GlassTabItem(label: 'D', icon: Icons.circle),
+          ],
+          selectedIndex: 0,
+          onSelected: enabled ? (_) {} : null,
+        ),
+      );
+      await _mount(tester, direction, bar(enabled: true));
+      final TestGesture gesture = await tester.startGesture(tester.getCenter(find.text('D')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await _mount(tester, direction, bar(enabled: false), keep: true);
+      await tester.pumpAndSettle();
+      expect(_knob(tester).materialize, 0, reason: '$direction: the drop stayed lifted after the bar was disabled');
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(
+        _tabCapsule(tester).center.dx,
+        closeTo(tester.getCenter(find.text('A')).dx, 2),
+        reason: '$direction: the capsule left A',
+      );
+    }
+  });
+
   testWidgets('a tab bar starts at the right: its capsule, its taps and its held drop follow its labels', (
     WidgetTester tester,
   ) async {
@@ -197,6 +422,40 @@ void main() {
       await tester.flingFrom(tester.getCenter(find.text('B')), Offset(60 * towardC, 0), 2000);
       await tester.pumpAndSettle();
       expect(selected, <int>[3], reason: '$direction: a flick toward C did not carry on to D');
+    }
+  });
+
+  testWidgets('a bar, a card and a button put a directional padding\'s start at the right', (
+    WidgetTester tester,
+  ) async {
+    const padding = EdgeInsetsDirectional.only(start: 30, end: 4);
+    const Key inside = Key('inside');
+    final panels = <String, Widget Function()>{
+      'bar': () => const GlassBar(
+        padding: padding,
+        child: SizedBox(key: inside, width: 40, height: 20),
+      ),
+      'card': () => const GlassCard(
+        padding: padding,
+        child: SizedBox(key: inside, width: 40, height: 20),
+      ),
+      'button': () => GlassButton(
+        onPressed: () {},
+        padding: padding,
+        minSize: Size.zero,
+        child: const SizedBox(key: inside, width: 40, height: 20),
+      ),
+    };
+    for (final MapEntry<String, Widget Function()> panel in panels.entries) {
+      for (final TextDirection direction in TextDirection.values) {
+        await _mount(tester, direction, panel.value());
+        final Rect glass = tester.getRect(find.byType(GlassSurface).first);
+        final Rect child = tester.getRect(find.byKey(inside));
+        final (double start, double end) = direction == TextDirection.rtl
+            ? (glass.right - child.right, child.left - glass.left)
+            : (child.left - glass.left, glass.right - child.right);
+        expect((start, end), (30.0, 4.0), reason: '${panel.key}, $direction: the start is not where it reads from');
+      }
     }
   });
 
@@ -368,8 +627,32 @@ RenderGlassSurface _knob(WidgetTester tester) => tester
     .renderObjectList<RenderGlassSurface>(find.byType(GlassSurface))
     .singleWhere((RenderGlassSurface s) => s.declaredFinish?.name == GlassFinish.clear.name);
 
-Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control) async {
-  _shotKey = GlobalKey();
+/// The tab bar's resting capsule.
+Rect _tabCapsule(WidgetTester tester) => tester.getRect(
+  find.byWidgetPredicate(
+    (Widget w) =>
+        w is DecoratedBox &&
+        w.decoration is ShapeDecoration &&
+        (w.decoration as ShapeDecoration).shape is StadiumBorder,
+  ),
+);
+
+/// Where the segmented control's capsule is drawn, as a segment index.
+double _capsuleAt(WidgetTester tester) {
+  final CustomPaint paint = tester
+      .widgetList<CustomPaint>(find.byType(CustomPaint))
+      .firstWhere(
+        (CustomPaint p) => p.painter.runtimeType.toString() == '_CapsulePainter',
+      );
+  return ((paint.painter! as dynamic).at as Animation<double>).value;
+}
+
+/// [keep] rebuilds the same tree with [control] and [direction] in place —
+/// one host, one state — instead of mounting afresh.
+Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control, {bool keep = false}) async {
+  if (!keep) {
+    _shotKey = GlobalKey();
+  }
   await tester.pumpWidget(
     MediaQuery(
       data: const MediaQueryData(size: kScreen),
@@ -378,7 +661,7 @@ Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control
         child: Align(
           alignment: Alignment.topLeft,
           child: GlassHost(
-            key: ValueKey<TextDirection>(direction),
+            key: keep ? _hostKey : _hostKey = GlobalKey(),
             hardware: GlassHardware.appleMetal,
             tier: const GlassTierChoice(GlassTier.cheap, GlassTierReason.pinnedByHost),
             backdrop: const Color(0xFF404040),
@@ -403,6 +686,8 @@ Future<void> _mount(WidgetTester tester, TextDirection direction, Widget control
     await tester.pump();
   }
 }
+
+GlobalKey _hostKey = GlobalKey();
 
 Future<Uint8List> _shot(WidgetTester tester) async {
   final boundary = _shotKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;

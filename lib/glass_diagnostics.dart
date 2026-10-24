@@ -24,6 +24,8 @@
 ///   fused draw is split and culled.
 /// - [debugGlassShaderAntiAlias]: the shader's anti-alias flag.
 /// - [debugGlassShaderLoader]: the loader a test replaces to see a load fail.
+/// - [debugGlassWalkFallback]: whether the capture hands a subtree the walk
+///   draws apart from the engine to the engine.
 ///
 /// Each has a measured default; set one back when the run is over.
 ///
@@ -51,12 +53,20 @@ export 'src/surface/glass_group.dart'
 // The verdicts a host that reads its backdrop publishes, and the band-and-hold
 // rule each one is kept by — which a test drives without a frame. The count of
 // read-backs is `GlassProxyHandle.readBacks`.
+// Whether the atlas is blurred by the package's own Gaussian on Impeller or by
+// `ImageFilter.blur`, which a bench draws the one against the other with.
+export 'src/proxy/proxy_blur.dart' show debugGlassBlurShader;
 export 'src/surface/glass_adaptive.dart' show GlassBackdropReadings, GlassBackdropVerdict;
 // The host's published proxy and its counters — `recorded`, `held`,
 // `readBacks` — which is what a report reads to say whether a frame captured,
 // and the shader loader a test replaces to see a load fail.
 export 'src/surface/glass_host.dart'
     show GlassProxyHandle, GlassProxyScope, debugGlassShaderLoader, kGlassRippleShaderAsset, kGlassShaderAsset;
+// Whether the capture hands what the walk draws apart from the engine to the
+// engine, on by default.
+export 'src/proxy/proxy_pipeline.dart' show debugGlassWalkFallback;
+// What the capture walk observed on a frame, read off the handle's frame.
+export 'src/proxy/proxy_walk.dart' show WalkLog;
 // The ripple's model, which a test drives without a frame.
 export 'src/surface/glass_ripple.dart' show GlassRippleField, GlassRippleWave;
 // The anti-alias flag of the surface's draw, off by default.

@@ -192,7 +192,7 @@ void main() {
         .whereType<File>()
         .map((File f) => f.path)
         .where((String p) => p.endsWith('.frag'));
-    expect(own, hasLength(3));
+    expect(own, hasLength(4));
     expect(shaders.map((s) => s.file), containsAll(own));
   });
 

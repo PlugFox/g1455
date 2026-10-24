@@ -67,7 +67,9 @@ class LayerChange {
   ///
   /// What a layer type the table does not read produces, and what a subtree
   /// under an `ImageFilterLayer` with no clip above it produces: a filter moves
-  /// pixels outward by an amount no Dart API will say.
+  /// pixels outward by an amount no Dart API will say. A `ColorFilterLayer`
+  /// with no clip above it produces it too, but only when the filter itself
+  /// changes: it can paint over all of its cull rect.
   static const LayerChange everywhere = LayerChange._(
     changed: true,
     region: null,
@@ -432,6 +434,10 @@ class _Walk {
     // reports, and a type the table cannot read at all. Both then answer with
     // the clip above them, which is the only honest bound left.
     var spreads = false;
+    // Whether this layer can paint the whole of its clip on its own account,
+    // while what its descendants change stays where they changed it. Narrower
+    // than [spreads] on purpose, and the colour filter is why it exists.
+    var fills = false;
 
     if (!ProxyLayerWatch._readable(layer)) {
       spreads = true;
@@ -467,6 +473,24 @@ class _Walk {
       // filter could have pulled in from outside had to change *somewhere*, and
       // that somewhere has its own entry.
       spreads = true;
+    } else if (layer is ColorFilterLayer) {
+      // A colour filter maps each pixel on its own, and its layer covers the
+      // cull rect: a filter that does not keep transparent black transparent —
+      // `ColorFilter.mode(c, BlendMode.srcOver)`, a matrix with an offset —
+      // paints `F(0)` across all of it, outside the children too. So a new
+      // filter can change every pixel of the clip, and its own entry is read
+      // as the clip. Dart cannot ask a `ColorFilter` which kind it is, so every
+      // one is read that way.
+      //
+      // Its descendants are not, and that is a choice about cost made on
+      // correctness grounds rather than against them. A pixel the children did
+      // not change is `F` of what it was before, which is what it was before:
+      // where the children are transparent the output is `F(0)` on both
+      // frames, and where they repainted the output changed exactly there. A
+      // spinner under an app-wide `ColorFiltered` is therefore dirty where it
+      // turns and nowhere else, and reading it as the clip — every change
+      // under a greyscale app damaging the whole screen — would buy nothing.
+      fills = true;
     } else if (layer is ShaderMaskLayer) {
       // Multiplies its children inside `maskRect` and paints nothing outside
       // them, so the children are the bound.
@@ -482,7 +506,7 @@ class _Walk {
         subtree = union(subtree, visit(child, childTransform, childClip, isRoot: false));
       }
     }
-    if (spreads) {
+    if (spreads || fills) {
       // With no clip above it, a filter is dirty everywhere; under an empty one
       // it composites nothing at all, and `Rect.zero` is how [_narrow] spells
       // that. Unioning the empty rect instead would drag the region to the

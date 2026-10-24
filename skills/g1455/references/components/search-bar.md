@@ -47,7 +47,7 @@ without), because it is the field's resize that costs, not Cancel's paint. Under
 ## Layout
 
 - The field is [kGlassFieldHeight](https://pub.dev/documentation/g1455/latest/g1455/kGlassFieldHeight-constant.html)
-  (44) tall, and Cancel's tap target is at least 44 tall too.
+  (44) tall at the default text size and grows with a larger one; Cancel's tap target is at least 44 tall too.
 - The bar stretches to the width it is given, so the width must be bounded: an `Expanded` in a `Row`, a `Positioned`
   with a `left` and a `right`.
 
@@ -115,7 +115,7 @@ class _ContactsState extends State<Contacts> {
 | `onCancel` | `VoidCallback?` | `null` | Called after Cancel has emptied the field and let go of the focus. |
 | `showsCancelButton` | `bool` | `true` | Whether Cancel slides in while the field has the focus. `false` keeps the field's box still. |
 | `cancelLabel` | `String` | `'Cancel'` | Cancel's text. |
-| `cancelColor` | `Color` | `Color(0xFF007AFF)` | Cancel's colour. |
+| `cancelColor` | `Color?` | `null` | Cancel's colour, and the caret's. Null for iOS's blue in the appearance of the label beside the field. |
 | `cancelDuration` | `Duration` | `Duration(milliseconds: 250)` | How long Cancel takes to slide in or out: a capture a frame for as long. |
 | `autofocus` | `bool` | `false` | Focus the field as soon as it is built. |
 | `finish` | `GlassFinish?` | `null` | The glass. Null takes the theme's. |

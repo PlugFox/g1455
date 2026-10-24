@@ -19,7 +19,13 @@
 //    (the periodic timer never starts): arm 1 counts 2 steps instead of 7,
 //    and arm 4's hold never passes 5;
 //  - `..blendMode = BlendMode.plus` -> `..blendMode = BlendMode.dst`: arm 3's
-//    held half is not lit (213 -> 213 where it was 213 -> 255).
+//    held half is not lit (213 -> 213 where it was 213 -> 255);
+//  - in `_stepAlong`, `_next(half)` -> `_next(half) ?? widget.max`: arm 1's
+//    caller that never hands the value back is sent max on every repeat;
+//  - the semantics' `onDecrease` stepping `_Half.increment`: arm 2's
+//    decrease steps up;
+//  - in `_say`, `return say(v);` -> `return v.toString();`: the formatter arm
+//    hears the bare number.
 
 import 'dart:typed_data';
 
@@ -111,6 +117,20 @@ void main() {
     await tester.pump();
     expect(steps, <double>[1, 2, 3], reason: 'the plus half stepped past max');
 
+    // A caller that never hands the value back: the repeat steps on from what
+    // it reported, and stops at the limit all the same.
+    value = 0;
+    steps.clear();
+    await ComponentScene.mount(tester, GlassStepper(value: 0, max: 3, onChanged: steps.add));
+    finger = await tester.startGesture(plus);
+    await tester.pump(kGlassStepperRepeatDelay);
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(kGlassStepperRepeatInterval);
+    }
+    await finger.up();
+    await tester.pump();
+    expect(steps, <double>[1, 2, 3], reason: 'a repeat with the value never handed back ran past max');
+
     // Wrapping: past max lands on min.
     value = 3;
     steps.clear();
@@ -180,12 +200,36 @@ void main() {
       ),
       reason: 'increase is offered at max',
     );
+    tester.semantics.decrease(find.semantics.byLabel('Copies'));
+    await tester.pump();
+    expect(value, 4, reason: 'a screen reader\'s decrease did not step down');
 
     // Disabled: no actions, and said so.
     await ComponentScene.mount(tester, const GlassStepper(value: 2, onChanged: null, semanticLabel: 'Copies'));
     expect(
       tester.getSemantics(find.byType(GlassStepper)),
       matchesSemantics(label: 'Copies', value: '2', hasEnabledState: true),
+    );
+    handle.dispose();
+  });
+
+  testWidgets('a formatter says the value, and the values a step would reach, in its own words', (
+    WidgetTester tester,
+  ) async {
+    final SemanticsHandle handle = tester.ensureSemantics();
+    await ComponentScene.mount(
+      tester,
+      GlassStepper(
+        value: 2,
+        max: 5,
+        semanticLabel: 'Copies',
+        semanticFormatterCallback: (double v) => '${v.toInt()} copies',
+        onChanged: (_) {},
+      ),
+    );
+    expect(
+      tester.getSemantics(find.byType(GlassStepper)),
+      isSemantics(value: '2 copies', increasedValue: '3 copies', decreasedValue: '1 copies'),
     );
     handle.dispose();
   });

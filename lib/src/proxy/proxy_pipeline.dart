@@ -30,6 +30,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/rendering.dart';
 
 import '../hardware.dart';
@@ -38,6 +39,7 @@ import '../surface/glass_group.dart';
 import '../surface/glass_surface.dart';
 import 'occlusion.dart';
 import 'proxy_atlas.dart';
+import 'proxy_blur.dart';
 import 'proxy_layer_watch.dart';
 import 'proxy_resolution.dart';
 import 'proxy_retake.dart';
@@ -246,6 +248,12 @@ enum ProxyBlurPass {
   static ProxyBlurPass defaultFor(GlassHardware hardware) => hardware == GlassHardware.appleMetal ? split : folded;
 }
 
+/// Whether the host's capture hands a subtree the walk draws apart from the
+/// engine to the engine (`ProxyWalkContext.fallbackPixelRatio`): an opacity
+/// folded into a filter below it, a shader mask that paints past its
+/// children. On; a benchmark turns it off to price it, and sets it back.
+bool debugGlassWalkFallback = true;
+
 /// Runs the proxy pipeline for one screen.
 ///
 /// Not a widget and not a render object: it is driven by whoever owns the
@@ -451,6 +459,22 @@ class GlassProxyPipeline {
 
   GlassProxyFrame? _current;
 
+  /// Whether the last [captureIfNeeded] recorded only because a surface's
+  /// finish changed, over a screen the oracle would have held: what is under
+  /// the glass is what it was, so what was read of it still stands.
+  bool get refinished => _refinished;
+  bool _refinished = false;
+
+  /// The finishes [_current] was recorded for, as [_worn] reads them.
+  List<(String, double)>? _currentWorn;
+
+  /// What the capture reads off [finishes]: each one's name, which picks the
+  /// divisor, and its sigma, which the residual blur is baked from — or the
+  /// host's own when every surface wears it.
+  List<(String, double)> _worn(List<GlassFinish>? finishes) => finishes == null
+      ? <(String, double)>[(finish, finishSigmaLogical)]
+      : <(String, double)>[for (final GlassFinish f in finishes) (f.name, f.blurSigmaLogical)];
+
   /// The frame [captureIfNeeded] is holding, if any.
   ///
   /// Owned by the pipeline, unlike the one [capture] hands back. The two are
@@ -482,7 +506,17 @@ class GlassProxyPipeline {
     // [watched] when glass stands on glass: the levels above are recorded on
     // this decision, so the oracle has to see their surfaces move too.
     oracle.noteSurfaces(watched ?? surfaces);
-    final RetakeReason reason = oracle.decide();
+    final List<(String, double)> worn = _worn(finishes);
+    RetakeReason reason = oracle.decide();
+    // The finishes decide the divisor and the blur baked into the atlas, and
+    // the oracle watches the screen, not them: a surface that changed its
+    // finish over a still screen kept the capture taken for the old one — a
+    // search bar turned from light glass to dark kept light's 1/4 where dark
+    // takes 1/2 (#34).
+    _refinished = reason.holds && _current != null && !listEquals(worn, _currentWorn);
+    if (_refinished) {
+      reason = RetakeReason.changed;
+    }
     if (reason.holds) {
       oracle.noteFrame();
       return (frame: _current, reason: reason);
@@ -503,6 +537,7 @@ class GlassProxyPipeline {
     }
     _current?.dispose();
     _current = frame;
+    _currentWorn = worn;
     // What the divisor cost comes out of the same allowance staleness draws on,
     // and it is only knowable here: the density arrives with the frame.
     oracle.noteResolutionDamage(frame.resolution.damage?.deltaE ?? 0);
@@ -514,6 +549,7 @@ class GlassProxyPipeline {
   void dispose() {
     _current?.dispose();
     _current = null;
+    _currentWorn = null;
   }
 
   /// Records one frame of proxy for [surfaces], or null when there is nothing
@@ -616,6 +652,11 @@ class GlassProxyPipeline {
           return occluded == WalkAction.paint ? glass(child) : occluded;
         },
         shadowFilter: shadowFilter,
+        // What the pass draws apart from the engine is drawn by the engine,
+        // over the slots' sources only: the atlas reads nothing else. A pixel
+        // out, for the texel a slot rounds up to.
+        fallbackPixelRatio: debugGlassWalkFallback ? scale : null,
+        fallbackRegion: _sourcesOf(update.layout)?.inflate(1),
       )..paintChild(root, rootOffset);
       context.finish();
 
@@ -780,10 +821,12 @@ class GlassProxyPipeline {
         return packed;
       }
       final recorder = ui.PictureRecorder();
-      Canvas(recorder, bounds)
-        ..saveLayer(bounds, Paint()..imageFilter = _blurFilter(residual * scale))
-        ..drawPicture(packed)
-        ..restore();
+      final canvas = Canvas(recorder, bounds);
+      final int layers = saveBlurLayers(canvas, bounds, residual * scale);
+      canvas.drawPicture(packed);
+      for (var i = 0; i < layers; i++) {
+        canvas.restore();
+      }
       return recorder.endRecording();
     }
     final recorder = ui.PictureRecorder();
@@ -799,15 +842,26 @@ class GlassProxyPipeline {
       if (residual == null) {
         canvas.drawPicture(packed);
       } else {
+        final int layers = saveBlurLayers(canvas, region, residual * scale);
         canvas
-          ..saveLayer(region, Paint()..imageFilter = _blurFilter(residual * scale))
           ..clipRect(region)
-          ..drawPicture(packed)
-          ..restore();
+          ..drawPicture(packed);
+        for (var i = 0; i < layers; i++) {
+          canvas.restore();
+        }
       }
       canvas.restore();
     }
     return recorder.endRecording();
+  }
+
+  /// The box around every slot's source, in the scene's coordinates.
+  static Rect? _sourcesOf(AtlasLayout layout) {
+    Rect? out;
+    for (final AtlasSlot slot in layout.slots) {
+      out = out?.expandToInclude(slot.source) ?? slot.source;
+    }
+    return out;
   }
 
   /// The box around blur class [c]'s slots.
@@ -839,12 +893,6 @@ class GlassProxyPipeline {
     }
     return path;
   }
-
-  /// `TileMode.clamp` rather than the default `decal`: the border of the atlas
-  /// is the border of a slot, and a decal there darkens it — which is where a
-  /// surface at the screen's edge samples.
-  static ui.ImageFilter _blurFilter(double sigmaTexels) =>
-      ui.ImageFilter.blur(sigmaX: sigmaTexels, sigmaY: sigmaTexels, tileMode: TileMode.clamp);
 
   /// The sigma the pass still owes for a finish of [sigma], or null when
   /// [blurPass] asks for none.
@@ -888,7 +936,15 @@ class GlassProxyPipeline {
     final canvas = Canvas(recorder);
     if (single != null) {
       // In texels, which is what the filter works in.
-      canvas.drawImage(atlas, Offset.zero, Paint()..imageFilter = _blurFilter(single * scale));
+      final int layers = saveBlurLayers(
+        canvas,
+        Offset.zero & Size(atlas.width.toDouble(), atlas.height.toDouble()),
+        single * scale,
+      );
+      canvas.drawImage(atlas, Offset.zero, Paint());
+      for (var i = 0; i < layers; i++) {
+        canvas.restore();
+      }
     } else {
       var any = false;
       for (var c = 0; c < blurs.sigmas.length; c++) {
@@ -898,14 +954,13 @@ class GlassProxyPipeline {
         final Rect region = _classBounds(layout, blurs, c);
         canvas
           ..save()
-          ..clipPath(_classClip(layout, blurs, c))
-          ..drawImageRect(
-            atlas,
-            region,
-            region,
-            residual == null ? Paint() : (Paint()..imageFilter = _blurFilter(residual * scale)),
-          )
-          ..restore();
+          ..clipPath(_classClip(layout, blurs, c));
+        final int layers = residual == null ? 0 : saveBlurLayers(canvas, region, residual * scale);
+        canvas.drawImageRect(atlas, region, region, Paint());
+        for (var i = 0; i < layers; i++) {
+          canvas.restore();
+        }
+        canvas.restore();
       }
       if (!any) {
         recorder.endRecording().dispose();

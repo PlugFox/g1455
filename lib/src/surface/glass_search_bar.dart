@@ -20,7 +20,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_components.dart' show glassAmbientLabel, glassSystemBlue, kGlassMinTapTarget;
 import 'glass_finish.dart';
 import 'glass_text_field.dart';
 
@@ -66,7 +66,7 @@ class GlassSearchBar extends StatefulWidget {
     this.onCancel,
     this.showsCancelButton = true,
     this.cancelLabel = 'Cancel',
-    this.cancelColor = const Color(0xFF007AFF),
+    this.cancelColor,
     this.cancelDuration = const Duration(milliseconds: 250),
     this.autofocus = false,
     this.finish,
@@ -100,8 +100,10 @@ class GlassSearchBar extends StatefulWidget {
   /// Cancel's text. "Cancel" by default; pass the localized word.
   final String cancelLabel;
 
-  /// Cancel's colour, and the caret's: iOS's blue by default.
-  final Color cancelColor;
+  /// Cancel's colour, and the caret's. Null for iOS's `systemBlue`: Cancel's
+  /// in the appearance of the label beside the field, the caret's in the
+  /// field's own.
+  final Color? cancelColor;
 
   /// How long Cancel takes to slide in or out. Zero under reduced motion
   /// whatever is passed.
@@ -256,7 +258,10 @@ class _GlassSearchBarState extends State<GlassSearchBar> with SingleTickerProvid
                     child: Text(
                       widget.cancelLabel,
                       maxLines: 1,
-                      style: DefaultTextStyle.of(context).style.copyWith(color: widget.cancelColor, fontSize: 17),
+                      style: DefaultTextStyle.of(context).style.copyWith(
+                        color: widget.cancelColor ?? glassSystemBlue(glassAmbientLabel(context)),
+                        fontSize: 17,
+                      ),
                     ),
                   ),
                 ),

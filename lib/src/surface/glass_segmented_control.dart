@@ -63,7 +63,8 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'glass_components.dart' show kGlassMinTapTarget;
+import 'glass_components.dart'
+    show GlassAtMostDefaultTextSize, glassAmbientLabel, glassTertiarySystemFill, kGlassMinTapTarget;
 import 'glass_concentric.dart';
 import 'glass_controls.dart' show glassControlClaimsPointer, kGlassDropOptics;
 import 'glass_drop_motion.dart';
@@ -76,10 +77,15 @@ import 'glass_travel.dart';
 /// (116–127) at 0.12.
 ///
 /// Not glass: a flat fill, under which what is behind the control stays
-/// sharp. [GlassSegmentedControl.trackColor]'s default.
+/// sharp. [GlassSegmentedControl.trackColor]'s default in the light
+/// appearance.
 ///
 /// {@category Panels and controls}
 const Color kGlassSegmentTrack = Color.fromRGBO(118, 118, 128, 0.12);
+
+/// The resting capsule on a dark control: (99, 99, 102), iOS's selected
+/// segment in the dark appearance. White in the light one.
+const Color _kDarkThumb = Color(0xFF636366);
 
 /// How far past the resting capsule the held drop reaches, across and down,
 /// logical px (iOS 26.5: 86 x 28 -> 110 x 44).
@@ -172,6 +178,11 @@ Size _marginFor(GlassDropMotion motion) =>
 /// > frames where it lifts and settles are captures, and a slide is drawn from
 /// > the proxy already held.
 ///
+/// **Text size.** The labels do not grow past the default text size, as
+/// UIKit's `UISegmentedControl` does not: the track is 32 tall and its
+/// segments a quarter of the row, and a larger label is cut there. The
+/// semantics still carry every label whole to a screen reader.
+///
 /// See also:
 ///
 ///  * [GlassTabBar], the same drop on a glass bar.
@@ -187,8 +198,8 @@ class GlassSegmentedControl extends StatefulWidget {
     required this.segments,
     required this.selectedIndex,
     required this.onSelected,
-    this.trackColor = kGlassSegmentTrack,
-    this.thumbColor = const Color(0xFFFFFFFF),
+    this.trackColor,
+    this.thumbColor,
     this.dropMotion,
     this.focusNode,
     this.autofocus = false,
@@ -213,11 +224,14 @@ class GlassSegmentedControl extends StatefulWidget {
   /// opacity.
   final ValueChanged<int>? onSelected;
 
-  /// The track's fill. [kGlassSegmentTrack], iOS's, by default.
-  final Color trackColor;
+  /// The track's fill. Null for iOS's `tertiarySystemFill` in the appearance
+  /// of the label around the control: [kGlassSegmentTrack] in light, twice its
+  /// alpha in dark.
+  final Color? trackColor;
 
-  /// The resting capsule under the selected segment.
-  final Color thumbColor;
+  /// The resting capsule under the selected segment. Null for iOS's: white in
+  /// the light appearance, (99, 99, 102) in the dark.
+  final Color? thumbColor;
 
   /// How the held drop deforms as it launches and brakes. Null takes
   /// [GlassThemeData.dropMotion]; [GlassDropMotion.none] keeps its shape.
@@ -276,10 +290,20 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
     final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
     if (rtl != _rtl) {
+      final bool flipped = _rtl != null;
       _rtl = rtl;
       // The capsule is placed, not slid: the segments under it just moved.
+      // Held, the drop stays over the segment it was over, now drawn on the
+      // other side, so the release still selects that one.
       if (!_down) {
         _at.value = _visual(widget.selectedIndex).toDouble();
+      } else if (flipped) {
+        _at.value = widget.segments.length - 1 - _at.value;
+        // Setting the value stops the slide the press started; resumed, or a
+        // flip inside its first frames leaves the drop between two segments.
+        if (!_moved) {
+          _slideTo(_pressed, 0);
+        }
       }
     }
   }
@@ -288,12 +312,22 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
   void didUpdateWidget(GlassSegmentedControl oldWidget) {
     super.didUpdateWidget(oldWidget);
     _stretch.motion = _motion = GlassDropMotion.resolve(context, widget.dropMotion);
-    if (!_enabled && _down) {
+    // Disabled, or the segment under the finger gone or another one: the
+    // press ends selecting nothing, as a lost one does, and the capsule goes
+    // back under the selected segment — slid, or placed below like any other
+    // count change.
+    final bool recounted = widget.segments.length != oldWidget.segments.length;
+    final bool ended = _down && (!_enabled || recounted);
+    if (ended) {
       _down = false;
       _liftTo(0);
     }
-    if (widget.selectedIndex != oldWidget.selectedIndex && !_down) {
+    if ((widget.selectedIndex != oldWidget.selectedIndex || ended && !recounted) && !_down) {
       _slideTo(widget.selectedIndex, 0);
+    } else if (recounted && !_down) {
+      // Under rtl a segment added or taken away moves where the selected one
+      // is drawn, and `_at` is where it is drawn: placed, as on a flip.
+      _at.value = _visual(widget.selectedIndex).toDouble();
     }
   }
 
@@ -431,7 +465,10 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
               children: <Widget>[
                 Positioned.fill(
                   child: DecoratedBox(
-                    decoration: ShapeDecoration(shape: const StadiumBorder(), color: widget.trackColor),
+                    decoration: ShapeDecoration(
+                      shape: const StadiumBorder(),
+                      color: widget.trackColor ?? glassTertiarySystemFill(glassAmbientLabel(context)),
+                    ),
                   ),
                 ),
                 GlassFocusRing(visible: _focused && _enabled, radius: kGlassCapsule),
@@ -444,7 +481,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
                         lift: _lift,
                         at: _at,
                         count: widget.segments.length,
-                        colour: widget.thumbColor,
+                        colour: _thumb,
                         repaint: _capsuleRepaint,
                       ),
                     ),
@@ -515,7 +552,11 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     );
   }
 
-  Widget _labels() => Padding(
+  // At most the default text size (see the class): a larger label is cut by
+  // the capsule it sits on.
+  Widget _labels() => GlassAtMostDefaultTextSize(child: _labelRow());
+
+  Widget _labelRow() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: _kInset),
     child: Row(
       children: <Widget>[
@@ -535,18 +576,38 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> with Tick
     ),
   );
 
+  /// The resting capsule's colour: [GlassSegmentedControl.thumbColor], or
+  /// iOS's for the appearance of the label around the control.
+  Color get _thumb =>
+      widget.thumbColor ??
+      (glassAmbientLabel(context).computeLuminance() < 0.5 ? const Color(0xFFFFFFFF) : _kDarkThumb);
+
   /// The selected segment's label in a colour that reads on the capsule under
   /// it — black on the white one, white on a dark one — rather than in the
   /// ambient label colour, which on a dark page is the capsule's own white.
+  ///
+  /// The capsule fades as the drop lifts, and the ink goes back to the ambient
+  /// colour with it: held, the label is on the track like the others, and a
+  /// black one there is black on a dark track (#21). Only the lift moves it,
+  /// so a slide, where the lift stands still, repaints no label.
   Widget _onThumb(Widget label) {
-    final Color thumb = widget.thumbColor;
+    final Color thumb = _thumb;
     final Color ink = thumb.computeLuminance() > 0.4 ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
-    return DefaultTextStyle.merge(
-      style: TextStyle(color: ink),
-      child: IconTheme.merge(
-        data: IconThemeData(color: ink),
-        child: label,
-      ),
+    final Color? text = DefaultTextStyle.of(context).style.color;
+    final Color? icon = IconTheme.of(context).color;
+    return AnimatedBuilder(
+      animation: _lift,
+      child: label,
+      builder: (BuildContext context, Widget? label) {
+        final double t = _lift.value.clamp(0.0, 1.0);
+        return DefaultTextStyle.merge(
+          style: TextStyle(color: text == null ? ink : Color.lerp(ink, text, t)),
+          child: IconTheme.merge(
+            data: IconThemeData(color: icon == null ? ink : Color.lerp(ink, icon, t)),
+            child: label!,
+          ),
+        );
+      },
     );
   }
 

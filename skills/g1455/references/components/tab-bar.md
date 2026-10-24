@@ -56,6 +56,9 @@ behind it.
 - The drop is glass over glass (the bar), so while it is held the host captures one extra level.
   At rest, the bar is one surface.
 - Each tab is a button for screen readers, labelled with its `label` and marked selected.
+- Labels stay at the default text size, as UIKit's do. From an accessibility text size (1.5 times and up), a touch on a
+  tab shows its icon and label large in a panel in the middle of the screen, which follows the finger and goes when it
+  lifts: iOS's large content viewer. It needs an `Overlay` above the bar, which an app has.
 - The held drop stretches as it sets off and squashes as it lands. `dropMotion:` tunes it or turns it off; see
   [Drop motion](../foundations/drop-motion.md).
 
@@ -148,8 +151,10 @@ item's icon is built once more, for the circle.
 > with the list padded to end above it, and its scrolls collapse a bar that asks to.
 
 > [!NOTE]
-> A bare `setState` that rebuilds the bar costs one capture, even when nothing it draws changed. A known cost, not yet
-> traced: rebuild the bar when its selection or its items change, not with every change of the screen around it.
+> A rebuild that changes nothing the bar draws costs nothing: the bar keeps what it built, and a new `onSelected` is
+> read when a tap lands. Items compare by their icon and label, and their builders by identity, so an `iconBuilder`
+> written inline as a closure is a new one on every rebuild — and, under a lifted bar, a capture. Keep such builders in
+> a field or a top-level function.
 
 ## Complete example
 
@@ -227,7 +232,7 @@ class _AppShellState extends State<AppShell> {
 | `items` | `List<GlassTabItem>` | **required** | The tabs. At least 2. |
 | `selectedIndex` | `int` | **required** | The selected tab. |
 | `onSelected` | `ValueChanged<int>?` | **required** | Called with the new tab. Null disables the bar. |
-| `activeColor` | `Color` | `Color(0xFF007AFF)` | Icon and label colour of the selected tab, and of the tab under a held drop. |
+| `activeColor` | `Color?` | `null` | Icon and label colour of the selected tab, and of the tab under a held drop. Null for iOS's blue in the bar's appearance: `0xFF007AFF` light, `0xFF0A84FF` dark. |
 | `dropZoom` | `double` | `kGlassTabDropZoom` | How much the held drop magnifies the bar. `1` for none; must be above 0. |
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](../foundations/drop-motion.md). |
 | `minimizeBehavior` | `GlassTabBarMinimizeBehavior` | `.never` | `.onScrollDown` collapses the bar to its selected tab while the content scrolls down, under a `GlassTabBarMinimizer`. |

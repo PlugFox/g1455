@@ -5,7 +5,7 @@ it is turned off: anything that adds a capture, a read-back, a shader pass or
 a ticker is a declaration on `GlassHost`, `GlassTheme` or the widget, and the
 cheap setting is reachable without a fork.
 
-## Done — branch `improvements`
+## Done — 0.1.2
 
 ### The package page
 
@@ -104,16 +104,74 @@ cheap setting is reachable without a fork.
       `dispose` (flutter/flutter#185248): the menu and popover anchors and a
       page control given a `PageController`.
 
+## Done — 0.4.0
+
+- [x] `GlassHost.appearance`, for an app whose theme does not follow the
+      phone's (#16).
+- [x] Fills, reds and the grabber's grey in the appearance of the glass
+      they lie on (#15), and a held segment's label in the page's (#21).
+- [x] Every control's default colours per appearance, nullable (#28), and
+      a badge's red.
+- [x] Large text: the tab bar and the segmented control stop at the default
+      size, as UIKit's do; the field grows (#20).
+- [x] Right to left: the tab bar's touches, capsule and drop (#19), menu
+      rows, the segmented control's capsule as segments change, and
+      paddings as `EdgeInsetsGeometry` (#29).
+- [x] Clips at fractional device pixel ratios: the tab bar's drop (#23) and
+      its accessory.
+- [x] The capture walk: a shader mask off the origin, a composited image
+      filter at an offset, filters under a fade, and the shadow filter's
+      sharp draws (#17, #18), what it forwards unseen counted (#30), and the
+      Skia resampling difference named (#31); `ShadowFilter` and `WalkLog`
+      exported, so an app can give the one and read the other; on Impeller
+      the atlas blurred by a Gaussian of the package's own, and past 4
+      texels the engine's blur asked for the sigma the finishes were
+      calibrated at, measured on an M2 iPad (#33).
+- [x] CI runs the tests on Impeller too, the known differences tagged
+      `impeller-gap` and left to the Skia run (#33).
+- [x] A sheet pulled below its lowest detent is not retaken on every frame:
+      the capture is cut to the screen. A drag to close is, because the dim
+      under the sheet fades, which is a change under its glass.
+- [x] Glass that changes finish over a still screen is captured for the new
+      one, not held on the old one's resolution (#34).
+- [x] The hard scroll edge's band in the dark appearance: the screen's
+      background at 0.90, photographed on iOS 26.5 (#36).
+- [x] The tab bar's large content viewer at accessibility text sizes, as
+      a `UITabBarController`'s (#27).
+- [x] Menus at large text: rows that wrap and grow, no icons and the
+      screen's width from an accessibility size, and a scroll past 520, as
+      iOS 26.5's at five text sizes (#26).
+- [x] The walk hands a fade folded into a filter and a mask that paints past
+      its child to the engine, inside the capture (#32), and leaves a shader
+      mask's and a backdrop filter's live layers as their paint set them.
+
+## Next — what 0.4.0 left open
+
+- [ ] What the walk still draws apart from the engine (#32): a
+      `BackdropFilter` under glass, which reads what lies below it, and a
+      fold or a mask inside a subtree that holds glass, which the engine
+      cannot draw for it. 0.4.0 hands every other such subtree to the engine.
+- [ ] The remaining Impeller differences (#33). The atlas is blurred by
+      the package's own Gaussian up to 4 texels, which closed the soft
+      scroll edge (residual contrast 0.174 on an M2 iPad, Apple 0.157; it
+      was 0.098), for up to 0.3 ms of GPU time a frame on an M2 iPad and
+      none an S22 can tell from noise (glass D239). Left: the engine's
+      blur past 4 texels, whose width is right to 2-6% and which at 5 and
+      8 texels lets a period of 12 through at 2% of its contrast; a pass of
+      ours ahead of it does not remove that, and ours alone at 12 texels
+      costs 52% of a frame on an S22, so it would take a downsampled
+      Gaussian of our own. The tiled group's seams were not seams: a pixel on
+      a rounded box's diagonal is a tie the last bit of FlutterFragCoord
+      broke, and that bit is the draw's on Vulkan and GLES (glass D240).
+      Broken one way now; what is left is a code value on up to 17 of
+      92,400 px on an S22, where the interpolated coordinate is the draw's.
+
 ## Next — what 0.2.0 left open
 
 - [ ] The engine's `RSuperellipse` corner in the shader. Tried and deferred:
       +22% fragment GPU time on a Mac, and Skia draws a native
       `RSuperellipse` as an `RRect`, so on Skia the glass and the engine's own
       shape would not agree. Measure it on Adreno before deciding.
-- [ ] A bare `setState` on a `GlassTabBar` costs one capture even when nothing
-      it draws changed. Measured, not traced.
-- [ ] The dim behind a sheet does not fade while the sheet is dragged down to
-      close.
 - [ ] No trailing action circle beside the tab bar, such as the search tab
       iOS 26 sets apart from the others.
 - [ ] Content that scrolls inside a sheet does not hand the drag over to the
@@ -130,7 +188,7 @@ cheap setting is reachable without a fork.
 - [ ] Adaptive glass over a declared backdrop: the texture is in hand, so the
       mean level is a read-back once per texture, not per capture.
 
-## Next — what the branch left open
+## Next — what 0.1.2 left open
 
 - [ ] Adaptivity for the rest: a raw `GlassSurface`, `GlassScrollEdge` (still
       keys its tint off the declared `backdrop`) and the segmented control.
@@ -140,8 +198,8 @@ cheap setting is reachable without a fork.
       included; the band, hold and interval are taste until then.
 - [ ] `GlassMorph`: carry the spring's velocity through a swap mid-morph, and
       keep glass inside fading content (an `Opacity` layer drops it).
-- [ ] `GlassScaffold`: the keyboard (`viewInsets`), a bottom scroll edge, and
-      a top bar shorter than `topBarHeight`.
+- [ ] `GlassScaffold`: a bottom scroll edge, and a top bar shorter than
+      `topBarHeight`.
 - [ ] Tune the drop's stretch and the morph's timing against Apple's devices;
       both are set by eye.
 

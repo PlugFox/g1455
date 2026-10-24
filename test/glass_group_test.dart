@@ -60,6 +60,15 @@ const double kRadius = 20;
 const Size kPanel = Size(90, 90);
 const double kTop = 60;
 
+/// The most a pixel may move between grouped and ungrouped surfaces that do not
+/// touch.
+///
+/// One code value, and only on Impeller, where the fused draw and the plain
+/// ones cover the panels with different quads and 584 edge pixels read one
+/// off. Skia reads zero. The bridge this arm exists to catch is tens of code
+/// values.
+const int kBackendTolerance = 1;
+
 /// The floats the group shader's uniform block holds, counted by hand off the
 /// declaration order in `shaders/glass_group.frag` — packed into lanes since
 /// the bind count was priced, in the order the names below always had:
@@ -186,8 +195,8 @@ void main() {
     final _Diff diff = await _compare(tester, apart, grouped);
     print('two far surfaces, grouped vs not: $diff');
     expect(
-      diff.differing,
-      0,
+      diff.maxDelta,
+      lessThanOrEqualTo(kBackendTolerance),
       reason: 'the group invented a bridge, or moved the atlas under the samples — $diff',
     );
     apart.dispose();
@@ -323,7 +332,16 @@ void main() {
       'full-screen group vs tight group: $diff; quad ${looseQuad.size} vs '
       '${tightQuad.size}',
     );
-    expect(diff.differing, 0, reason: 'the group\'s own box reached the picture');
+    if (ui.ImageFilter.isShaderFilterSupported) {
+      // On Impeller the atlas is blurred by `glass_blur.frag`, and the two
+      // arms place the group's slot differently: two pixels inside the panels
+      // came out one code apart in one channel, and `ImageFilter.blur` in the
+      // same place reads none. A box that reached the picture shows along its
+      // edge, at full contrast, which a code of rounding is not.
+      expect(diff.maxDelta, lessThanOrEqualTo(1), reason: 'the group\'s own box reached the picture');
+    } else {
+      expect(diff.differing, 0, reason: 'the group\'s own box reached the picture');
+    }
     expect(diff.total, kScreen.width * kScreen.height);
     // And the quad itself is the same in both, which is what makes the arm
     // above a statement about the mechanism rather than about two screens that
@@ -637,6 +655,58 @@ void main() {
       lessThan(wholeArea),
       reason: 'the split shaded at least as much as the single quad',
     );
+  });
+
+  testWidgets('a layout the split would cut too fine is drawn as the one quad, and counted', (
+    WidgetTester tester,
+  ) async {
+    // Six tall bars crossed by six wide ones: between two tall bars every slab
+    // is six spans, so the partition is forty-odd rectangles, past the
+    // ceiling. The split is refused and the paint falls back to the quad it
+    // always could draw: one draw a paint.
+    final boxes = <Rect>[
+      for (var i = 0; i < 6; i++) Rect.fromLTWH(20 + i * 66, 10, 24, 200),
+      for (var i = 0; i < 6; i++) Rect.fromLTWH(10, 14 + i * 34, 400, 14),
+    ];
+    expect(
+      fusedDrawTiles(boxes: boxes, reach: 2, cullMargin: 30),
+      isNull,
+      reason: 'the layout splits within the ceiling, so this arm reaches nothing',
+    );
+    final bool wasSplit = debugGlassFusedSplit;
+    addTearDown(() => debugGlassFusedSplit = wasSplit);
+    debugGlassFusedSplit = true;
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(size: kScreen),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: GlassHost(
+              hardware: GlassHardware.appleMetal,
+              child: SizedBox.fromSize(
+                size: kScreen,
+                child: GlassGroup(
+                  spacing: 4,
+                  child: Stack(
+                    children: <Widget>[
+                      for (final Rect box in boxes) Positioned.fromRect(rect: box, child: const GlassSurface()),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+    });
+    final RenderGlassGroup group = _groupOf(tester);
+    expect(group.fusedPaints, greaterThan(0), reason: 'the group never drew');
+    expect(group.fusedTileRefusals, group.fusedPaints, reason: 'a paint split the layout it should have refused');
+    expect(group.fusedDraws, group.fusedPaints, reason: 'not one quad a paint');
   });
 
   testWidgets('a group splits by default, whatever hardware the host declares', (

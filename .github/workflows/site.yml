@@ -93,6 +93,9 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PLUG_FOX }}
+          # Pinned: 15.34.1 asks Service Usage whether Hosting is enabled, a
+          # permission the deploy account does not have, and fails with a 403.
+          firebaseToolsVersion: 15.34.0
           projectId: plug-fox
           target: g1455
           entryPoint: site
