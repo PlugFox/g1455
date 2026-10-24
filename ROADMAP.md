@@ -147,24 +147,25 @@ cheap setting is reachable without a fork.
 
 ## Next — what 0.4.0 left open
 
-- [ ] What the walk still draws apart from the engine (#32): a
+- [ ] What the walk still draws apart from the engine (#37): a
       `BackdropFilter` under glass, which reads what lies below it, and a
       fold or a mask inside a subtree that holds glass, which the engine
-      cannot draw for it. 0.4.0 hands every other such subtree to the engine.
-- [ ] The remaining Impeller differences (#33). The atlas is blurred by
-      the package's own Gaussian up to 4 texels, which closed the soft
-      scroll edge (residual contrast 0.174 on an M2 iPad, Apple 0.157; it
-      was 0.098), for up to 0.3 ms of GPU time a frame on an M2 iPad and
-      none an S22 can tell from noise (glass D239). Left: the engine's
-      blur past 4 texels, whose width is right to 2-6% and which at 5 and
-      8 texels lets a period of 12 through at 2% of its contrast; a pass of
-      ours ahead of it does not remove that, and ours alone at 12 texels
-      costs 52% of a frame on an S22, so it would take a downsampled
-      Gaussian of our own. The tiled group's seams were not seams: a pixel on
-      a rounded box's diagonal is a tie the last bit of FlutterFragCoord
-      broke, and that bit is the draw's on Vulkan and GLES (glass D240).
-      Broken one way now; what is left is a code value on up to 17 of
-      92,400 px on an S22, where the interpolated coordinate is the draw's.
+      cannot draw for it. 0.4.0 hands every other such subtree to the engine
+      (#32).
+- [ ] The engine's blur past 4 texels on Impeller (#38), whose width is
+      right to 2-6% and which at 5 and 8 texels lets a period of 12 through
+      at 2% of its contrast. A pass of ours ahead of it does not remove
+      that, and ours alone at 12 texels costs 52% of a frame on an S22, so
+      it would take a downsampled Gaussian of our own. Up to 4 texels the
+      atlas is blurred by the package's own (#33, glass D239).
+- [ ] Calibrate the finishes against what a device's blur delivers (#39):
+      they were matched to Apple's on `flutter_tester`'s Skia, whose blur
+      steps, so `regular` asked for 2.6 matched at 2.45; on a device, Skia
+      and Impeller alike, it blurs 2.6.
+- The tiled group's seams on Vulkan and GLES were a tie on a rounded box's
+  diagonal, broken one way now (#33, glass D240). What is left is a code
+  value on up to 17 of 92,400 px on an S22, where the interpolated
+  coordinate is the draw's: recorded, not a task.
 
 ## Next — what 0.2.0 left open
 
