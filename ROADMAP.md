@@ -152,8 +152,12 @@ cheap setting is reachable without a fork.
       cannot draw for it. 0.4.0 hands every other such subtree to the engine.
 - [ ] The remaining Impeller differences (#33): what the blur correction
       cannot reach — no kernel under 0.69 texels, a downsampled kernel of
-      another shape — and the dark soft scroll edge, which on Impeller reads
-      apart from the light one at the same sigma. The tiled group's seams are
+      another shape — and the soft scroll edge, which on Impeller is blurrier
+      than Apple's on the devices too (residual contrast 0.098 on an M2 iPad,
+      0.089 on an S22, Apple 0.157): its 1.57 texels fall between two of
+      Impeller's integer radii, which leave 0.25 and 0.09. A divisor that
+      puts more texels under the sigma, two passes, or a Gaussian of our own
+      would reach it; each is a cost (glass D238). The tiled group's seams are
       `flutter_tester`'s: on an M2 iPad the tiles are the one quad, 0 of
       19,200 px.
 

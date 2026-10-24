@@ -121,8 +121,10 @@ void main() {
       expect(ours.bottom.leastContrast, greaterThan(0.85), reason: 'the bottom blurs, and Apple\'s does not');
       expect(ours.bottom.a, closeTo(apple.bottom.a, 0.04));
       expect(ours.bottom.tint50, closeTo(apple.bottom.tint50, 7.5));
-      // The dark edge reads apart from the light one on Impeller at the same
-      // sigma, which is not traced yet (#33).
+      // On Impeller the dark edge leaves 0.09 of the lines, on the devices too
+      // (glass D238): its 1.57 texels fall between two of Impeller's integer
+      // radii. The light one reads a few code values under its 0.85 tint and
+      // cannot tell (#33).
     }, tags: appearance == GlassScrollEdgeAppearance.dark ? 'impeller-gap' : null);
   }
 
