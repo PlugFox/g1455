@@ -1131,6 +1131,11 @@ class _GlassHostState extends State<GlassHost> {
         if (cluster.bridgeReach > 0)
           for (final GlassSurfaceGeometry member in cluster.members) member: cluster.bridgeReach,
     };
+    // What the host's subtree covers: nothing past it is drawn, so nothing past
+    // it is captured.
+    final Rect? scene = root is RenderBox && root.hasSize
+        ? MatrixUtils.transformRect(root.getTransformTo(null), Offset.zero & root.size)
+        : null;
     final rects = <Rect>[];
     final present = <GlassSurfaceGeometry>[];
     final finishes = <GlassFinish>[];
@@ -1157,11 +1162,14 @@ class _GlassHostState extends State<GlassHost> {
         // A widened or minifying glass samples past its box; by its
         // full reach rather than the presence-scaled one, so a drop lifting in
         // does not change the capture's input on every frame of it.
-        rects.add(
-          record.captureRect.inflate(
-            (reachOf[surface] ?? 0) + finish.optics.reach(record.rect.size / 2),
-          ),
+        final Rect wanted = record.captureRect.inflate(
+          (reachOf[surface] ?? 0) + finish.optics.reach(record.rect.size / 2),
         );
+        // Cut to the screen: a sheet dragged down to close goes on past the
+        // bottom of the area it travels in, and the part below the screen grew
+        // the rectangle on every frame, which the oracle read as a move — a
+        // retake a frame, where a drag between detents is one.
+        rects.add(scene != null && scene.overlaps(wanted) ? wanted.intersect(scene) : wanted);
         present.add(surface);
         finishes.add(finish);
         boxes?.add((surface: surface, box: record.rect));

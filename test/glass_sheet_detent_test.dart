@@ -277,6 +277,47 @@ void main() {
     expect(atlas[true], greaterThan(0), reason: 'the declared region cost the atlas nothing: $atlas');
   });
 
+  // The twin, down. A drag down past the lowest detent moves the sheet past
+  // the bottom of the area it travels in, and the part below the screen grew
+  // its capture rectangle on every frame, which the oracle read as a move —
+  // a retake a frame, where the drag between detents above is one. The
+  // capture is cut to the screen. A sheet the drag cannot close, so that it
+  // is pulled and no dim fades under it: a dim that fades is a change under
+  // the glass, and a drag to close is retaken for it, as it should be.
+  testWidgets('pulled down past its lowest detent, the sheet is not retaken on every frame', (
+    WidgetTester tester,
+  ) async {
+    final retakes = <bool, int>{};
+    addTearDown(() => debugGlassSheetTravel = true);
+    for (final bool travel in <bool>[false, true]) {
+      debugGlassSheetTravel = travel;
+      final _Rig rig = await _Rig.mount(tester, largeFinish: GlassFinish.regularDark, dismissible: false);
+      await rig.open();
+      final TestGesture finger = await tester.startGesture(tester.getCenter(find.text('sheet body')));
+      await finger.moveBy(const Offset(0, 20));
+      await tester.pump();
+      await tester.pump();
+      final int before = rig.recorded;
+      var moved = 0;
+      for (var i = 0; i < 12; i++) {
+        final double top = rig.sheet.globalRect.top;
+        await finger.moveBy(const Offset(0, 25));
+        await tester.pump(const Duration(milliseconds: 16));
+        if (rig.sheet.globalRect.top != top) {
+          moved++;
+        }
+      }
+      retakes[travel] = rig.recorded - before;
+      expect(moved, 12, reason: 'the sheet did not follow the finger down');
+      await finger.up();
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+    }
+    debugPrint('retakes pulled down $retakes');
+    expect(retakes[false], greaterThanOrEqualTo(12), reason: '$retakes');
+    expect(retakes[true], lessThanOrEqualTo(1), reason: '$retakes');
+  });
+
   // A tap is not a drag. The sheet's recognizer is the only one under a tap
   // on its body, so it wins the arena and ends with no velocity; under a tap
   // on a button inside, it loses and is cancelled. Either used to re-pick the
@@ -444,6 +485,7 @@ class _Rig {
     GlassSheetDetent? initialDetent,
     ValueChanged<GlassSheetDetent>? onDetentChanged,
     bool reduceMotion = false,
+    bool dismissible = true,
     WidgetBuilder? content,
   }) async {
     await tester.pumpWidget(const SizedBox());
@@ -490,6 +532,7 @@ class _Rig {
                     initialDetent: initialDetent,
                     largeFinish: largeFinish,
                     onDetentChanged: onDetentChanged,
+                    barrierDismissible: dismissible,
                     builder: (BuildContext context) => LayoutBuilder(
                       builder: (BuildContext context, BoxConstraints constraints) {
                         heights.add(constraints.maxHeight);

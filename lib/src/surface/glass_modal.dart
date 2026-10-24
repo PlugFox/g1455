@@ -611,8 +611,9 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
   // The dim follows the sheet down a drag to close, as iOS's does: gone when
   // the sheet would be its whole height below its lowest detent. At rest the
   // opacity is 1 and pushes no layer. The dim is under the sheet, in what its
-  // glass captures, but a drag down retakes on every frame without the fade
-  // (13 of 13 in the package's tests), so it adds none.
+  // glass captures, so a drag to close is retaken on every frame for it: the
+  // glass shows the screen brightening. A pull that cannot close has no dim
+  // to fade and is not retaken (`glass_sheet_detent_test`).
   @override
   Widget buildModalBarrier() => ValueListenableBuilder<double>(
     valueListenable: _drop,

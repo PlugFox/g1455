@@ -589,9 +589,10 @@ one that was measured.
 ### Moving
 
 While the sheet is dragged between detents it declares where it travels, so the drag is one retake rather than one a
-frame (1 against 16 in the package's tests). Dragged down to close, the dim behind it fades with it. Two known gaps: a
-drag down to close is still retaken on every frame, and a list inside the sheet does not hand the drag over to the
-sheet when it reaches its top.
+frame (1 against 16 in the package's tests), and so is a pull below its lowest detent. Dragged down to close, the dim
+behind it fades with it, and that drag is retaken on every frame: the dim is under the glass, and the glass shows the
+screen brightening. A known gap: a list inside the sheet does not hand the drag over to the sheet when it reaches its
+top.
 
 ## Content
 

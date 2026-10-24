@@ -126,6 +126,9 @@ cheap setting is reachable without a fork.
       exported, so an app can give the one and read the other; on Impeller
       the blur asked for the sigma the finishes were calibrated at, measured
       on an M2 iPad (#33).
+- [x] A sheet pulled below its lowest detent is not retaken on every frame:
+      the capture is cut to the screen. A drag to close is, because the dim
+      under the sheet fades, which is a change under its glass.
 - [x] Glass that changes finish over a still screen is captured for the new
       one, not held on the old one's resolution (#34).
 - [x] The hard scroll edge's band in the dark appearance: the screen's
@@ -148,10 +151,6 @@ cheap setting is reachable without a fork.
       apart from the light one at the same sigma. The tiled group's seams are
       `flutter_tester`'s: on an M2 iPad the tiles are the one quad, 0 of
       19,200 px.
-- [ ] A sheet dragged down to close is retaken on every frame (13 of 13 in a
-      test), where a drag between detents is one retake: the layer watch
-      reads the drop as a change under the sheet. 0.2.0 claimed one retake
-      for this drag too.
 - [ ] CI has no Impeller run; `flutter test --enable-impeller` reads the
       blur as an M2 iPad does, 0.02 apart on average (#33).
 

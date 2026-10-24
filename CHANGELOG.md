@@ -113,6 +113,10 @@ a change.
   more render pass on a frame that is capturing anyway, and named in
   `WalkLog.fellBack`. A subtree that holds glass is still drawn by the
   capture, as is a `BackdropFilter`.
+- A sheet dragged below its lowest detent is no longer captured on every
+  frame of the drag: the part of it below the screen grew its capture, and
+  the capture is now cut to the screen. A sheet dragged down to close still
+  is, since the dim under it fades with the drag.
 - Glass that changes finish over a still screen, such as a `GlassSearchBar`
   turned from light glass to dark, or adaptive glass whose verdict moves,
   is captured again for the new finish. It used to keep the capture taken
