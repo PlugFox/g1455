@@ -113,8 +113,8 @@ class _BadgeDemoState extends State<BadgeDemo> {
                       iconBuilder: (BuildContext context, GlassTabItemLook look) =>
                           _badge(SiteIcon(SFIcons.sf_envelope_fill, color: look.color, size: look.iconSize)),
                     ),
-                    const GlassTabItem(icon: SFIcons.sf_person_2_fill, label: 'Contacts'),
-                    const GlassTabItem(icon: SFIcons.sf_gearshape_fill, label: 'Settings'),
+                    siteTab(SFIcons.sf_person_2_fill, 'Contacts'),
+                    siteTab(SFIcons.sf_gearshape_fill, 'Settings'),
                   ],
                   selectedIndex: _tab,
                   onSelected: (int i) => setState(() => _tab = i),

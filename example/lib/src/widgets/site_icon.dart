@@ -1,4 +1,6 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
+import 'package:g1455/g1455.dart';
 
 /// How much of the box the glyph's height takes. SF Symbols are drawn larger
 /// on their em than Material's icons, which leave a margin inside it; at the
@@ -13,6 +15,10 @@ const double _kGlyphScale = 0.94;
 /// own — the eye, the laptop and the house are wider than tall — and in that
 /// box it runs into the label beside it. Here the glyph is measured, and one
 /// wider than the box is scaled down until it fits; the rest keep their size.
+///
+/// Drawn by [SFIcon], whose symbols are vector paths (flutter_sficon 2 bundles
+/// no font, and [Icon] cannot draw them), in the line box the font had, so
+/// the glyph sits where it always did.
 ///
 /// Themed as [Icon] is: [IconTheme]'s size, colour and opacity, and no text
 /// scaling. Not selectable, and silent to a screen reader unless
@@ -44,27 +50,21 @@ class SiteIcon extends StatelessWidget {
       );
     }
     final TextDirection direction = Directionality.of(context);
-    // A RichText, not a Text: a Text under the site's SelectionArea would be
-    // selectable, and a copy would carry the glyph's private-use character.
-    final Widget glyph = RichText(
-      overflow: TextOverflow.visible,
+    // No text scaling, as [Icon] has none: [SFIcon] scales with the text.
+    final MediaQueryData? media = MediaQuery.maybeOf(context);
+    Widget glyph = SFIcon(
+      icon,
+      fontSize: side * _kGlyphScale,
+      color: colour,
+      shadows: shadows,
       textDirection: direction,
-      textScaler: TextScaler.noScaling,
-      text: TextSpan(
-        text: String.fromCharCode(icon.codePoint),
-        style: TextStyle(
-          inherit: false,
-          color: colour,
-          fontSize: side * _kGlyphScale,
-          fontFamily: icon.fontFamily,
-          package: icon.fontPackage,
-          fontFamilyFallback: icon.fontFamilyFallback,
-          height: 1,
-          leadingDistribution: TextLeadingDistribution.even,
-          shadows: shadows,
-        ),
-      ),
     );
+    if (media != null) {
+      glyph = MediaQuery(
+        data: media.copyWith(textScaler: TextScaler.noScaling),
+        child: glyph,
+      );
+    }
     final Widget box = SizedBox.square(
       dimension: side,
       child: Center(
@@ -84,3 +84,17 @@ class SiteIcon extends StatelessWidget {
     );
   }
 }
+
+/// A tab of a [GlassTabBar] showing an SF Symbol, which the bar's own [Icon]
+/// cannot draw: through [GlassTabItem.iconBuilder], in the size and colour the
+/// bar resolved for the item.
+///
+/// One builder per symbol, held: the bar compares builders by identity, and a
+/// fresh closure on every build would read to it as a changed item.
+GlassTabItem siteTab(IconData icon, String label) =>
+    GlassTabItem(label: label, iconBuilder: _tabIcons.putIfAbsent(icon, () => _tabIcon(icon)));
+
+final Map<IconData, GlassTabItemBuilder> _tabIcons = <IconData, GlassTabItemBuilder>{};
+
+GlassTabItemBuilder _tabIcon(IconData icon) =>
+    (BuildContext context, GlassTabItemLook look) => SiteIcon(icon, size: look.iconSize, color: look.color);

@@ -1449,19 +1449,19 @@ class _TabsSceneState extends State<_TabsScene> {
             onSelected: _select,
             items: <GlassTabItem>[
               for (final (IconData icon, String label, _) in _kTabs)
-                GlassTabItem(
-                  label: label,
-                  // Any widget for the icon: here a badge, in the colour the
-                  // bar chose for the item.
-                  iconBuilder: label == 'Inbox' && _unread > 0
-                      ? (BuildContext context, GlassTabItemLook look) => GlassBadge(
-                          count: _unread,
-                          semanticLabel: '$_unread unread',
-                          child: SiteIcon(icon, size: look.iconSize, color: look.color),
-                        )
-                      : null,
-                  icon: icon,
-                ),
+                if (label == 'Inbox' && _unread > 0)
+                  GlassTabItem(
+                    label: label,
+                    // Any widget for the icon: here a badge, in the colour the
+                    // bar chose for the item.
+                    iconBuilder: (BuildContext context, GlassTabItemLook look) => GlassBadge(
+                      count: _unread,
+                      semanticLabel: '$_unread unread',
+                      child: SiteIcon(icon, size: look.iconSize, color: look.color),
+                    ),
+                  )
+                else
+                  siteTab(icon, label),
             ],
           ),
         ),

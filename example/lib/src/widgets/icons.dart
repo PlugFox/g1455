@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
 
 /// The icons the catalog names, which is plain Dart and cannot hold an
-/// [IconData] itself. Kept as one const map so the icon font is still
-/// tree-shaken to the glyphs named here.
+/// [IconData] itself. Kept as one const map so the symbols are still
+/// tree-shaken to the ones named here: each `SFIcons` constant carries its
+/// own outline.
 const Map<String, IconData> _kIcons = <String, IconData>{
   'rocket_launch': SFIcons.sf_paperplane,
   'download': SFIcons.sf_arrow_down_circle,
@@ -25,7 +26,7 @@ const Map<String, IconData> _kIcons = <String, IconData>{
   'memory': SFIcons.sf_cpu,
   'smart_button': SFIcons.sf_capsule,
   'crop_7_5': SFIcons.sf_rectangle,
-  'web_asset': SFIcons.sf_macwindow,
+  'web_asset': SFIcons.sf_interface_window,
   'toggle_on': SFIcons.sf_switch_2,
   'tune': SFIcons.sf_slider_horizontal_3,
   'view_week': SFIcons.sf_rectangle_split_3x1,

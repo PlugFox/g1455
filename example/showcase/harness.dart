@@ -185,10 +185,6 @@ Future<void> loadShowcaseFonts() async {
   }
   await roboto.load();
   await (FontLoader('MaterialIcons')..addFont(read('MaterialIcons-Regular.otf'))).load();
-  // The family `IconData(fontPackage: 'flutter_sficon')` asks for.
-  await (FontLoader(
-    'packages/flutter_sficon/sficons',
-  )..addFont(rootBundle.load('packages/flutter_sficon/lib/fonts/sficons.ttf'))).load();
 }
 
 Directory _materialFontsDir() {

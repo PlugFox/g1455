@@ -1086,10 +1086,10 @@ class _LibrarySceneState extends State<LibraryScene> {
             right: 12,
             bottom: 12,
             child: GlassTabBar(
-              items: const <GlassTabItem>[
-                GlassTabItem(icon: SFIcons.sf_music_note_list, label: 'Library'),
-                GlassTabItem(icon: SFIcons.sf_radio, label: 'Radio'),
-                GlassTabItem(icon: SFIcons.sf_magnifyingglass, label: 'Search'),
+              items: <GlassTabItem>[
+                siteTab(SFIcons.sf_music_note_list, 'Library'),
+                siteTab(SFIcons.sf_radio, 'Radio'),
+                siteTab(SFIcons.sf_magnifyingglass, 'Search'),
               ],
               selectedIndex: _tab,
               onSelected: _select,

@@ -194,7 +194,7 @@ const List<(String, String, IconData)> _kItems = <(String, String, IconData)>[
   ('Spring meadow', 'Provence · 54 photos', SFIcons.sf_leaf),
   ('Volcano', 'Iceland · 23 photos', SFIcons.sf_mountain_2),
   ('Lagoon', 'Bora Bora · 65 photos', SFIcons.sf_beach_umbrella),
-  ('Old town', 'Prague · 41 photos', SFIcons.sf_building_columns),
+  ('Old town', 'Prague · 41 photos', SFIcons.sf_building_classical_columns),
   ('Rainforest', 'Borneo · 76 photos', SFIcons.sf_tree),
   ('Ice fields', 'Patagonia · 29 photos', SFIcons.sf_snowflake),
   ('Canyon', 'Arizona · 58 photos', SFIcons.sf_mountain_2_fill),

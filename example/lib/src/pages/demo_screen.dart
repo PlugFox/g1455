@@ -29,7 +29,7 @@ class DemoScreen extends StatefulWidget {
 }
 
 final List<GlassTabItem> _kTabs = <GlassTabItem>[
-  for (final Entry e in kDemoEntries) GlassTabItem(icon: iconFor(e.icon), label: e.title),
+  for (final Entry e in kDemoEntries) siteTab(iconFor(e.icon), e.title),
 ];
 
 class _DemoScreenState extends State<DemoScreen> {
