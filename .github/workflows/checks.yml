@@ -75,7 +75,11 @@ jobs:
       # is tagged `impeller-gap` (see dart_test.yaml) and left to the Skia run.
       - name: Test on Impeller
         if: matrix.name == 'stable'
-        run: flutter test --enable-impeller --exclude-tags impeller-gap --reporter=github
+        # With coverage of its own: the package's Gaussian, and the host's load
+        # of it, run only here.
+        run: >-
+          flutter test --enable-impeller --exclude-tags impeller-gap --reporter=github
+          --coverage --coverage-path coverage/impeller.info
 
       # Plays every showcase loop headless and checks each meets itself at the
       # seam, so a change that breaks the README's animations fails here.
@@ -87,7 +91,7 @@ jobs:
         if: matrix.name == 'stable'
         uses: codecov/codecov-action@v7
         with:
-          files: coverage/lcov.info
+          files: coverage/lcov.info,coverage/impeller.info
           use_oidc: true
           # A fork's pull request gets no OIDC token; its upload is skipped
           # rather than failing the checks.

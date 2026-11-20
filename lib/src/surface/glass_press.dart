@@ -351,9 +351,8 @@ class _PressStage extends SingleChildRenderObjectWidget {
 
   @override
   void updateRenderObject(BuildContext context, _RenderPressStage renderObject) {
-    renderObject
-      ..press = press
-      ..region = region;
+    // The region is the state's own, the same for the stage's whole life.
+    renderObject.press = press;
   }
 }
 
@@ -405,17 +404,7 @@ class _RenderPressStage extends RenderProxyBox {
     markNeedsLayout();
   }
 
-  _PressRegion _region;
-  set region(_PressRegion value) {
-    if (identical(value, _region)) {
-      return;
-    }
-    if (identical(_region._body, child)) {
-      _region._body = null;
-    }
-    _region = value;
-    markNeedsLayout();
-  }
+  final _PressRegion _region;
 
   @override
   void detach() {

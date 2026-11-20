@@ -1151,34 +1151,23 @@ class _SheetFrame extends SingleChildRenderObjectWidget {
   final double extent;
 
   @override
-  _RenderSheetFrame createRenderObject(BuildContext context) =>
-      _RenderSheetFrame(route: route, extent: extent, limits: route.constraints);
+  _RenderSheetFrame createRenderObject(BuildContext context) => _RenderSheetFrame(route: route, extent: extent);
 
   @override
-  void updateRenderObject(BuildContext context, _RenderSheetFrame renderObject) => renderObject
-    ..route = route
-    ..extent = extent
-    ..limits = route.constraints;
+  void updateRenderObject(BuildContext context, _RenderSheetFrame renderObject) => renderObject.extent = extent;
 }
 
 class _RenderSheetFrame extends RenderShiftedBox {
-  _RenderSheetFrame({required this.route, required this._extent, required this._limits}) : super(null);
+  _RenderSheetFrame({required this.route, required this._extent}) : super(null);
 
-  _GlassSheetRoute<Object?> route;
+  /// The route this frame lays out, for its whole life: a sheet's frame is
+  /// built for one route, and with its constraints, which do not change.
+  final _GlassSheetRoute<Object?> route;
 
   double _extent;
   set extent(double value) {
     if (value != _extent) {
       _extent = value;
-      markNeedsLayout();
-    }
-  }
-
-  BoxConstraints? _limits;
-  set limits(BoxConstraints? value) {
-    if (value != _limits) {
-      _limits = value;
-      _natural = null;
       markNeedsLayout();
     }
   }
@@ -1223,7 +1212,7 @@ class _RenderSheetFrame extends RenderShiftedBox {
     if (child == null) {
       return;
     }
-    BoxConstraints within(double width, double height) => (_limits ?? const BoxConstraints()).enforce(
+    BoxConstraints within(double width, double height) => (route.constraints ?? const BoxConstraints()).enforce(
       BoxConstraints(maxWidth: math.max(0, width), maxHeight: math.max(0, height)),
     );
     final double p = _extent.clamp(0.0, 1.0);

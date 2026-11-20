@@ -145,7 +145,7 @@ cheap setting is reachable without a fork.
       its child to the engine, inside the capture (#32), and leaves a shader
       mask's and a backdrop filter's live layers as their paint set them.
 
-## Done — next release
+## Done — 0.5.0
 
 - [x] A glass circle beside the tab bar for one action set apart from the
       tabs, as iOS 26's search tab (`GlassTabBar.trailingAction`). Its gap
