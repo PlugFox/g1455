@@ -76,7 +76,7 @@ right-to-left `Directionality` the stepper is mirrored, with the minus at the en
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A print dialog's options on a glass card.

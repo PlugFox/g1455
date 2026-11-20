@@ -83,7 +83,7 @@ how a pressed [button](../components/button.md) swells and leans (`GlassPress.no
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 void main() => runApp(const HostApp(reduceTransparency: false));

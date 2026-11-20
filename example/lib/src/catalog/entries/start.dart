@@ -22,7 +22,8 @@ The package is pure Dart and shaders. It ships no platform code, so there is not
 flutter pub add g1455
 ```
 
-It needs Flutter 3.47 or later. Then import it wherever you use glass:
+It needs Flutter 3.47 or later. g1455 itself needs only `widgets`; the examples in these guides use Material from
+`material_ui`, where Flutter 3.50 moves it (`flutter pub add material_ui`). Then import g1455 wherever you use glass:
 
 ```dart
 import 'package:g1455/g1455.dart';
@@ -114,7 +115,7 @@ catch it if the app should start regardless.
 - [Misuse & common errors](/start/common-errors): missing glass, holes, grey boxes, and what the debug messages mean.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 Future<void> main() async {
@@ -395,7 +396,7 @@ reported costs and the default texture limit, never correctness.
 > for tests and benchmarks, not for users.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// The settings the package cannot read for itself. Fill them from your own

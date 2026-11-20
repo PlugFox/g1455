@@ -124,7 +124,7 @@ sheet lifts itself above page glass and bars on its own.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Opens a glass sheet to choose who to share with, and returns the name.

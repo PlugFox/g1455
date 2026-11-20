@@ -75,7 +75,7 @@ nothing, since nothing is all it shows.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A mail app's tab bar, the unread count on the Mail tab.

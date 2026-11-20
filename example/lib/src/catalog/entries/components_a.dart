@@ -71,7 +71,7 @@ see [Legibility](/foundations/legibility).
 > in [`GlassAbove`](/foundations/above), or use a [scroll edge](/foundations/scroll-edge) instead.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A library screen: a top bar and a "now playing" bar over a list.
@@ -245,7 +245,7 @@ sees: focusing a button costs nothing.
   more capture level. See [Performance](/foundations/performance).
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A photo viewer's floating actions.
@@ -397,7 +397,7 @@ hardest to read on. Try them in the demo above, and see [Finishes](/foundations/
   at 70% alpha) rather than a fixed grey, so it follows the label colour the card chose.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A weather widget over a wallpaper.
@@ -548,7 +548,7 @@ The switch is never smaller than 44 px tall, so it stays easy to hit.
 > works, but the held knob is not drawn as glass.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A settings group on a glass card.
@@ -725,7 +725,7 @@ that width. Use it to place a tick, a label or a buffered-range bar exactly unde
 `textDirection: TextDirection.rtl` for a mirrored slider, whose fill ends that far from the right.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Volume and brightness on a glass card, with a readout.
@@ -883,7 +883,7 @@ segments read their text. For icon segments, wrap each icon in `Semantics(label:
   [GlassSurface](/foundations/surface)): 14 inside a 16 track inset 2.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A calendar header: a range picker on a glass card, and what it selects.
@@ -1137,7 +1137,7 @@ item's icon is built once more, for the circle.
 > a field or a top-level function.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// An app shell: one page per tab, a floating glass tab bar on top that

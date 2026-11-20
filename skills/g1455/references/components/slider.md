@@ -88,7 +88,7 @@ that width. Use it to place a tick, a label or a buffered-range bar exactly unde
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Volume and brightness on a glass card, with a readout.

@@ -59,7 +59,7 @@ hardest to read on. Try them in the demo above, and see [Finishes](../foundation
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A weather widget over a wallpaper.

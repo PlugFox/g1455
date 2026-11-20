@@ -58,7 +58,7 @@ The field is an `EditableText`, read as a text field with its placeholder. The c
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A list of contacts with a search bar floating over its top.

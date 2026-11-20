@@ -52,7 +52,7 @@ A wave changes how the captured backdrop is sampled, not the backdrop itself, so
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A hero panel that answers a touch with a wave. Assumes a GlassHost above,

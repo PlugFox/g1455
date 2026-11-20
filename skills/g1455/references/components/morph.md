@@ -70,7 +70,7 @@ fading out keeps its state.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A "+" in the corner that flows into a panel of actions.

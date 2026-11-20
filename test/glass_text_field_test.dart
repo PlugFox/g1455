@@ -10,7 +10,7 @@
 // seconds). Without it, "0 records while blinking" would read the same on a
 // host that saw nothing at all.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 

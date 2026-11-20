@@ -26,7 +26,7 @@
 // `RetakeOracle.noteSurfacesChanged` setting only `_dirty`, a replacement
 // held like content (2); the host no longer setting `throttleFrames` (3).
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 import 'package:g1455/src/proxy/proxy_retake.dart';

@@ -57,7 +57,7 @@ Blobs that orbit or follow a finger move over still content, so wrap them in a [
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Blobs that fuse, one that buds, and a split pill. Assumes a GlassHost above.

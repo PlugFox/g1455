@@ -90,7 +90,7 @@ The demo above shows the same counters live: switch the declaration off and on, 
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A home screen over a gradient that never changes, with a feed below it.

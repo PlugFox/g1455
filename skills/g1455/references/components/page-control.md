@@ -69,7 +69,7 @@ and the left and right arrows follow it. When `count` shrinks below the current 
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// An onboarding carousel with page dots over it.

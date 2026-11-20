@@ -77,7 +77,7 @@ surfaces; a group of three is one. Grouping is how Apple draws it, and it's also
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A photo viewer's bottom toolbar: share alone, three actions grouped,

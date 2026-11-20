@@ -74,7 +74,7 @@ controller drives one anchor at a time.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A note's header with a "…" menu of actions.

@@ -77,7 +77,7 @@ popover and the list listen to.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A "Sort & filter" button whose popover changes the list behind it.

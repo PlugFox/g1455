@@ -83,7 +83,7 @@ GlassTextField(
 - Keep a visible label or a clear placeholder: the field has no separate label parameter.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A list of cities with a glass search field floating over it.
@@ -246,7 +246,7 @@ surfaces; a group of three is one. Grouping is how Apple draws it, and it's also
 > those widgets break it. `RepaintBoundary` is fine.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A photo viewer's bottom toolbar: share alone, three actions grouped,
@@ -411,7 +411,7 @@ final bool? delete = await showGlassDialog<bool>(
 - Keep action labels short verbs ("Delete", "Keep"), not "Yes" and "No".
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A row that asks before deleting its file.
@@ -626,7 +626,7 @@ sheet lifts itself above page glass and bars on its own.
 - Dragging is not the only way out: give the sheet a visible close or cancel action as well.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Opens a glass sheet to choose who to share with, and returns the name.
@@ -808,7 +808,7 @@ controller drives one anchor at a time.
 - Give an icon-only button a `semanticLabel`. The area around the open menu is announced with `barrierLabel`.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A note's header with a "…" menu of actions.
@@ -977,7 +977,7 @@ popover and the list listen to.
 - Label the controls inside, e.g. `semanticLabel` on a `GlassSlider`, or `MergeSemantics` around a text and a switch.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A "Sort & filter" button whose popover changes the list behind it.
@@ -1121,7 +1121,7 @@ fading out keeps its state.
 - Label the controls inside the panel as you would anywhere else.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A "+" in the corner that flows into a panel of actions.
@@ -1277,7 +1277,7 @@ frame, so every frame of a scroll is one capture, for every glass on the screen 
 capture. Being lifted is free over plain content, and one more snapshot per recorded frame over glass cards.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 void main() => runApp(const LibraryApp());

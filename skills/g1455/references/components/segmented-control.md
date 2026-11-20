@@ -68,7 +68,7 @@ segments read their text. For icon segments, wrap each icon in `Semantics(label:
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A calendar header: a range picker on a glass card, and what it selects.

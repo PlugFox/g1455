@@ -76,7 +76,7 @@ altogether: declare it with [`GlassBackdrop`](../foundations/backdrop.md).
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A video player under a glass control bar. The player is a platform view,

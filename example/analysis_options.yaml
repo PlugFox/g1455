@@ -14,6 +14,13 @@ formatter:
   # A trailing comma the author wrote keeps its construct split.
   trailing_commas: preserve
 
+# The site stays on `package:flutter/material.dart`, which Flutter 3.50
+# deprecates for `package:material_ui`, while the package and its tests have
+# moved. The guides are drawn by flutter_md, which is built on the former: its
+# ThemeData, Theme and localizations are another library's types than
+# material_ui's, so a site on material_ui would hand it a theme it cannot take
+# and leave it no theme to find. Each import carries its own ignore, so every
+# other deprecation still fails the analysis; they go when flutter_md moves.
 analyzer:
   exclude:
     - build/**

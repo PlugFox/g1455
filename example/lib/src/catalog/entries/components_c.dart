@@ -82,7 +82,7 @@ focus ring is drawn inside the glass, so it takes no capture, and a disabled ste
 right-to-left `Directionality` the stepper is mirrored, with the minus at the end, and so are the left and right arrows.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A print dialog's options on a glass card.
@@ -238,7 +238,7 @@ display and takes no focus. Under a right-to-left `Directionality` the first pag
 and the left and right arrows follow it. When `count` shrinks below the current page, the control shows the last page.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// An onboarding carousel with page dots over it.
@@ -382,7 +382,7 @@ without), because it is the field's resize that costs, not Cancel's paint. Under
 The field is an `EditableText`, read as a text field with its placeholder. The clear button and Cancel are buttons.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A list of contacts with a search bar floating over its top.
@@ -524,7 +524,7 @@ A screen reader hears `semanticLabel`, or the count or label as written. Give a 
 nothing, since nothing is all it shows.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A mail app's tab bar, the unread count on the Mail tab.
