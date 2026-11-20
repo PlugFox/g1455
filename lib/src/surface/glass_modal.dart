@@ -40,6 +40,7 @@
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
+import 'package:flutter/gestures.dart' show Drag, DragStartDetails;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -493,6 +494,16 @@ bool debugGlassSheetTravel = true;
 /// on the theme's rung and sees the sheet behind it. A [largeFinish] whose
 /// tint is translucent keeps the sheet glass, and keeps its capture.
 ///
+/// **A list in the sheet** shares one drag with it, as a scroll view in
+/// UIKit's sheet does: down, the list scrolls to its top and the sheet moves
+/// with the rest, towards medium or on to close; up, the sheet rises first,
+/// to large where it has that detent, and the list scrolls with the rest; a
+/// release flings whichever the finger last moved. The content is handed a
+/// [PrimaryScrollController] for it, on every platform, so a vertical scroll
+/// view with no `controller` of its own takes part as it is. One given its own
+/// controller, a reversed one and a mouse wheel keep to themselves;
+/// [PrimaryScrollController.none] around the content keeps every one out.
+///
 /// [barrierDismissible] false is a sheet only its own content closes, as
 /// UIKit's `isModalInPresentation`: a tap on the dim, Escape and a drag all
 /// leave it where it is — a drag down past its lowest detent pulls it a quarter
@@ -725,6 +736,34 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
     }
   }
 
+  /// An upward [dy] from a scroll in the content, before the content takes
+  /// it: out of a drag below the lowest detent first, then towards large —
+  /// UIKit's `prefersScrollingExpandsWhenScrolledToEdge`, its default. Returns
+  /// what is left for the content to scroll by.
+  double _dragUpFromContent(double dy) {
+    assert(dy < 0);
+    final bool below = _drop.value > 0 || _pull.value > 0;
+    if (!below && !(_between && _extent.value < 1)) {
+      return dy;
+    }
+    _settle?.stop();
+    _dragged = true;
+    _moving.value = true;
+    var rest = _raise(dy);
+    if (rest < 0 && _between && _extent.value < 1) {
+      final double span = math.max(_span, 1);
+      final double used = math.min(-rest, (1 - _extent.value) * span);
+      _extent.value = math.min(1, _extent.value + used / span);
+      rest += used;
+    }
+    return rest;
+  }
+
+  /// The controller the content's scroll views inherit
+  /// ([PrimaryScrollController]), whose positions hand the finger over to the
+  /// sheet at their top.
+  late final _SheetScrollController _scroll = _SheetScrollController(this);
+
   /// Takes an upward [dy] out of whatever pulls the sheet below its lowest
   /// detent, and returns what is left of it.
   double _raise(double dy) {
@@ -821,12 +860,130 @@ class _GlassSheetRoute<T> extends PopupRoute<T> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _settle?.dispose();
     _moving.dispose();
     _extent.dispose();
     _drop.dispose();
     _pull.dispose();
     super.dispose();
+  }
+}
+
+/// What a sheet's content inherits as its [PrimaryScrollController]: a
+/// controller whose positions hand the finger over to the sheet.
+class _SheetScrollController extends ScrollController {
+  _SheetScrollController(this.route) : super(debugLabel: 'GlassSheet');
+
+  final _GlassSheetRoute<Object?> route;
+
+  @override
+  ScrollPosition createScrollPosition(ScrollPhysics physics, ScrollContext context, ScrollPosition? oldPosition) =>
+      _SheetScrollPosition(
+        route: route,
+        physics: physics,
+        context: context,
+        oldPosition: oldPosition,
+        initialPixels: initialScrollOffset,
+        keepScrollOffset: keepScrollOffset,
+        debugLabel: debugLabel,
+      );
+}
+
+/// A scroll position in a sheet's content that shares a drag with the sheet,
+/// as UIKit's does with a sheet's scroll view:
+///
+///  - **a drag down** scrolls the content until it is at its top, and moves
+///    the sheet with the rest — towards medium, or below its lowest detent,
+///    where a release closes it as a drag on the grabber does;
+///  - **a drag up** lifts the sheet first, out of a drag below its lowest
+///    detent and on to large where it has that detent, and scrolls the
+///    content with the rest;
+///  - **a release** flings whichever the finger last moved: the sheet, with
+///    the finger's speed, or the content, the sheet settling where it is.
+///
+/// Only a scroll view whose top is at the top: one laid out downwards. A
+/// reversed one — a chat — keeps its drag to itself, as does any drag that is
+/// not a finger's (a mouse wheel, a keyboard, `jumpTo`).
+class _SheetScrollPosition extends ScrollPositionWithSingleContext {
+  _SheetScrollPosition({
+    required this.route,
+    required super.physics,
+    required super.context,
+    super.oldPosition,
+    super.initialPixels,
+    super.keepScrollOffset,
+    super.debugLabel,
+  });
+
+  final _GlassSheetRoute<Object?> route;
+
+  /// A finger is dragging this position, and its release is still to come.
+  bool _dragging = false;
+
+  /// Whether the finger's last move went, at least in part, to the sheet.
+  bool _sheetOwns = false;
+
+  bool get _hands => axisDirection == AxisDirection.down;
+
+  @override
+  Drag drag(DragStartDetails details, VoidCallback dragCancelCallback) {
+    _dragging = _hands;
+    _sheetOwns = false;
+    if (_hands) {
+      route._touch();
+    }
+    return super.drag(details, dragCancelCallback);
+  }
+
+  // `delta` is the finger's travel, down positive: the content's offset goes
+  // down by it.
+  @override
+  void applyUserOffset(double delta) {
+    if (!_dragging || delta == 0) {
+      super.applyUserOffset(delta);
+      return;
+    }
+    if (delta > 0) {
+      // Down: the content until its top, then the sheet.
+      final double room = math.max(0, pixels - minScrollExtent);
+      if (delta <= room) {
+        _sheetOwns = false;
+        super.applyUserOffset(delta);
+        return;
+      }
+      if (room > 0) {
+        super.applyUserOffset(room);
+      }
+      _sheetOwns = true;
+      route._drag(delta - room);
+      return;
+    }
+    // Up: the sheet until it is as high as it goes, then the content.
+    final double rest = route._dragUpFromContent(delta);
+    _sheetOwns = rest != delta;
+    if (rest < 0) {
+      super.applyUserOffset(rest);
+    }
+  }
+
+  // `velocity` is the content's, the finger's negated.
+  @override
+  void goBallistic(double velocity) {
+    if (!_dragging) {
+      super.goBallistic(velocity);
+      return;
+    }
+    _dragging = false;
+    if (_sheetOwns) {
+      _sheetOwns = false;
+      route._release(-velocity);
+      super.goBallistic(0);
+      return;
+    }
+    // The sheet settles where it was left, if this drag moved it at all.
+    route._release(0);
+    super.goBallistic(velocity);
   }
 }
 
@@ -884,7 +1041,16 @@ class _GlassSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-              Flexible(child: Builder(builder: route.builder)),
+              // A vertical scroll view in the content with no controller of
+              // its own shares its drag with the sheet; on every platform, as
+              // the sheet's own drag is.
+              Flexible(
+                child: PrimaryScrollController(
+                  controller: route._scroll,
+                  automaticallyInheritForPlatforms: TargetPlatform.values.toSet(),
+                  child: Builder(builder: route.builder),
+                ),
+              ),
             ],
           ),
         ),

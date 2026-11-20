@@ -87,8 +87,23 @@ one that was measured.
 While the sheet is dragged between detents it declares where it travels, so the drag is one retake rather than one a
 frame (1 against 16 in the package's tests), and so is a pull below its lowest detent. Dragged down to close, the dim
 behind it fades with it, and that drag is retaken on every frame: the dim is under the glass, and the glass shows the
-screen brightening. A known gap: a list inside the sheet does not hand the drag over to the sheet when it reaches its
-top.
+screen brightening.
+
+### A list in the sheet
+
+A vertical list in the content shares one drag with the sheet, as a scroll view in a UIKit sheet does:
+
+- **down**, the list scrolls until it is at its top, and the rest of the drag moves the sheet: towards medium from large,
+  or below the lowest detent, where a release past a third of the sheet, or a flick, closes it;
+- **up**, the sheet rises first, back from a drag below its lowest detent and on to large where it has that detent
+  (UIKit's `prefersScrollingExpandsWhenScrolledToEdge`, on by default there), and the list scrolls with the rest;
+- **a release** flings whichever the finger last moved: a flick up at medium carries the sheet to large and leaves the
+  list at its top, a flick at large flings the list.
+
+The sheet hands its content a `PrimaryScrollController`, so a `ListView`, a `CustomScrollView` or a
+`SingleChildScrollView` with no `controller` of its own takes part without any wiring, on every platform. A scroll view
+given its own `controller`, a reversed one (a chat, whose top is at the bottom) and a horizontal one keep their drag to
+themselves, and so does a mouse wheel. Wrap the content in `PrimaryScrollController.none` to keep all of them out.
 
 ## Content
 

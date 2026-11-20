@@ -152,6 +152,8 @@ cheap setting is reachable without a fork.
       and size are layout taste: Apple's was not measured.
 - [x] Glass partly past the screen's edge reads the screen clamped to that
       edge, not black (#42).
+- [x] A list in a sheet hands the drag over to the sheet at its top, and the
+      sheet hands it to the list once it is at large, as UIKit's does.
 
 ## Next — what 0.4.0 left open
 
@@ -181,8 +183,6 @@ cheap setting is reachable without a fork.
       +22% fragment GPU time on a Mac, and Skia draws a native
       `RSuperellipse` as an `RRect`, so on Skia the glass and the engine's own
       shape would not agree. Measure it on Adreno before deciding.
-- [ ] Content that scrolls inside a sheet does not hand the drag over to the
-      sheet at its top, as UIKit's does.
 - [ ] `GlassPageControl` with many pages: iOS shrinks the dots toward the ends
       of a long row; ours draws them all at one size.
 - [ ] Apple's medium detent is half the window whatever the content; ours is

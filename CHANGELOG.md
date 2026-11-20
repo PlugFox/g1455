@@ -9,6 +9,16 @@
   circle stays where it is and the accessory moves down between the two.
   `selected: true` makes it the selection: its icon in the accent, and no
   tab in the bar drawn as selected. One surface more, always.
+- A list in a sheet shares its drag with the sheet, as a scroll view in
+  UIKit's sheet does. Down, the list scrolls to its top and the sheet moves
+  with the rest, towards medium or on to close; up, the sheet rises first,
+  to large where it has that detent, and the list scrolls with the rest; a
+  release flings whichever the finger last moved. The sheet hands its
+  content a `PrimaryScrollController`, on every platform, so a vertical
+  scroll view with no controller of its own takes part as it is; one with
+  its own controller, a reversed one and a mouse wheel do not, and
+  `PrimaryScrollController.none` around the content keeps them all out.
+  Before, a list at its top overscrolled and the sheet stayed put.
 
 ### Fixed
 
