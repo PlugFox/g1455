@@ -1,5 +1,15 @@
 ## Unreleased
 
+### Added
+
+- `GlassTabBar.trailingAction`: one action set apart from the tabs, as iOS
+  26 does with search — a `GlassTabBarAction`, drawn as a glass circle as
+  tall as the bar, 12 px past its end edge, which takes a tap as a
+  `GlassButton` does. The bar takes the width that is left; collapsed, the
+  circle stays where it is and the accessory moves down between the two.
+  `selected: true` makes it the selection: its icon in the accent, and no
+  tab in the bar drawn as selected. One surface more, always.
+
 ### Fixed
 
 - Glass partly past the screen's edge no longer darkens toward it (#42). The

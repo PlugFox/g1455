@@ -145,6 +145,14 @@ cheap setting is reachable without a fork.
       its child to the engine, inside the capture (#32), and leaves a shader
       mask's and a backdrop filter's live layers as their paint set them.
 
+## Done — next release
+
+- [x] A glass circle beside the tab bar for one action set apart from the
+      tabs, as iOS 26's search tab (`GlassTabBar.trailingAction`). Its gap
+      and size are layout taste: Apple's was not measured.
+- [x] Glass partly past the screen's edge reads the screen clamped to that
+      edge, not black (#42).
+
 ## Next — what 0.4.0 left open
 
 - [ ] What the walk still draws apart from the engine (#37): a
@@ -173,14 +181,14 @@ cheap setting is reachable without a fork.
       +22% fragment GPU time on a Mac, and Skia draws a native
       `RSuperellipse` as an `RRect`, so on Skia the glass and the engine's own
       shape would not agree. Measure it on Adreno before deciding.
-- [ ] No trailing action circle beside the tab bar, such as the search tab
-      iOS 26 sets apart from the others.
 - [ ] Content that scrolls inside a sheet does not hand the drag over to the
       sheet at its top, as UIKit's does.
 - [ ] `GlassPageControl` with many pages: iOS shrinks the dots toward the ends
       of a long row; ours draws them all at one size.
 - [ ] Apple's medium detent is half the window whatever the content; ours is
       the content's height.
+- [ ] The tab bar's trailing action at an accessibility text size: iOS's
+      large content viewer shows it as it does a tab; ours shows tabs only.
 
 - [ ] Measure a declared backdrop against its capture on the devices: the
       saving is a snapshot per changed frame, and a still screen already

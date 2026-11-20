@@ -1102,6 +1102,40 @@ bar's box is taller by the accessory and the gap, and stays that height.
 Under [adaptive glass](/foundations/adaptive) the bar reads what is under it and picks its branch, and the accessory
 wears the same one, whatever is under the accessory: a light bar under a dark capsule would read as two controls.
 
+## A trailing action
+
+`trailingAction` sets one action apart from the tabs, as iOS 26 does with search: a glass circle as tall as the bar,
+12 px past its end edge (its start edge under right to left), and the bar takes the width that is left. It is a
+[`GlassButton`](/components/button), so it swells under a finger and takes the keyboard's focus, and it wears the bar's
+verdict under [adaptive glass](/foundations/adaptive).
+
+```dart
+GlassTabBar(
+  items: tabs,
+  selectedIndex: _tab,
+  onSelected: (int i) => setState(() {
+    _tab = i;
+    _searching = false;
+  }),
+  trailingAction: GlassTabBarAction(
+    icon: Icons.search,
+    label: 'Search',
+    selected: _searching,
+    onPressed: () => setState(() => _searching = true),
+  ),
+)
+```
+
+It is not a tab: the drop does not slide onto it, and `onSelected` is not told of it. A search screen is shown from
+`onPressed`, and `selected` says it is up: the circle's icon takes the accent, and the bar's tabs give up the
+selection, no capsule and no accent, until it is `false` again. When the bar collapses, the circle stays where it is
+and the accessory moves down between the two.
+
+- **Cost.** One surface more, at rest and always: the bar and the circle are two glasses. A press is the button's own
+  two captures; the bar's drop and its collapse take none from it.
+- A screen reader hears a button named by `label`, selected when `selected` says so.
+- The gap and the size are layout taste: Apple's search tab was not measured.
+
 ## Custom icons and badges
 
 An `IconData` is drawn by the bar in the right colour: the accent when selected, otherwise the label colour its glass
@@ -1213,7 +1247,20 @@ class _AppShellState extends State<AppShell> {
 | `dropMotion` | `GlassDropMotion?` | `null` | How the held drop stretches and squashes as it moves. Null takes the theme's; `GlassDropMotion.none` keeps it round. See [Drop motion](/foundations/drop-motion). |
 | `minimizeBehavior` | `GlassTabBarMinimizeBehavior` | `.never` | `.onScrollDown` collapses the bar to its selected tab while the content scrolls down, under a `GlassTabBarMinimizer`. |
 | `bottomAccessory` | `Widget?` | `null` | A widget on a glass capsule above the bar, which moves beside the collapsed circle. |
+| `trailingAction` | `GlassTabBarAction?` | `null` | A glass circle as tall as the bar past its end edge, for an action set apart from the tabs, as iOS 26's search. |
 | `key` | `Key?` | `null` | |
+
+## GlassTabBarAction
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `label` | `String` | **required** | What a screen reader says; the circle draws no text. |
+| `icon` | `IconData?` | `null` | Drawn in the accent while `selected`, in the bar's label colour otherwise. Ignored when `iconBuilder` is given. |
+| `iconBuilder` | `GlassTabItemBuilder?` | `null` | Builds the icon instead of `icon`. Its `look.index` is the item count, one past the last tab. |
+| `onPressed` | `VoidCallback?` | `null` | Called on a tap. Null disables the circle. |
+| `selected` | `bool` | `false` | The action is the selection: its icon in the accent, a screen reader told so, and no tab in the bar drawn as selected. |
+
+An action needs an `icon` or an `iconBuilder`; it asserts.
 
 ## GlassTabBarMinimizer
 

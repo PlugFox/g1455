@@ -9,8 +9,8 @@ import '../widgets/site_icon.dart';
 
 /// A floating tab bar at the bottom of a small "app" whose page changes with
 /// the tab and scrolls under it, one of its tabs drawn with a badge by
-/// `iconBuilder`; the bar can collapse on a scroll down and carry an
-/// accessory.
+/// `iconBuilder`; the bar can collapse on a scroll down, carry an accessory,
+/// and set Search apart as a circle of its own, as iOS 26 does.
 class TabBarDemo extends StatefulWidget {
   const TabBarDemo({super.key});
 
@@ -37,6 +37,11 @@ Widget _savedWithBadge(BuildContext context, GlassTabItemLook look) => GlassBadg
 
 const GlassTabItem _kSavedWithBadge = GlassTabItem(label: 'Saved', iconBuilder: _savedWithBadge);
 
+/// Search's glyph in the circle set apart: one function, so the bar sees the
+/// same builder on every rebuild and keeps what it built.
+Widget _searchIcon(BuildContext context, GlassTabItemLook look) =>
+    SiteIcon(SFIcons.sf_magnifyingglass, color: look.color, size: look.iconSize);
+
 const Map<String, Color> _kAccents = <String, Color>{
   'Blue': Color(0xFF0A84FF),
   'Pink': Color(0xFFFF375F),
@@ -51,18 +56,34 @@ class _TabBarDemoState extends State<TabBarDemo> {
   bool _badge = true;
   bool _minimize = true;
   bool _accessory = true;
+  bool _searchApart = false;
+  bool _searching = false;
+
+  /// The tabs the bar shows: all of them, or all but Search when it is set
+  /// apart.
+  List<(GlassTabItem, String)> get _shown => <(GlassTabItem, String)>[
+    for (final (GlassTabItem, String) tab in _kTabs.take(_count))
+      if (!_searchApart || tab.$1.label != 'Search') tab,
+  ];
 
   void _setCount(int count) => setState(() {
     _count = count;
-    _tab = _tab.clamp(0, count - 1);
+    _tab = _tab.clamp(0, _shown.length - 1);
+  });
+
+  void _setSearchApart(bool apart) => setState(() {
+    _searchApart = apart;
+    _searching = false;
+    _tab = 0;
   });
 
   @override
   Widget build(BuildContext context) {
-    final (GlassTabItem item, String line) = _kTabs[_tab];
+    final List<(GlassTabItem, String)> shown = _shown;
+    final (GlassTabItem item, String line) = _searching ? _kTabs[1] : shown[_tab];
     return DemoStage(
       height: 440,
-      background: GridBackdrop(hue: _tab * 70.0),
+      background: GridBackdrop(hue: _kTabs.indexOf((item, line)) * 70.0),
       hint: _minimize
           ? 'Scroll the page down: the bar collapses to the selected tab, and the accessory moves beside it. '
                 'Scroll up, or tap the circle, to bring it back. Press and hold the selected tab to drag the drop.'
@@ -79,6 +100,7 @@ class _TabBarDemoState extends State<TabBarDemo> {
         KnobSwitch(label: 'Badge', value: _badge, onChanged: (bool v) => setState(() => _badge = v)),
         KnobSwitch(label: 'Collapse on scroll', value: _minimize, onChanged: (bool v) => setState(() => _minimize = v)),
         KnobSwitch(label: 'Accessory', value: _accessory, onChanged: (bool v) => setState(() => _accessory = v)),
+        KnobSwitch(label: 'Search apart', value: _searchApart, onChanged: _setSearchApart),
         KnobSlider(
           label: 'Zoom',
           value: _zoom,
@@ -96,7 +118,7 @@ class _TabBarDemoState extends State<TabBarDemo> {
             Positioned.fill(
               child: ListView(
                 // Each tab its own page, from its top.
-                key: ValueKey<int>(_tab),
+                key: ValueKey<String>(item.label),
                 padding: const EdgeInsets.fromLTRB(20, 32, 20, 150),
                 children: <Widget>[
                   SiteIcon(item.icon, size: 64, color: Colors.white),
@@ -128,13 +150,24 @@ class _TabBarDemoState extends State<TabBarDemo> {
                     width: double.infinity,
                     child: GlassTabBar(
                       items: <GlassTabItem>[
-                        for (final (GlassTabItem tab, _) in _kTabs.take(_count))
+                        for (final (GlassTabItem tab, _) in shown)
                           _badge && tab.label == 'Saved' ? _kSavedWithBadge : tab,
                       ],
                       selectedIndex: _tab,
                       activeColor: _kAccents[_accent]!,
                       dropZoom: _zoom,
-                      onSelected: (int i) => setState(() => _tab = i),
+                      onSelected: (int i) => setState(() {
+                        _tab = i;
+                        _searching = false;
+                      }),
+                      trailingAction: _searchApart
+                          ? GlassTabBarAction(
+                              iconBuilder: _searchIcon,
+                              label: 'Search',
+                              selected: _searching,
+                              onPressed: () => setState(() => _searching = true),
+                            )
+                          : null,
                       minimizeBehavior: _minimize
                           ? GlassTabBarMinimizeBehavior.onScrollDown
                           : GlassTabBarMinimizeBehavior.never,

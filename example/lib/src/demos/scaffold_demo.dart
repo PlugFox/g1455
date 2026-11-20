@@ -21,10 +21,10 @@ class ScaffoldDemo extends StatefulWidget {
 /// The scroll edge under the top bar, or none.
 enum _Edge { soft, hard, none }
 
-const List<GlassTabItem> _kTabs = <GlassTabItem>[
-  GlassTabItem(icon: SFIcons.sf_photo_on_rectangle_angled, label: 'Library'),
-  GlassTabItem(icon: SFIcons.sf_heart_fill, label: 'Saved'),
-  GlassTabItem(icon: SFIcons.sf_magnifyingglass, label: 'Search'),
+final List<GlassTabItem> _kTabs = <GlassTabItem>[
+  siteTab(SFIcons.sf_photo_on_rectangle_angled, 'Library'),
+  siteTab(SFIcons.sf_heart_fill, 'Saved'),
+  siteTab(SFIcons.sf_magnifyingglass, 'Search'),
 ];
 
 class _ScaffoldDemoState extends State<ScaffoldDemo> {

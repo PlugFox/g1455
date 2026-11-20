@@ -148,6 +148,7 @@ export 'src/surface/glass_modal.dart'
 export 'src/surface/glass_tab_bar.dart'
     show
         GlassTabBar,
+        GlassTabBarAction,
         GlassTabBarMinimizeBehavior,
         GlassTabBarMinimizer,
         GlassTabItem,
