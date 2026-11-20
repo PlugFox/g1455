@@ -308,6 +308,11 @@ MarkdownThemeData siteMarkdownTheme(BuildContext context) {
     linkColor: kSiteAccent,
     surfaceColor: const Color(0x99101626),
     monospaceBackgroundColor: const Color(0x268AB4FF),
+    // The bundled JetBrains Mono, registered as `monospace` (see the
+    // pubspec): named here, since flutter_md 0.3 sets code in Menlo on iOS
+    // and macOS and Consolas on Windows unless told, and only the web would
+    // still reach the bundled face.
+    monospaceFontFamily: 'monospace',
     dividerColor: kSiteLine,
     highlighter: kSiteHighlighter,
     onLinkTap: (String title, String url) => openLink(context, url),
