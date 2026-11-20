@@ -4,6 +4,7 @@ import 'package:g1455/g1455.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
 
 import '../backdrops.dart';
+import '../widgets/site_icon.dart';
 import '../widgets/stage.dart';
 
 /// The four controls with a held drop, all on one [GlassDropMotion] whose
@@ -15,11 +16,11 @@ class DropMotionDemo extends StatefulWidget {
   State<DropMotionDemo> createState() => _DropMotionDemoState();
 }
 
-const List<GlassTabItem> _kTabs = <GlassTabItem>[
-  GlassTabItem(icon: SFIcons.sf_house_fill, label: 'Home'),
-  GlassTabItem(icon: SFIcons.sf_magnifyingglass, label: 'Search'),
-  GlassTabItem(icon: SFIcons.sf_music_note_list, label: 'Library'),
-  GlassTabItem(icon: SFIcons.sf_person_fill, label: 'Profile'),
+final List<GlassTabItem> _kTabs = <GlassTabItem>[
+  siteTab(SFIcons.sf_house_fill, 'Home'),
+  siteTab(SFIcons.sf_magnifyingglass, 'Search'),
+  siteTab(SFIcons.sf_music_note_list, 'Library'),
+  siteTab(SFIcons.sf_person_fill, 'Profile'),
 ];
 
 class _DropMotionDemoState extends State<DropMotionDemo> {

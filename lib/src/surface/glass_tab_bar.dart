@@ -194,6 +194,66 @@ class GlassTabItem {
   final GlassTabItemBuilder? labelBuilder;
 }
 
+/// The circle a [GlassTabBar] sets apart at its end edge: iOS 26's search tab,
+/// or any one action that is not one of the tabs.
+///
+/// A glass circle as tall as the bar, beside it, that takes a tap: a
+/// [GlassButton], so it swells under the finger and takes the keyboard's
+/// focus as one does. It shows only its icon, in the bar's accent colour while
+/// [selected] and in the bar's label colour otherwise; [label] is what a
+/// screen reader says.
+///
+/// It is not a tab: the bar's drop does not slide onto it, and [GlassTabBar.
+/// onSelected] is never told of it. An app whose action is a tab — a search
+/// screen — shows that screen from [onPressed] and says so with [selected],
+/// and while it does no tab in the bar is drawn as selected.
+///
+/// ```dart
+/// GlassTabBarAction(
+///   icon: Icons.search,
+///   label: 'Search',
+///   selected: searching,
+///   onPressed: () => setState(() => searching = true),
+/// )
+/// ```
+///
+/// {@category Panels and controls}
+@immutable
+class GlassTabBarAction {
+  /// A circle named [label], drawn with [icon] or built by [iconBuilder] —
+  /// one of the two is required, which an assert checks.
+  const GlassTabBarAction({
+    required this.label,
+    this.icon,
+    this.iconBuilder,
+    this.onPressed,
+    this.selected = false,
+  }) : assert(icon != null || iconBuilder != null, 'A tab bar action needs an icon or an iconBuilder.');
+
+  /// Drawn in the colour the bar resolved. Ignored when [iconBuilder] is
+  /// given.
+  final IconData? icon;
+
+  /// What a screen reader says; the circle draws no text.
+  final String label;
+
+  /// Builds the icon instead of [icon], handed the look the bar resolved for
+  /// the circle: its [GlassTabItemLook.index] is the bar's item count, one
+  /// past the last tab.
+  final GlassTabItemBuilder? iconBuilder;
+
+  /// Called on a tap. Null disables the circle, whose icon then dims as a
+  /// disabled [GlassButton]'s label does.
+  final VoidCallback? onPressed;
+
+  /// Whether the circle is the selection, as iOS 26's search tab is while
+  /// its screen is up: its icon in the bar's accent colour, a screen reader
+  /// told it is selected — and no tab in the bar drawn as selected, neither
+  /// on the capsule nor in the accent, until this is false again. The bar's
+  /// [GlassTabBar.selectedIndex] is kept for then.
+  final bool selected;
+}
+
 /// How much the held drop magnifies the bar under it.
 ///
 /// Read off iOS 26.5's own tab bar on a phone and an iPad, both at 1.17x once
@@ -248,6 +308,11 @@ const double kGlassTabAccessoryHeight = 48;
 
 /// Between the accessory and the bar, or the collapsed circle.
 const double _kAccessoryGap = 8;
+
+/// Between the bar and its [GlassTabBar.trailingAction]'s circle. Layout
+/// taste — iOS 26's search tab was not measured — wide enough that the bar
+/// grown under a finger ([_kBarGrow]) stops short of the circle.
+const double _kActionGap = 12;
 
 // The large content viewer, read off iOS 26.5's `UITabBarController` at the
 // largest accessibility size on an iPhone 17 (spike 38): a 220 pt square in
@@ -505,6 +570,11 @@ class _TabGeometry {
 /// is a shape changing inside a declared travel region, so it takes no
 /// capture; under reduced motion it is not animated at all.
 ///
+/// **A trailing action** ([trailingAction]) is a glass circle as tall as the
+/// bar past its end edge, for one action set apart from the tabs — iOS 26's
+/// search tab. The bar takes the width the circle leaves; collapsed, the
+/// circle stays where it is. It is one surface more, at rest and always.
+///
 /// **An accessory** ([bottomAccessory], UIKit's `tabViewBottomAccessory`) is
 /// a glass capsule [kGlassTabAccessoryHeight] tall above the bar, which moves
 /// down beside the collapsed circle. The bar's box is the same height either
@@ -541,6 +611,7 @@ class GlassTabBar extends StatefulWidget {
     this.dropMotion,
     this.minimizeBehavior = GlassTabBarMinimizeBehavior.never,
     this.bottomAccessory,
+    this.trailingAction,
     super.key,
   }) : assert(items.length >= 2),
        assert(dropZoom > 0);
@@ -577,6 +648,12 @@ class GlassTabBar extends StatefulWidget {
   /// that moves down beside the bar's collapsed circle when it is minimized.
   /// Drawn in the bar's label colour. Null for none.
   final Widget? bottomAccessory;
+
+  /// A glass circle as tall as the bar at its end edge, 12 px from it — iOS
+  /// 26's search tab, set apart from the others. The bar takes the
+  /// width that is left; the circle stays where it is while the bar is
+  /// minimized, and the accessory moves down between the two. Null for none.
+  final GlassTabBarAction? trailingAction;
 
   @override
   State<GlassTabBar> createState() => _GlassTabBarState();
@@ -726,6 +803,18 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
         a.items.length != b.items.length) {
       return false;
     }
+    final GlassTabBarAction? p = a.trailingAction;
+    final GlassTabBarAction? q = b.trailingAction;
+    if (!identical(p, q) &&
+        (p == null ||
+            q == null ||
+            p.label != q.label ||
+            p.icon != q.icon ||
+            !identical(p.iconBuilder, q.iconBuilder) ||
+            (p.onPressed == null) != (q.onPressed == null) ||
+            p.selected != q.selected)) {
+      return false;
+    }
     for (var i = 0; i < a.items.length; i++) {
       final GlassTabItem x = a.items[i];
       final GlassTabItem y = b.items[i];
@@ -804,6 +893,13 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
   }
 
   bool get _enabled => widget.onSelected != null;
+
+  /// Whether the trailing action says it is the selection, as iOS 26's search
+  /// tab is when its screen is up: then no tab in the bar is — no capsule, no
+  /// accent, and a screen reader told none is selected.
+  bool get _actionSelected => widget.trailingAction?.selected ?? false;
+
+  bool _isSelected(int i) => i == widget.selectedIndex && !_actionSelected;
 
   // Ends the springs where the motion is under a device pixel, rather than at
   // the default thousandth: every frame of a spring's tail is a frame the bar
@@ -944,9 +1040,25 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     child: SelectionContainer.disabled(
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
-          final double width = constraints.maxWidth;
+          final double full = constraints.maxWidth;
           final bool rtl = Directionality.maybeOf(context) == TextDirection.rtl;
-          final _TabGeometry g = _geometry = _TabGeometry(width, widget.items.length, rtl: rtl);
+          final GlassTabBarAction? action = widget.trailingAction;
+          // With an action the bar takes what its circle leaves, and the
+          // circle is as tall as the bar: tried at the stacked layout's
+          // height first, and again at the side-by-side one's if the width
+          // left is that wide — which, wider by the difference, it still is.
+          _TabGeometry g = _TabGeometry(full, widget.items.length, rtl: rtl);
+          if (action != null) {
+            g = _TabGeometry(full - 60 - _kActionGap, widget.items.length, rtl: rtl);
+            if (g.height != 60) {
+              g = _TabGeometry(full - g.height - _kActionGap, widget.items.length, rtl: rtl);
+            }
+          }
+          _geometry = g;
+          // The bar's own width, and where it starts in the box: under rtl
+          // the action is on the left, and the bar after it.
+          final double width = g.width;
+          final double lead = rtl ? full - width : 0;
           final Size margin = g.margin(widget.items.length, _motion);
           final double slot = math.max(g.height, kGlassMinTapTarget.height);
           final Widget? accessory = widget.bottomAccessory;
@@ -954,14 +1066,16 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
           // The collapsed circle, in the box: the bar's own height, at its
           // start edge.
           final Rect circle = Rect.fromLTWH(
-            rtl ? width - g.height : 0,
+            rtl ? full - g.height : 0,
             above + (slot - g.height) / 2,
             g.height,
             g.height,
           );
+          // The action's circle, at the end edge, as tall as the bar.
+          final Rect end = Rect.fromLTWH(rtl ? 0 : full - g.height, circle.top, g.height, g.height);
           Widget travel(Widget child) => debugGlassTabMinimizeTravel ? GlassTravel(child: child) : child;
           return SizedBox(
-            width: width,
+            width: full,
             height: above + slot,
             child: RepaintBoundary(
               child: LayoutBuilder(
@@ -972,8 +1086,8 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                     // the bar's own capture — and so is its collapse, which is inside
                     // the same box.
                     Positioned(
-                      left: -_kBarGrow.width,
-                      right: -_kBarGrow.width,
+                      left: lead - _kBarGrow.width,
+                      width: width + 2 * _kBarGrow.width,
                       top: above - _kBarGrow.height,
                       height: slot + 2 * _kBarGrow.height,
                       child: travel(
@@ -987,7 +1101,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                               g,
                               margin,
                               slot,
-                              circle.translate(_kBarGrow.width, _kBarGrow.height - above),
+                              circle.translate(_kBarGrow.width - lead, _kBarGrow.height - above),
                               child!,
                             ),
                             child: ValueListenableBuilder<bool>(
@@ -1008,15 +1122,17 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                               animation: _minimize,
                               builder: (BuildContext context, Widget? child) {
                                 final double m = _minimize.value.clamp(0.0, 1.0);
-                                final open = Rect.fromLTWH(0, 0, width, kGlassTabAccessoryHeight);
+                                final open = Rect.fromLTWH(0, 0, full, kGlassTabAccessoryHeight);
                                 // No taller than the circle it sits beside: a
                                 // 44-tall bar's box ends 2 px short of a 48-tall
                                 // capsule centred on it.
                                 final double half = math.min(kGlassTabAccessoryHeight, circle.height) / 2;
+                                // Between the circle and the bar's far end,
+                                // which with an action is short of its circle.
                                 final inline = Rect.fromLTRB(
-                                  rtl ? 0 : circle.right + _kAccessoryGap,
+                                  rtl ? lead : circle.right + _kAccessoryGap,
                                   circle.center.dy - half,
-                                  rtl ? circle.left - _kAccessoryGap : width,
+                                  rtl ? circle.left - _kAccessoryGap : lead + width,
                                   circle.center.dy + half,
                                 );
                                 return Stack(
@@ -1047,8 +1163,8 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                     // The press, over the bar's slot only: an accessory above it
                     // takes its own taps, and a collapsed bar takes none here.
                     Positioned(
-                      left: 0,
-                      right: 0,
+                      left: lead,
+                      width: width,
                       top: above,
                       height: slot,
                       child: ValueListenableBuilder<bool>(
@@ -1079,13 +1195,14 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                         child: Semantics(
                           button: true,
                           label: widget.items[widget.selectedIndex].label,
-                          selected: true,
+                          selected: !_actionSelected,
                           enabled: true,
                           onTap: _expand,
                           child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: _expand),
                         ),
                       ),
                     ),
+                    if (action != null) Positioned.fromRect(rect: end, child: _action(g, action)),
                   ],
                 ),
               ),
@@ -1180,7 +1297,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       color: ink,
       iconSize: _kViewerIcon,
       labelStyle: style,
-      selected: i == widget.selectedIndex,
+      selected: _isSelected(i),
       highlighted: true,
       inline: false,
     );
@@ -1318,11 +1435,41 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     );
   }
 
+  /// The trailing action's circle: a button in the bar's verdict, its icon in
+  /// the accent while it says it is selected.
+  ///
+  /// Its tap reads the action the bar was last given, as an item's does, so a
+  /// build the bar keeps (see [_built]) calls the latest callback.
+  Widget _action(_TabGeometry g, GlassTabBarAction action) => GlassSharedReadingScope(
+    share: _reading,
+    child: Semantics(
+      selected: action.selected,
+      child: GlassButton(
+        onPressed: action.onPressed == null ? null : () => widget.trailingAction?.onPressed?.call(),
+        padding: EdgeInsets.zero,
+        minSize: Size.square(g.height),
+        semanticLabel: action.label,
+        child: Builder(
+          builder: (BuildContext context) {
+            final GlassTabItemLook look = _look(
+              context,
+              g,
+              widget.items.length,
+              highlighted: action.selected,
+              selected: action.selected,
+            );
+            return action.iconBuilder?.call(context, look) ?? Icon(action.icon, size: look.iconSize, color: look.color);
+          },
+        ),
+      ),
+    ),
+  );
+
   /// The selected item's icon, as the collapsed circle shows it.
   Widget _glyph(BuildContext context, _TabGeometry g) {
     final int i = widget.selectedIndex;
     final GlassTabItem item = widget.items[i];
-    final GlassTabItemLook look = _look(context, g, i, highlighted: true);
+    final GlassTabItemLook look = _look(context, g, i, highlighted: !_actionSelected);
     return item.iconBuilder?.call(context, look) ?? Icon(item.icon, size: look.iconSize, color: look.color);
   }
 
@@ -1338,7 +1485,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
             animation: Listenable.merge(<Listenable>[_lift, _at]),
             builder: (BuildContext context, Widget? _) {
               final double fade = 1 - _lift.value.clamp(0.0, 1.0);
-              if (fade <= 0) {
+              if (fade <= 0 || _actionSelected) {
                 return const SizedBox.shrink();
               }
               // iOS's `systemFill` for the appearance the bar's label is in:
@@ -1378,7 +1525,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
                   for (var i = 0; i < widget.items.length; i++)
                     SizedBox(
                       width: g.pitch,
-                      child: _item(g, i, highlighted: i == over),
+                      child: _item(g, i, highlighted: i == over && !_actionSelected),
                     ),
                 ],
               ),
@@ -1394,7 +1541,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     return Semantics(
       button: true,
       label: item.label,
-      selected: i == widget.selectedIndex,
+      selected: _isSelected(i),
       enabled: _enabled,
       onTap: _enabled ? () => widget.onSelected?.call(i) : null,
       child: ExcludeSemantics(
@@ -1434,7 +1581,9 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
     );
   }
 
-  GlassTabItemLook _look(BuildContext context, _TabGeometry g, int i, {required bool highlighted}) {
+  /// Item [i]'s look: [selected] is whether [i] is the selection, unless
+  /// given — the trailing action says for itself.
+  GlassTabItemLook _look(BuildContext context, _TabGeometry g, int i, {required bool highlighted, bool? selected}) {
     final TextStyle ambient = DefaultTextStyle.of(context).style;
     final Color colour = highlighted
         ? widget.activeColor ?? glassSystemBlue(ambient.color ?? const Color(0xFF000000))
@@ -1446,7 +1595,7 @@ class _GlassTabBarState extends State<GlassTabBar> with TickerProviderStateMixin
       labelStyle: ambient.merge(
         TextStyle(fontSize: g.inline ? 12 : 11, fontWeight: FontWeight.w600, color: colour),
       ),
-      selected: i == widget.selectedIndex,
+      selected: selected ?? _isSelected(i),
       highlighted: highlighted,
       inline: g.inline,
     );

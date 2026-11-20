@@ -92,7 +92,7 @@ class SiteIcon extends StatelessWidget {
 /// One builder per symbol, held: the bar compares builders by identity, and a
 /// fresh closure on every build would read to it as a changed item.
 GlassTabItem siteTab(IconData icon, String label) =>
-    GlassTabItem(label: label, iconBuilder: _tabIcons.putIfAbsent(icon, () => _tabIcon(icon)));
+    GlassTabItem(label: label, icon: icon, iconBuilder: _tabIcons.putIfAbsent(icon, () => _tabIcon(icon)));
 
 final Map<IconData, GlassTabItemBuilder> _tabIcons = <IconData, GlassTabItemBuilder>{};
 
