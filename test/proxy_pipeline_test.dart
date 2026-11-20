@@ -860,6 +860,13 @@ class _Bars extends CustomPainter {
 }
 
 Future<void> _mount(WidgetTester tester, GlassLedger ledger, Widget child) async {
+  // The test window is [kScreen], not the default 800x600: the root is the
+  // screen the pipeline clamps to (#42), and a root cut to 600 would leave the
+  // lower panel past it.
+  tester.view
+    ..physicalSize = kScreen * 2
+    ..devicePixelRatio = 2;
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MediaQuery(
       data: const MediaQueryData(size: kScreen, devicePixelRatio: 2),

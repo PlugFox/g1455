@@ -534,10 +534,22 @@ class AtlasLayout {
   /// [jitter] displaces one slot's *content* without moving its rectangle, for
   /// tests: without it a pixel test would pass for any map that is merely
   /// self-consistent, and self-consistency is not what a shader needs.
+  ///
+  /// [screen] is where the scene has content: the host's own box. A slot's
+  /// source is its surface inflated by the bleed, so a surface near the edge
+  /// has a source that reaches past it, and what the scene holds there is
+  /// nothing — transparent black, which the blur spreads inward and a
+  /// refraction bending outward reads directly: glass partly past the edge
+  /// darkened toward it (#42). So the part of a slot past [screen] is filled
+  /// with the screen's last texel row or column, stretched across it — the
+  /// slot then holds what `TileMode.clamp` at the screen's edge would read, and
+  /// the blur, the shader and the adaptive read-back all see that without a
+  /// change of their own. Null replays the scene as it is.
   ui.Picture record(
     ui.Picture scene, {
     Offset Function(AtlasSlot)? jitter,
     bool clipToSource = false,
+    Rect? screen,
   }) {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Offset.zero & size);
@@ -551,16 +563,95 @@ class AtlasLayout {
               texelSpan(slot.source.height, pixelRatio).toDouble(),
             )
           : slot.rect;
-      canvas
-        ..save()
-        ..clipRect(clip)
-        ..translate(slot.rect.left + shift.dx, slot.rect.top + shift.dy)
-        ..scale(pixelRatio)
-        ..translate(-slot.source.left, -slot.source.top)
-        ..drawPicture(scene)
-        ..restore();
+      final Offset origin = slot.rect.topLeft + shift;
+      final List<_Span>? xs = screen == null
+          ? null
+          : _spans(slot.source.left, slot.source.right, screen.left, screen.right, origin.dx, clip.left, clip.right);
+      final List<_Span>? ys = screen == null
+          ? null
+          : _spans(slot.source.top, slot.source.bottom, screen.top, screen.bottom, origin.dy, clip.top, clip.bottom);
+      // Either axis cut is enough: a surface past the right edge alone has its
+      // vertical axis inside the screen, one piece at the slot's own map.
+      if (xs == null || ys == null || (xs.length == 1 && ys.length == 1)) {
+        canvas
+          ..save()
+          ..clipRect(clip)
+          ..translate(origin.dx, origin.dy)
+          ..scale(pixelRatio)
+          ..translate(-slot.source.left, -slot.source.top)
+          ..drawPicture(scene)
+          ..restore();
+        continue;
+      }
+      // Up to nine pieces: the screen's part of the slot at the slot's own
+      // map, and around it the edges and corners, each a stretch of the last
+      // texel the screen holds on that side.
+      for (final _Span x in xs) {
+        for (final _Span y in ys) {
+          canvas
+            ..save()
+            ..clipRect(Rect.fromLTRB(x.atlasLo, y.atlasLo, x.atlasHi, y.atlasHi), doAntiAlias: false)
+            ..transform(
+              Float64List.fromList(<double>[
+                x.scale, 0, 0, 0, //
+                0, y.scale, 0, 0,
+                0, 0, 1, 0,
+                x.offset, y.offset, 0, 1,
+              ]),
+            )
+            ..drawPicture(scene)
+            ..restore();
+        }
+      }
     }
     return recorder.endRecording();
+  }
+
+  /// One axis of a slot cut by the screen's edge, as the pieces [record]
+  /// draws: the screen's part at the slot's own map, and a stretch of the
+  /// screen's last texel over each part past it. One piece when the source
+  /// lies inside the screen on this axis. Null when it lies wholly outside it:
+  /// there is no texel of the screen to clamp to, and the slot is then drawn as
+  /// it was.
+  ///
+  /// [lo]-[hi] is the source and [screenLo]-[screenHi] the screen, logical;
+  /// [origin] is where the source starts in the atlas and [clipLo]-[clipHi] the
+  /// part of the slot drawn, in texels. The cut is snapped to whole texels, so
+  /// a texel is either the screen's or a copy of its edge, never half of each.
+  List<_Span>? _spans(
+    double lo,
+    double hi,
+    double screenLo,
+    double screenHi,
+    double origin,
+    double clipLo,
+    double clipHi,
+  ) {
+    final identity = _Span(clipLo, clipHi, pixelRatio, origin - lo * pixelRatio);
+    if (lo >= screenLo && hi <= screenHi) {
+      return <_Span>[identity];
+    }
+    // Snapped inward to whole texels, then held to a texel at least.
+    final double inLo = math.max(clipLo, (origin + (screenLo - lo) * pixelRatio).ceilToDouble());
+    final double inHi = math.min(clipHi, (origin + (screenHi - lo) * pixelRatio).floorToDouble());
+    if (inHi - inLo < 1) {
+      return null;
+    }
+    final double texel = 1 / pixelRatio;
+    // The scene's coordinate at the cut, read back through the slot's own map,
+    // so the edge piece copies exactly the texel the middle piece ends on.
+    double scene(double atlas) => lo + (atlas - origin) / pixelRatio;
+    // A piece that maps scene [s0, s1] onto atlas [a0, a1].
+    _Span stretch(double a0, double a1, double s0, double s1) {
+      final double k = (a1 - a0) / (s1 - s0);
+      return _Span(a0, a1, k, a0 - s0 * k);
+    }
+
+    return <_Span>[
+      if (inLo > clipLo) stretch(clipLo, inLo, scene(inLo), scene(inLo) + texel),
+      _Span(inLo, inHi, identity.scale, identity.offset),
+      if (inHi < clipHi) stretch(inHi, clipHi, scene(inHi) - texel, scene(inHi)),
+    ];
   }
 
   /// Device pixels the slots occupy.
@@ -584,6 +675,18 @@ class AtlasLayout {
   }
 
   static int _alignUp(int value, int align) => ((value + align - 1) ~/ align) * align;
+}
+
+/// One piece of a slot along one axis: atlas texels [atlasLo]-[atlasHi], drawn
+/// through `atlas = scene * scale + offset`.
+@immutable
+class _Span {
+  const _Span(this.atlasLo, this.atlasHi, this.scale, this.offset);
+
+  final double atlasLo;
+  final double atlasHi;
+  final double scale;
+  final double offset;
 }
 
 @immutable
