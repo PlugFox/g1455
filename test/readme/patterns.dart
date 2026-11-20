@@ -2,7 +2,7 @@
 // carries each one verbatim, which `test/readme_test.dart` checks, and that
 // test also pumps them: what the README shows compiles and runs.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 class Feed extends StatelessWidget {

@@ -95,7 +95,7 @@ reported costs and the default texture limit, never correctness.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// The settings the package cannot read for itself. Fill them from your own

@@ -69,7 +69,7 @@ GlassTheme(
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// The app's tier from what the app knows about the device and the user.

@@ -57,7 +57,7 @@ A wave changes how the captured backdrop is sampled, not the backdrop itself, so
 > Glass without text, like the panel in the demo, should set `labelled: false`. Otherwise a clear finish may be dimmed to keep labels legible, and the wave is harder to see.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A hero panel that answers a touch with a wave. Assumes a GlassHost above,
@@ -203,7 +203,7 @@ draw `GlassDropStretch.apply(size, value)`. `GlassDropStretchDriver` runs one of
 do: call `wake()` when the drop moves, and listen for `value`.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 void main() => runApp(const DropApp());
@@ -377,7 +377,7 @@ Blobs that orbit or follow a finger move over still content, so wrap them in a [
 `GlassBlendGroup` is the membership object behind a group or union, and `GlassGroupScope` is the inherited widget that hands it to the surfaces below. You don't build these yourself, but `GlassGroupScope.maybeOf(context) != null` tells a widget whether it is inside a group. `unionBlendRadius(boxes, radii)` returns the blend radius a union would use for those boxes.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Blobs that fuse, one that buds, and a split pill. Assumes a GlassHost above.
@@ -545,7 +545,7 @@ The example in the Code tab follows that layout. Turn the switch in the demo off
 `GlassTravelScope` is the inherited widget that carries the region down to the surfaces, and `GlassTravelRegion` is the region itself. `GlassTravelScope.maybeOf(context)?.globalRect` gives its current rectangle in global logical pixels. You don't need either to use `GlassTravel`.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A magnifier you drag over a photo. Inside GlassTravel the drag costs no
@@ -681,7 +681,7 @@ Each occupied extra level costs **one more capture** on frames that re-capture. 
 - Each lift is another capture level, so don't lift what has no glass under it "just in case" deep in a list.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Glass cards scrolling under a glass bar. Assumes a GlassHost above.
@@ -840,7 +840,7 @@ When the whole backdrop is known and does not change (one colour, a gradient, a 
 altogether: declare it with [`GlassBackdrop`](/foundations/backdrop).
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A video player under a glass control bar. The player is a platform view,
@@ -1008,7 +1008,7 @@ cannot tell you the declaration took. The counters can:
 The demo above shows the same counters live: switch the declaration off and on, and turn on the motion under the glass.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A home screen over a gradient that never changes, with a feed below it.
@@ -1190,7 +1190,7 @@ A soft edge tints toward white over light content and toward black over dark con
 > Put the bar **in** `child`. An unlifted bar placed beside a lifted edge appears blurred inside the edge's capture.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A list under a top app bar and a bottom toolbar, each in a scroll edge.
@@ -1354,7 +1354,7 @@ Set the top-level `debugPaintGlassSurfaces = true` (debug builds only, like `deb
     code: r'''
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A debug overlay that reads what the host's ledger says about the screen.

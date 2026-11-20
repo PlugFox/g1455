@@ -62,7 +62,7 @@ GlassCard(finish: GlassFinish.clear, child: Text('Clear'))
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// The four presets side by side, plus a brand-tinted one.

@@ -55,7 +55,7 @@ The example in the Code tab follows that layout. Turn the switch in the demo off
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A magnifier you drag over a photo. Inside GlassTravel the drag costs no

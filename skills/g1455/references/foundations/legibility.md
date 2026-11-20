@@ -76,7 +76,7 @@ on a bright sky and a button on a dark shadow, let each glass read what is under
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A light settings panel inside a dark app, and custom glass that reads

@@ -12,7 +12,7 @@
 // `HitTestBehavior.opaque` — the ripple count stays 0 and selection still
 // works, which is why the selection alone could not see it.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 

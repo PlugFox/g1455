@@ -82,7 +82,7 @@ The switch is never smaller than 44 px tall, so it stays easy to hit.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A settings group on a glass card.

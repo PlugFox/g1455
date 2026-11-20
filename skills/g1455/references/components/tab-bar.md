@@ -159,7 +159,7 @@ item's icon is built once more, for the circle.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// An app shell: one page per tab, a floating glass tab bar on top that

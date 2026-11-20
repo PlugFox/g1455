@@ -95,7 +95,7 @@ sees: focusing a button costs nothing.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A photo viewer's floating actions.

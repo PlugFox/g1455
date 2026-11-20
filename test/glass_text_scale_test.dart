@@ -19,7 +19,7 @@
 //    replaced by a clamp of a default `MediaQueryData`: the no-MediaQuery arm
 //    finds one made up under the labels.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show RenderEditable, RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';

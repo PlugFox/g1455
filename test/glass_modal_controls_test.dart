@@ -8,7 +8,7 @@
 // paths. These are the paths it does not take: each is something an app does
 // routinely and that looks right until the one case where it does not.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
 

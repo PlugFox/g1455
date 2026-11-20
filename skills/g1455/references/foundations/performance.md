@@ -62,7 +62,7 @@ Set the top-level `debugPaintGlassSurfaces = true` (debug builds only, like `deb
 ```dart
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A debug overlay that reads what the host's ledger says about the screen.

@@ -88,7 +88,7 @@ how a pressed [button](/components/button) swells and leans (`GlassPress.none` t
   example to 16384, if you know the GPU supports it.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 void main() => runApp(const HostApp(reduceTransparency: false));
@@ -286,7 +286,7 @@ keyboard's focus rings.
   [GlassAbove](/foundations/above).
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A now-playing pill that materializes in, next to a magnifying lens.
@@ -447,7 +447,7 @@ GlassCard(finish: GlassFinish.clear, child: Text('Clear'))
 > tint of the whole site through the host.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// The four presets side by side, plus a brand-tinted one.
@@ -610,7 +610,7 @@ on a bright sky and a button on a dark shadow, let each glass read what is under
 > subtree, build a new `GlassThemeData`.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A light settings panel inside a dark app, and custom glass that reads
@@ -818,7 +818,7 @@ subtree, nest `GlassTheme(data: GlassTheme.of(context).withAdaptive(null), ...)`
 > [Legibility & theme](/foundations/legibility) still apply: adaptive only gives each glass its own `backdrop`.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 void main() => runApp(const PhotoApp());
@@ -997,7 +997,7 @@ GlassTheme(
 > `pinned` overrides everything, the user's Reduce Transparency setting included.
 ''',
     code: r'''
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// The app's tier from what the app knows about the device and the user.

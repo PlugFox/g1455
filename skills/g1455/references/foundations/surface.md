@@ -106,7 +106,7 @@ keyboard's focus rings.
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A now-playing pill that materializes in, next to a magnifying lens.

@@ -67,7 +67,7 @@ A soft edge tints toward white over light content and toward black over dark con
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A list under a top app bar and a bottom toolbar, each in a scroll edge.

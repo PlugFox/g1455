@@ -7,7 +7,7 @@
 // through the same gesture: it lands between stops and reports every move, so
 // a pass is the snapping and not a gesture that happened to land on a stop.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';

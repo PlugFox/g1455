@@ -56,7 +56,7 @@ Each occupied extra level costs **one more capture** on frames that re-capture. 
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// Glass cards scrolling under a glass bar. Assumes a GlassHost above.

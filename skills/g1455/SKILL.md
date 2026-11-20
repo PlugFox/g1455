@@ -31,11 +31,14 @@ file. Requires Flutter >= 3.47. Pure Dart and shaders: no platform setup.
 ## Setup
 
 ```bash
-flutter pub add g1455
+flutter pub add g1455 material_ui
 ```
 
+The examples import Material from `material_ui`, where Flutter 3.50 moves it;
+g1455 itself needs only `widgets`.
+
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 Future<void> main() async {

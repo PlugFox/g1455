@@ -66,7 +66,7 @@ see [Legibility](../foundations/legibility.md).
 ## Complete example
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 /// A library screen: a top bar and a "now playing" bar over a list.

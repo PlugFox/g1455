@@ -143,7 +143,9 @@ are not a frame time.
 flutter pub add g1455
 ```
 
-Requires Flutter 3.47 or later.
+Requires Flutter 3.47 or later. g1455 itself needs only `widgets`; the
+examples here use Material from `material_ui`, where Flutter 3.50 moves it
+(`flutter pub add material_ui`).
 
 ## Quick start
 
@@ -151,7 +153,7 @@ A whole app: a list of coloured tiles to refract, a bar over it and a tab bar
 under it. Paste it over `lib/main.dart`.
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:g1455/g1455.dart';
 
 void main() => runApp(const App());

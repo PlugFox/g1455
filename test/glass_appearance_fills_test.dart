@@ -38,7 +38,7 @@
 //    glassAmbientLabel(context))` -> `const Color(0xFF007AFF)`: the blue arm
 //    fails on dark glass.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show RenderCustomPaint, RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';

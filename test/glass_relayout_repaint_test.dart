@@ -23,7 +23,7 @@
 //     paints a strip itself: the repaint mints a picture, the watch sees it —
 //     so the guard in arm 1 is not hiding a frame the watch would have read.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:g1455/g1455.dart';
