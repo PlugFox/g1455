@@ -19,12 +19,12 @@ class TabBarDemo extends StatefulWidget {
 }
 
 /// The tabs, and what each page says.
-const List<(GlassTabItem, String)> _kTabs = <(GlassTabItem, String)>[
-  (GlassTabItem(icon: SFIcons.sf_house_fill, label: 'Home'), 'Good morning'),
-  (GlassTabItem(icon: SFIcons.sf_magnifyingglass, label: 'Search'), 'Find anything'),
-  (GlassTabItem(icon: SFIcons.sf_music_note_list, label: 'Library'), '128 albums'),
-  (GlassTabItem(icon: SFIcons.sf_heart_fill, label: 'Saved'), '42 songs you love'),
-  (GlassTabItem(icon: SFIcons.sf_person_fill, label: 'Profile'), 'Signed in'),
+final List<(GlassTabItem, String)> _kTabs = <(GlassTabItem, String)>[
+  (siteTab(SFIcons.sf_house_fill, 'Home'), 'Good morning'),
+  (siteTab(SFIcons.sf_magnifyingglass, 'Search'), 'Find anything'),
+  (siteTab(SFIcons.sf_music_note_list, 'Library'), '128 albums'),
+  (siteTab(SFIcons.sf_heart_fill, 'Saved'), '42 songs you love'),
+  (siteTab(SFIcons.sf_person_fill, 'Profile'), 'Signed in'),
 ];
 
 /// The "Saved" tab with a badge: drawn by `iconBuilder`, in the colour and
