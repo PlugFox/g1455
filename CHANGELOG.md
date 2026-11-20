@@ -1,3 +1,16 @@
+## Unreleased
+
+### Fixed
+
+- Glass partly past the screen's edge no longer darkens toward it (#42). The
+  part of a surface's capture past the edge held nothing, which the blur
+  spread inward and a refraction bending outward read directly: a thick
+  black rim on a disc mostly past the edge, a shade over a quarter of a disc
+  half past it. It now holds the screen's last row or column, stretched, so
+  the glass reads the backdrop clamped to the edge, as `TileMode.clamp`
+  would: a disc half past the edge draws the same as the left half of the
+  same disc fully on screen, to a code value.
+
 ## 0.4.0 - 2026-10-24
 
 ### Breaking changes

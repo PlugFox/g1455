@@ -661,7 +661,7 @@ class GlassProxyPipeline {
       context.finish();
 
       final ui.Picture scene = _singlePictureOf(handle.layer!);
-      final ui.Picture packed = update.layout.record(scene);
+      final ui.Picture packed = update.layout.record(scene, screen: sceneBounds ?? _boundsOf(root));
       // The folded pass draws the packed atlas once more, inside a layer that
       // carries the filter. One extra `Picture` object and no extra
       // rasterization — `drawPicture` splices the ops in — against one whole
