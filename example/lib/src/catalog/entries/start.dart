@@ -587,6 +587,12 @@ nothing by itself. Put a `GlassTabBarMinimizer` above both the scroll view and t
 [GlassScaffold](/components/scaffold) is one already. Only the nearest vertical scroll view counts: a list nested in
 another scroll view, or a horizontal one, does not collapse the bar. See [Tab bar](/components/tab-bar).
 
+### A list in a sheet moves the sheet
+
+That is the sheet sharing the drag, as UIKit's does: at its top, a drag down on the list moves the sheet, and at medium
+a drag up raises the sheet before the list scrolls. To keep a list's drag to itself, give it a `controller` of its own;
+to keep the whole content out, wrap it in `PrimaryScrollController.none`. See [Sheet](/components/sheet).
+
 ## Look and legibility
 
 ### "A glass component has no GlassThemeData.backdrop, and its finish is not legible over every backdrop"

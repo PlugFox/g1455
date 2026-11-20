@@ -300,7 +300,7 @@ Every name links to its page in the API reference.
 |---|---|
 | [`GlassBar`][GlassBar] · [`GlassButton`][GlassButton] · [`GlassCard`][GlassCard] | Panels with a label colour chosen for legibility. |
 | [`GlassSwitch`][GlassSwitch] · [`GlassSlider`][GlassSlider] | Controls whose knob turns into a clear drop while held. A slider with `divisions` lands on stops. |
-| [`GlassTabBar`][GlassTabBar] · [`GlassSegmentedControl`][GlassSegmentedControl] | The selection lifts into a drop that can be dragged between items. A tab's icon and label can be any widget, through `iconBuilder` and `labelBuilder`. The tab bar collapses to its selected tab on a scroll down (`minimizeBehavior`, under a [`GlassTabBarMinimizer`][GlassTabBarMinimizer]) and carries a `bottomAccessory`. |
+| [`GlassTabBar`][GlassTabBar] · [`GlassSegmentedControl`][GlassSegmentedControl] | The selection lifts into a drop that can be dragged between items. A tab's icon and label can be any widget, through `iconBuilder` and `labelBuilder`. The tab bar collapses to its selected tab on a scroll down (`minimizeBehavior`, under a [`GlassTabBarMinimizer`][GlassTabBarMinimizer]), carries a `bottomAccessory`, and sets one action apart in a circle beside it (`trailingAction`), as iOS 26 does with search. |
 | [`GlassStepper`][GlassStepper] | A minus and a plus in one glass capsule; a held half repeats, and the end at a limit is disabled. One surface; a press is no capture. |
 | [`GlassPageControl`][GlassPageControl] | Page dots on a glass capsule; follows and turns a `PageController`, a tap steps toward its side, a drag scrubs. One surface. |
 | [`GlassButtonGroup`][GlassButtonGroup] | A toolbar capsule of icon buttons ([`GlassToolbarItem`][GlassToolbarItem]). |
@@ -325,7 +325,7 @@ vertical list around them.
 | API | What it is |
 |---|---|
 | [`showGlassDialog`][showGlassDialog] · [`GlassAlert`][GlassAlert] | An alert that materializes over the screen, blur first and tint last. |
-| [`showGlassSheet`][showGlassSheet] | A glass sheet from the bottom edge that follows the finger. With [`GlassSheetDetent.large`][GlassSheetDetent] it pulls up to the whole height, where it turns opaque and stops reading its backdrop. |
+| [`showGlassSheet`][showGlassSheet] | A glass sheet from the bottom edge that follows the finger. With [`GlassSheetDetent.large`][GlassSheetDetent] it pulls up to the whole height, where it turns opaque and stops reading its backdrop. A list in it shares one drag with it, as in UIKit: the sheet moves once the list is at its top, and rises to large before the list scrolls. |
 | [`GlassMenuAnchor`][GlassMenuAnchor] · [`GlassPopoverAnchor`][GlassPopoverAnchor] | A menu, or a panel of any content, that grows out of its anchor. |
 
 Glass appears and leaves through `GlassSurface.materialize`: the bend, the blur
@@ -860,6 +860,11 @@ cyan outline. The same list, at more length:
   `GlassTabBarMinimizer` above both, as in
   [the pattern above](#a-tab-bar-that-collapses-on-scroll); `GlassScaffold` is
   one. Only the nearest vertical scroll view counts, not one nested in it.
+- **A list in a sheet moves the sheet.** At its top, a drag down on it moves
+  the sheet, and at medium a drag up raises the sheet before the list
+  scrolls, as UIKit's sheet does. To keep a list's drag to itself, give it a
+  `controller` of its own; to keep the whole content out, wrap it in
+  `PrimaryScrollController.none`.
 
 ### Look and legibility
 

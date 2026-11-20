@@ -23,7 +23,13 @@
 //    `glassTextScale(context) < kGlassAccessibleTextScale || ` dropped from
 //    `_showViewer`: it finds one at the default size; `_under.value = …`
 //    dropped from `_onMove`: it names the item the finger left;
-//    `reverseDuration: _kViewerOut` -> `_kViewerIn`: it goes at once.
+//    `reverseDuration: _kViewerOut` -> `_kViewerIn`: it goes at once;
+//    `if (!hosted) {` -> `if (false) {`: the hostless arm finds glass with
+//    no host where the flat panel should be.
+//  - in `_GlassTabBarState`, `_built = null;` dropped from `reassemble` or
+//    from the `setState` override, or `!identical(x.labelBuilder,
+//    y.labelBuilder)` dropped from `_drawsAlike`: the rebuild arm finds the
+//    bar keeping a build it should have dropped.
 //
 // The mechanisms the cost arms lean on — the drop as a level of its own, and
 // the watch over what the bar bears — are `GlassHost`'s, and their breaks are
@@ -368,6 +374,119 @@ void main() {
     });
   }
 
+  testWidgets('kept across a bare rebuild, rebuilt for a new label builder, a reassemble or its own setState', (
+    WidgetTester tester,
+  ) async {
+    var runs = 0;
+    Widget first(BuildContext context, GlassTabItemLook look) {
+      runs++;
+      return Text('first ${look.index}', style: look.labelStyle);
+    }
+
+    Widget second(BuildContext context, GlassTabItemLook look) => Text('second ${look.index}', style: look.labelStyle);
+
+    List<GlassTabItem> items(GlassTabItemBuilder label) => <GlassTabItem>[
+      GlassTabItem(icon: Icons.home, label: 'Home', labelBuilder: label),
+      GlassTabItem(icon: Icons.person, label: 'Profile', labelBuilder: label),
+    ];
+    final swap = _Swap(tester);
+    await swap.mount(items(first));
+    expect(find.text('first 0'), findsOneWidget);
+    final int built = runs;
+    expect(built, greaterThan(0));
+
+    // A parent rebuilding with equal items, new lists of new items, is not a
+    // rebuild of the bar.
+    swap.items.value = items(first);
+    await tester.pump();
+    swap.parent.value++;
+    await tester.pump();
+    expect(runs, built, reason: 'a bar with nothing new to draw was rebuilt');
+
+    // A hot reload, and a rebuild asked for from inside, are never skipped.
+    // A reload dirties every element below anyway, so the builder runs either
+    // way; what a kept build would cost is the bar's own new code, so it is the
+    // tree the bar returns that has to be new.
+    Widget barBuilt() => tester.widget(
+      find.descendant(of: find.byType(GlassTabBar), matching: find.byType(OverlayPortal)).first,
+    );
+    final Widget before = barBuilt();
+    // Not awaited: it completes on the frame the pump draws.
+    final Future<void> reassembled = tester.binding.reassembleApplication();
+    await tester.pump();
+    await reassembled;
+    expect(identical(barBuilt(), before), isFalse, reason: 'a reassemble kept the old build');
+    expect(runs, greaterThan(built));
+    final int afterReassemble = runs;
+    // ignore: invalid_use_of_protected_member
+    (tester.state(find.byType(GlassTabBar)) as dynamic).setState(() {});
+    await tester.pump();
+    expect(runs, greaterThan(afterReassemble), reason: 'the bar\'s own setState kept the old build');
+
+    // Only the label builder new: the bar draws the new one.
+    swap.items.value = items(second);
+    await tester.pump();
+    expect(find.text('first 0'), findsNothing);
+    expect(find.text('second 0'), findsOneWidget);
+  });
+
+  testWidgets('with no host above the bar, the large content viewer is a plain panel of the same tint', (
+    WidgetTester tester,
+  ) async {
+    // The viewer inherits from where the bar is (an `OverlayPortal`'s child
+    // does), so with no host there it has nothing to be glass over, and draws
+    // its tint flat.
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (BuildContext context, Widget? child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: Stack(
+          children: <Widget>[
+            Positioned(
+              left: 50,
+              right: 50,
+              bottom: 40,
+              child: GlassTabBar(
+                items: const <GlassTabItem>[
+                  GlassTabItem(icon: Icons.home, label: 'Home'),
+                  GlassTabItem(icon: Icons.person, label: 'Profile'),
+                ],
+                selectedIndex: 0,
+                onSelected: (_) {},
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    Finder panel() => find.byWidgetPredicate(
+      (Widget w) =>
+          w is DecoratedBox &&
+          w.decoration is BoxDecoration &&
+          (w.decoration as BoxDecoration).borderRadius == const BorderRadius.all(Radius.circular(16)),
+    );
+    final TestGesture finger = await tester.startGesture(tester.getCenter(find.byIcon(Icons.person).first));
+    // The fade starts on the first frame, and is in after 80 ms.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(panel(), findsOneWidget, reason: 'no plain panel for the viewer');
+    expect(tester.getSize(panel()), const Size(220, 220));
+    final Color tint = (tester.widget<DecoratedBox>(panel()).decoration as BoxDecoration).color!;
+    expect(tint.a, closeTo(0.7, 0.01), reason: 'not the light tint at full fade-in');
+    expect(
+      find.byWidgetPredicate((Widget w) => w is GlassSurface && w.finish?.name == GlassFinish.frosted.name),
+      findsNothing,
+      reason: 'glass with no host to capture it',
+    );
+    expect(find.descendant(of: panel(), matching: find.text('Profile')), findsOneWidget);
+    await finger.up();
+    await tester.pumpAndSettle();
+    expect(panel(), findsNothing);
+  });
+
   testWidgets('a tap on another item selects it; the semantics say which is selected', (
     WidgetTester tester,
   ) async {
@@ -414,6 +533,48 @@ RenderGlassSurface _bar(WidgetTester tester) => tester
 RenderGlassSurface _drop(WidgetTester tester) => tester
     .renderObjectList<RenderGlassSurface>(find.byType(GlassSurface))
     .singleWhere((RenderGlassSurface s) => s.declaredFinish?.name == GlassFinish.clear.name);
+
+/// A bar whose items a test swaps while the same bar stays mounted, and
+/// whose label builder counts its runs.
+class _Swap {
+  _Swap(this.tester);
+
+  final WidgetTester tester;
+  final ValueNotifier<List<GlassTabItem>> items = ValueNotifier<List<GlassTabItem>>(<GlassTabItem>[]);
+  final ValueNotifier<int> parent = ValueNotifier<int>(0);
+
+  Future<void> mount(List<GlassTabItem> first) async {
+    items.value = first;
+    addTearDown(items.dispose);
+    addTearDown(parent.dispose);
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: kScreen),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassHost(
+            hardware: GlassHardware.appleMetal,
+            child: Stack(
+              children: <Widget>[
+                Positioned.fromRect(
+                  rect: kBar,
+                  // Rebuilt on either notifier: a parent's bare rebuild hands
+                  // the bar equal items, a swap new ones.
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge(<Listenable>[items, parent]),
+                    builder: (BuildContext context, Widget? _) =>
+                        GlassTabBar(items: items.value, selectedIndex: 0, onSelected: (_) {}),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+  }
+}
 
 Future<void> _mount(
   WidgetTester tester, {
