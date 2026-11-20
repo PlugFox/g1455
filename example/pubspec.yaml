@@ -13,7 +13,7 @@ dependencies:
     sdk: flutter
   g1455:
     path: ..
-  flutter_md: ^0.2.0
+  flutter_md: ^0.3.1
   squid: ^0.1.1
   url_launcher: ^6.3.2
   flutter_sficon: ^2.0.0
@@ -36,9 +36,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    # Named `monospace` on purpose: flutter_md draws code in that family, and
-    # on the web a generic name resolves to nothing — the bundled face is
-    # what every code block and inline `code` is set in.
+    # Named `monospace` on purpose: the site's markdown theme
+    # (`siteMarkdownTheme`) and its demos set code in that family, and on the
+    # web a generic name resolves to nothing — the bundled face is what every
+    # code block and inline `code` is set in.
     - family: monospace
       fonts:
         - asset: assets/fonts/JetBrainsMonoNL-Regular.ttf
