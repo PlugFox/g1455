@@ -26,6 +26,7 @@
 // Deliberately observable: every subtraction and every construct this pass
 // cannot reproduce is counted in [WalkLog] rather than assumed away.
 
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
@@ -74,8 +75,8 @@ WalkAction paintEverything(RenderObject child) => WalkAction.paint;
 /// [fellBack]; a layer still counted in [unhandledLayers] or a filter in
 /// [opacityFoldedIntoFilter] is one it drew as it drew it, because the
 /// subtree held something the engine must not draw for it (glass, a marker,
-/// what the policy took out) or is a backdrop filter, which reads what lies
-/// below it.
+/// what the policy took out) or is a backdrop filter under an open layer (an
+/// opacity, a filter, a mask), which reads that layer rather than the scene.
 ///
 /// {@category Diagnostics}
 class WalkLog {
@@ -206,10 +207,13 @@ class ProxyWalkContext extends PaintingContext {
     this.shadowFilter,
     this.fallbackPixelRatio,
     this.fallbackRegion,
-  }) : log = log ?? WalkLog();
+  }) : log = log ?? WalkLog(),
+       _container = containerLayer;
 
   /// What this pass observed.
   final WalkLog log;
+
+  final ContainerLayer _container;
 
   /// What to do with each child the walk reaches.
   final WalkPolicy policy;
@@ -255,9 +259,19 @@ class ProxyWalkContext extends PaintingContext {
 
   FilteringCanvas? _filtered;
 
+  _Tracked? _top;
+
   /// The canvas under the shadow filter: the context's own, or the detour's
   /// a subtree is being recorded into.
-  Canvas get _raw => _detours.isEmpty ? super.canvas : _detours.last.canvas;
+  Canvas get _raw {
+    if (_detours.isNotEmpty) {
+      return _detours.last.canvas;
+    }
+    if (fallbackPixelRatio == null) {
+      return super.canvas;
+    }
+    return _top ??= _Tracked(super.canvas);
+  }
 
   @override
   Canvas get canvas {
@@ -478,12 +492,7 @@ class ProxyWalkContext extends PaintingContext {
     if (region.isEmpty) {
       return false;
     }
-    final snapped = Rect.fromLTRB(
-      (region.left * ratio).floorToDouble() / ratio,
-      (region.top * ratio).floorToDouble() / ratio,
-      (region.right * ratio).ceilToDouble() / ratio,
-      (region.bottom * ratio).ceilToDouble() / ratio,
-    );
+    final Rect snapped = _snap(region, ratio);
     final int width = (snapped.width * ratio).round();
     final int height = (snapped.height * ratio).round();
     if (width <= 0 || height <= 0) {
@@ -519,6 +528,56 @@ class ProxyWalkContext extends PaintingContext {
     // The recording holds the image; this handle is ours.
     image.dispose();
     return true;
+  }
+
+  static Rect _snap(Rect region, double ratio) => Rect.fromLTRB(
+    (region.left * ratio).floorToDouble() / ratio,
+    (region.top * ratio).floorToDouble() / ratio,
+    (region.right * ratio).ceilToDouble() / ratio,
+    (region.bottom * ratio).ceilToDouble() / ratio,
+  );
+
+  _Backdrop? _backdropOf(BackdropFilterLayer layer) {
+    final double? ratio = fallbackPixelRatio;
+    final ui.ImageFilter? filter = layer.filter;
+    if (ratio == null || filter == null || layer.blendMode != BlendMode.srcOver || _detours.isNotEmpty) {
+      return null;
+    }
+    final top = _raw as _Tracked;
+    final Float64List local = top.getTransform();
+    final Matrix4? toLocal = Matrix4.tryInvert(Matrix4.fromFloat64List(local));
+    final Rect region = fallbackRegion ?? estimatedBounds;
+    if (top.layerOpen || toLocal == null || region.isEmpty) {
+      return null;
+    }
+    final Rect snapped = _snap(region, ratio);
+    final int width = (snapped.width * ratio).round();
+    final int height = (snapped.height * ratio).round();
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    stopRecordingIfNeeded();
+    final held = _container.lastChild! as PictureLayer;
+    final ui.Picture picture = held.picture!;
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder)
+      ..scale(ratio)
+      ..translate(-snapped.left, -snapped.top)
+      ..drawPicture(picture);
+    final ui.Picture placed = recorder.endRecording();
+    final ui.Image image;
+    try {
+      image = placed.toImageSync(width, height);
+    } finally {
+      placed.dispose();
+    }
+    final Canvas fresh = super.canvas..drawPicture(picture);
+    held.remove();
+    top.moveTo(fresh);
+    if (local[1] == 0 && local[4] == 0 && local[3] == 0 && local[7] == 0 && local[15] == 1) {
+      return _Backdrop(image, MatrixUtils.transformRect(toLocal, snapped), Matrix4.identity(), filter);
+    }
+    return _Backdrop(image, snapped, toLocal, filter);
   }
 
   /// Where [layer]'s parent's coordinates land in the scene, or null when
@@ -939,12 +998,15 @@ class ProxyWalkContext extends PaintingContext {
         return null;
       case ContainerLayer() when layer.runtimeType == ContainerLayer:
         return null;
+      case BackdropFilterLayer():
+        final _Backdrop? backdrop = _backdropOf(layer);
+        if (backdrop == null) {
+          log.unhandledLayers.add(layer.runtimeType.toString());
+        }
+        return backdrop;
       default:
-        // `BackdropFilterLayer` lands here and cannot land anywhere else: a
-        // backdrop filter reads what is already on the destination, and
-        // `ui.Canvas.saveLayer` has no backdrop parameter — there is no canvas
-        // call that reproduces it. `FollowerLayer` lands here too, because its
-        // transform is resolved against a leader at composition time.
+        // `FollowerLayer` lands here, because its transform is resolved
+        // against a leader at composition time.
         log.unhandledLayers.add(layer.runtimeType.toString());
         return null;
     }
@@ -1172,6 +1234,36 @@ class _FilterAt extends _CanvasEffect {
   }
 }
 
+class _Backdrop extends _CanvasEffect {
+  const _Backdrop(this.image, this.dst, this.transform, this.filter);
+
+  final ui.Image image;
+  final Rect dst;
+  final Matrix4 transform;
+  final ui.ImageFilter filter;
+
+  @override
+  void begin(Canvas canvas) {
+    canvas
+      ..saveLayer(null, ui.Paint())
+      ..save()
+      ..transform(transform.storage)
+      ..drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        dst,
+        ui.Paint()
+          ..filterQuality = FilterQuality.low
+          ..imageFilter = filter,
+      )
+      ..restore();
+    image.dispose();
+  }
+
+  @override
+  void end(Canvas canvas) => canvas.restore();
+}
+
 class _OffsetThen extends _CanvasEffect {
   const _OffsetThen(this.offset, this.inner);
 
@@ -1340,4 +1432,197 @@ class _ShaderMask extends _CanvasEffect {
       ..restore()
       ..restore();
   }
+}
+
+final class _Tracked implements Canvas {
+  _Tracked(this._inner);
+
+  Canvas _inner;
+
+  final List<List<void Function(Canvas)>?> _saves = <List<void Function(Canvas)>?>[<void Function(Canvas)>[]];
+
+  bool get layerOpen => _saves.contains(null);
+
+  void moveTo(Canvas fresh) {
+    for (var i = 0; i < _saves.length; i++) {
+      if (i > 0) {
+        fresh.save();
+      }
+      for (final void Function(Canvas) op in _saves[i]!) {
+        op(fresh);
+      }
+    }
+    _inner = fresh;
+  }
+
+  void _set(void Function(Canvas) op) {
+    op(_inner);
+    _saves.last?.add(op);
+  }
+
+  void _trim(int count) {
+    while (_saves.length > count && _saves.length > 1) {
+      _saves.removeLast();
+    }
+  }
+
+  @override
+  void save() {
+    _inner.save();
+    _saves.add(<void Function(Canvas)>[]);
+  }
+
+  @override
+  void saveLayer(Rect? bounds, Paint paint) {
+    _inner.saveLayer(bounds, paint);
+    _saves.add(null);
+  }
+
+  @override
+  void restore() {
+    _inner.restore();
+    _trim(_saves.length - 1);
+  }
+
+  @override
+  void restoreToCount(int count) {
+    _inner.restoreToCount(count);
+    _trim(count);
+  }
+
+  @override
+  int getSaveCount() => _inner.getSaveCount();
+
+  @override
+  void translate(double dx, double dy) => _set((Canvas c) => c.translate(dx, dy));
+
+  @override
+  void scale(double sx, [double? sy]) => _set((Canvas c) => c.scale(sx, sy));
+
+  @override
+  void rotate(double radians) => _set((Canvas c) => c.rotate(radians));
+
+  @override
+  void skew(double sx, double sy) => _set((Canvas c) => c.skew(sx, sy));
+
+  @override
+  void transform(Float64List matrix4) {
+    final copy = Float64List.fromList(matrix4);
+    _set((Canvas c) => c.transform(copy));
+  }
+
+  @override
+  Float64List getTransform() => _inner.getTransform();
+
+  @override
+  void clipRect(Rect rect, {ui.ClipOp clipOp = ui.ClipOp.intersect, bool doAntiAlias = true}) =>
+      _set((Canvas c) => c.clipRect(rect, clipOp: clipOp, doAntiAlias: doAntiAlias));
+
+  @override
+  void clipRRect(RRect rrect, {bool doAntiAlias = true}) =>
+      _set((Canvas c) => c.clipRRect(rrect, doAntiAlias: doAntiAlias));
+
+  @override
+  void clipRSuperellipse(RSuperellipse rsuperellipse, {bool doAntiAlias = true}) =>
+      _set((Canvas c) => c.clipRSuperellipse(rsuperellipse, doAntiAlias: doAntiAlias));
+
+  @override
+  void clipPath(Path path, {bool doAntiAlias = true}) {
+    final copy = Path.from(path);
+    _set((Canvas c) => c.clipPath(copy, doAntiAlias: doAntiAlias));
+  }
+
+  @override
+  Rect getLocalClipBounds() => _inner.getLocalClipBounds();
+
+  @override
+  Rect getDestinationClipBounds() => _inner.getDestinationClipBounds();
+
+  @override
+  void drawColor(Color color, BlendMode blendMode) => _inner.drawColor(color, blendMode);
+
+  @override
+  void drawLine(Offset p1, Offset p2, Paint paint) => _inner.drawLine(p1, p2, paint);
+
+  @override
+  void drawPaint(Paint paint) => _inner.drawPaint(paint);
+
+  @override
+  void drawRect(Rect rect, Paint paint) => _inner.drawRect(rect, paint);
+
+  @override
+  void drawRRect(RRect rrect, Paint paint) => _inner.drawRRect(rrect, paint);
+
+  @override
+  void drawDRRect(RRect outer, RRect inner, Paint paint) => _inner.drawDRRect(outer, inner, paint);
+
+  @override
+  void drawRSuperellipse(RSuperellipse rsuperellipse, Paint paint) => _inner.drawRSuperellipse(rsuperellipse, paint);
+
+  @override
+  void drawOval(Rect rect, Paint paint) => _inner.drawOval(rect, paint);
+
+  @override
+  void drawCircle(Offset c, double radius, Paint paint) => _inner.drawCircle(c, radius, paint);
+
+  @override
+  void drawArc(Rect rect, double startAngle, double sweepAngle, bool useCenter, Paint paint) =>
+      _inner.drawArc(rect, startAngle, sweepAngle, useCenter, paint);
+
+  @override
+  void drawPath(Path path, Paint paint) => _inner.drawPath(path, paint);
+
+  @override
+  void drawImage(ui.Image image, Offset offset, Paint paint) => _inner.drawImage(image, offset, paint);
+
+  @override
+  void drawImageRect(ui.Image image, Rect src, Rect dst, Paint paint) => _inner.drawImageRect(image, src, dst, paint);
+
+  @override
+  void drawImageNine(ui.Image image, Rect center, Rect dst, Paint paint) =>
+      _inner.drawImageNine(image, center, dst, paint);
+
+  @override
+  void drawPicture(ui.Picture picture) => _inner.drawPicture(picture);
+
+  @override
+  void drawParagraph(ui.Paragraph paragraph, Offset offset) => _inner.drawParagraph(paragraph, offset);
+
+  @override
+  void drawPoints(ui.PointMode pointMode, List<Offset> points, Paint paint) =>
+      _inner.drawPoints(pointMode, points, paint);
+
+  @override
+  void drawRawPoints(ui.PointMode pointMode, Float32List points, Paint paint) =>
+      _inner.drawRawPoints(pointMode, points, paint);
+
+  @override
+  void drawVertices(ui.Vertices vertices, BlendMode blendMode, Paint paint) =>
+      _inner.drawVertices(vertices, blendMode, paint);
+
+  @override
+  void drawAtlas(
+    ui.Image atlas,
+    List<RSTransform> transforms,
+    List<Rect> rects,
+    List<Color>? colors,
+    BlendMode? blendMode,
+    Rect? cullRect,
+    Paint paint,
+  ) => _inner.drawAtlas(atlas, transforms, rects, colors, blendMode, cullRect, paint);
+
+  @override
+  void drawRawAtlas(
+    ui.Image atlas,
+    Float32List rstTransforms,
+    Float32List rects,
+    Int32List? colors,
+    BlendMode? blendMode,
+    Rect? cullRect,
+    Paint paint,
+  ) => _inner.drawRawAtlas(atlas, rstTransforms, rects, colors, blendMode, cullRect, paint);
+
+  @override
+  void drawShadow(Path path, Color color, double elevation, bool transparentOccluder) =>
+      _inner.drawShadow(path, color, elevation, transparentOccluder);
 }
