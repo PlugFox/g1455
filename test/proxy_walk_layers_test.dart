@@ -334,6 +334,54 @@ void main() {
         exact.dispose();
       });
 
+      final Map<String, Widget Function(Widget)> backdrops = <String, Widget Function(Widget)>{
+        'a backdrop filter': (Widget b) => b,
+        'a backdrop filter in a ClipRRect': (Widget b) =>
+            ClipRRect(borderRadius: const BorderRadius.all(Radius.circular(12)), child: b),
+        'a backdrop filter in a scaled ClipRect': (Widget b) => Transform.scale(scale: 1.5, child: ClipRect(child: b)),
+      };
+      for (final MapEntry<String, Widget Function(Widget)> e in backdrops.entries) {
+        testWidgets('${e.key} with no layer open above it is drawn through its filter', (WidgetTester tester) async {
+          final _Shot apart = await _shoot(tester, _backdropOverScene(e.value));
+          expect(apart.log.unhandledLayers, <String>['BackdropFilterLayer']);
+          expect(
+            await _differing(tester, apart.stock, apart.pass),
+            greaterThan(0),
+            reason: 'the fixture does not diverge, so the backdrop is not tested',
+          );
+          apart.dispose();
+
+          final _Shot shot = await _shoot(tester, _backdropOverScene(e.value), fallback: 1);
+          expect(shot.log.errors, isEmpty);
+          expect(shot.log.unhandledLayers, isEmpty);
+          expect(shot.log.fellBack, isEmpty);
+          expect(shot.liveTreeChanges, isEmpty);
+          expect(await _differing(tester, shot.stock, shot.pass), 0);
+          shot.dispose();
+        });
+      }
+
+      testWidgets('a backdrop filter under an open layer stays named, drawn without its filter', (
+        WidgetTester tester,
+      ) async {
+        final Map<String, Widget Function(Widget)> layers = <String, Widget Function(Widget)>{
+          'an opacity': (Widget b) => Opacity(opacity: 0.5, child: b),
+          'a colour filter': (Widget b) => ColorFiltered(
+            colorFilter: const ColorFilter.mode(Color(0xFF00FFFF), BlendMode.modulate),
+            child: b,
+          ),
+        };
+        for (final MapEntry<String, Widget Function(Widget)> e in layers.entries) {
+          final _Shot shot = await _shoot(tester, e.value(_backdropOverScene((Widget b) => b)), fallback: 1);
+          expect(shot.log.errors, isEmpty, reason: e.key);
+          expect(shot.log.unhandledLayers, <String>['BackdropFilterLayer'], reason: e.key);
+          expect(shot.log.fellBack, isEmpty, reason: e.key);
+          expect(shot.liveTreeChanges, isEmpty, reason: e.key);
+          expect(await _differing(tester, shot.stock, shot.pass), greaterThan(0), reason: e.key);
+          shot.dispose();
+        }
+      });
+
       // The engine would draw what the pass subtracts, and a subtree that
       // holds glass would hold the glass itself.
       testWidgets('a subtree the pass subtracted from is left as the pass drew it', (WidgetTester tester) async {
@@ -374,24 +422,7 @@ void main() {
     });
 
     testWidgets('a backdrop filter is named as unhandled, and its content still drawn', (WidgetTester tester) async {
-      final _Shot shot = await _shoot(
-        tester,
-        Stack(
-          children: <Widget>[
-            _scene(),
-            Positioned(
-              left: 10,
-              top: 10,
-              width: 40,
-              height: 40,
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-                child: const ColoredBox(color: Color(0x40FFFFFF)),
-              ),
-            ),
-          ],
-        ),
-      );
+      final _Shot shot = await _shoot(tester, _backdropOverScene((Widget b) => b));
       expect(shot.log.unhandledLayers, <String>['BackdropFilterLayer']);
       expect(shot.liveTreeChanges, isEmpty);
       shot.dispose();
@@ -897,6 +928,24 @@ Widget _maskOverSmallChild(BlendMode mode) => Padding(
       ),
     ),
   ),
+);
+
+Widget _backdropOverScene(Widget Function(Widget backdrop) around) => Stack(
+  children: <Widget>[
+    _scene(),
+    Positioned(
+      left: 10,
+      top: 10,
+      width: 40,
+      height: 40,
+      child: around(
+        BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+          child: const ColoredBox(color: Color(0x40FFFFFF)),
+        ),
+      ),
+    ),
+  ],
 );
 
 Widget _placed(Widget child) => Stack(

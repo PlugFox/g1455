@@ -1,3 +1,16 @@
+## Unreleased
+
+### Fixed
+
+- Glass over a `BackdropFilter` reads it filtered, as the screen shows it,
+  where no opacity, filter or mask is open above the filter (#37). The
+  capture drew the filter's child and left out its effect; it now
+  rasterizes what it has drawn so far, at the capture's resolution, and
+  draws that back through the filter under the filter's clip: one more
+  render pass for each such filter, on a frame that is capturing anyway.
+  Under an open layer, which the engine's filter reads instead of the
+  screen, it is drawn as before and named in `WalkLog.unhandledLayers`.
+
 ## 0.5.0 - 2026-11-21
 
 ### Behaviour changes
